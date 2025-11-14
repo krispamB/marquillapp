@@ -3,11 +3,13 @@ import { LLMService } from '../llm/llm.service';
 import { LLMProvider, MessageRole } from '../llm/interfaces';
 import { SEARCH_KEYWORDS_SYSTEM_PROMPT } from './prompts';
 import { ResponseParserService } from '../llm/parsers/responseParser.service';
+import { ActorsService } from '../actors/actors.service';
 
 @Injectable()
 export class AgentService {
   constructor(
     private llmService: LLMService,
+    private actorsService: ActorsService,
     private parser: ResponseParserService,
   ) {}
 
