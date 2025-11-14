@@ -7,7 +7,6 @@ async function bootstrap() {
   const logger = new Logger(
     bootstrap.name.charAt(0).toUpperCase() + bootstrap.name.slice(1),
   );
-
   app.enableCors();
 
   app.setGlobalPrefix('api/v1');

@@ -2,6 +2,7 @@
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
 
+//TODO: Fix string type response input.
 @Injectable()
 export class ResponseParserService {
   /**
