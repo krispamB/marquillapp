@@ -27,3 +27,18 @@ export interface YoutubeScraperConfig {
 export interface YoutubeTranscriptConfig {
   videoUrl: string;
 }
+
+// jupri/reddit
+export interface RedditScraperConfig {
+  dev_dataset_clear: boolean;
+  dev_no_strip: boolean;
+  filters: {
+    mode: string; //'posts' | 'comments'
+    safe: boolean;
+    sort: string; //'RELEVANCE' | 'NEW' | 'TOP' | 'HOT';
+    timing: string; //'hour' | 'day' | 'week' | 'month' | 'year' | 'all';
+    types: string[]; //('text' | 'image' | 'video' | 'link' | 'poll')[];
+  };
+  limit: number;
+  query: string[];
+}

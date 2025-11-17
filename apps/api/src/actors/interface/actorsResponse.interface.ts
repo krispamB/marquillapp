@@ -36,3 +36,18 @@ export const YouTubeTranscriptResponseSchema = z.array(TranscriptDataSchema);
 export type YoutubeTranscriptResponse = z.infer<
   typeof YouTubeTranscriptResponseSchema
 >;
+
+// jupri/reddit
+export interface RedditPost {
+  id: unknown;
+  url: unknown;
+  content: unknown;
+}
+
+export const RawRedditItemSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  content: z.object({
+    markdown: z.string(),
+  }),
+});
