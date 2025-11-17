@@ -108,4 +108,49 @@ describe('ActorsService', () => {
       expect(result).toEqual([{ text: 'hello world' }]);
     });
   });
+
+  describe('searchReddit', () => {
+    it('should call ApifyService and return only valid Reddit posts', async () => {
+      const run = { id: 'run-123' };
+      const completedRun = { defaultDatasetId: 'dataset-2' };
+      const datasetItems = {
+        items: [
+          {
+            id: 'id-xyz',
+            url: 'https://youtube.com/x',
+            content: {
+              markdown: 'This is life',
+            },
+          },
+          {
+            invalid: true,
+          },
+        ],
+      };
+
+      apifyService.startActor.mockResolvedValue(run as any);
+      apifyService.waitForRun.mockResolvedValue(completedRun as any);
+      apifyService.getDatasetItems.mockResolvedValue(datasetItems as any);
+
+      const result = await service.searchReddit(['nestjs']);
+
+      expect(apifyService.startActor).toHaveBeenCalledWith(
+        'jupri/reddit',
+        expect.any(Object),
+      );
+      expect(apifyService.waitForRun).toHaveBeenCalledWith(run.id);
+      expect(apifyService.getDatasetItems).toHaveBeenCalledWith(
+        completedRun.defaultDatasetId as any,
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        id: 'id-xyz',
+        url: 'https://youtube.com/x',
+        content: {
+          markdown: 'This is life',
+        },
+      });
+    });
+  });
 });

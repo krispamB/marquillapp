@@ -1,20 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ApifyService } from '../apify/apify.service';
+import type { YoutubeScraperResponse } from './interface';
 import {
+  RawRedditItemSchema,
+  RedditPost,
+  RedditScraperConfig,
   YoutubeScraperConfig,
   YoutubeScraperResponseSchema,
   YoutubeTranscriptConfig,
   YoutubeTranscriptResponse,
   YouTubeTranscriptResponseSchema,
 } from './interface';
-import type { YoutubeScraperResponse } from './interface';
 import { ResponseParserService } from '../llm/parsers/responseParser.service';
 
 @Injectable()
 export class ActorsService {
   private logger: Logger;
   private videoPerKeyword = 1;
-  private numberOfPosts: 10;
+  private numberOfPosts = 2;
   constructor(
     private apifyService: ApifyService,
     private parserService: ResponseParserService,
@@ -77,5 +80,37 @@ export class ActorsService {
     );
   }
 
-  async searchReddit() {}
+  async searchReddit(keywords: string[]) {
+    const actorId = `jupri/reddit`;
+    const input: RedditScraperConfig = {
+      dev_dataset_clear: false,
+      dev_no_strip: false,
+      filters: {
+        mode: 'posts',
+        safe: false,
+        sort: 'RELEVANCE',
+        timing: 'month',
+        types: ['text'],
+      },
+      limit: this.numberOfPosts,
+      query: keywords,
+    };
+    const run = await this.apifyService.startActor(actorId, input);
+    const completedRun = await this.apifyService.waitForRun(run.id);
+    const datasetItems = await this.apifyService.getDatasetItems(
+      completedRun.defaultDatasetId,
+    );
+
+    const accept: RedditPost[] = datasetItems.items.flatMap((it, index) => {
+      const result = RawRedditItemSchema.safeParse(it);
+      if (!result.success) {
+        this.logger.error(`Error while retrieving reddit item at ${index}`);
+        return [];
+      }
+
+      return [result.data];
+    });
+
+    return accept;
+  }
 }
