@@ -41,17 +41,25 @@ export default function Header() {
               Features
             </a>
             <Link
-              href="/privacy-policy"
+              href="/pricing"
               className="text-text-secondary hover:text-primary transition-colors duration-200 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded px-2 py-1"
             >
-              Privacy Policy
+              Pricing
             </Link>
-            <button
-              className="bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-opacity-90 transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-              aria-label="Get started with inContentai"
-            >
-              Get Started
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                className="text-text-secondary hover:text-primary px-4 py-2 rounded-lg font-semibold transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                aria-label="Login to inContentai"
+              >
+                Login
+              </button>
+              <button
+                className="bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                aria-label="Get started with inContentai"
+              >
+                Get Started
+              </button>
+            </div>
           </div>
 
           {/* Mobile menu button */}
@@ -100,18 +108,26 @@ export default function Header() {
                 Features
               </a>
               <Link
-                href="/privacy-policy"
+                href="/pricing"
                 className="block px-3 py-3 rounded-md text-base font-medium text-text-secondary hover:text-primary hover:bg-surface transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset min-h-[44px]"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Privacy Policy
+                Pricing
               </Link>
-              <button
-                className="w-full mt-2 bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-opacity-90 transition-all duration-200 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 min-h-[44px]"
-                aria-label="Get started with inContentai"
-              >
-                Get Started
-              </button>
+              <div className="space-y-2 mt-2">
+                <button
+                  className="w-full text-text-secondary hover:text-primary px-6 py-3 rounded-lg font-semibold border border-gray-300 hover:border-primary transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 min-h-[44px]"
+                  aria-label="Login to inContentai"
+                >
+                  Login
+                </button>
+                <button
+                  className="w-full bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition-all duration-200 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 min-h-[44px]"
+                  aria-label="Get started with inContentai"
+                >
+                  Get Started
+                </button>
+              </div>
             </div>
           </div>
         )}
