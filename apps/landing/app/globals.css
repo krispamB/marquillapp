@@ -1,17 +1,62 @@
 @import "tailwindcss";
 
+@theme {
+  /* Custom color palette */
+  --color-primary: #f25623;
+  --color-secondary: #4D4D4D;
+  --color-accent: #DEDEDE;
+  --color-background: #FFFFFF;
+  --color-surface: #F3F4F6;
+  --color-text-primary: #171717;
+  --color-text-secondary: #6B7280;
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;
   }
 
   body {
-    font-family: Inter, sans-serif;
-    color: #1F2937;
-    background-color: #FFFFFF;
+    font-family: var(--font-inria-sans), sans-serif;
+    color: var(--color-text-primary);
+    background-color: var(--color-background);
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: Inter, sans-serif;
+    font-family: var(--font-inria-sans), sans-serif;
+  }
+
+  /* Skip to content link - hidden by default, visible on focus */
+  .skip-to-content {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--color-primary);
+    color: white;
+    padding: 8px 16px;
+    text-decoration: none;
+    z-index: 100;
+    border-radius: 0 0 4px 0;
+  }
+
+  .skip-to-content:focus {
+    top: 0;
+  }
+
+  /* Enhanced focus visible styles for keyboard navigation */
+  *:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  /* Ensure minimum touch target size for mobile */
+  @media (max-width: 768px) {
+    button,
+    a[role="button"],
+    input[type="button"],
+    input[type="submit"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
   }
 }

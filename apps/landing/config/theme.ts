@@ -1,12 +1,12 @@
 export const themeConfig = {
   colors: {
-    primary: '#0A66C2',      // LinkedIn blue
-    secondary: '#057642',     // LinkedIn green
-    accent: '#F59E0B',       // Warm accent
+    primary: '#f25623',      // LinkedIn blue
+    secondary: '#4D4D4D',     // LinkedIn green
+    accent: '#DEDEDE',       // Warm accent
     background: '#FFFFFF',
     surface: '#F3F4F6',
     text: {
-      primary: '#1F2937',
+      primary: '#171717',
       secondary: '#6B7280',
     }
   },
