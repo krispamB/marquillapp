@@ -1,0 +1,123 @@
+Last Updated: [Insert Date]
+
+1. Introduction
+
+This Privacy Policy explains how inContentAi (“we”, “our”, or “us”) collects, uses, and protects information when users access or use our website, services, or integrations, including those powered by the LinkedIn API.
+
+We are currently in the development stage and may update this policy as our product evolves.
+
+⸻
+
+2. Information We Collect
+
+2.1 Information Provided by Users
+
+We may collect:
+	•	Name
+	•	Email address
+	•	LinkedIn profile information (when a user connects their account)
+	•	Any content submitted by users while interacting with our service
+
+2.2 Automatically Collected Information
+
+When users interact with our platform, we may automatically collect:
+	•	IP address
+	•	Device information
+	•	Browser type
+	•	Usage logs
+
+2.3 Data from LinkedIn
+
+If a user signs in with LinkedIn or allows access, we may receive:
+	•	Basic profile details
+	•	Email address
+	•	Public posts
+	•	Any other data the user explicitly authorizes through LinkedIn OAuth
+
+We only request permissions necessary to provide the service.
+
+⸻
+
+3. How We Use Collected Information
+
+We use collected data to:
+	•	Provide and improve our services
+	•	Personalize content
+	•	Analyze usage and performance
+	•	Enable features that require LinkedIn data
+	•	Communicate with users regarding updates or support
+
+We do not sell or rent user data.
+
+⸻
+
+4. How We Share Information
+
+We may share information only with:
+	•	Third-party service providers that help us operate our service (e.g., hosting providers, analytics tools)
+	•	LinkedIn, as required by their API usage policies
+
+We do not share personal data with advertisers or unrelated third parties.
+
+⸻
+
+5. Data Storage & Security
+
+We use reasonable administrative and technical measures to protect user data.
+While no method of transmission is 100% secure, we are committed to safeguarding information.
+
+⸻
+
+6. LinkedIn API Compliance
+
+Our use of LinkedIn data fully adheres to:
+	•	LinkedIn API Terms of Use
+	•	LinkedIn Marketing Developer Platform Policies
+	•	LinkedIn Data Protection rules
+
+Users can revoke access at any time via their LinkedIn settings.
+
+We only access data necessary for the features of our platform.
+
+⸻
+
+7. Cookies & Tracking
+
+We may use:
+	•	Cookies
+	•	Local storage
+	•	Analytics scripts
+
+Users can disable cookies through browser settings.
+
+⸻
+
+8. User Rights
+
+Users may:
+	•	Request access to their data
+	•	Request deletion of their data
+	•	Revoke LinkedIn permissions
+	•	Contact us for clarification
+
+Contact: incontentai@gmail.com
+
+⸻
+
+9. Children’s Privacy
+
+We do not knowingly collect data from individuals under the age of 13.
+
+⸻
+
+10. Changes to This Policy
+
+We may update this Privacy Policy as we continue building.
+Updates will be posted with a new “Last Updated” date.
+
+⸻
+
+11. Contact Information
+
+For questions or concerns, contact us at:
+incontentai@gmail.com
