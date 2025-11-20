@@ -336,3 +336,37 @@ const config: Config = {
 - **Mobile**: Single column, stacked layout, hamburger menu
 - **Tablet**: 2-column feature grid, condensed spacing
 - **Desktop**: 3-column feature grid, full navigation, optimal line lengths
+
+
+---
+
+## Important Development Notes
+
+### React/JSX Escaping Rules
+
+**CRITICAL**: Always escape apostrophes and quotes in JSX text content to prevent build errors.
+
+**Common Error**: 
+```
+Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities
+```
+
+**Solution**: Replace all apostrophes in text content with `&apos;`
+
+**Examples**:
+- ❌ Wrong: `"We'll help you"`
+- ✅ Correct: `"We&apos;ll help you"`
+- ❌ Wrong: `"You're ready"`
+- ✅ Correct: `"You&apos;re ready"`
+- ❌ Wrong: `"It's working"`
+- ✅ Correct: `"It&apos;s working"`
+
+**Where to Apply**:
+- All text content inside JSX elements (`<p>`, `<h1>`, `<span>`, etc.)
+- Alt text in images
+- ARIA labels
+- Any string that appears in the rendered HTML
+
+**Note**: This rule applies to ALL pages and components. Always check for unescaped apostrophes before committing code.
+
+---

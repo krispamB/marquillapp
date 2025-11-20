@@ -91,8 +91,8 @@ export default function PricingPage() {
                             <div
                                 key={index}
                                 className={`rounded-2xl p-8 ${tier.highlighted
-                                        ? 'bg-primary text-white shadow-2xl scale-105 border-2 border-primary'
-                                        : 'bg-white border-2 border-gray-200 shadow-lg'
+                                    ? 'bg-primary text-white shadow-2xl scale-105 border-2 border-primary'
+                                    : 'bg-white border-2 border-gray-200 shadow-lg'
                                     }`}
                             >
                                 {tier.highlighted && (
@@ -151,8 +151,8 @@ export default function PricingPage() {
 
                                 <button
                                     className={`w-full py-3 px-6 rounded-lg font-semibold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 min-h-[44px] ${tier.highlighted
-                                            ? 'bg-white text-primary hover:bg-gray-50 focus-visible:ring-white'
-                                            : 'bg-primary text-white hover:opacity-90 focus-visible:ring-primary'
+                                        ? 'bg-white text-primary hover:bg-gray-50 focus-visible:ring-white'
+                                        : 'bg-primary text-white hover:opacity-90 focus-visible:ring-primary'
                                         }`}
                                     aria-label={`${tier.cta} for ${tier.name} plan`}
                                 >
@@ -176,7 +176,7 @@ export default function PricingPage() {
                                 Can I change plans later?
                             </h3>
                             <p className="text-text-secondary">
-                                Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately, and we'll prorate any charges.
+                                Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately, and we&apos;ll prorate any charges.
                             </p>
                         </div>
                         <div>
@@ -184,7 +184,7 @@ export default function PricingPage() {
                                 What happens after the free trial?
                             </h3>
                             <p className="text-text-secondary">
-                                After your 14-day free trial, you'll be charged for your selected plan. You can cancel anytime during the trial with no charges.
+                                After your 14-day free trial, you&apos;ll be charged for your selected plan. You can cancel anytime during the trial with no charges.
                             </p>
                         </div>
                         <div>
@@ -192,7 +192,7 @@ export default function PricingPage() {
                                 Do you offer refunds?
                             </h3>
                             <p className="text-text-secondary">
-                                Yes, we offer a 30-day money-back guarantee. If you're not satisfied with inContentai, contact us for a full refund.
+                                Yes, we offer a 30-day money-back guarantee. If you&apos;re not satisfied with inContentai, contact us for a full refund.
                             </p>
                         </div>
                         <div>
