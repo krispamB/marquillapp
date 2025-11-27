@@ -13,7 +13,7 @@ async function bootstrap() {
 
   app.useGlobalPipes(new ValidationPipe());
 
-  const PORT = process.env.PORT || 3000;
+  const PORT = process.env.PORT || 3500;
   await app.listen(PORT, () => {
     logger.log(
       `Running API in MODE: ${process.env.NODE_ENV} on Port: [${PORT}]`,

@@ -17,7 +17,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "worker": "ts-node src/workflow/worrkflow.worker.ts"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",
@@ -28,8 +29,11 @@
     "@openrouter/sdk": "^0.1.8",
     "apify-client": "^2.19.0",
     "axios": "^1.13.2",
+    "bullmq": "^5.65.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "dotenv": "^17.2.3",
+    "ioredis": "^5.8.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^4.1.12"
