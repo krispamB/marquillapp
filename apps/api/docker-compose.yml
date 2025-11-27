@@ -1,0 +1,40 @@
+services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: redis_local
+    ports:
+      - "6379:6379"
+    command:
+      [
+        "redis-server",
+        "--appendonly", "yes",
+        "--requirepass", "securelinkgenpass",
+        "--maxmemory-policy", "noeviction",
+        "--protected-mode", "no"
+      ]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "securelinkgenpass", "PING"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  bullboard:
+    image: venatum/bull-board
+    container_name: bullmq_dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: securelinkgenpass
+      BULL_PREFIX: bull
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis_data:
