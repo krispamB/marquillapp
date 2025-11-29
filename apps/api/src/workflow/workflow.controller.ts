@@ -1,20 +1,23 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Param, Post } from '@nestjs/common';
 import { WorkflowQueue } from './workflow.queue';
-import { WORKFLOW_STEPS } from './workflow.constants';
+import { WorkflowStep } from './workflow.constants';
 import { InputDto } from '../agent/dto';
 
 @Controller('workflow')
 export class WorkflowController {
-  constructor(private readonly workflowQueue: WorkflowQueue) {}
+  private logger: Logger;
+  constructor(private readonly workflowQueue: WorkflowQueue) {
+    this.logger = new Logger(WorkflowController.name);
+  }
 
   @Post()
   async startWorkflow(@Body() dto: InputDto) {
     const workflowId = `workflow_${Date.now()}`;
     await this.workflowQueue.addWorkflowJob(workflowId, {
       steps: [
-        WORKFLOW_STEPS.GET_QUERIES,
-        WORKFLOW_STEPS.RUN_RESEARCH,
-        WORKFLOW_STEPS.CREATE_DRAFT,
+        WorkflowStep.GET_QUERIES,
+        WorkflowStep.RUN_RESEARCH,
+        WorkflowStep.CREATE_DRAFT,
       ],
       input: dto.input,
     });

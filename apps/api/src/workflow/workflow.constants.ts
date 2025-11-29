@@ -1,4 +1,4 @@
-export enum WORKFLOW_STEPS {
+export enum WorkflowStep {
   GET_QUERIES = 'getQueries',
   RUN_RESEARCH = 'runResearch',
   CREATE_DRAFT = 'createDraft',
