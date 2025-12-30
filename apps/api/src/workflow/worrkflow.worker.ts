@@ -19,7 +19,7 @@ async function bootstrapWorker() {
 
   const agentService = app.get(AgentService);
 
-  logger.log('NestJs context ready]');
+  logger.log('NestJs context ready');
 
   const connection = new IORedis(process.env.REDIS_URL!, {
     maxRetriesPerRequest: null,
@@ -47,14 +47,19 @@ async function bootstrapWorker() {
             stepOutput = await agentService.generateSearchKeywords(
               stepInput as string,
             );
+
             break;
 
           case WorkflowStep.RUN_RESEARCH:
-            stepOutput = await agentService.research(stepInput as string[]);
+            {
+              stepOutput = await agentService.getYouTubeTranscripts(
+                stepInput as string[],
+              );
+            }
             break;
 
           case WorkflowStep.CREATE_DRAFT:
-            stepOutput = await agentService.createDraft(stepInput as string[]);
+            stepOutput = await agentService.createDraft(stepInput);
             break;
 
           default:
