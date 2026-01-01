@@ -2,24 +2,30 @@ import { Body, Controller, Get, Logger, Param, Post } from '@nestjs/common';
 import { WorkflowQueue } from './workflow.queue';
 import { WorkflowStep } from './workflow.constants';
 import { InputDto } from '../agent/dto';
+import { AgentService } from '../agent/agent.service';
 
 @Controller('workflow')
 export class WorkflowController {
   private logger: Logger;
-  constructor(private readonly workflowQueue: WorkflowQueue) {
+  constructor(
+    private readonly workflowQueue: WorkflowQueue,
+    private agentService: AgentService,
+  ) {
     this.logger = new Logger(WorkflowController.name);
   }
 
   @Post()
   async startWorkflow(@Body() dto: InputDto) {
     const workflowId = `workflow_${Date.now()}`;
+    const userIntent = await this.agentService.generateUserIntent(dto.input);
+    this.logger.log(userIntent);
     await this.workflowQueue.addWorkflowJob(workflowId, {
       steps: [
         WorkflowStep.GET_QUERIES,
         WorkflowStep.RUN_RESEARCH,
         WorkflowStep.CREATE_DRAFT,
       ],
-      input: dto.input,
+      input: userIntent,
     });
 
     return {
