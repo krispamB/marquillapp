@@ -7,7 +7,7 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { AgentService } from '../agent/agent.service';
-import { UserIntent } from '../agent/agent.interface';
+import { CompressionResult, UserIntent } from '../agent/agent.interface';
 
 async function bootstrapWorker() {
   const logger = new Logger(
@@ -65,7 +65,10 @@ async function bootstrapWorker() {
             break;
 
           case WorkflowStep.CREATE_DRAFT:
-            stepOutput = await agentService.createDraft(stepInput);
+            stepOutput = await agentService.createDraft(
+              stepOutput as CompressionResult,
+              userIntent,
+            );
             break;
 
           default:

@@ -18,7 +18,6 @@ export class WorkflowController {
   async startWorkflow(@Body() dto: InputDto) {
     const workflowId = `workflow_${Date.now()}`;
     const userIntent = await this.agentService.generateUserIntent(dto.input);
-    this.logger.log(userIntent);
     await this.workflowQueue.addWorkflowJob(workflowId, {
       steps: [
         WorkflowStep.GET_QUERIES,

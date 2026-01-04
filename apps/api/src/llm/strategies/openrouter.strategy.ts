@@ -21,7 +21,7 @@ export class OpenRouterStrategy implements LLMStrategy {
     options?: CompletionOptions,
   ): Promise<string> {
     const completions = await this.client.chat.send({
-      model: options?.model || 'openai/gpt-4o-mini',
+      model: options?.model || 'openai/gpt-5-mini',
       maxTokens: options?.max_tokens,
       messages,
       stream: false,
