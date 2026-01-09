@@ -7,6 +7,7 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
 import { AgentService } from '../agent/agent.service';
+import { CompressionResult, UserIntent } from '../agent/agent.interface';
 
 async function bootstrapWorker() {
   const logger = new Logger(
@@ -19,7 +20,7 @@ async function bootstrapWorker() {
 
   const agentService = app.get(AgentService);
 
-  logger.log('NestJs context ready]');
+  logger.log('NestJs context ready');
 
   const connection = new IORedis(process.env.REDIS_URL!, {
     maxRetriesPerRequest: null,
@@ -32,6 +33,7 @@ async function bootstrapWorker() {
       logger.log(`Processing job ${job.id}`);
       const { steps, input } = job.data as IJobData;
 
+      const userIntent = input as UserIntent;
       let stepInput = input;
       let stepOutput: unknown = null;
 
@@ -45,16 +47,28 @@ async function bootstrapWorker() {
         switch (step) {
           case WorkflowStep.GET_QUERIES:
             stepOutput = await agentService.generateSearchKeywords(
-              stepInput as string,
+              stepInput as UserIntent,
             );
             break;
 
           case WorkflowStep.RUN_RESEARCH:
-            stepOutput = await agentService.research(stepInput as string[]);
+            {
+              const transcripts = await agentService.getYouTubeTranscripts(
+                stepInput as string[],
+              );
+
+              stepOutput = await agentService.extractInsight(
+                transcripts,
+                userIntent,
+              );
+            }
             break;
 
           case WorkflowStep.CREATE_DRAFT:
-            stepOutput = await agentService.createDraft(stepInput as string[]);
+            stepOutput = await agentService.createDraft(
+              stepOutput as CompressionResult,
+              userIntent,
+            );
             break;
 
           default:

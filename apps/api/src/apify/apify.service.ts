@@ -64,4 +64,6 @@ export class ApifyService {
       await new Promise((r) => setTimeout(r, intervalMs));
     }
   }
+
+  async waitUntilFinish() {}
 }
