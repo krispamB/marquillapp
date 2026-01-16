@@ -1,0 +1,39 @@
+import { Module, Global, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MongooseModule, InjectConnection } from '@nestjs/mongoose';
+import { Connection } from 'mongoose';
+import { User, UserSchema } from './schemas/user.schema';
+
+@Global()
+@Module({
+  imports: [
+    MongooseModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        uri: configService.get<string>('MONGO_URI'),
+      }),
+      inject: [ConfigService],
+    }),
+    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+  ],
+  exports: [MongooseModule],
+})
+export class DatabaseModule implements OnModuleInit {
+  private readonly logger = new Logger(DatabaseModule.name);
+
+  constructor(@InjectConnection() private readonly connection: Connection) {}
+
+  onModuleInit() {
+    if (this.connection.readyState === 1) {
+      this.logger.log('Database connected successfully');
+    }
+
+    this.connection.on('connected', () => {
+      this.logger.log('Database connected successfully');
+    });
+
+    this.connection.on('error', (err) => {
+      this.logger.error(`Database connection error: ${err}`);
+    });
+  }
+}
