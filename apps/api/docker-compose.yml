@@ -4,22 +4,24 @@ services:
     container_name: redis_local
     ports:
       - "6379:6379"
-    command:
-      [
-        "redis-server",
-        "--appendonly", "yes",
-        "--requirepass", "securelinkgenpass",
-        "--maxmemory-policy", "noeviction",
-        "--protected-mode", "no"
-      ]
+    command: [ "redis-server", "--appendonly", "yes", "--requirepass", "securelinkgenpass", "--maxmemory-policy", "noeviction", "--protected-mode", "no" ]
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "securelinkgenpass", "PING"]
+      test: [ "CMD", "redis-cli", "-a", "securelinkgenpass", "PING" ]
       interval: 10s
       timeout: 3s
       retries: 5
     restart: unless-stopped
+
+  mongo:
+    image: mongo:latest
+    container_name: mongodb_local
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
 
   bullboard:
     image: venatum/bull-board
@@ -38,3 +40,4 @@ services:
 
 volumes:
   redis_data:
+  mongo_data:

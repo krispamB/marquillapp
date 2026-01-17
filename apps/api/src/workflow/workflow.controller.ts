@@ -1,9 +1,19 @@
-import { Body, Controller, Get, Logger, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Logger,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { WorkflowQueue } from './workflow.queue';
 import { WorkflowStep } from './workflow.constants';
 import { InputDto } from '../agent/dto';
 import { AgentService } from '../agent/agent.service';
+import { JwtAuthGuard } from '../common/guards';
 
+@UseGuards(JwtAuthGuard)
 @Controller('workflow')
 export class WorkflowController {
   private logger: Logger;
