@@ -22,11 +22,6 @@ async function bootstrapWorker() {
 
   logger.log('NestJs context ready');
 
-  const connection = new IORedis(process.env.REDIS_URL!, {
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
-  });
-
   new Worker(
     QUEUE_NAME,
     async (job: Job) => {
@@ -82,7 +77,11 @@ async function bootstrapWorker() {
       return { success: true, result: stepOutput };
     },
     {
-      connection,
+      connection: {
+        url: process.env.REDIS_URL!,
+        maxRetriesPerRequest: null,
+        enableReadyCheck: false,
+      },
     },
   );
 }

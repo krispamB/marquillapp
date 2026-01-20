@@ -13,7 +13,11 @@ export class WorkflowQueue implements OnModuleInit {
 
   onModuleInit() {
     this.connection = new IORedis(this.config.get<string>('REDIS_URL')!);
-    this.queue = new Queue(QUEUE_NAME, { connection: this.connection });
+    this.queue = new Queue(QUEUE_NAME, {
+      connection: {
+        url: this.config.get<string>('REDIS_URL')!,
+      },
+    });
   }
 
   async addWorkflowJob(workflowId: string, payload: IJobData) {
