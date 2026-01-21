@@ -25,8 +25,8 @@ export class WorkflowController {
   async startWorkflow(@Body() dto: InputDto) {
     const workflowId = `workflow_${Date.now()}`;
     await this.workflowQueue.addWorkflowJob(workflowId, {
-      workflowName: 'content',
-      input: dto.input,
+      workflowName: dto.contentType,
+      input: dto,
     });
 
     return {

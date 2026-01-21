@@ -3,6 +3,7 @@ import { WorkflowContext, WorkflowDefinition } from './workflow.types';
 import { WorkflowStep } from '../workflow.constants';
 import {
   createDraftStep,
+  createLinkedinDraftStep,
   extractIntentStep,
   getQueriesStep,
   runReasearchStep,
@@ -13,6 +14,7 @@ const stepHandlers = {
   [WorkflowStep.GET_QUERIES]: getQueriesStep,
   [WorkflowStep.RUN_RESEARCH]: runReasearchStep,
   [WorkflowStep.CREATE_DRAFT]: createDraftStep,
+  [WorkflowStep.CREATE_LINKEDIN_DRAFT]: createLinkedinDraftStep,
 };
 
 export async function runWorkflow(
