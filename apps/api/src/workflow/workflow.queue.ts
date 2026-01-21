@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import IORedis from 'ioredis';
 import { Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
-import { JOB_NAME, QUEUE_NAME } from './workflow.constants';
+import { QUEUE_NAME } from './workflow.constants';
 import { IJobData } from './workflow.interface';
 
 @Injectable()
@@ -13,11 +13,15 @@ export class WorkflowQueue implements OnModuleInit {
 
   onModuleInit() {
     this.connection = new IORedis(this.config.get<string>('REDIS_URL')!);
-    this.queue = new Queue(QUEUE_NAME, { connection: this.connection });
+    this.queue = new Queue(QUEUE_NAME, {
+      connection: {
+        url: this.config.get<string>('REDIS_URL')!,
+      },
+    });
   }
 
   async addWorkflowJob(workflowId: string, payload: IJobData) {
-    await this.queue.add(JOB_NAME, payload, {
+    await this.queue.add(payload.workflowName, payload.input, {
       jobId: workflowId,
       removeOnComplete: false,
       removeOnFail: false,

@@ -19,7 +19,6 @@ export class WorkflowController {
   private logger: Logger;
   constructor(
     private readonly workflowQueue: WorkflowQueue,
-    private agentService: AgentService,
   ) {
     this.logger = new Logger(WorkflowController.name);
   }
@@ -27,14 +26,9 @@ export class WorkflowController {
   @Post()
   async startWorkflow(@Body() dto: InputDto) {
     const workflowId = `workflow_${Date.now()}`;
-    const userIntent = await this.agentService.generateUserIntent(dto.input);
     await this.workflowQueue.addWorkflowJob(workflowId, {
-      steps: [
-        WorkflowStep.GET_QUERIES,
-        WorkflowStep.RUN_RESEARCH,
-        WorkflowStep.CREATE_DRAFT,
-      ],
-      input: userIntent,
+      workflowName: 'content',
+      input: dto.input,
     });
 
     return {
