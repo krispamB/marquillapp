@@ -18,7 +18,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "start:worker": "ts-node src/workflow/worrkflow.worker.ts"
+    "start:worker": "node dist/workflow/workers/workflow.worker.js"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",
