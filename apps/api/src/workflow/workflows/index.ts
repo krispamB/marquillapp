@@ -1,1 +1,1 @@
-export * from './content.workflow'
+export * from './content.workflow';

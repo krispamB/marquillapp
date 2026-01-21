@@ -11,7 +11,7 @@ import { runWorkflow } from '../engine/workflow.engine';
 async function bootstrapWorker() {
   const logger = new Logger(
     bootstrapWorker.name.charAt(0).toUpperCase() +
-    bootstrapWorker.name.slice(1),
+      bootstrapWorker.name.slice(1),
   );
   logger.log('Bootstrapping workflow context...');
   const app = await NestFactory.createApplicationContext(AppModule);
@@ -38,10 +38,6 @@ async function bootstrapWorker() {
         logger.error(error);
         throw error;
       }
-
-
-
-
     },
     {
       connection: {

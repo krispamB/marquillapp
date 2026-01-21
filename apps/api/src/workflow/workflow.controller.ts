@@ -17,9 +17,7 @@ import { JwtAuthGuard } from '../common/guards';
 @Controller('workflow')
 export class WorkflowController {
   private logger: Logger;
-  constructor(
-    private readonly workflowQueue: WorkflowQueue,
-  ) {
+  constructor(private readonly workflowQueue: WorkflowQueue) {
     this.logger = new Logger(WorkflowController.name);
   }
 
