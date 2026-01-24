@@ -1,8 +1,8 @@
 import { WorkflowDefinition } from '../engine/workflow.types';
 import { WorkflowStep } from '../workflow.constants';
 
-export const ContentWorkflow: WorkflowDefinition = {
-  name: 'content',
+export const InsightPostLinkedinWorkflow: WorkflowDefinition = {
+  name: 'insightPostLinkedin',
   steps: [
     WorkflowStep.EXTRACT_INTENT,
     WorkflowStep.GET_QUERIES,

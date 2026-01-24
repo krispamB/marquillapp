@@ -1,2 +1,2 @@
-export * from './content.workflow';
+export * from './insightPostLinkedin.workflow';
 export * from './quickPostLinkedin.workflow';
