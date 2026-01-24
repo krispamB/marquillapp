@@ -3,6 +3,7 @@ import { LLMService } from '../llm/llm.service';
 import { LLMProvider, MessageRole } from '../llm/interfaces';
 import {
   CREATE_DRAFT_SYSTEM_PROMPT,
+  CREATE_LINKEDIN_POST_SYSTEM_PROMPT,
   SEARCH_KEYWORDS_SYSTEM_PROMPT,
   TRANSCRIPT_COMPRESSIONS_SYSTEM_PROMPT,
   USER_INTENT_SYSTEM_PROMPT,
@@ -182,6 +183,28 @@ export class AgentService {
     await delay(20000);
     this.logger.log(`Researching complete for ${input.length} keywords`);
     return input;
+  }
+
+  async createLinkedInPost(
+    userIntent: UserIntent,
+    compressionResult?: CompressionResult,
+  ) {
+    const response = await this.llmService.generateCompletions(
+      LLMProvider.OPENROUTER,
+      [
+        {
+          role: MessageRole.System,
+          content: CREATE_LINKEDIN_POST_SYSTEM_PROMPT,
+        },
+        { role: MessageRole.User, content: JSON.stringify(userIntent) },
+        {
+          role: MessageRole.User,
+          content: JSON.stringify(compressionResult || {}),
+        },
+      ],
+    );
+
+    return response;
   }
 
   async createDraft(

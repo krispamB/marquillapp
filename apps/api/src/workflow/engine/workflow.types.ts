@@ -3,16 +3,15 @@ import { WorkflowStep } from '../workflow.constants';
 import { AgentService } from 'src/agent/agent.service';
 import { Logger } from '@nestjs/common';
 
-
 export interface WorkflowState<T = unknown> {
-  data: T;               // pipeline data (changes every step)
+  data: T; // pipeline data (changes every step)
   initialInput: unknown; // original user input
-  metadata: Record<string, any>; // step-produced info
+  metadata: Record<string, any>;
 }
 
 export interface WorkflowContext {
-  agentService: AgentService; 
-  logger: Logger
+  agentService: AgentService;
+  logger: Logger;
 }
 
 export interface WorkflowDefinition {
