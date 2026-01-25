@@ -2,7 +2,12 @@ import { Module, Global, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule, InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
-import { User, UserSchema } from './schemas/user.schema';
+import {
+  User,
+  UserSchema,
+  ConnectedAccount,
+  ConnectedAccountSchema,
+} from './schemas';
 
 @Global()
 @Module({
@@ -14,7 +19,10 @@ import { User, UserSchema } from './schemas/user.schema';
       }),
       inject: [ConfigService],
     }),
-    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    MongooseModule.forFeature([
+      { name: User.name, schema: UserSchema },
+      { name: ConnectedAccount.name, schema: ConnectedAccountSchema },
+    ]),
   ],
   exports: [MongooseModule],
 })
