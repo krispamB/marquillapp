@@ -1,9 +1,18 @@
-import { Controller, Get, UseGuards, Res, Post, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  UseGuards,
+  Res,
+  Post,
+  Req,
+  Query,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { GetUser } from '../common/decorators';
 import { User } from '../database/schemas';
+import { JwtAuthGuard } from 'src/common/guards';
 
 @Controller('auth')
 export class AuthController {
@@ -30,5 +39,19 @@ export class AuthController {
   logout(@Res() res: Response) {
     res.clearCookie('access_token');
     return { message: 'Logged out successfully' };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('linkedin')
+  linkedinAuth(@GetUser() user: User) {
+    return this.authService.createLinkedinOath(user);
+  }
+
+  @Get('linkedin/callback')
+  linkedinAuthRedirect(
+    @Query('code') code: string,
+    @Query('state') state: string,
+  ) {
+    return this.authService.linkedinCallback(code, state);
   }
 }

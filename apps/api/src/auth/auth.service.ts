@@ -1,14 +1,20 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { User } from '../database/schemas';
+import { Model, ObjectId } from 'mongoose';
+import { AccountProvider, ConnectedAccount, User } from '../database/schemas';
+import { ConfigService } from '@nestjs/config';
+import { apiFetch } from 'src/common/HelperFn';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     private jwtService: JwtService,
+    @InjectModel(ConnectedAccount.name)
+    private connectedAccountModel: Model<ConnectedAccount>,
+    private configService: ConfigService,
   ) {}
 
   async validateGoogleUser(details: {
@@ -39,14 +45,80 @@ export class AuthService {
     return user;
   }
 
-  async generateToken(payload: any): Promise<string> {
-    return this.jwtService.sign(payload);
-  }
-
   async login(user: User) {
     const payload = { email: user.email, sub: user._id.toString() };
     return {
       access_token: this.jwtService.sign(payload),
     };
+  }
+
+  async createLinkedinOath(user: User): Promise<string> {
+    return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${this.configService.getOrThrow<string>('LINKEDIN_CLIENT_ID')}&redirect_uri=${this.configService.getOrThrow<string>('LINKEDIN_REDIRECT_URI')}&state=${user._id.toString()}&scope=${encodeURIComponent('openid profile email w_member_social')}`;
+  }
+
+  async linkedinCallback(code: string, state: string) {
+    const { access_token, expires_in } =
+      await this.getLinkedinAccessToken(code);
+    const profileMetadata = await this.getLinkedinUser(access_token);
+    await this.connectedAccountModel.create({
+      user: state as unknown as ObjectId,
+      provider: AccountProvider.LINKEDIN,
+      accessToken: access_token,
+      accessTokenExpiresAt: new Date(Date.now() + expires_in * 1000),
+      profileMetadata,
+    });
+
+    return profileMetadata.email_verified;
+  }
+
+  private async getLinkedinAccessToken(code: string) {
+    const url = 'https://www.linkedin.com/oauth/v2/accessToken';
+    const data = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      client_id: this.configService.getOrThrow<string>('LINKEDIN_CLIENT_ID'),
+      client_secret: this.configService.getOrThrow<string>(
+        'LINKEDIN_CLIENT_SECRET',
+      ),
+      redirect_uri: this.configService.getOrThrow<string>(
+        'LINKEDIN_REDIRECT_URI',
+      ),
+    });
+
+    interface IResponse {
+      access_token: string;
+      expires_in: number;
+      scope: string;
+    }
+    const response = await apiFetch<IResponse>(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: data,
+    });
+    return response;
+  }
+
+  private async getLinkedinUser(access_token: string) {
+    const url = 'https://api.linkedin.com/v2/userinfo';
+    interface IResponse {
+      sub: string;
+      name: string;
+      given_name: string;
+      family_name: string;
+      picture: string;
+      locale: string;
+      email: string;
+      email_verified: boolean;
+    }
+    const response = await apiFetch<IResponse>(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Bearer ${access_token}`,
+      },
+    });
+    return response;
   }
 }
