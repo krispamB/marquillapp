@@ -23,6 +23,9 @@ export class ConnectedAccount extends Document {
 
   @Prop({ type: Object })
   profileMetadata?: Record<string, any>;
+
+  @Prop({ default: true })
+  isActive: boolean;
 }
 
 export const ConnectedAccountSchema =

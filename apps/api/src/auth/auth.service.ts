@@ -1,7 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, ObjectId } from 'mongoose';
+import { Model, ObjectId, Types } from 'mongoose';
 import { AccountProvider, ConnectedAccount, User } from '../database/schemas';
 import { ConfigService } from '@nestjs/config';
 import { apiFetch } from 'src/common/HelperFn';
@@ -120,5 +124,21 @@ export class AuthService {
       },
     });
     return response;
+  }
+
+  async getConnectedAccounts(userId: string) {
+    try {
+      const accounts = await this.connectedAccountModel
+        .find({
+          user: new Types.ObjectId(userId),
+        })
+        .select('-accessToken');
+      return accounts;
+    } catch (error) {
+      this.logger.error(error);
+      throw new InternalServerErrorException(
+        'An error occurred while fetching connected accounts',
+      );
+    }
   }
 }
