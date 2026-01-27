@@ -16,6 +16,7 @@ import { WorkflowModule } from './workflow/workflow.module';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './users/users.module';
+import { PostModule } from './post/post.module';
 import { ConfigService } from '@nestjs/config';
 
 @Module({
@@ -31,6 +32,7 @@ import { ConfigService } from '@nestjs/config';
     DatabaseModule,
     AuthModule,
     UserModule,
+    PostModule,
   ],
   controllers: [AppController],
   providers: [AppService],

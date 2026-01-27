@@ -10,6 +10,11 @@ export const extractIntentStep: StepHandler<InputDto, UserIntent> = async (
   try {
     ctx.logger.log(`Extracting Intent...`);
     const intent = await ctx.agentService.generateUserIntent(state.data.input);
+    if (_job.id) {
+      await ctx.agentService.updateDraft(_job.id, {
+        userIntent: intent,
+      });
+    }
     return {
       data: intent,
       initialInput: state.initialInput,
