@@ -40,4 +40,12 @@ export class PostService {
     const [state] = await Promise.all([job.getState()]);
     return { state, progress: job.progress };
   }
+
+  async getPosts(user: User, accountConnected?: string) {
+    const filter: any = { user: user._id };
+    if (accountConnected) {
+      filter.connectedAccount = new Types.ObjectId(accountConnected);
+    }
+    return this.postDraftModel.find(filter).exec();
+  }
 }

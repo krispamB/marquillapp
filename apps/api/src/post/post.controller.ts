@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { PostService } from './post.service';
@@ -18,7 +19,7 @@ import { User } from 'src/database/schemas';
 @UseGuards(JwtAuthGuard)
 @Controller('posts')
 export class PostController {
-  constructor(private readonly postService: PostService) {}
+  constructor(private readonly postService: PostService) { }
 
   @HttpCode(HttpStatus.CREATED)
   @Post(':id/draft')
@@ -40,6 +41,18 @@ export class PostController {
       statusCode: HttpStatus.OK,
       message: 'Draft status retrieved successfully',
       data: await this.postService.getStatus(id),
+    };
+  }
+
+  @Get()
+  async getPosts(
+    @GetUser() user: User,
+    @Query('accountConnected') accountConnected?: string,
+  ): Promise<IAppResponse> {
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Posts retrieved successfully',
+      data: await this.postService.getPosts(user, accountConnected),
     };
   }
 }
