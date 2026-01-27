@@ -8,10 +8,12 @@ import { AuthController } from './auth.controller';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { User, UserSchema } from '../database/schemas/user.schema';
+import { EncryptionModule } from '../encryption/encryption.module';
 
 @Module({
   imports: [
     PassportModule,
+    EncryptionModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

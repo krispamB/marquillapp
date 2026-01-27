@@ -21,7 +21,7 @@ import { User } from 'src/database/schemas';
 @UseGuards(JwtAuthGuard)
 @Controller('posts')
 export class PostController {
-  constructor(private readonly postService: PostService) { }
+  constructor(private readonly postService: PostService) {}
 
   @HttpCode(HttpStatus.CREATED)
   @Post(':id/draft')
@@ -71,4 +71,3 @@ export class PostController {
     };
   }
 }
-

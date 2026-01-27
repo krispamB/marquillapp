@@ -19,7 +19,7 @@ export class PostService {
     private readonly workflowQueue: WorkflowQueue,
     @InjectModel(PostDraft.name)
     private readonly postDraftModel: Model<PostDraft>,
-  ) { }
+  ) {}
 
   async createDraft(user: User, accountId: string, dto: InputDto) {
     const draft = new this.postDraftModel({
@@ -69,4 +69,3 @@ export class PostService {
     return post.save();
   }
 }
-
