@@ -1,6 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { WorkflowQueue } from '../workflow/workflow.queue';
 import { InputDto } from '../agent/dto';
+import { UpdatePostDto } from './dto';
 import { PostDraft, PostDraftStatus, User } from 'src/database/schemas';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -13,7 +19,7 @@ export class PostService {
     private readonly workflowQueue: WorkflowQueue,
     @InjectModel(PostDraft.name)
     private readonly postDraftModel: Model<PostDraft>,
-  ) {}
+  ) { }
 
   async createDraft(user: User, accountId: string, dto: InputDto) {
     const draft = new this.postDraftModel({
@@ -48,4 +54,19 @@ export class PostService {
     }
     return this.postDraftModel.find(filter).exec();
   }
+
+  async updateContent(user: User, postId: string, dto: UpdatePostDto) {
+    const post = await this.postDraftModel.findById(postId);
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (post.user.toString() !== user._id.toString()) {
+      throw new ForbiddenException('You are not authorized to edit this post');
+    }
+
+    post.content = dto.content;
+    return post.save();
+  }
 }
+

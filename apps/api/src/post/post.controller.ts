@@ -5,12 +5,14 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { InputDto } from '../agent/dto';
+import { UpdatePostDto } from './dto';
 import { JwtAuthGuard } from '../common/guards';
 import { IAppResponse } from 'src/common/interfaces';
 import { GetUser } from 'src/common/decorators';
@@ -55,4 +57,18 @@ export class PostController {
       data: await this.postService.getPosts(user, accountConnected),
     };
   }
+
+  @Patch(':id')
+  async updateContent(
+    @GetUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: UpdatePostDto,
+  ): Promise<IAppResponse> {
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Post content updated successfully',
+      data: await this.postService.updateContent(user, id, dto),
+    };
+  }
 }
+
