@@ -7,6 +7,6 @@ export const InsightPostLinkedinWorkflow: WorkflowDefinition = {
     WorkflowStep.EXTRACT_INTENT,
     WorkflowStep.GET_QUERIES,
     WorkflowStep.RUN_RESEARCH,
-    WorkflowStep.CREATE_DRAFT,
+    WorkflowStep.CREATE_LINKEDIN_DRAFT,
   ],
 };

@@ -21,6 +21,9 @@ import {
 } from './agent.interface';
 import { HttpService } from '@nestjs/axios';
 import { Supadata } from '@supadata/js';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { PostDraft } from 'src/database/schemas';
 
 @Injectable()
 export class AgentService {
@@ -33,6 +36,7 @@ export class AgentService {
     private parser: ResponseParserService,
     private config: ConfigService,
     private http: HttpService,
+    @InjectModel(PostDraft.name) private draftModel: Model<PostDraft>,
   ) {
     this.logger = new Logger(AgentService.name);
     const apiKey = this.config.get<string>('GOOGLE_API_KEY');
@@ -94,7 +98,7 @@ export class AgentService {
         return [];
       }
 
-      return response.data.items?.map((item) => ({
+      return response.data.items?.slice(0, maxResults).map((item) => ({
         videoId: item.id?.videoId || '',
         title: item.snippet?.title || 'No title',
         thumbnail: item.snippet?.thumbnails?.high?.url || '',
@@ -110,24 +114,25 @@ export class AgentService {
     }
   }
   async searchWithFallbacks(queries: string[]): Promise<YoutubeSearchResult[]> {
+    const targetCount = 3;
     const seen = new Set<string>();
     const result: YoutubeSearchResult[] = [];
     for (const query of queries) {
       const videos = await this.searchYoutube(query, 2);
       for (const video of videos) {
+        if (result.length >= targetCount) break;
         if (!video.videoId || seen.has(video.videoId)) continue;
 
         seen.add(video.videoId);
         result.push(video);
       }
 
-      if (result.length >= 3) break;
+      if (result.length >= targetCount) break;
     }
     return result;
   }
 
-  async getYouTubeTranscripts(input: string[]) {
-    const videos = await this.searchWithFallbacks(input);
+  async getYouTubeTranscripts(videos: YoutubeSearchResult[]) {
     const transcripts: TranscriptResult[] = [];
     for (const video of videos) {
       const transcript = await this.extractYtTranscript(video);
@@ -221,5 +226,9 @@ export class AgentService {
     );
 
     return response;
+  }
+
+  async updateDraft(draftId: string, draft: Partial<PostDraft>) {
+    return this.draftModel.updateOne({ _id: draftId }, draft);
   }
 }

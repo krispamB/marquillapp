@@ -6,7 +6,14 @@ export const runReasearchStep: StepHandler<
   CompressionResult
 > = async (state, _job, ctx) => {
   ctx.logger.log(`Running Research...`);
-  const transcripts = await ctx.agentService.getYouTubeTranscripts(state.data);
+  const videos = await ctx.agentService.searchWithFallbacks(state.data);
+
+  if (_job.id) {
+    await ctx.agentService.updateDraft(_job.id, {
+      youtubeResearch: videos,
+    });
+  }
+  const transcripts = await ctx.agentService.getYouTubeTranscripts(videos);
   const insight = await ctx.agentService.extractInsight(
     transcripts,
     state.metadata.intent as UserIntent,

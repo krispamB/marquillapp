@@ -7,6 +7,8 @@ import {
   UserSchema,
   ConnectedAccount,
   ConnectedAccountSchema,
+  PostDraft,
+  PostDraftSchema,
 } from './schemas';
 
 @Global()
@@ -22,6 +24,7 @@ import {
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: ConnectedAccount.name, schema: ConnectedAccountSchema },
+      { name: PostDraft.name, schema: PostDraftSchema },
     ]),
   ],
   exports: [MongooseModule],

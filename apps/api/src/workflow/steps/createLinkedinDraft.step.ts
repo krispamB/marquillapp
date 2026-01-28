@@ -12,15 +12,26 @@ export const createLinkedinDraftStep: StepHandler<
 
   let draft: string;
 
-  if (input.contentType === ContentType.QUICK_POST_LINKEDIN) {
-    draft = await ctx.agentService.createLinkedInPost(
-      state.metadata.intent as UserIntent,
-    );
-  } else {
-    draft = await ctx.agentService.createLinkedInPost(
-      state.metadata.intent as UserIntent,
-      state.data as CompressionResult,
-    );
+  try {
+    if (input.contentType === ContentType.QUICK_POST_LINKEDIN) {
+      draft = await ctx.agentService.createLinkedInPost(
+        state.metadata.intent as UserIntent,
+      );
+    } else {
+      draft = await ctx.agentService.createLinkedInPost(
+        state.metadata.intent as UserIntent,
+        state.data as CompressionResult,
+      );
+    }
+  } catch (error) {
+    ctx.logger.error('Draft creation failed:', error);
+    throw error;
+  }
+
+  if (_job.id) {
+    await ctx.agentService.updateDraft(_job.id, {
+      content: draft,
+    });
   }
 
   return {

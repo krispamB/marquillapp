@@ -23,7 +23,7 @@ export class WorkflowQueue implements OnModuleInit {
   async addWorkflowJob(workflowId: string, payload: IJobData) {
     await this.queue.add(payload.workflowName, payload.input, {
       jobId: workflowId,
-      removeOnComplete: false,
+      removeOnComplete: true,
       removeOnFail: false,
     });
   }

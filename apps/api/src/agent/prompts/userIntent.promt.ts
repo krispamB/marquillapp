@@ -8,7 +8,7 @@ INPUT:
 User request or description of what they want to achieve.
 
 OUTPUT:
-Return a single JSON object called \`intent\` with the following fields:
+Return a single JSON object with the following fields:
 
 - primary_goal: The core objective the user wants to achieve (1 sentence).
 - secondary_goals: Optional supporting goals (array, can be empty).
