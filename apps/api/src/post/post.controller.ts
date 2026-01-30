@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -37,6 +38,19 @@ export class PostController {
     };
   }
 
+  @HttpCode(HttpStatus.OK)
+  @Post(':id/publish')
+  async publishOnLinkedIn(
+    @GetUser() user: User,
+    @Param('id') id: string,
+  ): Promise<IAppResponse> {
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Post published successfully',
+      data: await this.postService.publishOnLinkedIn(user, id),
+    };
+  }
+
   @Get(':id/status')
   async getStatus(@Param('id') id: string): Promise<IAppResponse> {
     return {
@@ -70,5 +84,30 @@ export class PostController {
       data: await this.postService.updateContent(user, id, dto),
     };
   }
+
+  @Delete(':id')
+  async deletePost(
+    @GetUser() user: User,
+    @Param('id') id: string,
+  ): Promise<IAppResponse> {
+    await this.postService.deletePost(user, id);
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Post deleted successfully',
+    };
+  }
+
+  @Get(':id')
+  async getPostById(
+    @GetUser() user: User,
+    @Param('id') id: string,
+  ): Promise<IAppResponse> {
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Post retrieved successfully',
+      data: await this.postService.getPost(user, id),
+    };
+  }
 }
+
 

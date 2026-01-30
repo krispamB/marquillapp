@@ -9,6 +9,7 @@ import { Model, ObjectId, Types } from 'mongoose';
 import { AccountProvider, ConnectedAccount, User } from '../database/schemas';
 import { ConfigService } from '@nestjs/config';
 import { apiFetch } from 'src/common/HelperFn';
+import { EncryptionService } from '../encryption/encryption.service';
 
 @Injectable()
 export class AuthService {
@@ -19,7 +20,8 @@ export class AuthService {
     @InjectModel(ConnectedAccount.name)
     private connectedAccountModel: Model<ConnectedAccount>,
     private configService: ConfigService,
-  ) {}
+    private encryptionService: EncryptionService,
+  ) { }
 
   async validateGoogleUser(details: {
     email: string;
@@ -64,13 +66,20 @@ export class AuthService {
     const { access_token, expires_in } =
       await this.getLinkedinAccessToken(code);
     const profileMetadata = await this.getLinkedinUser(access_token);
-    await this.connectedAccountModel.create({
-      user: state as unknown as ObjectId,
-      provider: AccountProvider.LINKEDIN,
-      accessToken: access_token,
-      accessTokenExpiresAt: new Date(Date.now() + expires_in * 1000),
-      profileMetadata,
-    });
+    const encryptedAccessToken =
+      await this.encryptionService.encrypt(access_token);
+    await this.connectedAccountModel.findOneAndUpdate(
+      {
+        user: state as unknown as ObjectId,
+        provider: AccountProvider.LINKEDIN,
+      },
+      {
+        accessToken: encryptedAccessToken,
+        accessTokenExpiresAt: new Date(Date.now() + expires_in * 1000),
+        profileMetadata,
+      },
+      { upsert: true },
+    );
 
     return profileMetadata.email_verified;
   }
@@ -94,14 +103,14 @@ export class AuthService {
       expires_in: number;
       scope: string;
     }
-    const response = await apiFetch<IResponse>(url, {
+    const { data: result } = await apiFetch<IResponse>(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: data,
     });
-    return response;
+    return result;
   }
 
   private async getLinkedinUser(access_token: string) {
@@ -116,7 +125,7 @@ export class AuthService {
       email: string;
       email_verified: boolean;
     }
-    const response = await apiFetch<IResponse>(url, {
+    const { data: response } = await apiFetch<IResponse>(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

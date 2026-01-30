@@ -18,6 +18,7 @@ import { AuthModule } from './auth/auth.module';
 import { UserModule } from './users/users.module';
 import { PostModule } from './post/post.module';
 import { ConfigService } from '@nestjs/config';
+import { EncryptionModule } from './encryption/encryption.module';
 
 @Module({
   imports: [
@@ -32,7 +33,9 @@ import { ConfigService } from '@nestjs/config';
     DatabaseModule,
     AuthModule,
     UserModule,
+    UserModule,
     PostModule,
+    EncryptionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
