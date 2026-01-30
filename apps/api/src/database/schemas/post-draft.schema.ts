@@ -46,6 +46,9 @@ export class PostDraft extends Document {
   userIntent?: UserIntent;
 
   @Prop()
+  channelPostId?: string;
+
+  @Prop()
   scheduledAt?: Date;
 
   @Prop()

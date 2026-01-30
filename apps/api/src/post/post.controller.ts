@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -21,7 +22,7 @@ import { User } from 'src/database/schemas';
 @UseGuards(JwtAuthGuard)
 @Controller('posts')
 export class PostController {
-  constructor(private readonly postService: PostService) {}
+  constructor(private readonly postService: PostService) { }
 
   @HttpCode(HttpStatus.CREATED)
   @Post(':id/draft')
@@ -34,6 +35,19 @@ export class PostController {
       statusCode: HttpStatus.CREATED,
       message: 'Draft created successfully',
       data: await this.postService.createDraft(user, accountId, dto),
+    };
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post(':id/publish')
+  async publishOnLinkedIn(
+    @GetUser() user: User,
+    @Param('id') id: string,
+  ): Promise<IAppResponse> {
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Post published successfully',
+      data: await this.postService.publishOnLinkedIn(user, id),
     };
   }
 
@@ -70,4 +84,30 @@ export class PostController {
       data: await this.postService.updateContent(user, id, dto),
     };
   }
+
+  @Delete(':id')
+  async deletePost(
+    @GetUser() user: User,
+    @Param('id') id: string,
+  ): Promise<IAppResponse> {
+    await this.postService.deletePost(user, id);
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Post deleted successfully',
+    };
+  }
+
+  @Get(':id')
+  async getPostById(
+    @GetUser() user: User,
+    @Param('id') id: string,
+  ): Promise<IAppResponse> {
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Post retrieved successfully',
+      data: await this.postService.getPost(user, id),
+    };
+  }
 }
+
+

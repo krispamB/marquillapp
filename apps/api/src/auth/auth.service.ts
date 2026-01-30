@@ -21,7 +21,7 @@ export class AuthService {
     private connectedAccountModel: Model<ConnectedAccount>,
     private configService: ConfigService,
     private encryptionService: EncryptionService,
-  ) {}
+  ) { }
 
   async validateGoogleUser(details: {
     email: string;
@@ -103,14 +103,14 @@ export class AuthService {
       expires_in: number;
       scope: string;
     }
-    const response = await apiFetch<IResponse>(url, {
+    const { data: result } = await apiFetch<IResponse>(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: data,
     });
-    return response;
+    return result;
   }
 
   private async getLinkedinUser(access_token: string) {
@@ -125,7 +125,7 @@ export class AuthService {
       email: string;
       email_verified: boolean;
     }
-    const response = await apiFetch<IResponse>(url, {
+    const { data: response } = await apiFetch<IResponse>(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
