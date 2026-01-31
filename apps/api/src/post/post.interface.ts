@@ -1,7 +1,7 @@
 export interface ILinkedInPost {
     author: string;
-    commentary: string;
-    content?: any;
+    commentary?: string;
+    content?: IContent;
     visibility: 'PUBLIC' | 'CONNECTIONS';
     distribution: {
         feedDistribution: 'MAIN_FEED';
@@ -12,10 +12,12 @@ export interface ILinkedInPost {
     isReshareDisabledByAuthor: boolean;
 }
 
-export interface IShareContent {
-    shareCommentary: string;
-    shareMediaCategory: "NONE" | "ARTICLE" | "IMAGE";
-    media?: IShareMedia[];
+export interface IContent {
+    media?: {
+        title?: string;
+        id: string;
+    };
+    multiImage?: any
 }
 
 export interface IShareMedia {

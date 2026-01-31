@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -19,7 +20,7 @@ import { formatLinkedinContent } from 'src/common/HelperFn';
 @Injectable()
 export class PostService {
   private readonly logger = new Logger(PostService.name);
-  private readonly LINKEDIN_API_BASE = 'https://api.linkedin.com/rest/post';
+  private readonly LINKEDIN_API_BASE = 'https://api.linkedin.com/rest';
 
   constructor(
     private readonly workflowQueue: WorkflowQueue,
@@ -101,10 +102,8 @@ export class PostService {
       connectedAccount.accessToken,
     );
 
-    this.logger.log(`Deleting post ${post.channelPostId} with access token ${accessToken}`);
-
     if (post.status === PostDraftStatus.PUBLISHED && post.channelPostId) {
-      const externalUrl = `https://api.linkedin.com/rest/posts/${encodeURIComponent(post.channelPostId)}`;
+      const externalUrl = `${this.LINKEDIN_API_BASE}/posts/${encodeURIComponent(post.channelPostId)}`;
       await apiFetch(externalUrl, {
         method: 'DELETE',
         headers: {
@@ -141,6 +140,10 @@ export class PostService {
       throw new ForbiddenException('You are not authorized to publish this post');
     }
 
+    if (post.status === PostDraftStatus.PUBLISHED) {
+      throw new BadRequestException('Post is already published');
+    }
+
     const connectedAccount = await this.connectedAccountModel.findOne({
       user: post.user,
       provider: AccountProvider.LINKEDIN,
@@ -154,10 +157,16 @@ export class PostService {
       connectedAccount.accessToken,
     );
 
-    const url = 'https://api.linkedin.com/rest/posts';
+    const url = `${this.LINKEDIN_API_BASE}/posts`;
     const data: ILinkedInPost = {
       author: `urn:li:person:${connectedAccount.profileMetadata!.sub}`,
-      commentary: formatLinkedinContent(post.content!),
+      commentary: post.content ? formatLinkedinContent(post.content!) : undefined,
+      content: post.media ? {
+        media: {
+          id: post.media[0].id,
+          title: post.media[0].title,
+        },
+      } : undefined,
       visibility: 'PUBLIC',
       distribution: {
         feedDistribution: 'MAIN_FEED',
@@ -191,5 +200,92 @@ export class PostService {
       this.logger.error(error);
       throw new InternalServerErrorException('Failed to publish post');
     }
+  }
+
+  async addLinkedinMedia(user: User, postId: string, file: Express.Multer.File) {
+    const post = await this.postDraftModel.findById(postId);
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (post.user.toString() !== user._id.toString()) {
+      throw new ForbiddenException('You are not authorized to edit this post');
+    }
+
+    if (post.status === PostDraftStatus.PUBLISHED) {
+      throw new BadRequestException('Post is already published');
+    }
+
+    const connectedAccount = await this.connectedAccountModel.findOne({
+      user: post.user,
+      provider: AccountProvider.LINKEDIN,
+    });
+
+    if (!connectedAccount) {
+      throw new NotFoundException('Connected account not found');
+    }
+
+    const accessToken = await this.encryptionService.decrypt(
+      connectedAccount.accessToken,
+    );
+
+    const urn = await this.uploadLinkedinImage(`urn:li:person:${connectedAccount.profileMetadata!.sub}`, accessToken, file);
+    if (post.media) {
+      post.media.push({
+        id: urn,
+        title: file.originalname,
+        altText: file.originalname,
+      })
+    } else {
+      post.media = [{
+        id: urn,
+        title: file.originalname,
+        altText: file.originalname,
+      }]
+    }
+    await post.save();
+  }
+
+
+
+  private async uploadLinkedinImage(urn: string, accessToken: string, file: Express.Multer.File) {
+    interface IResponse {
+      value: {
+        uploadUrlExpiresAt: number;
+        uploadUrl: string;
+        image: string
+      };
+    }
+    const initializeUploadRequest = await apiFetch<IResponse>(
+      `${this.LINKEDIN_API_BASE}/images?action=initializeUpload`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Restli-Protocol-Version': '2.0.0',
+          'LinkedIn-Version': '202601',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          initializeUploadRequest: {
+            owner: urn,
+          },
+        }),
+      }
+    );
+
+    const uploadResponse = await apiFetch(initializeUploadRequest.data.value.uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'LinkedIn-Version': '202601',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: file.buffer as any,
+      ...({ duplex: 'half' } as any)
+    });
+    this.logger.log(uploadResponse.response)
+
+    return initializeUploadRequest.data.value.image
   }
 }
