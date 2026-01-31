@@ -8,8 +8,11 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { InputDto } from '../agent/dto';
@@ -18,6 +21,7 @@ import { JwtAuthGuard } from '../common/guards';
 import { IAppResponse } from 'src/common/interfaces';
 import { GetUser } from 'src/common/decorators';
 import { User } from 'src/database/schemas';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @UseGuards(JwtAuthGuard)
 @Controller('posts')
@@ -35,6 +39,20 @@ export class PostController {
       statusCode: HttpStatus.CREATED,
       message: 'Draft created successfully',
       data: await this.postService.createDraft(user, accountId, dto),
+    };
+  }
+
+  @Put(':id/image')
+  @UseInterceptors(FileInterceptor('file'))
+  async getUploadUrl(
+    @GetUser() user: User,
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<IAppResponse> {
+    await this.postService.addLinkedinMedia(user, id, file);
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Image Upload Successful',
     };
   }
 
