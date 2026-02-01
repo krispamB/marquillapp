@@ -1,4 +1,4 @@
-import { Console } from "console";
+import { Console } from 'console';
 
 export class ApiError extends Error {
   constructor(

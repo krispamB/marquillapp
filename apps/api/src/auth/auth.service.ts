@@ -21,7 +21,7 @@ export class AuthService {
     private connectedAccountModel: Model<ConnectedAccount>,
     private configService: ConfigService,
     private encryptionService: EncryptionService,
-  ) { }
+  ) {}
 
   async validateGoogleUser(details: {
     email: string;

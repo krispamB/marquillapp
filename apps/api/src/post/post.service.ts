@@ -9,7 +9,13 @@ import {
 import { WorkflowQueue } from '../workflow/workflow.queue';
 import { InputDto } from '../agent/dto';
 import { UpdatePostDto } from './dto';
-import { AccountProvider, ConnectedAccount, PostDraft, PostDraftStatus, User } from 'src/database/schemas';
+import {
+  AccountProvider,
+  ConnectedAccount,
+  PostDraft,
+  PostDraftStatus,
+  User,
+} from 'src/database/schemas';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { apiFetch } from 'src/common/HelperFn/apiFetch.helper';
@@ -29,7 +35,7 @@ export class PostService {
     @InjectModel(ConnectedAccount.name)
     private readonly connectedAccountModel: Model<ConnectedAccount>,
     private readonly encryptionService: EncryptionService,
-  ) { }
+  ) {}
 
   async createDraft(user: User, accountId: string, dto: InputDto) {
     const draft = new this.postDraftModel({
@@ -86,7 +92,9 @@ export class PostService {
     }
 
     if (post.user.toString() !== user._id.toString()) {
-      throw new ForbiddenException('You are not authorized to delete this post');
+      throw new ForbiddenException(
+        'You are not authorized to delete this post',
+      );
     }
 
     const connectedAccount = await this.connectedAccountModel.findOne({
@@ -110,11 +118,13 @@ export class PostService {
           'X-Restli-Protocol-Version': '2.0.0',
           'LinkedIn-Version': '202601',
           Authorization: `Bearer ${accessToken}`,
-        }
+        },
       });
     }
 
-    return this.postDraftModel.deleteOne({ _id: new Types.ObjectId(postId) }).exec();
+    return this.postDraftModel
+      .deleteOne({ _id: new Types.ObjectId(postId) })
+      .exec();
   }
 
   async getPost(user: User, postId: string) {
@@ -137,7 +147,9 @@ export class PostService {
     }
 
     if (post.user.toString() !== user._id.toString()) {
-      throw new ForbiddenException('You are not authorized to publish this post');
+      throw new ForbiddenException(
+        'You are not authorized to publish this post',
+      );
     }
 
     if (post.status === PostDraftStatus.PUBLISHED) {
@@ -160,13 +172,17 @@ export class PostService {
     const url = `${this.LINKEDIN_API_BASE}/posts`;
     const data: ILinkedInPost = {
       author: `urn:li:person:${connectedAccount.profileMetadata!.sub}`,
-      commentary: post.content ? formatLinkedinContent(post.content!) : undefined,
-      content: post.media ? {
-        media: {
-          id: post.media[0].id,
-          title: post.media[0].title,
-        },
-      } : undefined,
+      commentary: post.content
+        ? formatLinkedinContent(post.content!)
+        : undefined,
+      content: post.media
+        ? {
+            media: {
+              id: post.media[0].id,
+              title: post.media[0].title,
+            },
+          }
+        : undefined,
       visibility: 'PUBLIC',
       distribution: {
         feedDistribution: 'MAIN_FEED',
@@ -189,20 +205,23 @@ export class PostService {
         body: JSON.stringify(data),
       });
 
-      const postId = response.headers.get('x-restli-id')
+      const postId = response.headers.get('x-restli-id');
       if (postId) {
-        post.channelPostId = postId
+        post.channelPostId = postId;
       }
       post.status = PostDraftStatus.PUBLISHED;
       await post.save();
-
     } catch (error) {
       this.logger.error(error);
       throw new InternalServerErrorException('Failed to publish post');
     }
   }
 
-  async addLinkedinMedia(user: User, postId: string, file: Express.Multer.File) {
+  async addLinkedinMedia(
+    user: User,
+    postId: string,
+    file: Express.Multer.File,
+  ) {
     const post = await this.postDraftModel.findById(postId);
     if (!post) {
       throw new NotFoundException('Post not found');
@@ -229,31 +248,39 @@ export class PostService {
       connectedAccount.accessToken,
     );
 
-    const urn = await this.uploadLinkedinImage(`urn:li:person:${connectedAccount.profileMetadata!.sub}`, accessToken, file);
+    const urn = await this.uploadLinkedinImage(
+      `urn:li:person:${connectedAccount.profileMetadata!.sub}`,
+      accessToken,
+      file,
+    );
     if (post.media) {
       post.media.push({
         id: urn,
         title: file.originalname,
         altText: file.originalname,
-      })
+      });
     } else {
-      post.media = [{
-        id: urn,
-        title: file.originalname,
-        altText: file.originalname,
-      }]
+      post.media = [
+        {
+          id: urn,
+          title: file.originalname,
+          altText: file.originalname,
+        },
+      ];
     }
     await post.save();
   }
 
-
-
-  private async uploadLinkedinImage(urn: string, accessToken: string, file: Express.Multer.File) {
+  private async uploadLinkedinImage(
+    urn: string,
+    accessToken: string,
+    file: Express.Multer.File,
+  ) {
     interface IResponse {
       value: {
         uploadUrlExpiresAt: number;
         uploadUrl: string;
-        image: string
+        image: string;
       };
     }
     const initializeUploadRequest = await apiFetch<IResponse>(
@@ -271,21 +298,24 @@ export class PostService {
             owner: urn,
           },
         }),
-      }
+      },
     );
 
-    const uploadResponse = await apiFetch(initializeUploadRequest.data.value.uploadUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        'LinkedIn-Version': '202601',
-        Authorization: `Bearer ${accessToken}`,
+    const uploadResponse = await apiFetch(
+      initializeUploadRequest.data.value.uploadUrl,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'LinkedIn-Version': '202601',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: file.buffer as any,
+        ...({ duplex: 'half' } as any),
       },
-      body: file.buffer as any,
-      ...({ duplex: 'half' } as any)
-    });
-    this.logger.log(uploadResponse.response)
+    );
+    this.logger.log(uploadResponse.response);
 
-    return initializeUploadRequest.data.value.image
+    return initializeUploadRequest.data.value.image;
   }
 }

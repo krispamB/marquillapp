@@ -39,16 +39,20 @@ export class PostDraft extends Document {
   @Prop()
   content?: string;
 
-  @Prop(raw([{
-    id: { type: String, required: true },
-    title: { type: String },
-    altText: { type: String },
-  }]))
+  @Prop(
+    raw([
+      {
+        id: { type: String, required: true },
+        title: { type: String },
+        altText: { type: String },
+      },
+    ]),
+  )
   media?: {
-    id: string
-    title?: string
-    altText?: string
-  }[]
+    id: string;
+    title?: string;
+    altText?: string;
+  }[];
 
   @Prop({ type: Array<object> })
   youtubeResearch?: YoutubeSearchResult[];
