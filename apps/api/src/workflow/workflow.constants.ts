@@ -12,3 +12,4 @@ export enum ContentType {
 }
 
 export const QUEUE_NAME = 'workflow';
+export const SCHEDULE_QUEUE_NAME = 'post-schedule';

@@ -7,8 +7,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { WorkflowQueue } from '../workflow/workflow.queue';
+import { ScheduleQueue } from '../workflow/schedule.queue';
 import { InputDto } from '../agent/dto';
-import { UpdatePostDto } from './dto';
+import { UpdatePostDto, SchedulePostDto } from './dto';
 import {
   AccountProvider,
   ConnectedAccount,
@@ -30,12 +31,13 @@ export class PostService {
 
   constructor(
     private readonly workflowQueue: WorkflowQueue,
+    private readonly scheduleQueue: ScheduleQueue,
     @InjectModel(PostDraft.name)
     private readonly postDraftModel: Model<PostDraft>,
     @InjectModel(ConnectedAccount.name)
     private readonly connectedAccountModel: Model<ConnectedAccount>,
     private readonly encryptionService: EncryptionService,
-  ) {}
+  ) { }
 
   async createDraft(user: User, accountId: string, dto: InputDto) {
     const draft = new this.postDraftModel({
@@ -177,11 +179,11 @@ export class PostService {
         : undefined,
       content: post.media
         ? {
-            media: {
-              id: post.media[0].id,
-              title: post.media[0].title,
-            },
-          }
+          media: {
+            id: post.media[0].id,
+            title: post.media[0].title,
+          },
+        }
         : undefined,
       visibility: 'PUBLIC',
       distribution: {
@@ -215,6 +217,43 @@ export class PostService {
       this.logger.error(error);
       throw new InternalServerErrorException('Failed to publish post');
     }
+  }
+
+  async schedulePost(user: User, postId: string, dto: SchedulePostDto) {
+    const post = await this.postDraftModel.findById(postId);
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (post.user.toString() !== user._id.toString()) {
+      throw new ForbiddenException(
+        'You are not authorized to schedule this post',
+      );
+    }
+
+    if (post.status === PostDraftStatus.PUBLISHED) {
+      throw new BadRequestException('Post is already published');
+    }
+
+    const scheduledDate = new Date(dto.scheduledTime);
+    const now = new Date();
+    const delay = scheduledDate.getTime() - now.getTime();
+
+    if (delay <= 0) {
+      throw new BadRequestException('Scheduled time must be in the future');
+    }
+
+    post.status = PostDraftStatus.SCHEDULED;
+    post.scheduledAt = scheduledDate;
+    await post.save();
+
+    await this.scheduleQueue.addScheduleJob(
+      post._id.toString(),
+      user._id.toString(),
+      delay,
+    );
+
+    return post;
   }
 
   async addLinkedinMedia(
@@ -314,7 +353,6 @@ export class PostService {
         ...({ duplex: 'half' } as any),
       },
     );
-    this.logger.log(uploadResponse.response);
 
     return initializeUploadRequest.data.value.image;
   }

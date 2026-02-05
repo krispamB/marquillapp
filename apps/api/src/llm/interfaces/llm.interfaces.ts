@@ -7,8 +7,9 @@ export interface LLMStrategy {
 }
 
 export type CompletionOptions = {
-  model: string;
-  max_tokens: number;
+  model?: string;
+  max_tokens?: number;
+  temperature?: number;
 };
 
 export interface LLMMessage {

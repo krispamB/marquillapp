@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { InputDto } from '../agent/dto';
-import { UpdatePostDto } from './dto';
+import { UpdatePostDto, SchedulePostDto } from './dto';
 import { JwtAuthGuard } from '../common/guards';
 import { IAppResponse } from 'src/common/interfaces';
 import { GetUser } from 'src/common/decorators';
@@ -26,7 +26,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 @UseGuards(JwtAuthGuard)
 @Controller('posts')
 export class PostController {
-  constructor(private readonly postService: PostService) {}
+  constructor(private readonly postService: PostService) { }
 
   @HttpCode(HttpStatus.CREATED)
   @Post(':id/draft')
@@ -66,6 +66,20 @@ export class PostController {
       statusCode: HttpStatus.OK,
       message: 'Post published successfully',
       data: await this.postService.publishOnLinkedIn(user, id),
+    };
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post(':id/schedule')
+  async schedulePost(
+    @GetUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: SchedulePostDto,
+  ): Promise<IAppResponse> {
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Post scheduled successfully',
+      data: await this.postService.schedulePost(user, id, dto),
     };
   }
 
