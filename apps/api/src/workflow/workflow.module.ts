@@ -8,4 +8,4 @@ import { ScheduleQueue } from './schedule.queue';
   providers: [WorkflowQueue, ScheduleQueue],
   exports: [WorkflowQueue, ScheduleQueue],
 })
-export class WorkflowModule { }
+export class WorkflowModule {}

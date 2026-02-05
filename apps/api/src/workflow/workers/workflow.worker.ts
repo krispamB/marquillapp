@@ -19,7 +19,7 @@ import { User } from '../../database/schemas';
 async function bootstrapWorker() {
   const logger = new Logger(
     bootstrapWorker.name.charAt(0).toUpperCase() +
-    bootstrapWorker.name.slice(1),
+      bootstrapWorker.name.slice(1),
   );
   logger.log('Bootstrapping workflow context...');
   const app = await NestFactory.createApplicationContext(AppModule);

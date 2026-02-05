@@ -37,7 +37,7 @@ export class PostService {
     @InjectModel(ConnectedAccount.name)
     private readonly connectedAccountModel: Model<ConnectedAccount>,
     private readonly encryptionService: EncryptionService,
-  ) { }
+  ) {}
 
   async createDraft(user: User, accountId: string, dto: InputDto) {
     const draft = new this.postDraftModel({
@@ -179,11 +179,11 @@ export class PostService {
         : undefined,
       content: post.media
         ? {
-          media: {
-            id: post.media[0].id,
-            title: post.media[0].title,
-          },
-        }
+            media: {
+              id: post.media[0].id,
+              title: post.media[0].title,
+            },
+          }
         : undefined,
       visibility: 'PUBLIC',
       distribution: {
