@@ -1,5 +1,5 @@
 import { Prop, raw, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Schema as MongooseSchema } from 'mongoose';
+import { Document, Types } from 'mongoose';
 import { User } from './user.schema';
 import { ConnectedAccount } from './connected-account.schema';
 import { ContentType } from '../../workflow/workflow.constants';
@@ -16,15 +16,15 @@ export enum PostDraftStatus {
 
 @Schema({ timestamps: true })
 export class PostDraft extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
-  user: User;
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
+  user: User | Types.ObjectId;
 
   @Prop({
-    type: MongooseSchema.Types.ObjectId,
-    ref: 'ConnectedAccount',
+    type: Types.ObjectId,
+    ref: ConnectedAccount.name,
     required: true,
   })
-  connectedAccount: ConnectedAccount;
+  connectedAccount: ConnectedAccount | Types.ObjectId;
 
   @Prop({ required: true, enum: ContentType })
   type: ContentType;

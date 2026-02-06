@@ -27,6 +27,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     sub: string;
     email: string;
   }): Promise<User | null> {
-    return await this.userModel.findById(payload.sub);
+    return await this.userModel.findById(payload.sub).populate('tier');
   }
 }
