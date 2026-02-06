@@ -9,6 +9,8 @@ import {
   ConnectedAccountSchema,
   PostDraft,
   PostDraftSchema,
+  Tier,
+  TierSchema,
 } from './schemas';
 
 @Global()
@@ -25,6 +27,7 @@ import {
       { name: User.name, schema: UserSchema },
       { name: ConnectedAccount.name, schema: ConnectedAccountSchema },
       { name: PostDraft.name, schema: PostDraftSchema },
+      { name: Tier.name, schema: TierSchema },
     ]),
   ],
   exports: [MongooseModule],
@@ -32,7 +35,7 @@ import {
 export class DatabaseModule implements OnModuleInit {
   private readonly logger = new Logger(DatabaseModule.name);
 
-  constructor(@InjectConnection() private readonly connection: Connection) {}
+  constructor(@InjectConnection() private readonly connection: Connection) { }
 
   onModuleInit() {
     if (this.connection.readyState === 1) {
