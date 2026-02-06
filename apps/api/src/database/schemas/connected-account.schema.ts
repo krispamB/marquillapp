@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Schema as MongooseSchema } from 'mongoose';
+import { Document, Types } from 'mongoose';
 import { User } from './user.schema';
 
 export enum AccountProvider {
@@ -9,8 +9,8 @@ export enum AccountProvider {
 
 @Schema({ timestamps: true })
 export class ConnectedAccount extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
-  user: User;
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
+  user: User | Types.ObjectId;
 
   @Prop({ required: true, enum: AccountProvider })
   provider: AccountProvider;
