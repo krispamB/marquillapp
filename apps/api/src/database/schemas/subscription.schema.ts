@@ -19,6 +19,7 @@ export enum BillingCycle {
 export enum PaymentProvider {
     STRIPE = 'STRIPE',
     LEMON_SQUEEZY = 'LEMON_SQUEEZY',
+    PAYPAL = 'PAYPAL',
 }
 
 @Schema({ timestamps: true })
@@ -56,6 +57,12 @@ export class Subscription extends Document {
 
     @Prop({ enum: PaymentProvider })
     provider?: PaymentProvider;
+
+    @Prop({ required: true })
+    amountPaid: number;
+
+    @Prop({ required: true })
+    currency: string;
 
     @Prop()
     providerSubscriptionId?: string;
