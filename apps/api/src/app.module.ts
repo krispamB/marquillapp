@@ -19,10 +19,12 @@ import { UserModule } from './users/users.module';
 import { PostModule } from './post/post.module';
 import { ConfigService } from '@nestjs/config';
 import { EncryptionModule } from './encryption/encryption.module';
+import { SubscriptionModule } from './subscription/subscription.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    SubscriptionModule,
     AgentModule,
     LlmModule,
     ApifyModule.register({

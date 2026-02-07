@@ -11,6 +11,10 @@ import {
   PostDraftSchema,
   Tier,
   TierSchema,
+  Subscription,
+  SubscriptionSchema,
+  BillingCustomer,
+  BillingCustomerSchema,
 } from './schemas';
 
 @Global()
@@ -28,6 +32,8 @@ import {
       { name: ConnectedAccount.name, schema: ConnectedAccountSchema },
       { name: PostDraft.name, schema: PostDraftSchema },
       { name: Tier.name, schema: TierSchema },
+      { name: Subscription.name, schema: SubscriptionSchema },
+      { name: BillingCustomer.name, schema: BillingCustomerSchema },
     ]),
   ],
   exports: [MongooseModule],

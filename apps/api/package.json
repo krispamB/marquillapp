@@ -37,6 +37,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "cookie-parser": "^1.4.7",
+    "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
     "googleapis": "^168.0.0",
     "ioredis": "^5.8.2",
