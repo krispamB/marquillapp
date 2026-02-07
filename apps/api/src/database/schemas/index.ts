@@ -2,3 +2,5 @@ export * from './user.schema';
 export * from './connected-account.schema';
 export * from './post-draft.schema';
 export * from './tier.schema';
+export * from './subscription.schema';
+export * from './billing-customer.schema';
