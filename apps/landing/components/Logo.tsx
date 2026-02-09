@@ -1,35 +1,18 @@
-'use client';
-
-import Image from 'next/image';
-
 interface LogoProps {
   className?: string;
-  width?: number;
-  height?: number;
-  priority?: boolean;
+  compact?: boolean;
+  textClassName?: string;
 }
 
-export default function Logo({ 
-  className = '', 
-  width = 150, 
-  height = 40,
-  priority = true
-}: LogoProps) {
+export default function Logo({ className = '', compact = false, textClassName = '' }: LogoProps) {
   return (
-    <div className={className}>
-      <Image
-        src="/logo.svg"
-        alt="inContentai for LinkedIn logo"
-        width={width}
-        height={height}
-        priority={priority}
-        loading={priority ? undefined : 'lazy'}
-        onError={(e) => {
-          console.error('Logo failed to load');
-          // Fallback: hide the image if it fails to load
-          e.currentTarget.style.display = 'none';
-        }}
-      />
+    <div className={`inline-flex items-center gap-2 ${className}`} aria-label="Marquill">
+      <img src="/logo.svg" alt="Marquill" className="h-9 w-9" />
+      {!compact && (
+        <span className={`text-xl font-semibold tracking-tight text-text-primary ${textClassName}`}>
+          Marquill
+        </span>
+      )}
     </div>
   );
 }
