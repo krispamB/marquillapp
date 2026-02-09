@@ -1,3 +1,5 @@
+import InformateCarousel from '@/components/InformateCarousel';
+
 export const metadata = {
   title: 'Marquill - AI-Powered LinkedIn Content Platform',
   description:
@@ -19,9 +21,9 @@ export const metadata = {
 const stats = [
   { value: '150–300', label: 'Word range per post type' },
   { value: '3K', label: 'LinkedIn character guardrails' },
-  { value: '30s', label: 'Auto-save cadence in editor' },
-  { value: 'Multi', label: 'Personal + company pages' },
-  { value: 'TZ Smart', label: 'Timezone-aware scheduling' },
+  // { value: '30s', label: 'Auto-save cadence in editor' },
+  // { value: 'Multi', label: 'Personal + company pages' },
+  // { value: 'TZ Smart', label: 'Timezone-aware scheduling' },
 ];
 
 const pricing = [
@@ -131,40 +133,7 @@ export default function Home() {
 
       <section className="relative" id="informate">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-20">
-          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 items-center">
-            <div>
-                <p className="text-lg text-text-secondary">
-                  Create <span className="text-[#5B5CF6] font-semibold">LinkedIn-ready posts</span> from YouTube
-                  research.
-                </p>
-              <h2 className="mt-4 text-3xl sm:text-4xl font-semibold text-text-primary">
-                Turn research into publish-ready LinkedIn posts in minutes.
-              </h2>
-              <p className="mt-4 text-text-secondary">
-                Choose a post type, add your topic, and Marquill drafts a concise LinkedIn post with guardrails for
-                character limits. Edit, save, and schedule across accounts.
-              </p>
-            </div>
-            <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-xl">
-              <div className="text-sm font-semibold text-text-primary">Draft Intelligence</div>
-              <div className="mt-4 space-y-4 text-sm text-text-secondary">
-                <div className="flex items-center justify-between">
-                  <span>Character safety</span>
-                  <span className="font-semibold text-text-primary">3,000 max</span>
-                </div>
-                <div className="h-2 w-full rounded-full bg-[#EEF1FF]">
-                  <div className="h-2 w-4/5 rounded-full bg-gradient-to-r from-[#5B5CF6] to-[#9D6BFF]" />
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Auto-save</span>
-                  <span className="font-semibold text-text-primary">Every 30s</span>
-                </div>
-                <div className="h-2 w-full rounded-full bg-[#EEF1FF]">
-                  <div className="h-2 w-3/4 rounded-full bg-gradient-to-r from-[#4F84FF] to-[#6A7BFF]" />
-                </div>
-              </div>
-            </div>
-          </div>
+          <InformateCarousel />
         </div>
       </section>
 
