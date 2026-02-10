@@ -54,6 +54,14 @@ const pricing = [
   },
 ];
 
+const techLogos: Record<string, string> = {
+  linkedin: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770729052/marquill/LinkedIn_Symbol_2_pxns94.webp',
+  claude: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770729120/marquill/claude-color_ag3brm.webp',
+  chatgpt: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770729120/marquill/openai_qrnbyx.webp',
+  perplexity: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770729120/marquill/perplexity-color_olnehj.webp',
+  youtube: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770729022/marquill/YouTube_Symbol_2_yerobm.webp',
+};
+
 const faqs = [
   {
     question: 'What makes Marquill different from generic AI writers?',
@@ -197,17 +205,36 @@ export default function Home() {
                 Manage drafts, scheduling, images, and publishing without hopping between tools.
               </p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-text-secondary">
-              {[
-                'Draft editor with simple line breaks',
-                'Image search + uploads (LinkedIn sizes)',
-                'Calendar view for scheduled posts',
-                'Auto-refresh token handling',
-              ].map((item) => (
-                <div key={item} className="rounded-2xl bg-white/70 px-4 py-3 shadow-sm">
-                  {item}
-                </div>
-              ))}
+            <div className="orbit-wrap">
+              <div className="orbit-center">
+                {techLogos.linkedin ? (
+                  <img src={techLogos.linkedin} alt="LinkedIn" className="orbit-center-logo" />
+                ) : (
+                  <span className="orbit-placeholder" aria-label="LinkedIn logo placeholder" />
+                )}
+              </div>
+              <div className="orbit-ring">
+                {Object.entries(techLogos)
+                  .filter(([key]) => key !== 'linkedin')
+                  .map(([key, src], index, arr) => (
+                    <div
+                      key={key}
+                      className="orbit-item"
+                      style={{
+                        ['--orbit-angle' as string]: `${index * (360 / arr.length)}deg`,
+                        ['--float-delay' as string]: `${index * 0.5}s`,
+                      }}
+                    >
+                      <div className="orbit-badge">
+                        {src ? (
+                          <img src={src} alt={key} className="orbit-logo" />
+                        ) : (
+                          <span className="orbit-placeholder" aria-label={`${key} logo placeholder`} />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
             </div>
           </div>
         </div>
