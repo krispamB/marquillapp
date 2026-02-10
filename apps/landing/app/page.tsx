@@ -86,8 +86,8 @@ export default function Home() {
   return (
     <div className="bg-gradient-to-b from-white via-[#F6F2FF] to-[#EAF1FF]">
       <section className="relative overflow-hidden">
-        <div className="absolute -top-40 right-10 h-80 w-80 rounded-full bg-gradient-to-br from-[#C9D4FF] via-[#D8C8FF] to-[#F2C8FF] opacity-60 blur-3xl" />
-        <div className="absolute top-40 left-10 h-72 w-72 rounded-full bg-gradient-to-br from-[#B7E2FF] via-[#D4E7FF] to-[#E5D9FF] opacity-70 blur-3xl" />
+        <div className="mobile-decor absolute -top-40 right-10 h-80 w-80 rounded-full bg-gradient-to-br from-[#C9D4FF] via-[#D8C8FF] to-[#F2C8FF] opacity-60 blur-3xl" />
+        <div className="mobile-decor absolute top-40 left-10 h-72 w-72 rounded-full bg-gradient-to-br from-[#B7E2FF] via-[#D4E7FF] to-[#E5D9FF] opacity-70 blur-3xl" />
 
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 pt-24 pb-24 text-center">
           <div className="grid grid-cols-1 items-center">
@@ -134,13 +134,13 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="relative" id="informate">
+      <section className="perf-section relative" id="informate">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-20">
           <InformateCarousel />
         </div>
       </section>
 
-      <section id="how-it-works" className="py-20">
+      <section id="how-it-works" className="perf-section py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h2 className="text-3xl sm:text-4xl font-semibold text-text-primary">How Marquill Works</h2>
@@ -188,7 +188,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-16">
+      <section className="perf-section py-16">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-10 items-center">
             <div>
@@ -213,7 +213,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-20">
+      <section className="perf-section py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="rounded-[32px] border border-white/70 bg-white/80 p-10 shadow-2xl">
             <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 items-center">
@@ -256,7 +256,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="pricing" className="py-20">
+      <section id="pricing" className="perf-section py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <p className="text-sm font-semibold text-[#5B5CF6]">Simple, Transparent Pricing</p>
@@ -314,7 +314,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="faq" className="py-20">
+      <section id="faq" className="perf-section py-20">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h2 className="text-3xl sm:text-4xl font-semibold text-text-primary">

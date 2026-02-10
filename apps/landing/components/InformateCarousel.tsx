@@ -53,6 +53,7 @@ export default function InformateCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isActive, setIsActive] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
   const sectionRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -76,11 +77,14 @@ export default function InformateCarousel() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       return;
     }
+    if (isIOS) {
+      return;
+    }
     const id = window.setInterval(() => {
       setActiveIndex((prev) => (prev + 1) % posts.length);
     }, 2600);
     return () => window.clearInterval(id);
-  }, [isActive]);
+  }, [isActive, isIOS]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 768px)');
@@ -88,6 +92,11 @@ export default function InformateCarousel() {
     handleChange();
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    setIsIOS(/iPad|iPhone|iPod/.test(ua) && !(window as Window & { MSStream?: unknown }).MSStream);
   }, []);
 
   const orderedPosts = useMemo(() => {
@@ -116,7 +125,7 @@ export default function InformateCarousel() {
 
   return (
     <div ref={sectionRef} className="relative h-[70vh] min-h-[420px] sm:h-[460px]">
-      <div className="informate-carousel">
+      <div className="informate-carousel" data-ios={isIOS ? 'true' : 'false'}>
         {orderedPosts.map((post) => {
           const positionSet = isMobile ? mobilePositions : positions;
           const position = positionSet[post.offsetIndex + 2] ?? positionSet[2];
