@@ -1,11 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import Logo from './Logo';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+
+const navItems = [
+  { label: 'How it works', targetId: 'how-it-works' },
+  { label: 'Pricing', targetId: 'pricing' },
+  { label: 'FAQ', targetId: 'faq' },
+];
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isCompact, setIsCompact] = useState(false);
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
@@ -20,118 +26,114 @@ export default function Header() {
     }
   };
 
+  useEffect(() => {
+    const onScroll = () => {
+      setIsCompact(window.scrollY > 24);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-50 bg-white shadow-sm">
-      <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8" aria-label="Main navigation">
-        <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <div className="flex-shrink-0">
-            <Link href="/">
-              <Logo width={140} height={36} />
-            </Link>
-          </div>
+    <header className="fixed top-0 left-0 right-0 z-50">
+      <nav
+        className={`mx-auto mt-2 sm:mt-3 flex items-center justify-between bg-white/50 shadow-lg shadow-slate-200/30 backdrop-blur-xl transition-all duration-300 ${
+          isCompact ? 'max-w-5xl rounded-full px-6 py-4' : 'max-w-7xl rounded-3xl px-8 py-4'
+        }`}
+        aria-label="Main navigation"
+      >
+        <Link href="/" className="flex items-center transition-all duration-300">
+          <img
+            src="/logo.svg"
+            alt="Marquill"
+            className={`transition-all duration-300 ${isCompact ? 'h-7' : 'h-9'} w-auto`}
+          />
+        </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex md:items-center md:space-x-8">
+        <div className={`hidden md:flex items-center transition-all duration-300 ${isCompact ? 'gap-6' : 'gap-8'}`}>
+          {navItems.map((item) => (
             <a
-              href="#features"
-              onClick={(e) => handleSmoothScroll(e, 'features')}
-              className="text-text-secondary hover:text-primary transition-colors duration-200 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded px-2 py-1"
+              key={item.targetId}
+              href={`#${item.targetId}`}
+              onClick={(e) => handleSmoothScroll(e, item.targetId)}
+              className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
             >
-              Features
+              {item.label}
             </a>
-            <Link
-              href="/pricing"
-              className="text-text-secondary hover:text-primary transition-colors duration-200 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded px-2 py-1"
-            >
-              Pricing
-            </Link>
-            <div className="flex items-center space-x-3">
-              <button
-                className="text-text-secondary hover:text-primary px-4 py-2 rounded-lg font-semibold transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                aria-label="Login to inContentai"
-              >
-                Login
-              </button>
-              <button
-                className="bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                aria-label="Get started with inContentai"
-              >
-                Get Started
-              </button>
-            </div>
-          </div>
+          ))}
+        </div>
 
-          {/* Mobile menu button */}
-          <div className="md:hidden">
+        <div className={`hidden md:flex items-center transition-all duration-300 ${isCompact ? 'gap-2' : 'gap-3'}`}>
+          <button
+            className={`text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors ${
+              isCompact ? 'px-3 py-1.5' : 'px-4 py-2'
+            }`}
+            aria-label="Log in to Marquill"
+          >
+            Log in
+          </button>
+          <button
+            className={`text-sm font-semibold text-white rounded-full bg-gradient-to-r from-[#5B5CF6] via-[#6C62FF] to-[#7C72FF] shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all ${
+              isCompact ? 'px-4 py-2' : 'px-5 py-2.5'
+            }`}
+            aria-label="Start free trial"
+          >
+            Start free
+          </button>
+        </div>
+
+        <div className="md:hidden">
+          <button
+            onClick={toggleMobileMenu}
+            className={`inline-flex items-center justify-center rounded-full text-text-secondary hover:text-text-primary hover:bg-white/70 transition-all duration-300 ${
+              isCompact ? 'p-2' : 'p-3'
+            }`}
+            aria-expanded={mobileMenuOpen}
+            aria-label="Toggle navigation menu"
+            aria-controls="mobile-menu"
+          >
+            {mobileMenuOpen ? (
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
+        </div>
+      </nav>
+
+      {mobileMenuOpen && (
+        <div id="mobile-menu" className="md:hidden px-4 sm:px-6 pt-3">
+          <div className="flex flex-col gap-4 rounded-2xl bg-white/90 p-4 shadow-lg backdrop-blur-xl">
+            {navItems.map((item) => (
+              <a
+                key={item.targetId}
+                href={`#${item.targetId}`}
+                onClick={(e) => handleSmoothScroll(e, item.targetId)}
+                className="text-base font-medium text-text-secondary hover:text-text-primary transition-colors"
+              >
+                {item.label}
+              </a>
+            ))}
             <button
-              onClick={toggleMobileMenu}
-              className="inline-flex items-center justify-center p-3 rounded-md text-text-secondary hover:text-primary hover:bg-surface transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 min-h-[44px] min-w-[44px]"
-              aria-expanded={mobileMenuOpen}
-              aria-label="Toggle navigation menu"
-              aria-controls="mobile-menu"
+              className="w-full rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-text-secondary"
+              aria-label="Log in to Marquill"
             >
-              {mobileMenuOpen ? (
-                <svg
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth="2"
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              ) : (
-                <svg
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth="2"
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              )}
+              Log in
+            </button>
+            <button
+              className="w-full rounded-full bg-gradient-to-r from-[#5B5CF6] via-[#6C62FF] to-[#7C72FF] px-4 py-2 text-sm font-semibold text-white shadow-lg"
+              aria-label="Start free trial"
+            >
+              Start free
             </button>
           </div>
         </div>
-
-        {/* Mobile Navigation Menu */}
-        {mobileMenuOpen && (
-          <div id="mobile-menu" className="md:hidden border-t border-gray-200">
-            <div className="space-y-1 px-2 pb-3 pt-2">
-              <a
-                href="#features"
-                onClick={(e) => handleSmoothScroll(e, 'features')}
-                className="block px-3 py-3 rounded-md text-base font-medium text-text-secondary hover:text-primary hover:bg-surface transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset min-h-[44px]"
-              >
-                Features
-              </a>
-              <Link
-                href="/pricing"
-                className="block px-3 py-3 rounded-md text-base font-medium text-text-secondary hover:text-primary hover:bg-surface transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset min-h-[44px]"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Pricing
-              </Link>
-              <div className="space-y-2 mt-2">
-                <button
-                  className="w-full text-text-secondary hover:text-primary px-6 py-3 rounded-lg font-semibold border border-gray-300 hover:border-primary transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 min-h-[44px]"
-                  aria-label="Login to inContentai"
-                >
-                  Login
-                </button>
-                <button
-                  className="w-full bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition-all duration-200 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 min-h-[44px]"
-                  aria-label="Get started with inContentai"
-                >
-                  Get Started
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </nav>
+      )}
     </header>
   );
 }

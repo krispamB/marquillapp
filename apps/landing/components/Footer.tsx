@@ -1,76 +1,72 @@
 'use client';
 
-import Logo from './Logo';
 import Link from 'next/link';
+import Logo from './Logo';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
-  const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
-    e.preventDefault();
-    const element = document.getElementById(targetId);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
   return (
-    <footer className="bg-surface border-t border-gray-200" role="contentinfo">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Logo and Tagline Column */}
+    <footer className="bg-[#0F111A] text-white" role="contentinfo">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="space-y-4">
-            <Logo width={140} height={36} priority={false} />
-            <p className="text-text-secondary text-sm max-w-xs">
-              AI-powered LinkedIn content—researched, written, and ready to post
+            <Logo className="text-white" textClassName="text-white" />
+            <p className="text-sm text-white/70 max-w-xs">
+              Marquill is the shortcut to content that performs. Turn proven viral formats into winning scripts.
             </p>
           </div>
 
-          {/* Navigation Links Column */}
           <div>
-            <h3 className="text-text-primary font-semibold mb-4">Navigation</h3>
-            <ul className="space-y-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-white/80 mb-4">Product</h3>
+            <ul className="space-y-3 text-sm text-white/70">
               <li>
-                <a
-                  href="#features"
-                  onClick={(e) => handleSmoothScroll(e, 'features')}
-                  className="text-text-secondary hover:text-primary transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded inline-block"
-                >
-                  Features
+                <a href="#how-it-works" className="hover:text-white transition-colors">
+                  How it works
                 </a>
               </li>
               <li>
-                <Link
-                  href="/privacy-policy"
-                  className="text-text-secondary hover:text-primary transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded inline-block"
-                >
+                <a href="#pricing" className="hover:text-white transition-colors">
+                  Pricing
+                </a>
+              </li>
+              <li>
+                <a href="#faq" className="hover:text-white transition-colors">
+                  FAQ
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-white/80 mb-4">Company</h3>
+            <ul className="space-y-3 text-sm text-white/70">
+              <li>
+                <Link href="/privacy-policy" className="hover:text-white transition-colors">
                   Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/pricing" className="hover:text-white transition-colors">
+                  Pricing Details
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Legal Column */}
           <div>
-            <h3 className="text-text-primary font-semibold mb-4">Legal</h3>
-            <ul className="space-y-3">
-              <li>
-                <Link
-                  href="/privacy-policy"
-                  className="text-primary font-medium hover:text-opacity-80 transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded inline-block"
-                >
-                  Privacy Policy
-                </Link>
-              </li>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-white/80 mb-4">Contact</h3>
+            <ul className="space-y-3 text-sm text-white/70">
+              <li>Email: hello@marquill.ai</li>
+              <li>Partnerships: partners@marquill.ai</li>
+              <li>Press: press@marquill.ai</li>
             </ul>
           </div>
         </div>
 
-        {/* Copyright Notice */}
-        <div className="mt-12 pt-8 border-t border-gray-300">
-          <p className="text-center text-text-secondary text-sm">
-            © {currentYear} inContentai. All rights reserved.
-          </p>
+        <div className="mt-12 border-t border-white/10 pt-6 text-sm text-white/60 flex flex-col md:flex-row justify-between gap-4">
+          <span>© {currentYear} Marquill. All rights reserved.</span>
+          <span>Built for creators, agencies, and growth teams.</span>
         </div>
       </div>
     </footer>

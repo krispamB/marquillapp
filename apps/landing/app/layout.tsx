@@ -1,29 +1,36 @@
 import type { Metadata } from 'next';
-import { Inria_Sans } from 'next/font/google';
+import { Sofia_Sans, Sora } from 'next/font/google';
 import './globals.css';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
-const inriaSans = Inria_Sans({
+const sofiaSans = Sofia_Sans({
   subsets: ['latin'],
-  variable: '--font-inria-sans',
-  weight: ['300', '400', '700'],
+  variable: '--font-sofia-sans',
+  weight: ['300', '400', '500', '600', '700', '800'],
+  display: 'swap',
+});
+
+const sora = Sora({
+  subsets: ['latin'],
+  variable: '--font-sora',
+  weight: ['400', '500', '600', '700'],
   display: 'swap',
 });
 
 export const metadata: Metadata = {
-  title: 'inContentai',
-  description: 'AI powered LinkedIn content researched, written, and ready to post.',
+  title: 'Marquill',
+  description: 'Marquill helps teams transform viral formats into winning scripts and scalable content.',
   openGraph: {
-    title: 'inContentai for LinkedIn',
-    description: 'AI powered LinkedIn content researched, written, and ready to post.',
+    title: 'Marquill',
+    description: 'Transform viral formats into winning scripts with Marquill.',
     type: 'website',
     locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'inContentai for LinkedIn',
-    description: 'AI powered LinkedIn content researched, written, and ready to post.',
+    title: 'Marquill',
+    description: 'Transform viral formats into winning scripts with Marquill.',
   },
 };
 
@@ -33,7 +40,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inriaSans.variable}>
+    <html lang="en" className={`${sofiaSans.variable} ${sora.variable}`}>
       <body className="antialiased">
         <a href="#main-content" className="skip-to-content">
           Skip to main content
