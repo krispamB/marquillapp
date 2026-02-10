@@ -38,7 +38,7 @@ export default function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
       <nav
-        className={`mx-auto mt-2 sm:mt-3 flex items-center justify-between bg-white/50 shadow-lg shadow-slate-200/30 backdrop-blur-xl transition-all duration-300 ${
+        className={`mobile-blur-off mx-auto mt-2 sm:mt-3 flex items-center justify-between bg-white/50 shadow-lg shadow-slate-200/30 backdrop-blur-xl transition-all duration-300 ${
           isCompact ? 'max-w-5xl rounded-full px-6 py-4' : 'max-w-7xl rounded-3xl px-8 py-4'
         }`}
         aria-label="Main navigation"
