@@ -69,7 +69,7 @@ This landing page is designed to be easily customizable without requiring extens
 
 The logo is stored as a single file that can be easily replaced:
 
-**Location**: `public/logo.svg`
+**Location**: `publichttps://res.cloudinary.com/dnpvndlmy/image/upload/v1770689074/marquill/logo_bpw55v.svg`
 
 **Supported Formats**:
 - SVG (recommended for scalability)
@@ -85,7 +85,7 @@ The logo is stored as a single file that can be easily replaced:
 **Example**:
 ```bash
 # Replace with your logo
-cp /path/to/your/logo.svg public/logo.svg
+cp /path/to/yourhttps://res.cloudinary.com/dnpvndlmy/image/upload/v1770689074/marquill/logo_bpw55v.svg publichttps://res.cloudinary.com/dnpvndlmy/image/upload/v1770689074/marquill/logo_bpw55v.svg
 ```
 
 The logo will automatically appear in:
@@ -180,7 +180,7 @@ const openSans = Open_Sans({
 You want to change the logo, colors, and fonts to match your brand.
 
 **Steps**:
-1. Replace `public/logo.svg` with your logo
+1. Replace `publichttps://res.cloudinary.com/dnpvndlmy/image/upload/v1770689074/marquill/logo_bpw55v.svg` with your logo
 2. Update all colors in `config/theme.ts` to match your brand palette
 3. Update fonts in `config/theme.ts` and `app/layout.tsx`
 4. Rebuild: `npm run build`
@@ -219,7 +219,7 @@ colors: {
 **Problem**: Logo doesn't appear after replacement
 
 **Solutions**:
-- Verify the file is in `public/logo.svg`
+- Verify the file is in `publichttps://res.cloudinary.com/dnpvndlmy/image/upload/v1770689074/marquill/logo_bpw55v.svg`
 - Check the file format is supported (SVG, PNG)
 - Clear browser cache and hard refresh (Cmd+Shift+R or Ctrl+Shift+R)
 - Restart the development server

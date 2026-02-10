@@ -153,23 +153,23 @@ export default function Home() {
               {
                 title: 'Connect your accounts',
                 copy: 'Link personal profiles and company pages with secure OAuth access.',
-                tag: 'account-linking',
+                gif: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770688525/marquill/account-linking_cfzuku.gif',
               },
               {
                 title: 'Generate your draft',
                 copy: 'Pick Quick or Insight posts and create a 150–300 word LinkedIn draft.',
-                tag: 'ai-draft',
+                gif: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770688525/marquill/ai-draft_iwqson.gif',
               },
               {
                 title: 'Schedule or publish',
                 copy: 'Set local publish times or xpost instantly with LinkedIn-ready validation.',
-                tag: 'publishing',
+                gif: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770688525/marquill/publishing_arxvh0.gif',
               },
             ].map((card, index) => (
               <div key={card.title} className="rounded-3xl bg-white/80 p-6 shadow-lg border border-white/70">
                 <div className="h-48 overflow-hidden rounded-2xl border border-slate-200/60 bg-white">
                   <img
-                    src={`/gifs/${card.tag}.gif`}
+                    src={card.gif}
                     alt={`${card.title} demo`}
                     className="h-full w-full object-contain p-2"
                     loading="lazy"

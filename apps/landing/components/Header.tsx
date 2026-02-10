@@ -45,7 +45,7 @@ export default function Header() {
       >
         <Link href="/" className="flex items-center transition-all duration-300">
           <img
-            src="/logo.svg"
+            src="https://res.cloudinary.com/dnpvndlmy/image/upload/v1770689074/marquill/logo_bpw55v.svg"
             alt="Marquill"
             className={`transition-all duration-300 ${isCompact ? 'h-7' : 'h-9'} w-auto`}
             width={36}
