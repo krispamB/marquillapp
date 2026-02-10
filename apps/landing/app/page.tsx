@@ -110,9 +110,12 @@ export default function Home() {
                 <button className="rounded-full bg-[#1B1C2A] px-6 py-3 text-sm font-semibold text-white shadow-lg">
                   Start free
                 </button>
-                <button className="rounded-full border border-[#CBD2FF] bg-white/80 px-6 py-3 text-sm font-semibold text-text-primary">
+                <a
+                  href="#how-it-works"
+                  className="rounded-full border border-[#CBD2FF] bg-white/80 px-6 py-3 text-sm font-semibold text-text-primary"
+                >
                   See how it works
-                </button>
+                </a>
               </div>
               <div className="mt-6 flex items-center justify-center gap-3 text-sm text-text-secondary">
                 <div className="flex -space-x-2">
@@ -150,17 +153,27 @@ export default function Home() {
               {
                 title: 'Connect your accounts',
                 copy: 'Link personal profiles and company pages with secure OAuth access.',
+                tag: 'account-linking',
               },
               {
                 title: 'Generate your draft',
                 copy: 'Pick Quick or Insight posts and create a 150–300 word LinkedIn draft.',
+                tag: 'ai-draft',
               },
               {
                 title: 'Schedule or publish',
-                copy: 'Set local publish times or post instantly with LinkedIn-ready validation.',
+                copy: 'Set local publish times or xpost instantly with LinkedIn-ready validation.',
+                tag: 'publishing',
               },
             ].map((card, index) => (
               <div key={card.title} className="rounded-3xl bg-white/80 p-6 shadow-lg border border-white/70">
+                <div className="h-48 overflow-hidden rounded-2xl border border-slate-200/60 bg-white">
+                  <img
+                    src={`/gifs/${card.tag}.gif`}
+                    alt={`${card.title} demo`}
+                    className="h-full w-full object-contain p-2"
+                  />
+                </div>
                 <div className="text-xs font-semibold text-[#5B5CF6]">0{index + 1}</div>
                 <h3 className="mt-3 text-lg font-semibold text-text-primary">{card.title}</h3>
                 <p className="mt-3 text-sm text-text-secondary">{card.copy}</p>

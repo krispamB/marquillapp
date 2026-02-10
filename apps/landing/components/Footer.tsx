@@ -67,6 +67,7 @@ export default function Footer() {
         <div className="mt-12 border-t border-white/10 pt-6 text-sm text-white/60 flex flex-col md:flex-row justify-between gap-4">
           <span>© {currentYear} Marquill. All rights reserved.</span>
           <span>Built for creators, agencies, and growth teams.</span>
+          <a href="https://lordicon.com/">Icons by Lordicon.com</a>
         </div>
       </div>
     </footer>

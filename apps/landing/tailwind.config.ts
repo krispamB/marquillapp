@@ -1,5 +1,25 @@
 import type { Config } from 'tailwindcss';
-import { themeConfig } from './config/theme';
+
+const themeConfig = {
+  colors: {
+    primary: '#f25623',
+    secondary: '#4D4D4D',
+    accent: '#DEDEDE',
+    background: '#FFFFFF',
+    surface: '#F3F4F6',
+    text: {
+      primary: '#171717',
+      secondary: '#6B7280',
+    },
+  },
+  fonts: {
+    heading: 'Inter, sans-serif',
+    body: 'Inter, sans-serif',
+  },
+  spacing: {
+    section: '5rem',
+  },
+};
 
 const config: Config = {
   content: [
