@@ -7,7 +7,7 @@ interface LogoProps {
 export default function Logo({ className = '', compact = false, textClassName = '' }: LogoProps) {
   return (
     <div className={`inline-flex items-center gap-2 ${className}`} aria-label="Marquill">
-      <img src="/logo.svg" alt="Marquill" className="h-9 w-9" />
+      <img src="/logo.svg" alt="Marquill" className="h-9 w-9" width={36} height={36} />
       {!compact && (
         <span className={`text-xl font-semibold tracking-tight text-text-primary ${textClassName}`}>
           Marquill

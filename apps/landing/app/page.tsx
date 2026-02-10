@@ -172,6 +172,11 @@ export default function Home() {
                     src={`/gifs/${card.tag}.gif`}
                     alt={`${card.title} demo`}
                     className="h-full w-full object-contain p-2"
+                    loading="lazy"
+                    decoding="async"
+                    fetchPriority="low"
+                    width={400}
+                    height={400}
                   />
                 </div>
                 <div className="text-xs font-semibold text-[#5B5CF6]">0{index + 1}</div>
