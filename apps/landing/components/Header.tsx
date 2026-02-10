@@ -48,6 +48,8 @@ export default function Header() {
             src="/logo.svg"
             alt="Marquill"
             className={`transition-all duration-300 ${isCompact ? 'h-7' : 'h-9'} w-auto`}
+            width={36}
+            height={36}
           />
         </Link>
 
