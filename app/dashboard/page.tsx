@@ -1,7 +1,12 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import DashboardClient from "./DashboardClient";
-import type { UserApiResponse, UserProfile } from "../lib/types";
+import type {
+  ConnectedAccount,
+  ConnectedAccountsResponse,
+  UserApiResponse,
+  UserProfile,
+} from "../lib/types";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
@@ -50,5 +55,29 @@ export default async function DashboardPage() {
     tier: apiUser?.tier ?? undefined,
   };
 
-  return <DashboardClient user={user} />;
+  let connectedAccounts: ConnectedAccount[] = [];
+  try {
+    const response = await fetch(`${apiBase}/auth/connected-accounts`, {
+      cache: "no-store",
+      headers: {
+        cookie: cookieHeader,
+      },
+    });
+
+    if (response.ok) {
+      const payload = (await response.json()) as ConnectedAccountsResponse;
+      connectedAccounts =
+        payload?.data?.map((account) => ({
+          id: account._id,
+          provider: account.provider,
+          accessTokenExpiresAt: account.accessTokenExpiresAt,
+          profile: account.profileMetadata ?? {},
+          isActive: account.isActive,
+        })) ?? [];
+    }
+  } catch {
+    connectedAccounts = [];
+  }
+
+  return <DashboardClient user={user} connectedAccounts={connectedAccounts} />;
 }

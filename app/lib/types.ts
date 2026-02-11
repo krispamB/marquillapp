@@ -36,3 +36,31 @@ export type UserApiResponse = UserProfile & {
   updatedAt?: string;
   __v?: number;
 };
+
+export type ConnectedAccountProvider = "LINKEDIN" | (string & {});
+
+export type ConnectedAccountProfile = {
+  name?: string;
+  email?: string;
+  picture?: string;
+};
+
+export type ConnectedAccount = {
+  id: string;
+  provider: ConnectedAccountProvider;
+  accessTokenExpiresAt?: string;
+  profile: ConnectedAccountProfile;
+  isActive?: boolean;
+};
+
+export type ConnectedAccountsResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: Array<{
+    _id: string;
+    provider: ConnectedAccountProvider;
+    accessTokenExpiresAt?: string;
+    profileMetadata?: ConnectedAccountProfile;
+    isActive?: boolean;
+  }>;
+};

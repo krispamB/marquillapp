@@ -10,19 +10,13 @@ import {
 } from "lucide-react";
 import Sidebar from "./Sidebar";
 import { Card, Icon, ListItem, PillButton, UserAvatar } from "./components";
-import type { UserProfile } from "../lib/types";
+import type { ConnectedAccount, UserProfile } from "../lib/types";
 
 const navItems = [
   { label: "Overview", active: true, icon: <LayoutDashboard className="h-4 w-4" /> },
   { label: "Posts", active: false, icon: <PenSquare className="h-4 w-4" /> },
   { label: "Calendar", active: false, icon: <CalendarClock className="h-4 w-4" /> },
   { label: "Analytics", active: false, icon: <TrendingUp className="h-4 w-4" /> },
-];
-
-const linkedInAccounts = [
-  { name: "Christopher Pam", initials: "CP" },
-  { name: "Marquill Inc", initials: "MI" },
-  { name: "Avery Johnson", initials: "AJ" },
 ];
 
 const stats = {
@@ -103,7 +97,13 @@ function getInitials(name: string, email: string) {
   return email.slice(0, 2).toUpperCase();
 }
 
-export default function DashboardPage({ user }: { user: UserProfile }) {
+export default function DashboardPage({
+  user,
+  connectedAccounts,
+}: {
+  user: UserProfile;
+  connectedAccounts: ConnectedAccount[];
+}) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const now = useMemo(() => new Date(), []);
   const monthLabel = now.toLocaleString("en-US", {
@@ -157,7 +157,7 @@ export default function DashboardPage({ user }: { user: UserProfile }) {
           <Sidebar
             user={{ ...user, initials }}
             items={navItems}
-            accounts={linkedInAccounts}
+            accounts={connectedAccounts}
             primaryAccountIndex={0}
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed((value) => !value)}
