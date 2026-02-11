@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { ChevronDown, ChevronLeft, Linkedin, Plus, Settings } from "lucide-react";
+import { ChevronDown, ChevronLeft, Plus, Settings } from "lucide-react";
 import { Card, NavItem, PillButton, UserAvatar } from "./components";
 import type { ConnectedAccountProvider, UserProfile } from "../lib/types";
 
@@ -64,9 +64,21 @@ export default function Sidebar({
   const providerIcon = (provider: ConnectedAccountProvider, className: string) => {
     switch (provider) {
       case "LINKEDIN":
-        return <Linkedin className={className} />;
+        return (
+          <img
+            src="https://res.cloudinary.com/dnpvndlmy/image/upload/v1770814368/marquill/LinkedIn_Symbol_2_qs8mjj.webp"
+            alt="LinkedIn"
+            className={className}
+          />
+        );
       default:
-        return <Linkedin className={className} />;
+        return (
+          <img
+            src="https://res.cloudinary.com/dnpvndlmy/image/upload/v1770814368/marquill/LinkedIn_Symbol_2_qs8mjj.webp"
+            alt="Connected account"
+            className={className}
+          />
+        );
     }
   };
 
@@ -192,10 +204,7 @@ export default function Sidebar({
                     {primaryAccount.profile?.name ?? "Connected account"}
                   </p>
                   <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                    {providerIcon(
-                      primaryAccount.provider,
-                      "h-3.5 w-3.5 text-[#0A66C2]",
-                    )}
+                    {providerIcon(primaryAccount.provider, "h-3.5 w-3.5")}
                     <span>{providerLabel(primaryAccount.provider)}</span>
                   </div>
                   {primaryAccount.profile?.email ? (
@@ -282,7 +291,7 @@ export default function Sidebar({
                           })()}
                         </div>
                       </div>
-                      {providerIcon(account.provider, "h-4 w-4 text-[#0A66C2]")}
+                      {providerIcon(account.provider, "h-4 w-4")}
                     </div>
                   ))}
                 </div>

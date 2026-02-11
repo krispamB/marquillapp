@@ -100,9 +100,11 @@ function getInitials(name: string, email: string) {
 export default function DashboardPage({
   user,
   connectedAccounts,
+  primaryAccountId,
 }: {
   user: UserProfile;
   connectedAccounts: ConnectedAccount[];
+  primaryAccountId?: string;
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const now = useMemo(() => new Date(), []);
@@ -113,6 +115,8 @@ export default function DashboardPage({
   const monthGrid = useMemo(() => buildMonthGrid(now), [now]);
   const usageRatio = Math.round((stats.postsThisMonth / stats.postLimit) * 100);
   const initials = getInitials(user.name, user.email);
+  const hasConnectedAccounts =
+    connectedAccounts.length > 0 && Boolean(primaryAccountId);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[var(--color-background)]">
@@ -179,164 +183,177 @@ export default function DashboardPage({
               </PillButton>
             </div>
 
-            <section className="grid gap-4 lg:grid-cols-2">
-              <Card className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                      Posts this month
-                    </p>
-                    <div className="mt-3 flex items-baseline gap-3">
-                      <span className="text-3xl font-semibold text-[var(--color-text-primary)]">
-                        {stats.postsThisMonth}
-                      </span>
-                      <span className="text-sm font-semibold text-[var(--color-text-secondary)]">
-                        / {stats.postLimit}
-                      </span>
-                    </div>
-                  </div>
-                  <Icon>
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      className="h-4 w-4"
-                      fill="currentColor"
-                    >
-                      <path d="M4.5 6.75A2.25 2.25 0 0 1 6.75 4.5h10.5A2.25 2.25 0 0 1 19.5 6.75v10.5A2.25 2.25 0 0 1 17.25 19.5H6.75A2.25 2.25 0 0 1 4.5 17.25V6.75Zm5.25.75a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5Zm0 4.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5Z" />
-                    </svg>
-                  </Icon>
-                </div>
-                <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                  You are on track to hit your February goal.
-                </p>
+            {!hasConnectedAccounts ? (
+              <Card className="border-dashed border-[var(--color-border)] bg-white/60 p-6 text-sm text-[var(--color-text-secondary)]">
+                Connect an account to load dashboard data.
               </Card>
+            ) : null}
 
-              <Card className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                      Usage
-                    </p>
-                    <div className="mt-3 flex items-baseline gap-3">
-                      <span className="text-3xl font-semibold text-[var(--color-text-primary)]">
-                        {usageRatio}%
-                      </span>
-                      <span className="text-sm font-semibold text-[var(--color-text-secondary)]">
-                        this month
-                      </span>
+            <div
+              className={`flex flex-col gap-8 ${
+                hasConnectedAccounts ? "" : "pointer-events-none opacity-60"
+              }`}
+              aria-disabled={!hasConnectedAccounts}
+            >
+              <section className="grid gap-4 lg:grid-cols-2">
+                <Card className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                        Posts this month
+                      </p>
+                      <div className="mt-3 flex items-baseline gap-3">
+                        <span className="text-3xl font-semibold text-[var(--color-text-primary)]">
+                          {stats.postsThisMonth}
+                        </span>
+                        <span className="text-sm font-semibold text-[var(--color-text-secondary)]">
+                          / {stats.postLimit}
+                        </span>
+                      </div>
                     </div>
+                    <Icon>
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4"
+                        fill="currentColor"
+                      >
+                        <path d="M4.5 6.75A2.25 2.25 0 0 1 6.75 4.5h10.5A2.25 2.25 0 0 1 19.5 6.75v10.5A2.25 2.25 0 0 1 17.25 19.5H6.75A2.25 2.25 0 0 1 4.5 17.25V6.75Zm5.25.75a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5Zm0 4.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5Z" />
+                      </svg>
+                    </Icon>
                   </div>
-                  <Icon>
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      className="h-4 w-4"
-                      fill="currentColor"
-                    >
-                      <path d="M3.75 12a8.25 8.25 0 0 1 14.25-5.7.75.75 0 0 1-1.06 1.06A6.75 6.75 0 1 0 18.75 12a.75.75 0 0 1 1.5 0 8.25 8.25 0 0 1-16.5 0Z" />
-                      <path d="M12 6.75a.75.75 0 0 1 .75.75v4.19l2.47 2.47a.75.75 0 1 1-1.06 1.06l-2.69-2.69a.75.75 0 0 1-.22-.53V7.5a.75.75 0 0 1 .75-.75Z" />
-                    </svg>
-                  </Icon>
-                </div>
-                <div className="mt-4 h-2 w-full rounded-full bg-[var(--color-border)]">
-                  <div
-                    className="h-2 rounded-full bg-[var(--color-primary)]"
-                    style={{ width: `${stats.usagePercent}%` }}
-                  />
-                </div>
-              </Card>
-            </section>
-
-            <Card className="p-6">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="font-[var(--font-sora)] text-xl font-semibold text-[var(--color-text-primary)]">
-                    Quick actions
-                  </h2>
-                  <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-                    Start a new idea or schedule content in seconds.
+                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                    You are on track to hit your February goal.
                   </p>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <PillButton icon={<PenSquare className="h-4 w-4" />}>
-                    New post
-                  </PillButton>
-                  <PillButton
-                    variant="secondary"
-                    icon={<CalendarClock className="h-4 w-4" />}
-                  >
-                    Schedule
-                  </PillButton>
-                </div>
-              </div>
-            </Card>
+                </Card>
 
-            <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-              <Card className="p-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-[var(--font-sora)] text-xl font-semibold text-[var(--color-text-primary)]">
-                    Drafts
-                  </h2>
-                  <PillButton variant="ghost">View all</PillButton>
-                </div>
-                <div className="mt-6 flex flex-col gap-4">
-                  {drafts.map((draft) => (
-                    <ListItem
-                      key={draft.title}
-                      title={draft.title}
-                      subtitle={`Updated ${draft.updatedAt}`}
-                      badge={draft.status}
-                      icon={<PenSquare className="h-4 w-4" />}
-                    />
-                  ))}
-                </div>
-              </Card>
-
-              <Card className="p-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-[var(--font-sora)] text-xl font-semibold text-[var(--color-text-primary)]">
-                    Scheduled
-                  </h2>
-                  <PillButton variant="ghost" icon={<Activity className="h-4 w-4" />}>
-                    Timeline
-                  </PillButton>
-                </div>
-
-                <div className="mt-5 grid grid-cols-7 gap-2 text-center text-[11px] font-semibold text-[var(--color-text-secondary)]">
-                  {["S", "M", "T", "W", "T", "F", "S"].map((label, index) => (
-                    <div key={`${label}-${index}`}>{label}</div>
-                  ))}
-                </div>
-                <div className="mt-3 grid grid-cols-7 gap-2">
-                  {monthGrid.map((cell, index) => (
-                    <div
-                      key={`day-${index}`}
-                      className={`flex h-9 items-center justify-center rounded-2xl text-xs font-semibold transition ${
-                        cell.day === null
-                          ? "text-transparent"
-                          : cell.isToday
-                          ? "bg-[var(--color-secondary)] text-white shadow-[0_12px_30px_-20px_rgba(28,27,39,0.45)]"
-                          : "border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-white/70"
-                      }`}
-                    >
-                      {cell.day ?? "0"}
+                <Card className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                        Usage
+                      </p>
+                      <div className="mt-3 flex items-baseline gap-3">
+                        <span className="text-3xl font-semibold text-[var(--color-text-primary)]">
+                          {usageRatio}%
+                        </span>
+                        <span className="text-sm font-semibold text-[var(--color-text-secondary)]">
+                          this month
+                        </span>
+                      </div>
                     </div>
-                  ))}
-                </div>
-
-                <div className="mt-6 space-y-3">
-                  {scheduledPosts.map((post) => (
-                    <ListItem
-                      key={post.title}
-                      title={post.title}
-                      subtitle={post.date}
-                      badge="Scheduled"
-                      icon={<CalendarClock className="h-4 w-4" />}
+                    <Icon>
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4"
+                        fill="currentColor"
+                      >
+                        <path d="M3.75 12a8.25 8.25 0 0 1 14.25-5.7.75.75 0 0 1-1.06 1.06A6.75 6.75 0 1 0 18.75 12a.75.75 0 0 1 1.5 0 8.25 8.25 0 0 1-16.5 0Z" />
+                        <path d="M12 6.75a.75.75 0 0 1 .75.75v4.19l2.47 2.47a.75.75 0 1 1-1.06 1.06l-2.69-2.69a.75.75 0 0 1-.22-.53V7.5a.75.75 0 0 1 .75-.75Z" />
+                      </svg>
+                    </Icon>
+                  </div>
+                  <div className="mt-4 h-2 w-full rounded-full bg-[var(--color-border)]">
+                    <div
+                      className="h-2 rounded-full bg-[var(--color-primary)]"
+                      style={{ width: `${stats.usagePercent}%` }}
                     />
-                  ))}
+                  </div>
+                </Card>
+              </section>
+
+              <Card className="p-6">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h2 className="font-[var(--font-sora)] text-xl font-semibold text-[var(--color-text-primary)]">
+                      Quick actions
+                    </h2>
+                    <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+                      Start a new idea or schedule content in seconds.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <PillButton icon={<PenSquare className="h-4 w-4" />}>
+                      New post
+                    </PillButton>
+                    <PillButton
+                      variant="secondary"
+                      icon={<CalendarClock className="h-4 w-4" />}
+                    >
+                      Schedule
+                    </PillButton>
+                  </div>
                 </div>
               </Card>
-            </section>
+
+              <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+                <Card className="p-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-[var(--font-sora)] text-xl font-semibold text-[var(--color-text-primary)]">
+                      Drafts
+                    </h2>
+                    <PillButton variant="ghost">View all</PillButton>
+                  </div>
+                  <div className="mt-6 flex flex-col gap-4">
+                    {drafts.map((draft) => (
+                      <ListItem
+                        key={draft.title}
+                        title={draft.title}
+                        subtitle={`Updated ${draft.updatedAt}`}
+                        badge={draft.status}
+                        icon={<PenSquare className="h-4 w-4" />}
+                      />
+                    ))}
+                  </div>
+                </Card>
+
+                <Card className="p-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-[var(--font-sora)] text-xl font-semibold text-[var(--color-text-primary)]">
+                      Scheduled
+                    </h2>
+                    <PillButton variant="ghost" icon={<Activity className="h-4 w-4" />}>
+                      Timeline
+                    </PillButton>
+                  </div>
+
+                  <div className="mt-5 grid grid-cols-7 gap-2 text-center text-[11px] font-semibold text-[var(--color-text-secondary)]">
+                    {["S", "M", "T", "W", "T", "F", "S"].map((label, index) => (
+                      <div key={`${label}-${index}`}>{label}</div>
+                    ))}
+                  </div>
+                  <div className="mt-3 grid grid-cols-7 gap-2">
+                    {monthGrid.map((cell, index) => (
+                      <div
+                        key={`day-${index}`}
+                        className={`flex h-9 items-center justify-center rounded-2xl text-xs font-semibold transition ${
+                          cell.day === null
+                            ? "text-transparent"
+                            : cell.isToday
+                            ? "bg-[var(--color-secondary)] text-white shadow-[0_12px_30px_-20px_rgba(28,27,39,0.45)]"
+                            : "border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-white/70"
+                        }`}
+                      >
+                        {cell.day ?? "0"}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-6 space-y-3">
+                    {scheduledPosts.map((post) => (
+                      <ListItem
+                        key={post.title}
+                        title={post.title}
+                        subtitle={post.date}
+                        badge="Scheduled"
+                        icon={<CalendarClock className="h-4 w-4" />}
+                      />
+                    ))}
+                  </div>
+                </Card>
+              </section>
+            </div>
           </main>
         </div>
       </div>

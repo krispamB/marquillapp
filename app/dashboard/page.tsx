@@ -79,5 +79,13 @@ export default async function DashboardPage() {
     connectedAccounts = [];
   }
 
-  return <DashboardClient user={user} connectedAccounts={connectedAccounts} />;
+  const primaryAccountId = connectedAccounts[0]?.id;
+
+  return (
+    <DashboardClient
+      user={user}
+      connectedAccounts={connectedAccounts}
+      primaryAccountId={primaryAccountId}
+    />
+  );
 }
