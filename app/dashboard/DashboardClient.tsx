@@ -298,8 +298,8 @@ export default function DashboardPage({ user }: { user: DashboardUser }) {
                 </div>
 
                 <div className="mt-5 grid grid-cols-7 gap-2 text-center text-[11px] font-semibold text-[var(--color-text-secondary)]">
-                  {["S", "M", "T", "W", "T", "F", "S"].map((label) => (
-                    <div key={label}>{label}</div>
+                  {["S", "M", "T", "W", "T", "F", "S"].map((label, index) => (
+                    <div key={`${label}-${index}`}>{label}</div>
                   ))}
                 </div>
                 <div className="mt-3 grid grid-cols-7 gap-2">

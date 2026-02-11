@@ -22,9 +22,10 @@ type CookieUser = {
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
+  const accessToken = cookieStore.get("access_token")?.value;
   const userCookie = cookieStore.get("user")?.value;
 
-  if (!userCookie) {
+  if (!accessToken || !userCookie) {
     redirect("/");
   }
 
