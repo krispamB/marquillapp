@@ -9,7 +9,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Sidebar from "./Sidebar";
-import { Card, Icon, ListItem, PillButton } from "./components";
+import { Card, Icon, ListItem, PillButton, UserAvatar } from "./components";
+import type { UserProfile } from "../lib/types";
 
 const navItems = [
   { label: "Overview", active: true, icon: <LayoutDashboard className="h-4 w-4" /> },
@@ -17,13 +18,6 @@ const navItems = [
   { label: "Calendar", active: false, icon: <CalendarClock className="h-4 w-4" /> },
   { label: "Analytics", active: false, icon: <TrendingUp className="h-4 w-4" /> },
 ];
-
-type DashboardUser = {
-  name: string;
-  email: string;
-  initials: string;
-  avatarUrl?: string;
-};
 
 const linkedInAccounts = [
   { name: "Christopher Pam", initials: "CP" },
@@ -97,7 +91,19 @@ function buildMonthGrid(baseDate: Date) {
   return cells;
 }
 
-export default function DashboardPage({ user }: { user: DashboardUser }) {
+function getInitials(name: string, email: string) {
+  const cleaned = name.trim();
+  if (cleaned.length > 0) {
+    const parts = cleaned.split(/\s+/).filter(Boolean);
+    if (parts.length === 1) {
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+    return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+  }
+  return email.slice(0, 2).toUpperCase();
+}
+
+export default function DashboardPage({ user }: { user: UserProfile }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const now = useMemo(() => new Date(), []);
   const monthLabel = now.toLocaleString("en-US", {
@@ -106,6 +112,7 @@ export default function DashboardPage({ user }: { user: DashboardUser }) {
   });
   const monthGrid = useMemo(() => buildMonthGrid(now), [now]);
   const usageRatio = Math.round((stats.postsThisMonth / stats.postLimit) * 100);
+  const initials = getInitials(user.name, user.email);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[var(--color-background)]">
@@ -116,9 +123,7 @@ export default function DashboardPage({ user }: { user: DashboardUser }) {
         <header className="flex flex-col gap-4 md:hidden">
           <Card className="flex items-center justify-between gap-3 px-4 py-3">
             <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-full bg-[var(--color-secondary)] text-sm font-semibold text-white">
-                {user.initials}
-              </div>
+              <UserAvatar initials={initials} avatarUrl={user.avatar} />
               <div>
                 <p className="text-sm font-semibold text-[var(--color-text-primary)]">
                   {user.name}
@@ -150,7 +155,7 @@ export default function DashboardPage({ user }: { user: DashboardUser }) {
           }`}
         >
           <Sidebar
-            user={{ ...user, role: "Product designer" }}
+            user={{ ...user, initials }}
             items={navItems}
             accounts={linkedInAccounts}
             primaryAccountIndex={0}

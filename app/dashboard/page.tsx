@@ -1,24 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import DashboardClient from "./DashboardClient";
-
-function getInitials(name: string, email: string) {
-  const cleaned = name.trim();
-  if (cleaned.length > 0) {
-    const parts = cleaned.split(/\s+/).filter(Boolean);
-    if (parts.length === 1) {
-      return parts[0].slice(0, 2).toUpperCase();
-    }
-    return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
-  }
-  return email.slice(0, 2).toUpperCase();
-}
-
-type CookieUser = {
-  name?: string;
-  email?: string;
-  avatar?: string;
-};
+import type { UserApiResponse, UserProfile } from "../lib/types";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
@@ -29,29 +12,43 @@ export default async function DashboardPage() {
     redirect("/");
   }
 
-  let parsedUser: CookieUser | null = null;
+  const apiBase =
+    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
+  const cookieHeader = cookieStore
+    .getAll()
+    .map(({ name, value }) => `${name}=${value}`)
+    .join("; ");
+
+  let apiUser: UserApiResponse | null = null;
   try {
-    parsedUser = JSON.parse(userCookie) as CookieUser;
+    const response = await fetch(`${apiBase}/users/me`, {
+      cache: "no-store",
+      headers: {
+        cookie: cookieHeader,
+      },
+    });
+
+    if (!response.ok) {
+      redirect("/");
+    }
+
+    apiUser = (await response.json()) as UserApiResponse;
   } catch {
-    parsedUser = null;
+    apiUser = null;
   }
 
-  const email = parsedUser?.email?.trim();
-  if (!email) {
+  const name = apiUser?.name?.trim();
+  const email = apiUser?.email?.trim();
+  if (!name || !email) {
     redirect("/");
   }
 
-  const name = parsedUser?.name?.trim() || email;
-  const initials = getInitials(name, email);
+  const user: UserProfile = {
+    name,
+    email,
+    avatar: apiUser?.avatar ?? undefined,
+    tier: apiUser?.tier ?? undefined,
+  };
 
-  return (
-    <DashboardClient
-      user={{
-        name,
-        email,
-        initials,
-        avatarUrl: parsedUser?.avatar,
-      }}
-    />
-  );
+  return <DashboardClient user={user} />;
 }

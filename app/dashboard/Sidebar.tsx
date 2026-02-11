@@ -3,15 +3,12 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { ChevronDown, ChevronLeft, Linkedin, Plus, Settings } from "lucide-react";
-import { Card, NavItem, PillButton } from "./components";
+import { Card, NavItem, PillButton, UserAvatar } from "./components";
+import type { UserProfile } from "../lib/types";
 
 type SidebarUser = {
-  name: string;
-  email: string;
   initials: string;
-  role?: string;
-  avatarUrl?: string;
-};
+} & UserProfile;
 
 type SidebarItem = {
   label: string;
@@ -82,19 +79,17 @@ export default function Sidebar({
         </div>
 
         <div className={`flex w-full items-center gap-4 ${collapsed ? "flex-col" : ""}`}>
-          <div className="grid h-12 w-12 place-items-center rounded-full bg-[var(--color-secondary)] text-base font-semibold text-white">
-            {user.initials}
-          </div>
+          <UserAvatar
+            initials={user.initials}
+            avatarUrl={user.avatar}
+            sizeClass="h-12 w-12"
+            textClass="text-base"
+          />
           {collapsed ? null : (
             <div>
               <p className="text-sm font-semibold text-[var(--color-text-primary)]">
                 {user.name}
               </p>
-              {user.role ? (
-                <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-secondary)]">
-                  {user.role}
-                </p>
-              ) : null}
               <p className="text-xs text-[var(--color-text-secondary)]">
                 {user.email}
               </p>

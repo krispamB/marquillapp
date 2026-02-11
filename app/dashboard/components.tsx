@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { UserProfile } from "../lib/types";
 
 export function Icon({
   children,
@@ -116,6 +117,36 @@ export function ListItem({
       <span className="rounded-full bg-[var(--color-accent)]/20 px-3 py-1 text-xs font-semibold text-[var(--color-primary)]">
         {badge}
       </span>
+    </div>
+  );
+}
+
+export function UserAvatar({
+  initials,
+  avatarUrl,
+  sizeClass = "h-10 w-10",
+  textClass = "text-sm",
+}: {
+  initials: string;
+  avatarUrl?: UserProfile["avatar"];
+  sizeClass?: string;
+  textClass?: string;
+}) {
+  return (
+    <div className="rounded-full bg-gradient-to-br from-[#7C3AED] via-[#A855F7] to-[#EC4899] p-[2px]">
+      <div
+        className={`grid ${sizeClass} place-items-center overflow-hidden rounded-full bg-[var(--color-secondary)] font-semibold text-white ${textClass}`}
+      >
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <span>{initials}</span>
+        )}
+      </div>
     </div>
   );
 }
