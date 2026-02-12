@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import type { MouseEventHandler, ReactNode } from "react";
+import { Plug } from "lucide-react";
 import type { UserProfile } from "../lib/types";
 
 export function Icon({
@@ -37,13 +38,27 @@ export function PillButton({
   children,
   variant = "primary",
   icon,
+  onClick,
+  ariaLabel,
+  ariaExpanded,
+  ariaControls,
+  type = "button",
+  disabled = false,
+  className = "",
 }: {
   children: ReactNode;
   variant?: "primary" | "secondary" | "ghost";
   icon?: ReactNode;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+  ariaLabel?: string;
+  ariaExpanded?: boolean;
+  ariaControls?: string;
+  type?: "button" | "submit" | "reset";
+  disabled?: boolean;
+  className?: string;
 }) {
   const base =
-    "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition active:scale-[0.98]";
+    "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60";
   const styles: Record<typeof variant, string> = {
     primary:
       "bg-[var(--color-secondary)] text-white shadow-[0_18px_40px_-26px_rgba(28,27,39,0.55)] hover:-translate-y-0.5",
@@ -54,10 +69,122 @@ export function PillButton({
   };
 
   return (
-    <button className={`${base} ${styles[variant]}`}>
+    <button
+      type={type}
+      disabled={disabled}
+      onClick={onClick}
+      aria-label={ariaLabel}
+      aria-expanded={ariaExpanded}
+      aria-controls={ariaControls}
+      className={`${base} ${styles[variant]} ${className}`}
+    >
       {icon ? <span className="text-base">{icon}</span> : null}
       {children}
     </button>
+  );
+}
+
+export function ConnectAccountCta({
+  isConnectMenuOpen,
+  onToggleConnectMenu,
+  onConnectLinkedIn,
+  isConnectingLinkedIn = false,
+  menuId = "connect-account-menu-cta",
+}: {
+  isConnectMenuOpen: boolean;
+  onToggleConnectMenu: () => void;
+  onConnectLinkedIn: () => void;
+  isConnectingLinkedIn?: boolean;
+  menuId?: string;
+}) {
+  return (
+    <Card className="relative overflow-visible border-[var(--color-border)] bg-white/80 p-0">
+      <div className="pointer-events-none absolute left-4 right-4 top-2 h-1.5 rounded-full bg-gradient-to-r from-[var(--color-primary)] via-[#8B6CFF] to-[var(--color-accent)]" />
+      <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-accent)] text-white">
+            <Plug className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="text-base font-semibold text-[var(--color-text-primary)]">
+              Connect your account
+            </p>
+            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+              You are one step away from loading your dashboard data and publishing tools.
+            </p>
+          </div>
+        </div>
+        <div className="relative">
+          <PillButton
+            variant="primary"
+            ariaLabel="Open connect account options"
+            ariaExpanded={isConnectMenuOpen}
+            ariaControls={menuId}
+            onClick={onToggleConnectMenu}
+            className="w-fit"
+          >
+            Connect account
+          </PillButton>
+          <ConnectProviderMenu
+            menuId={menuId}
+            isOpen={isConnectMenuOpen}
+            isConnectingLinkedIn={isConnectingLinkedIn}
+            onConnectLinkedIn={onConnectLinkedIn}
+          />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+export function ConnectProviderMenu({
+  menuId,
+  isOpen,
+  isConnectingLinkedIn = false,
+  onConnectLinkedIn,
+  align = "right",
+}: {
+  menuId: string;
+  isOpen: boolean;
+  isConnectingLinkedIn?: boolean;
+  onConnectLinkedIn: () => void;
+  align?: "left" | "right";
+}) {
+  return (
+    <div
+      id={menuId}
+      role="menu"
+      aria-hidden={!isOpen}
+      className={`pointer-events-none absolute top-12 z-40 h-40 w-44 transition-all duration-200 ${
+        align === "right" ? "right-0" : "left-0"
+      } ${isOpen ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"}`}
+    >
+      <button
+        type="button"
+        role="menuitem"
+        onClick={onConnectLinkedIn}
+        disabled={isConnectingLinkedIn}
+        className={`group pointer-events-auto absolute right-2 top-2 flex h-16 w-16 items-center justify-center rounded-full border border-[var(--color-border)] bg-white/95 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.45)] backdrop-blur-md transition-all ${
+          isOpen ? "scale-100" : "scale-90"
+        } disabled:cursor-not-allowed disabled:opacity-70`}
+        aria-label="Connect LinkedIn account"
+      >
+        <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#0A66C2]/10">
+          <img
+            src="/LinkedIn_Icon_1.webp"
+            alt="LinkedIn"
+            className="h-5 w-5 object-contain"
+          />
+        </span>
+      </button>
+      <p
+        className={`pointer-events-none absolute right-1 top-20 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-[var(--color-text-primary)] shadow-[0_10px_30px_-20px_rgba(15,23,42,0.35)] transition-all ${
+          isOpen ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
+        }`}
+      >
+        {isConnectingLinkedIn ? "Connecting..." : "LinkedIn"}
+      </p>
+    </div>
   );
 }
 

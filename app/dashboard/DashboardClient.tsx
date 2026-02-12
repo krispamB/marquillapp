@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   CalendarClock,
@@ -9,8 +9,19 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Sidebar from "./Sidebar";
-import { Card, Icon, ListItem, PillButton, UserAvatar } from "./components";
-import type { ConnectedAccount, UserProfile } from "../lib/types";
+import {
+  Card,
+  ConnectAccountCta,
+  Icon,
+  ListItem,
+  PillButton,
+  UserAvatar,
+} from "./components";
+import type {
+  ConnectedAccount,
+  LinkedinAuthUrlResponse,
+  UserProfile,
+} from "../lib/types";
 
 const navItems = [
   { label: "Overview", active: true, icon: <LayoutDashboard className="h-4 w-4" /> },
@@ -107,7 +118,14 @@ export default function DashboardPage({
   primaryAccountId?: string;
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [connectFeedback, setConnectFeedback] = useState<string | null>(null);
+  const [isConnectingLinkedIn, setIsConnectingLinkedIn] = useState(false);
+  const [isConnectMenuOpen, setIsConnectMenuOpen] = useState(false);
+  const connectMenuBoundaryRef = useRef<HTMLDivElement | null>(null);
+  const popupWatcherRef = useRef<number | null>(null);
   const now = useMemo(() => new Date(), []);
+  const apiBase =
+    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
   const monthLabel = now.toLocaleString("en-US", {
     month: "long",
     year: "numeric",
@@ -117,6 +135,148 @@ export default function DashboardPage({
   const initials = getInitials(user.name, user.email);
   const hasConnectedAccounts =
     connectedAccounts.length > 0 && Boolean(primaryAccountId);
+
+  useEffect(() => {
+    if (!connectFeedback) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setConnectFeedback(null);
+    }, 2800);
+    return () => window.clearTimeout(timeoutId);
+  }, [connectFeedback]);
+
+  useEffect(() => {
+    if (!isConnectMenuOpen) {
+      return;
+    }
+
+    const handleOutsidePointer = (event: MouseEvent) => {
+      const boundary = connectMenuBoundaryRef.current;
+      if (!boundary) {
+        return;
+      }
+      if (event.target instanceof Node && !boundary.contains(event.target)) {
+        setIsConnectMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsConnectMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsidePointer);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsidePointer);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isConnectMenuOpen]);
+
+  useEffect(
+    () => () => {
+      if (popupWatcherRef.current !== null) {
+        window.clearInterval(popupWatcherRef.current);
+      }
+    },
+    [],
+  );
+
+  const openCenteredPopup = () => {
+    const width = 560;
+    const height = 700;
+    const left = Math.max(0, Math.floor(window.screenX + (window.outerWidth - width) / 2));
+    const top = Math.max(
+      0,
+      Math.floor(window.screenY + (window.outerHeight - height) / 2),
+    );
+    const features = [
+      `width=${width}`,
+      `height=${height}`,
+      `left=${left}`,
+      `top=${top}`,
+      "popup=yes",
+      "resizable=yes",
+      "scrollbars=yes",
+    ].join(",");
+    return window.open("", "marquill-linkedin-auth", features);
+  };
+
+  const handleConnectLinkedIn = async () => {
+    if (isConnectingLinkedIn) {
+      return;
+    }
+
+    setIsConnectMenuOpen(false);
+    setConnectFeedback(null);
+
+    const popup = openCenteredPopup();
+    if (!popup) {
+      setConnectFeedback("Popup was blocked. Please allow popups and try again.");
+      return;
+    }
+
+    setIsConnectingLinkedIn(true);
+
+    try {
+      popup.document.title = "Connecting to LinkedIn";
+
+      const response = await fetch(`${apiBase}/auth/linkedin`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      let payload: LinkedinAuthUrlResponse | null = null;
+      try {
+        payload = (await response.json()) as LinkedinAuthUrlResponse;
+      } catch {
+        payload = null;
+      }
+
+      if (!response.ok) {
+        throw new Error(payload?.message || "Unable to start account connection.");
+      }
+
+      const authUrl = payload?.data;
+      if (!authUrl) {
+        throw new Error("Unable to start account connection.");
+      }
+
+      new URL(authUrl);
+      popup.location.href = authUrl;
+
+      if (popupWatcherRef.current !== null) {
+        window.clearInterval(popupWatcherRef.current);
+      }
+
+      popupWatcherRef.current = window.setInterval(() => {
+        if (popup.closed) {
+          if (popupWatcherRef.current !== null) {
+            window.clearInterval(popupWatcherRef.current);
+            popupWatcherRef.current = null;
+          }
+          window.location.reload();
+        }
+      }, 500);
+    } catch (error) {
+      if (!popup.closed) {
+        popup.close();
+      }
+      setConnectFeedback(
+        error instanceof Error
+          ? error.message
+          : "Unable to start account connection. Please try again.",
+      );
+    } finally {
+      setIsConnectingLinkedIn(false);
+    }
+  };
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[var(--color-background)]">
@@ -152,6 +312,7 @@ export default function DashboardPage({
         </header>
 
         <div
+          ref={connectMenuBoundaryRef}
           className={`grid gap-6 ${
             sidebarCollapsed
               ? "md:grid-cols-[120px_1fr] lg:grid-cols-[140px_1fr]"
@@ -166,9 +327,25 @@ export default function DashboardPage({
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed((value) => !value)}
             showChrome
+            isConnectMenuOpen={isConnectMenuOpen}
+            isConnectingLinkedIn={isConnectingLinkedIn}
+            onToggleConnectMenu={() =>
+              setIsConnectMenuOpen((previousState) => !previousState)
+            }
+            onConnectLinkedIn={handleConnectLinkedIn}
           />
 
           <main className="flex flex-col gap-8">
+            {connectFeedback ? (
+              <div
+                role="status"
+                aria-live="polite"
+                className="fixed right-4 top-4 z-40 rounded-2xl border border-[var(--color-border)] bg-white/95 px-4 py-3 text-sm font-medium text-[var(--color-text-primary)] shadow-[0_24px_60px_-45px_rgba(15,23,42,0.45)] backdrop-blur-md sm:right-6 sm:top-6 lg:right-8"
+              >
+                {connectFeedback}
+              </div>
+            ) : null}
+
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-[var(--color-text-secondary)]">
@@ -184,9 +361,15 @@ export default function DashboardPage({
             </div>
 
             {!hasConnectedAccounts ? (
-              <Card className="border-dashed border-[var(--color-border)] bg-white/60 p-6 text-sm text-[var(--color-text-secondary)]">
-                Connect an account to load dashboard data.
-              </Card>
+              <ConnectAccountCta
+                isConnectMenuOpen={isConnectMenuOpen}
+                isConnectingLinkedIn={isConnectingLinkedIn}
+                menuId="connect-account-menu-cta"
+                onToggleConnectMenu={() =>
+                  setIsConnectMenuOpen((previousState) => !previousState)
+                }
+                onConnectLinkedIn={handleConnectLinkedIn}
+              />
             ) : null}
 
             <div

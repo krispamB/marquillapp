@@ -2,8 +2,14 @@
 
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { ChevronDown, ChevronLeft, Plus, Settings } from "lucide-react";
-import { Card, NavItem, PillButton, UserAvatar } from "./components";
+import { ChevronDown, ChevronLeft, Settings } from "lucide-react";
+import {
+  Card,
+  ConnectProviderMenu,
+  NavItem,
+  PillButton,
+  UserAvatar,
+} from "./components";
 import type { ConnectedAccountProvider, UserProfile } from "../lib/types";
 
 type SidebarUser = {
@@ -36,6 +42,10 @@ export default function Sidebar({
   collapsed = false,
   onToggle,
   showChrome = true,
+  isConnectMenuOpen = false,
+  isConnectingLinkedIn = false,
+  onToggleConnectMenu,
+  onConnectLinkedIn,
 }: {
   user: SidebarUser;
   items: SidebarItem[];
@@ -45,6 +55,10 @@ export default function Sidebar({
   collapsed?: boolean;
   onToggle?: () => void;
   showChrome?: boolean;
+  isConnectMenuOpen?: boolean;
+  isConnectingLinkedIn?: boolean;
+  onToggleConnectMenu?: () => void;
+  onConnectLinkedIn?: () => void;
 }) {
   const [accountsExpanded, setAccountsExpanded] = useState(false);
   const primaryAccount = accounts[primaryAccountIndex] ?? accounts[0];
@@ -58,27 +72,6 @@ export default function Sidebar({
         return "LinkedIn account";
       default:
         return "Connected account";
-    }
-  };
-
-  const providerIcon = (provider: ConnectedAccountProvider, className: string) => {
-    switch (provider) {
-      case "LINKEDIN":
-        return (
-          <img
-            src="https://res.cloudinary.com/dnpvndlmy/image/upload/v1770814368/marquill/LinkedIn_Symbol_2_qs8mjj.webp"
-            alt="LinkedIn"
-            className={className}
-          />
-        );
-      default:
-        return (
-          <img
-            src="https://res.cloudinary.com/dnpvndlmy/image/upload/v1770814368/marquill/LinkedIn_Symbol_2_qs8mjj.webp"
-            alt="Connected account"
-            className={className}
-          />
-        );
     }
   };
 
@@ -109,6 +102,38 @@ export default function Sidebar({
     const isDanger = diffDays <= 7;
     return { label, isDanger };
   };
+
+  const accountAvatarWithProviderBadge = ({
+    provider,
+    initials,
+    avatarUrl,
+    sizeClass,
+    textClass,
+  }: {
+    provider: ConnectedAccountProvider;
+    initials: string;
+    avatarUrl?: string;
+    sizeClass: string;
+    textClass: string;
+  }) => (
+    <div className="relative w-fit">
+      <UserAvatar
+        initials={initials}
+        avatarUrl={avatarUrl}
+        sizeClass={sizeClass}
+        textClass={textClass}
+      />
+      {provider === "LINKEDIN" ? (
+        <span className="absolute -bottom-1 -right-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white bg-white shadow-[0_6px_16px_-8px_rgba(15,23,42,0.45)]">
+          <img
+            src="/LinkedIn_Icon_1.webp"
+            alt="LinkedIn"
+            className="h-3.5 w-3.5 object-contain"
+          />
+        </span>
+      ) : null}
+    </div>
+  );
 
   return (
     <aside className="sticky top-8 hidden h-fit md:flex">
@@ -190,21 +215,21 @@ export default function Sidebar({
               type="button"
             >
               <div className="flex items-center gap-3">
-                <UserAvatar
-                  initials={initialsFromName(
+                {accountAvatarWithProviderBadge({
+                  provider: primaryAccount.provider,
+                  initials: initialsFromName(
                     primaryAccount.profile?.name,
                     primaryAccount.profile?.email,
-                  )}
-                  avatarUrl={primaryAccount.profile?.picture}
-                  sizeClass="h-10 w-10"
-                  textClass="text-sm"
-                />
+                  ),
+                  avatarUrl: primaryAccount.profile?.picture,
+                  sizeClass: "h-10 w-10",
+                  textClass: "text-sm",
+                })}
                 <div>
                   <p className="text-sm font-semibold text-[var(--color-text-primary)]">
                     {primaryAccount.profile?.name ?? "Connected account"}
                   </p>
                   <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                    {providerIcon(primaryAccount.provider, "h-3.5 w-3.5")}
                     <span>{providerLabel(primaryAccount.provider)}</span>
                   </div>
                   {primaryAccount.profile?.email ? (
@@ -252,15 +277,16 @@ export default function Sidebar({
                       className="flex items-center justify-between rounded-2xl border border-[var(--color-border)] bg-white/80 px-3 py-2"
                     >
                       <div className="flex items-center gap-3">
-                        <UserAvatar
-                          initials={initialsFromName(
+                        {accountAvatarWithProviderBadge({
+                          provider: account.provider,
+                          initials: initialsFromName(
                             account.profile?.name,
                             account.profile?.email,
-                          )}
-                          avatarUrl={account.profile?.picture}
-                          sizeClass="h-9 w-9"
-                          textClass="text-xs"
-                        />
+                          ),
+                          avatarUrl: account.profile?.picture,
+                          sizeClass: "h-9 w-9",
+                          textClass: "text-xs",
+                        })}
                         <div>
                           <p className="text-sm font-semibold text-[var(--color-text-primary)]">
                             {account.profile?.name ?? "Connected account"}
@@ -291,14 +317,30 @@ export default function Sidebar({
                           })()}
                         </div>
                       </div>
-                      {providerIcon(account.provider, "h-4 w-4")}
                     </div>
                   ))}
                 </div>
-                <div className="mt-3 flex justify-end">
-                  <PillButton variant="secondary" icon={<Plus className="h-4 w-4" />}>
-                    Add account
+                <div className="relative mt-3 flex justify-end">
+                  <PillButton
+                    variant="primary"
+                    ariaLabel="Open connect account options"
+                    ariaExpanded={isConnectMenuOpen}
+                    ariaControls="connect-account-menu-sidebar"
+                    onClick={onToggleConnectMenu}
+                  >
+                    + Add acount
                   </PillButton>
+                  <ConnectProviderMenu
+                    menuId="connect-account-menu-sidebar"
+                    isOpen={isConnectMenuOpen}
+                    isConnectingLinkedIn={isConnectingLinkedIn}
+                    onConnectLinkedIn={() => {
+                      if (onConnectLinkedIn) {
+                        onConnectLinkedIn();
+                      }
+                    }}
+                    align="right"
+                  />
                 </div>
               </div>
             ) : null}

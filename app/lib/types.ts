@@ -64,3 +64,9 @@ export type ConnectedAccountsResponse = {
     isActive?: boolean;
   }>;
 };
+
+export type LinkedinAuthUrlResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: string;
+};
