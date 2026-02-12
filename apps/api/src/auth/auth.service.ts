@@ -63,7 +63,7 @@ export class AuthService {
   }
 
   async createLinkedinOath(user: User): Promise<string> {
-    return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${this.configService.getOrThrow<string>('LINKEDIN_CLIENT_ID')}&redirect_uri=${this.configService.getOrThrow<string>('LINKEDIN_REDIRECT_URI')}&state=${user._id.toString()}&scope=${encodeURIComponent('openid profile email w_member_social')}`;
+    return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${this.configService.getOrThrow<string>('LINKEDIN_CLIENT_ID')}&redirect_uri=${this.configService.getOrThrow<string>('LINKEDIN_REDIRECT_URI')}&state=${user._id.toString()}&scope=${encodeURIComponent('openid profile email w_member_social')}&enable_extended_login=true`;
   }
 
   async linkedinCallback(code: string, state: string) {
@@ -72,9 +72,17 @@ export class AuthService {
     const profileMetadata = await this.getLinkedinUser(access_token);
     const encryptedAccessToken =
       await this.encryptionService.encrypt(access_token);
+
+    const connectedAccount = await this.connectedAccountModel.findOne({
+      user: new Types.ObjectId(state),
+    });
+    if (connectedAccount && connectedAccount.profileMetadata && connectedAccount.profileMetadata['sub'] != profileMetadata.sub) {
+      return false
+    }
+
     await this.connectedAccountModel.findOneAndUpdate(
       {
-        user: state as unknown as ObjectId,
+        user: new Types.ObjectId(state),
         provider: AccountProvider.LINKEDIN,
       },
       {

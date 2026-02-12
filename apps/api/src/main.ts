@@ -8,7 +8,10 @@ async function bootstrap() {
   const logger = new Logger(
     bootstrap.name.charAt(0).toUpperCase() + bootstrap.name.slice(1),
   );
-  app.enableCors();
+  app.enableCors({
+    origin: [process.env.FRONTEND_URL, process.env.FRONTEND_URL_DEV],
+    credentials: true,
+  });
 
   app.setGlobalPrefix('api/v1');
 
