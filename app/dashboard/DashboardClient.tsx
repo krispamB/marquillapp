@@ -279,7 +279,7 @@ export default function DashboardPage({
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[var(--color-background)]">
+    <div className="relative min-h-screen overflow-x-hidden bg-[var(--color-background)]">
       <div className="pointer-events-none absolute -left-28 top-10 h-80 w-80 rounded-full bg-[var(--color-accent)]/25 blur-[140px]" />
       <div className="pointer-events-none absolute right-6 top-24 h-64 w-64 rounded-full bg-[var(--color-primary)]/20 blur-[120px]" />
 
@@ -313,10 +313,10 @@ export default function DashboardPage({
 
         <div
           ref={connectMenuBoundaryRef}
-          className={`grid gap-6 ${
+          className={`relative ${
             sidebarCollapsed
-              ? "md:grid-cols-[120px_1fr] lg:grid-cols-[140px_1fr]"
-              : "md:grid-cols-[260px_1fr] lg:grid-cols-[280px_1fr]"
+              ? "md:pl-[136px] lg:pl-[156px]"
+              : "md:pl-[276px] lg:pl-[296px]"
           }`}
         >
           <Sidebar

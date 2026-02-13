@@ -136,9 +136,13 @@ export default function Sidebar({
   );
 
   return (
-    <aside className="sticky top-8 hidden h-fit md:flex">
+    <aside
+      className={`hidden md:fixed md:left-0 md:top-0 md:z-30 md:flex md:h-screen ${
+        collapsed ? "md:w-[120px] lg:w-[140px]" : "md:w-[260px] lg:w-[280px]"
+      }`}
+    >
       <Card
-        className={`flex w-full flex-col gap-6 p-5 ${
+        className={`flex h-full w-full flex-col gap-6 overflow-y-auto rounded-none p-5 ${
           collapsed ? "items-center px-3" : ""
         }`}
       >
