@@ -2,16 +2,19 @@
 
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { ChevronDown, ChevronLeft, Linkedin, Plus, Settings } from "lucide-react";
-import { Card, NavItem, PillButton } from "./components";
+import { ChevronDown, ChevronLeft, Settings } from "lucide-react";
+import {
+  Card,
+  ConnectProviderMenu,
+  NavItem,
+  PillButton,
+  UserAvatar,
+} from "./components";
+import type { ConnectedAccountProvider, UserProfile } from "../lib/types";
 
 type SidebarUser = {
-  name: string;
-  email: string;
   initials: string;
-  role?: string;
-  avatarUrl?: string;
-};
+} & UserProfile;
 
 type SidebarItem = {
   label: string;
@@ -20,9 +23,14 @@ type SidebarItem = {
 };
 
 type SidebarAccount = {
-  name: string;
-  avatarUrl?: string;
-  initials: string;
+  id: string;
+  provider: ConnectedAccountProvider;
+  accessTokenExpiresAt?: string;
+  profile: {
+    name?: string;
+    email?: string;
+    picture?: string;
+  };
 };
 
 export default function Sidebar({
@@ -34,6 +42,10 @@ export default function Sidebar({
   collapsed = false,
   onToggle,
   showChrome = true,
+  isConnectMenuOpen = false,
+  isConnectingLinkedIn = false,
+  onToggleConnectMenu,
+  onConnectLinkedIn,
 }: {
   user: SidebarUser;
   items: SidebarItem[];
@@ -43,14 +55,94 @@ export default function Sidebar({
   collapsed?: boolean;
   onToggle?: () => void;
   showChrome?: boolean;
+  isConnectMenuOpen?: boolean;
+  isConnectingLinkedIn?: boolean;
+  onToggleConnectMenu?: () => void;
+  onConnectLinkedIn?: () => void;
 }) {
   const [accountsExpanded, setAccountsExpanded] = useState(false);
   const primaryAccount = accounts[primaryAccountIndex] ?? accounts[0];
+  const connectedAccounts = accounts.filter(
+    (account) => account.profile?.name || account.profile?.email,
+  );
+
+  const providerLabel = (provider: ConnectedAccountProvider) => {
+    switch (provider) {
+      case "LINKEDIN":
+        return "LinkedIn account";
+      default:
+        return "Connected account";
+    }
+  };
+
+  const initialsFromName = (name?: string, email?: string) => {
+    const cleaned = name?.trim() ?? "";
+    if (cleaned.length > 0) {
+      const parts = cleaned.split(/\s+/).filter(Boolean);
+      if (parts.length === 1) {
+        return parts[0].slice(0, 2).toUpperCase();
+      }
+      return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+    }
+    return (email ?? "").slice(0, 2).toUpperCase();
+  };
+
+  const accessExpiryLabel = (iso?: string) => {
+    if (!iso) {
+      return null;
+    }
+    const expiresAt = new Date(iso);
+    if (Number.isNaN(expiresAt.getTime())) {
+      return null;
+    }
+    const today = new Date();
+    const diffMs = expiresAt.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const label = diffDays <= 0 ? "Access expired" : `Access ends in ${diffDays} days`;
+    const isDanger = diffDays <= 7;
+    return { label, isDanger };
+  };
+
+  const accountAvatarWithProviderBadge = ({
+    provider,
+    initials,
+    avatarUrl,
+    sizeClass,
+    textClass,
+  }: {
+    provider: ConnectedAccountProvider;
+    initials: string;
+    avatarUrl?: string;
+    sizeClass: string;
+    textClass: string;
+  }) => (
+    <div className="relative w-fit">
+      <UserAvatar
+        initials={initials}
+        avatarUrl={avatarUrl}
+        sizeClass={sizeClass}
+        textClass={textClass}
+      />
+      {provider === "LINKEDIN" ? (
+        <span className="absolute -bottom-1 -right-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white bg-white shadow-[0_6px_16px_-8px_rgba(15,23,42,0.45)]">
+          <img
+            src="/LinkedIn_Icon_1.webp"
+            alt="LinkedIn"
+            className="h-3.5 w-3.5 object-contain"
+          />
+        </span>
+      ) : null}
+    </div>
+  );
 
   return (
-    <aside className="sticky top-8 hidden h-fit md:flex">
+    <aside
+      className={`hidden md:fixed md:left-0 md:top-0 md:z-30 md:flex md:h-screen ${
+        collapsed ? "md:w-[120px] lg:w-[140px]" : "md:w-[260px] lg:w-[280px]"
+      }`}
+    >
       <Card
-        className={`flex w-full flex-col gap-6 p-5 ${
+        className={`flex h-full w-full flex-col gap-6 overflow-y-auto rounded-none p-5 ${
           collapsed ? "items-center px-3" : ""
         }`}
       >
@@ -82,19 +174,17 @@ export default function Sidebar({
         </div>
 
         <div className={`flex w-full items-center gap-4 ${collapsed ? "flex-col" : ""}`}>
-          <div className="grid h-12 w-12 place-items-center rounded-full bg-[var(--color-secondary)] text-base font-semibold text-white">
-            {user.initials}
-          </div>
+          <UserAvatar
+            initials={user.initials}
+            avatarUrl={user.avatar}
+            sizeClass="h-12 w-12"
+            textClass="text-base"
+          />
           {collapsed ? null : (
             <div>
               <p className="text-sm font-semibold text-[var(--color-text-primary)]">
                 {user.name}
               </p>
-              {user.role ? (
-                <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-secondary)]">
-                  {user.role}
-                </p>
-              ) : null}
               <p className="text-xs text-[var(--color-text-secondary)]">
                 {user.email}
               </p>
@@ -129,17 +219,47 @@ export default function Sidebar({
               type="button"
             >
               <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-full bg-[var(--color-secondary)] text-sm font-semibold text-white">
-                  {primaryAccount.initials}
-                </div>
+                {accountAvatarWithProviderBadge({
+                  provider: primaryAccount.provider,
+                  initials: initialsFromName(
+                    primaryAccount.profile?.name,
+                    primaryAccount.profile?.email,
+                  ),
+                  avatarUrl: primaryAccount.profile?.picture,
+                  sizeClass: "h-10 w-10",
+                  textClass: "text-sm",
+                })}
                 <div>
                   <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                    {primaryAccount.name}
+                    {primaryAccount.profile?.name ?? "Connected account"}
                   </p>
                   <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                    <Linkedin className="h-3.5 w-3.5 text-[#0A66C2]" />
-                    <span>LinkedIn account</span>
+                    <span>{providerLabel(primaryAccount.provider)}</span>
                   </div>
+                  {primaryAccount.profile?.email ? (
+                    <p className="mt-1 text-[11px] text-[var(--color-text-secondary)]">
+                      {primaryAccount.profile.email}
+                    </p>
+                  ) : null}
+                  {(() => {
+                    const expiry = accessExpiryLabel(
+                      primaryAccount.accessTokenExpiresAt,
+                    );
+                    if (!expiry) {
+                      return null;
+                    }
+                    return (
+                      <p
+                        className={`mt-1 text-[11px] font-semibold ${
+                          expiry.isDanger
+                            ? "text-rose-500"
+                            : "text-[var(--color-text-secondary)]"
+                        }`}
+                      >
+                        {expiry.label}
+                      </p>
+                    );
+                  })()}
                 </div>
               </div>
               <ChevronDown
@@ -155,27 +275,76 @@ export default function Sidebar({
                   Connected accounts
                 </p>
                 <div className="flex flex-col gap-2">
-                  {accounts.map((account) => (
+                  {connectedAccounts.map((account) => (
                     <div
-                      key={account.name}
+                      key={account.id}
                       className="flex items-center justify-between rounded-2xl border border-[var(--color-border)] bg-white/80 px-3 py-2"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="grid h-9 w-9 place-items-center rounded-full bg-[var(--color-secondary)] text-xs font-semibold text-white">
-                          {account.initials}
+                        {accountAvatarWithProviderBadge({
+                          provider: account.provider,
+                          initials: initialsFromName(
+                            account.profile?.name,
+                            account.profile?.email,
+                          ),
+                          avatarUrl: account.profile?.picture,
+                          sizeClass: "h-9 w-9",
+                          textClass: "text-xs",
+                        })}
+                        <div>
+                          <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                            {account.profile?.name ?? "Connected account"}
+                          </p>
+                          {account.profile?.email ? (
+                            <p className="text-[11px] text-[var(--color-text-secondary)]">
+                              {account.profile.email}
+                            </p>
+                          ) : null}
+                          {(() => {
+                            const expiry = accessExpiryLabel(
+                              account.accessTokenExpiresAt,
+                            );
+                            if (!expiry) {
+                              return null;
+                            }
+                            return (
+                              <p
+                                className={`text-[11px] font-semibold ${
+                                  expiry.isDanger
+                                    ? "text-rose-500"
+                                    : "text-[var(--color-text-secondary)]"
+                                }`}
+                              >
+                                {expiry.label}
+                              </p>
+                            );
+                          })()}
                         </div>
-                        <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                          {account.name}
-                        </p>
                       </div>
-                      <Linkedin className="h-4 w-4 text-[#0A66C2]" />
                     </div>
                   ))}
                 </div>
-                <div className="mt-3 flex justify-end">
-                  <PillButton variant="secondary" icon={<Plus className="h-4 w-4" />}>
-                    Add account
+                <div className="relative mt-3 flex justify-end">
+                  <PillButton
+                    variant="primary"
+                    ariaLabel="Open connect account options"
+                    ariaExpanded={isConnectMenuOpen}
+                    ariaControls="connect-account-menu-sidebar"
+                    onClick={onToggleConnectMenu}
+                  >
+                    + Add acount
                   </PillButton>
+                  <ConnectProviderMenu
+                    menuId="connect-account-menu-sidebar"
+                    isOpen={isConnectMenuOpen}
+                    isConnectingLinkedIn={isConnectingLinkedIn}
+                    onConnectLinkedIn={() => {
+                      if (onConnectLinkedIn) {
+                        onConnectLinkedIn();
+                      }
+                    }}
+                    align="right"
+                  />
                 </div>
               </div>
             ) : null}
