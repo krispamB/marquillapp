@@ -1,6 +1,6 @@
 import type { MouseEventHandler, ReactNode } from "react";
-import { Plug } from "lucide-react";
-import type { UserProfile } from "../lib/types";
+import { CalendarClock, CheckCheck, PenLine, Plug } from "lucide-react";
+import type { PostStatus, UserProfile } from "../lib/types";
 
 export function Icon({
   children,
@@ -218,33 +218,82 @@ export function NavItem({
 export function ListItem({
   title,
   subtitle,
+  status,
   badge,
-  icon,
 }: {
   title: string;
   subtitle: string;
-  badge: string;
-  icon: ReactNode;
+  status?: PostStatus;
+  badge?: string;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--color-border)] bg-white/85 px-4 py-3 transition hover:-translate-y-0.5">
-      <div className="flex items-center gap-3">
-        <span className="grid h-9 w-9 place-items-center rounded-2xl bg-[var(--color-gradient)] text-[var(--color-secondary)]">
-          {icon}
-        </span>
-        <div>
-          <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-            {title}
-          </p>
-          <p className="text-xs text-[var(--color-text-secondary)]">
-            {subtitle}
-          </p>
-        </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate whitespace-nowrap text-sm font-semibold text-[var(--color-text-primary)]">
+          {title}
+        </p>
+        <p className="text-xs text-[var(--color-text-secondary)]">
+          {subtitle}
+        </p>
       </div>
-      <span className="rounded-full bg-[var(--color-accent)]/20 px-3 py-1 text-xs font-semibold text-[var(--color-primary)]">
-        {badge}
-      </span>
+      <div className="shrink-0">
+        {status ? <StatusTag status={status} /> : null}
+        {!status && badge ? (
+          <span className="w-fit rounded-full bg-[var(--color-accent)]/20 px-3 py-1 text-xs font-semibold text-[var(--color-primary)]">
+            {badge}
+          </span>
+        ) : null}
+      </div>
     </div>
+  );
+}
+
+const statusVisuals: Record<
+  PostStatus,
+  { label: string; bg: string; fg: string; icon: ReactNode }
+> = {
+  DRAFT: {
+    label: "Draft",
+    bg: "#E8EAFE",
+    fg: "#4E5CF0",
+    icon: <PenLine className="h-3.5 w-3.5" />,
+  },
+  SCHEDULED: {
+    label: "Scheduled",
+    bg: "#F6F1DE",
+    fg: "#7A5A00",
+    icon: <CalendarClock className="h-3.5 w-3.5" />,
+  },
+  PUBLISHED: {
+    label: "Published",
+    bg: "#E2F0E9",
+    fg: "#1E7A52",
+    icon: <CheckCheck className="h-3.5 w-3.5" />,
+  },
+};
+
+export function StatusTag({
+  status,
+  size = "sm",
+}: {
+  status: PostStatus;
+  size?: "sm" | "md";
+}) {
+  const visual = statusVisuals[status];
+  const sizing =
+    size === "md"
+      ? "gap-1.5 px-3.5 py-1.5 text-sm"
+      : "gap-1.5 px-3 py-1 text-xs";
+
+  return (
+    <span
+      className={`inline-flex w-fit items-center rounded-full font-semibold ${sizing}`}
+      style={{ backgroundColor: visual.bg, color: visual.fg }}
+      aria-label={`Status: ${visual.label}`}
+    >
+      {visual.icon}
+      {visual.label}
+    </span>
   );
 }
 

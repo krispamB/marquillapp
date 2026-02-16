@@ -84,3 +84,21 @@ export type PostMetricsResponse = {
     monthly?: PostMetricsMonthlyItem[];
   };
 };
+
+export type DashboardPost = {
+  _id: string;
+  connectedAccount?: string;
+  status?: string;
+  content?: string;
+  scheduledAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type DashboardPostsResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: DashboardPost[];
+};
+
+export type PostStatus = "DRAFT" | "SCHEDULED" | "PUBLISHED";

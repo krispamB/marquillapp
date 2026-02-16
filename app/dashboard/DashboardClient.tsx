@@ -18,6 +18,8 @@ import {
 } from "./components";
 import type {
   ConnectedAccount,
+  DashboardPost,
+  DashboardPostsResponse,
   LinkedinAuthUrlResponse,
   PostMetricsResponse,
   UserProfile,
@@ -34,35 +36,6 @@ const stats = {
   postsThisMonth: 12,
   postLimit: 30,
 };
-
-const drafts = [
-  {
-    title: "How AI changes LinkedIn storytelling",
-    updatedAt: "2 hours ago",
-    status: "Draft",
-  },
-  {
-    title: "3 prompts to refresh your content engine",
-    updatedAt: "Yesterday",
-    status: "Draft",
-  },
-  {
-    title: "A simple YouTube research workflow",
-    updatedAt: "Jan 28",
-    status: "Draft",
-  },
-  {
-    title: "Turning long videos into snackable posts",
-    updatedAt: "Jan 24",
-    status: "Draft",
-  },
-];
-
-const scheduledPosts = [
-  { date: "Feb 12", title: "Pricing lessons from creator tools" },
-  { date: "Feb 18", title: "How to plan a 4-week content sprint" },
-  { date: "Feb 26", title: "Metrics that prove your content works" },
-];
 
 function buildMonthGrid(baseDate: Date) {
   const year = baseDate.getFullYear();
@@ -131,6 +104,89 @@ function monthLabelFromYearMonth(value: string) {
   return new Date(year, month - 1, 1).toLocaleString("en-US", { month: "short" });
 }
 
+function getDraftVisibleLimit(screenWidth: number) {
+  if (screenWidth >= 1024) {
+    return 4;
+  }
+  if (screenWidth >= 768) {
+    return 3;
+  }
+  return 2;
+}
+
+function getTitleFromContent(content?: string) {
+  if (!content) {
+    return "Untitled draft";
+  }
+  const firstNonEmptyLine =
+    content
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line.length > 0) ?? "";
+  const rawTitle = firstNonEmptyLine || content.trim();
+  if (!rawTitle) {
+    return "Untitled draft";
+  }
+  return rawTitle.length > 88 ? `${rawTitle.slice(0, 85)}...` : rawTitle;
+}
+
+function formatDraftUpdatedLabel(isoDate?: string) {
+  if (!isoDate) {
+    return "Recently";
+  }
+
+  const updatedAt = new Date(isoDate);
+  if (Number.isNaN(updatedAt.getTime())) {
+    return "Recently";
+  }
+
+  const now = new Date();
+  const diffMs = now.getTime() - updatedAt.getTime();
+  if (diffMs < 0) {
+    return updatedAt.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  const hourMs = 1000 * 60 * 60;
+  const dayMs = hourMs * 24;
+  if (diffMs < dayMs) {
+    const hours = Math.max(1, Math.floor(diffMs / hourMs));
+    return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
+  }
+
+  if (diffMs < dayMs * 2) {
+    return "Yesterday";
+  }
+
+  return updatedAt.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function parseUtcDate(value?: string) {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatScheduledLocalDateTime(isoDate?: string) {
+  const scheduled = parseUtcDate(isoDate);
+  if (!scheduled) {
+    return "Unknown schedule time";
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(scheduled);
+}
+
 export default function DashboardPage({
   user,
   connectedAccounts,
@@ -144,12 +200,20 @@ export default function DashboardPage({
   const [connectFeedback, setConnectFeedback] = useState<string | null>(null);
   const [isConnectingLinkedIn, setIsConnectingLinkedIn] = useState(false);
   const [isConnectMenuOpen, setIsConnectMenuOpen] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(
+    primaryAccountId ?? connectedAccounts[0]?.id,
+  );
   const [postMetrics, setPostMetrics] = useState<{
     total: number;
     monthly: Array<{ month: string; count: number }>;
   } | null>(null);
   const [isPostMetricsLoading, setIsPostMetricsLoading] = useState(false);
   const [postMetricsError, setPostMetricsError] = useState<string | null>(null);
+  const [posts, setPosts] = useState<DashboardPost[]>([]);
+  const [isPostsLoading, setIsPostsLoading] = useState(false);
+  const [postsError, setPostsError] = useState<string | null>(null);
+  const [isViewingAllDrafts, setIsViewingAllDrafts] = useState(false);
+  const [draftVisibleLimit, setDraftVisibleLimit] = useState(4);
   const connectMenuBoundaryRef = useRef<HTMLDivElement | null>(null);
   const popupWatcherRef = useRef<number | null>(null);
   const now = useMemo(() => new Date(), []);
@@ -162,7 +226,7 @@ export default function DashboardPage({
   const monthGrid = useMemo(() => buildMonthGrid(now), [now]);
   const initials = getInitials(user.name, user.email);
   const hasConnectedAccounts =
-    connectedAccounts.length > 0 && Boolean(primaryAccountId);
+    connectedAccounts.length > 0 && Boolean(selectedAccountId);
   const usagePercent = Math.max(
     0,
     Math.min(100, Math.round((stats.postsThisMonth / stats.postLimit) * 100)),
@@ -238,9 +302,78 @@ export default function DashboardPage({
     : chartPadding.left;
   const tooltipY = lastPoint ? Math.max(chartPadding.top, lastPoint.y - 28) : chartPadding.top;
   const tooltipTextX = tooltipX + tooltipWidth / 2;
+  const draftPosts = useMemo(
+    () =>
+      posts.filter(
+        (post) => Boolean(post?._id) && String(post.status ?? "").toUpperCase() === "DRAFT",
+      ),
+    [posts],
+  );
+  const scheduledPosts = useMemo(
+    () =>
+      posts
+        .filter((post) => String(post.status ?? "").toUpperCase() === "SCHEDULED")
+        .map((post) => {
+          const scheduledDate = parseUtcDate(post.scheduledAt);
+          return scheduledDate ? { ...post, scheduledDate } : null;
+        })
+        .filter((post): post is DashboardPost & { scheduledDate: Date } => post !== null),
+    [posts],
+  );
+  const nearestScheduledPosts = useMemo(() => {
+    const nowTs = Date.now();
+    return [...scheduledPosts]
+      .filter((post) => post.scheduledDate.getTime() >= nowTs)
+      .sort((a, b) => a.scheduledDate.getTime() - b.scheduledDate.getTime())
+      .slice(0, 3);
+  }, [scheduledPosts]);
+  const scheduledDaysInCurrentMonth = useMemo(() => {
+    const days = new Set<number>();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    for (const post of scheduledPosts) {
+      const date = post.scheduledDate;
+      if (date.getFullYear() === currentYear && date.getMonth() === currentMonth) {
+        days.add(date.getDate());
+      }
+    }
+    return days;
+  }, [now, scheduledPosts]);
+
+  const displayedDraftPosts = useMemo(() => {
+    if (isViewingAllDrafts) {
+      return draftPosts;
+    }
+    return draftPosts.slice(0, draftVisibleLimit);
+  }, [draftPosts, draftVisibleLimit, isViewingAllDrafts]);
+  const canToggleDrafts = draftPosts.length > draftVisibleLimit;
 
   useEffect(() => {
-    if (!primaryAccountId) {
+    if (connectedAccounts.length === 0) {
+      setSelectedAccountId(undefined);
+      return;
+    }
+
+    setSelectedAccountId((current) => {
+      if (current && connectedAccounts.some((account) => account.id === current)) {
+        return current;
+      }
+      return primaryAccountId ?? connectedAccounts[0]?.id;
+    });
+  }, [connectedAccounts, primaryAccountId]);
+
+  useEffect(() => {
+    const updateLimit = () => {
+      setDraftVisibleLimit(getDraftVisibleLimit(window.innerWidth));
+    };
+
+    updateLimit();
+    window.addEventListener("resize", updateLimit);
+    return () => window.removeEventListener("resize", updateLimit);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedAccountId) {
       setPostMetrics(null);
       setPostMetricsError(null);
       setIsPostMetricsLoading(false);
@@ -254,7 +387,7 @@ export default function DashboardPage({
       setPostMetricsError(null);
 
       try {
-        const response = await fetch(`${apiBase}/posts/metrics/${primaryAccountId}`, {
+        const response = await fetch(`${apiBase}/posts/metrics/${selectedAccountId}`, {
           credentials: "include",
           signal: controller.signal,
         });
@@ -309,7 +442,69 @@ export default function DashboardPage({
     return () => {
       controller.abort();
     };
-  }, [apiBase, primaryAccountId]);
+  }, [apiBase, selectedAccountId]);
+
+  useEffect(() => {
+    if (!selectedAccountId) {
+      setPosts([]);
+      setPostsError(null);
+      setIsPostsLoading(false);
+      setIsViewingAllDrafts(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const loadPosts = async () => {
+      setIsPostsLoading(true);
+      setPostsError(null);
+      setIsViewingAllDrafts(false);
+
+      try {
+        const month = toYearMonth(new Date());
+        const query = new URLSearchParams({
+          accountConnected: selectedAccountId,
+          month,
+        });
+        const response = await fetch(`${apiBase}/posts?${query.toString()}`, {
+          credentials: "include",
+          signal: controller.signal,
+        });
+
+        let payload: DashboardPostsResponse | null = null;
+        try {
+          payload = (await response.json()) as DashboardPostsResponse;
+        } catch {
+          payload = null;
+        }
+
+        if (!response.ok) {
+          throw new Error(payload?.message || "Unable to load posts.");
+        }
+
+        const resolvedPosts = payload?.data?.filter((post): post is DashboardPost =>
+          Boolean(post?._id),
+        );
+        setPosts(resolvedPosts ?? []);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        setPostsError(error instanceof Error ? error.message : "Unable to load posts.");
+        setPosts([]);
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsPostsLoading(false);
+        }
+      }
+    };
+
+    void loadPosts();
+
+    return () => {
+      controller.abort();
+    };
+  }, [apiBase, selectedAccountId]);
 
   useEffect(() => {
     if (!connectFeedback) {
@@ -499,9 +694,11 @@ export default function DashboardPage({
             items={navItems}
             accounts={connectedAccounts}
             primaryAccountIndex={0}
+            selectedAccountId={selectedAccountId}
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed((value) => !value)}
             showChrome
+            onSelectAccount={setSelectedAccountId}
             isConnectMenuOpen={isConnectMenuOpen}
             isConnectingLinkedIn={isConnectingLinkedIn}
             onToggleConnectMenu={() =>
@@ -604,12 +801,12 @@ export default function DashboardPage({
                     </div>
 
                     <div className="mt-5 rounded-2xl border border-[var(--color-border)]/70 bg-white/60 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-                      {!primaryAccountId ? (
+                      {!selectedAccountId ? (
                         <p className="mb-3 text-xs font-medium text-[var(--color-text-secondary)]">
                           Connect an account to load post metrics.
                         </p>
                       ) : null}
-                      {primaryAccountId && isPostMetricsLoading ? (
+                      {selectedAccountId && isPostMetricsLoading ? (
                         <p className="mb-3 text-xs font-medium text-[var(--color-text-secondary)]">
                           Loading metrics...
                         </p>
@@ -736,24 +933,47 @@ export default function DashboardPage({
                 </div>
               </Card>
 
-              <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+              <section className="grid gap-6 lg:grid-cols-2">
                 <Card className="p-6">
                   <div className="flex items-center justify-between">
                     <h2 className="font-[var(--font-sora)] text-xl font-semibold text-[var(--color-text-primary)]">
                       Drafts
                     </h2>
-                    <PillButton variant="ghost">View all</PillButton>
+                    {canToggleDrafts ? (
+                      <PillButton
+                        variant="ghost"
+                        onClick={() => setIsViewingAllDrafts((value) => !value)}
+                      >
+                        {isViewingAllDrafts ? "Show less" : "View all"}
+                      </PillButton>
+                    ) : null}
                   </div>
                   <div className="mt-6 flex flex-col gap-4">
-                    {drafts.map((draft) => (
-                      <ListItem
-                        key={draft.title}
-                        title={draft.title}
-                        subtitle={`Updated ${draft.updatedAt}`}
-                        badge={draft.status}
-                        icon={<PenSquare className="h-4 w-4" />}
-                      />
-                    ))}
+                    {isPostsLoading ? (
+                      <p className="text-sm text-[var(--color-text-secondary)]">
+                        Loading drafts...
+                      </p>
+                    ) : null}
+                    {postsError ? (
+                      <p className="text-sm text-amber-700">{postsError}</p>
+                    ) : null}
+                    {!isPostsLoading && !postsError && displayedDraftPosts.length === 0 ? (
+                      <p className="text-sm text-[var(--color-text-secondary)]">
+                        No drafts for this month.
+                      </p>
+                    ) : null}
+                    {!isPostsLoading && !postsError
+                      ? displayedDraftPosts.map((post) => (
+                          <ListItem
+                            key={post._id}
+                            title={getTitleFromContent(post.content)}
+                            subtitle={`Updated ${formatDraftUpdatedLabel(
+                              post.updatedAt ?? post.createdAt,
+                            )}`}
+                            status="DRAFT"
+                          />
+                        ))
+                      : null}
                   </div>
                 </Card>
 
@@ -774,31 +994,55 @@ export default function DashboardPage({
                   </div>
                   <div className="mt-3 grid grid-cols-7 gap-2">
                     {monthGrid.map((cell, index) => (
-                      <div
-                        key={`day-${index}`}
-                        className={`flex h-9 items-center justify-center rounded-2xl text-xs font-semibold transition ${
+                      (() => {
+                        const isScheduledDay =
+                          cell.day !== null && scheduledDaysInCurrentMonth.has(cell.day);
+                        const dayClass =
                           cell.day === null
                             ? "text-transparent"
+                            : cell.isToday && isScheduledDay
+                            ? "border border-[var(--color-secondary)] bg-[var(--color-secondary)] text-white shadow-[0_12px_30px_-20px_rgba(28,27,39,0.45)]"
                             : cell.isToday
                             ? "bg-[var(--color-secondary)] text-white shadow-[0_12px_30px_-20px_rgba(28,27,39,0.45)]"
-                            : "border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-white/70"
-                        }`}
-                      >
-                        {cell.day ?? "0"}
-                      </div>
+                            : isScheduledDay
+                            ? "border border-[#DCCFA4] bg-[#F6F1DE] text-[#7A5A00]"
+                            : "border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-white/70";
+                        return (
+                          <div
+                            key={`day-${index}`}
+                            className={`flex h-9 items-center justify-center rounded-2xl text-xs font-semibold transition ${dayClass}`}
+                          >
+                            {cell.day ?? "0"}
+                          </div>
+                        );
+                      })()
                     ))}
                   </div>
 
                   <div className="mt-6 space-y-3">
-                    {scheduledPosts.map((post) => (
-                      <ListItem
-                        key={post.title}
-                        title={post.title}
-                        subtitle={post.date}
-                        badge="Scheduled"
-                        icon={<CalendarClock className="h-4 w-4" />}
-                      />
-                    ))}
+                    {isPostsLoading ? (
+                      <p className="text-sm text-[var(--color-text-secondary)]">
+                        Loading scheduled posts...
+                      </p>
+                    ) : null}
+                    {postsError ? (
+                      <p className="text-sm text-amber-700">{postsError}</p>
+                    ) : null}
+                    {!isPostsLoading && !postsError && nearestScheduledPosts.length === 0 ? (
+                      <p className="text-sm text-[var(--color-text-secondary)]">
+                        No upcoming scheduled posts this month.
+                      </p>
+                    ) : null}
+                    {!isPostsLoading && !postsError
+                      ? nearestScheduledPosts.map((post) => (
+                          <ListItem
+                            key={post._id}
+                            title={getTitleFromContent(post.content)}
+                            subtitle={formatScheduledLocalDateTime(post.scheduledAt)}
+                            status="SCHEDULED"
+                          />
+                        ))
+                      : null}
                   </div>
                 </Card>
               </section>
