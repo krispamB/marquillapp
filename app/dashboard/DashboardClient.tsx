@@ -12,14 +12,16 @@ import Sidebar from "./Sidebar";
 import {
   Card,
   ConnectAccountCta,
-  Icon,
   ListItem,
   PillButton,
   UserAvatar,
 } from "./components";
 import type {
   ConnectedAccount,
+  DashboardPost,
+  DashboardPostsResponse,
   LinkedinAuthUrlResponse,
+  PostMetricsResponse,
   UserProfile,
 } from "../lib/types";
 
@@ -33,37 +35,7 @@ const navItems = [
 const stats = {
   postsThisMonth: 12,
   postLimit: 30,
-  usagePercent: 40,
 };
-
-const drafts = [
-  {
-    title: "How AI changes LinkedIn storytelling",
-    updatedAt: "2 hours ago",
-    status: "Draft",
-  },
-  {
-    title: "3 prompts to refresh your content engine",
-    updatedAt: "Yesterday",
-    status: "Draft",
-  },
-  {
-    title: "A simple YouTube research workflow",
-    updatedAt: "Jan 28",
-    status: "Draft",
-  },
-  {
-    title: "Turning long videos into snackable posts",
-    updatedAt: "Jan 24",
-    status: "Draft",
-  },
-];
-
-const scheduledPosts = [
-  { date: "Feb 12", title: "Pricing lessons from creator tools" },
-  { date: "Feb 18", title: "How to plan a 4-week content sprint" },
-  { date: "Feb 26", title: "Metrics that prove your content works" },
-];
 
 function buildMonthGrid(baseDate: Date) {
   const year = baseDate.getFullYear();
@@ -108,6 +80,113 @@ function getInitials(name: string, email: string) {
   return email.slice(0, 2).toUpperCase();
 }
 
+function toYearMonth(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function buildLastSixMonthKeys(baseDate: Date) {
+  const keys: string[] = [];
+  for (let offset = 5; offset >= 0; offset -= 1) {
+    keys.push(toYearMonth(new Date(baseDate.getFullYear(), baseDate.getMonth() - offset, 1)));
+  }
+  return keys;
+}
+
+function monthLabelFromYearMonth(value: string) {
+  const [yearPart, monthPart] = value.split("-");
+  const year = Number(yearPart);
+  const month = Number(monthPart);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    return value;
+  }
+  return new Date(year, month - 1, 1).toLocaleString("en-US", { month: "short" });
+}
+
+function getDraftVisibleLimit(screenWidth: number) {
+  if (screenWidth >= 1024) {
+    return 4;
+  }
+  if (screenWidth >= 768) {
+    return 3;
+  }
+  return 2;
+}
+
+function getTitleFromContent(content?: string) {
+  if (!content) {
+    return "Untitled draft";
+  }
+  const firstNonEmptyLine =
+    content
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line.length > 0) ?? "";
+  const rawTitle = firstNonEmptyLine || content.trim();
+  if (!rawTitle) {
+    return "Untitled draft";
+  }
+  return rawTitle.length > 88 ? `${rawTitle.slice(0, 85)}...` : rawTitle;
+}
+
+function formatDraftUpdatedLabel(isoDate?: string) {
+  if (!isoDate) {
+    return "Recently";
+  }
+
+  const updatedAt = new Date(isoDate);
+  if (Number.isNaN(updatedAt.getTime())) {
+    return "Recently";
+  }
+
+  const now = new Date();
+  const diffMs = now.getTime() - updatedAt.getTime();
+  if (diffMs < 0) {
+    return updatedAt.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  const hourMs = 1000 * 60 * 60;
+  const dayMs = hourMs * 24;
+  if (diffMs < dayMs) {
+    const hours = Math.max(1, Math.floor(diffMs / hourMs));
+    return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
+  }
+
+  if (diffMs < dayMs * 2) {
+    return "Yesterday";
+  }
+
+  return updatedAt.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function parseUtcDate(value?: string) {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatScheduledLocalDateTime(isoDate?: string) {
+  const scheduled = parseUtcDate(isoDate);
+  if (!scheduled) {
+    return "Unknown schedule time";
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(scheduled);
+}
+
 export default function DashboardPage({
   user,
   connectedAccounts,
@@ -121,6 +200,20 @@ export default function DashboardPage({
   const [connectFeedback, setConnectFeedback] = useState<string | null>(null);
   const [isConnectingLinkedIn, setIsConnectingLinkedIn] = useState(false);
   const [isConnectMenuOpen, setIsConnectMenuOpen] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(
+    primaryAccountId ?? connectedAccounts[0]?.id,
+  );
+  const [postMetrics, setPostMetrics] = useState<{
+    total: number;
+    monthly: Array<{ month: string; count: number }>;
+  } | null>(null);
+  const [isPostMetricsLoading, setIsPostMetricsLoading] = useState(false);
+  const [postMetricsError, setPostMetricsError] = useState<string | null>(null);
+  const [posts, setPosts] = useState<DashboardPost[]>([]);
+  const [isPostsLoading, setIsPostsLoading] = useState(false);
+  const [postsError, setPostsError] = useState<string | null>(null);
+  const [isViewingAllDrafts, setIsViewingAllDrafts] = useState(false);
+  const [draftVisibleLimit, setDraftVisibleLimit] = useState(4);
   const connectMenuBoundaryRef = useRef<HTMLDivElement | null>(null);
   const popupWatcherRef = useRef<number | null>(null);
   const now = useMemo(() => new Date(), []);
@@ -131,10 +224,287 @@ export default function DashboardPage({
     year: "numeric",
   });
   const monthGrid = useMemo(() => buildMonthGrid(now), [now]);
-  const usageRatio = Math.round((stats.postsThisMonth / stats.postLimit) * 100);
   const initials = getInitials(user.name, user.email);
   const hasConnectedAccounts =
-    connectedAccounts.length > 0 && Boolean(primaryAccountId);
+    connectedAccounts.length > 0 && Boolean(selectedAccountId);
+  const usagePercent = Math.max(
+    0,
+    Math.min(100, Math.round((stats.postsThisMonth / stats.postLimit) * 100)),
+  );
+  const postsRemaining = Math.max(0, stats.postLimit - stats.postsThisMonth);
+  const billingState =
+    usagePercent >= 90 ? "limit" : usagePercent >= 70 ? "near-limit" : "on-track";
+  const billingStateMeta = {
+    "on-track": {
+      note: "Great momentum this cycle.",
+      meter: "from-[var(--color-primary)] to-[var(--color-accent)]",
+    },
+    "near-limit": {
+      note: "Plan your next posts carefully.",
+      meter: "from-amber-400 to-orange-400",
+    },
+    limit: {
+      note: "Upgrade or wait for next cycle.",
+      meter: "from-rose-400 to-rose-600",
+    },
+  } as const;
+  const billingMeta = billingStateMeta[billingState];
+  const lastSixMonthKeys = useMemo(() => buildLastSixMonthKeys(now), [now]);
+  const sixMonthSeries = useMemo(() => {
+    const countsByMonth = new Map<string, number>();
+    for (const item of postMetrics?.monthly ?? []) {
+      countsByMonth.set(item.month, item.count);
+    }
+    return lastSixMonthKeys.map((monthKey) => ({
+      key: monthKey,
+      month: monthLabelFromYearMonth(monthKey),
+      count: countsByMonth.get(monthKey) ?? 0,
+    }));
+  }, [lastSixMonthKeys, postMetrics]);
+  const currentSeriesPoint = sixMonthSeries[sixMonthSeries.length - 1];
+  const chartAriaLabel = `Posts over last 6 months: ${sixMonthSeries
+    .map((point) => `${point.month} ${point.count}`)
+    .join(", ")}`;
+  const chartWidth = 320;
+  const chartHeight = 150;
+  const chartPadding = { left: 34, right: 12, top: 12, bottom: 24 };
+  const plotWidth = chartWidth - chartPadding.left - chartPadding.right;
+  const plotHeight = chartHeight - chartPadding.top - chartPadding.bottom;
+  const maxCount = Math.max(...sixMonthSeries.map((point) => point.count), 0);
+  const yMax = Math.max(5, Math.ceil(maxCount / 5) * 5);
+  const yTicks = Array.from({ length: yMax / 5 + 1 }, (_, index) => index * 5);
+  const chartPoints = sixMonthSeries.map((point, index) => {
+    const x = chartPadding.left + (index * plotWidth) / (sixMonthSeries.length - 1);
+    const y = chartPadding.top + ((yMax - point.count) / yMax) * plotHeight;
+    return { ...point, x, y };
+  });
+  const polylinePoints = chartPoints.map((point) => `${point.x},${point.y}`).join(" ");
+  const areaPath =
+    chartPoints.length > 0
+      ? `M ${chartPoints[0].x} ${chartPadding.top + plotHeight} L ${chartPoints
+          .map((point) => `${point.x} ${point.y}`)
+          .join(" L ")} L ${chartPoints[chartPoints.length - 1].x} ${chartPadding.top + plotHeight} Z`
+      : "";
+  const lastPoint = chartPoints[chartPoints.length - 1];
+  const tooltipText = lastPoint ? `${lastPoint.month}:${lastPoint.count}` : "";
+  const tooltipPaddingX = 10;
+  const tooltipHeight = 20;
+  const estimatedCharWidth = 6;
+  const tooltipWidth = Math.max(
+    52,
+    tooltipText.length * estimatedCharWidth + tooltipPaddingX * 2,
+  );
+  const tooltipX = lastPoint
+    ? Math.min(
+        chartWidth - chartPadding.right - tooltipWidth,
+        Math.max(chartPadding.left, lastPoint.x - tooltipWidth / 2),
+      )
+    : chartPadding.left;
+  const tooltipY = lastPoint ? Math.max(chartPadding.top, lastPoint.y - 28) : chartPadding.top;
+  const tooltipTextX = tooltipX + tooltipWidth / 2;
+  const draftPosts = useMemo(
+    () =>
+      posts.filter(
+        (post) => Boolean(post?._id) && String(post.status ?? "").toUpperCase() === "DRAFT",
+      ),
+    [posts],
+  );
+  const scheduledPosts = useMemo(
+    () =>
+      posts
+        .filter((post) => String(post.status ?? "").toUpperCase() === "SCHEDULED")
+        .map((post) => {
+          const scheduledDate = parseUtcDate(post.scheduledAt);
+          return scheduledDate ? { ...post, scheduledDate } : null;
+        })
+        .filter((post): post is DashboardPost & { scheduledDate: Date } => post !== null),
+    [posts],
+  );
+  const nearestScheduledPosts = useMemo(() => {
+    const nowTs = Date.now();
+    return [...scheduledPosts]
+      .filter((post) => post.scheduledDate.getTime() >= nowTs)
+      .sort((a, b) => a.scheduledDate.getTime() - b.scheduledDate.getTime())
+      .slice(0, 3);
+  }, [scheduledPosts]);
+  const scheduledDaysInCurrentMonth = useMemo(() => {
+    const days = new Set<number>();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    for (const post of scheduledPosts) {
+      const date = post.scheduledDate;
+      if (date.getFullYear() === currentYear && date.getMonth() === currentMonth) {
+        days.add(date.getDate());
+      }
+    }
+    return days;
+  }, [now, scheduledPosts]);
+
+  const displayedDraftPosts = useMemo(() => {
+    if (isViewingAllDrafts) {
+      return draftPosts;
+    }
+    return draftPosts.slice(0, draftVisibleLimit);
+  }, [draftPosts, draftVisibleLimit, isViewingAllDrafts]);
+  const canToggleDrafts = draftPosts.length > draftVisibleLimit;
+
+  useEffect(() => {
+    if (connectedAccounts.length === 0) {
+      setSelectedAccountId(undefined);
+      return;
+    }
+
+    setSelectedAccountId((current) => {
+      if (current && connectedAccounts.some((account) => account.id === current)) {
+        return current;
+      }
+      return primaryAccountId ?? connectedAccounts[0]?.id;
+    });
+  }, [connectedAccounts, primaryAccountId]);
+
+  useEffect(() => {
+    const updateLimit = () => {
+      setDraftVisibleLimit(getDraftVisibleLimit(window.innerWidth));
+    };
+
+    updateLimit();
+    window.addEventListener("resize", updateLimit);
+    return () => window.removeEventListener("resize", updateLimit);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedAccountId) {
+      setPostMetrics(null);
+      setPostMetricsError(null);
+      setIsPostMetricsLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const loadPostMetrics = async () => {
+      setIsPostMetricsLoading(true);
+      setPostMetricsError(null);
+
+      try {
+        const response = await fetch(`${apiBase}/posts/metrics/${selectedAccountId}`, {
+          credentials: "include",
+          signal: controller.signal,
+        });
+
+        let payload: PostMetricsResponse | null = null;
+        try {
+          payload = (await response.json()) as PostMetricsResponse;
+        } catch {
+          payload = null;
+        }
+
+        if (!response.ok) {
+          throw new Error(payload?.message || "Unable to load post metrics.");
+        }
+
+        const monthly =
+          payload?.data?.monthly
+            ?.filter(
+              (item): item is { month: string; count: number } =>
+                Boolean(item) && typeof item.month === "string" && typeof item.count === "number",
+            )
+            .map((item) => ({
+              month: item.month,
+              count: Math.max(0, Math.round(item.count)),
+            })) ?? [];
+        const total =
+          typeof payload?.data?.total === "number"
+            ? payload.data.total
+            : monthly.reduce((sum, item) => sum + item.count, 0);
+
+        setPostMetrics({
+          total,
+          monthly,
+        });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        setPostMetricsError(
+          error instanceof Error ? error.message : "Unable to load post metrics.",
+        );
+        setPostMetrics(null);
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsPostMetricsLoading(false);
+        }
+      }
+    };
+
+    void loadPostMetrics();
+
+    return () => {
+      controller.abort();
+    };
+  }, [apiBase, selectedAccountId]);
+
+  useEffect(() => {
+    if (!selectedAccountId) {
+      setPosts([]);
+      setPostsError(null);
+      setIsPostsLoading(false);
+      setIsViewingAllDrafts(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const loadPosts = async () => {
+      setIsPostsLoading(true);
+      setPostsError(null);
+      setIsViewingAllDrafts(false);
+
+      try {
+        const month = toYearMonth(new Date());
+        const query = new URLSearchParams({
+          accountConnected: selectedAccountId,
+          month,
+        });
+        const response = await fetch(`${apiBase}/posts?${query.toString()}`, {
+          credentials: "include",
+          signal: controller.signal,
+        });
+
+        let payload: DashboardPostsResponse | null = null;
+        try {
+          payload = (await response.json()) as DashboardPostsResponse;
+        } catch {
+          payload = null;
+        }
+
+        if (!response.ok) {
+          throw new Error(payload?.message || "Unable to load posts.");
+        }
+
+        const resolvedPosts = payload?.data?.filter((post): post is DashboardPost =>
+          Boolean(post?._id),
+        );
+        setPosts(resolvedPosts ?? []);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        setPostsError(error instanceof Error ? error.message : "Unable to load posts.");
+        setPosts([]);
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsPostsLoading(false);
+        }
+      }
+    };
+
+    void loadPosts();
+
+    return () => {
+      controller.abort();
+    };
+  }, [apiBase, selectedAccountId]);
 
   useEffect(() => {
     if (!connectFeedback) {
@@ -324,9 +694,11 @@ export default function DashboardPage({
             items={navItems}
             accounts={connectedAccounts}
             primaryAccountIndex={0}
+            selectedAccountId={selectedAccountId}
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed((value) => !value)}
             showChrome
+            onSelectAccount={setSelectedAccountId}
             isConnectMenuOpen={isConnectMenuOpen}
             isConnectingLinkedIn={isConnectingLinkedIn}
             onToggleConnectMenu={() =>
@@ -379,69 +751,160 @@ export default function DashboardPage({
               aria-disabled={!hasConnectedAccounts}
             >
               <section className="grid gap-4 lg:grid-cols-2">
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
+                <Card className="group relative overflow-hidden p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_36px_80px_-58px_rgba(15,23,42,0.45)]">
+                  <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-[var(--color-accent)]/20 blur-3xl" />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[var(--color-primary)]/8 via-white/70 to-[var(--color-accent)]/10" />
+                  <div className="relative flex items-start justify-between gap-4">
                     <div>
                       <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                        Posts this month
+                        Posts this billing cycle
                       </p>
-                      <div className="mt-3 flex items-baseline gap-3">
-                        <span className="text-3xl font-semibold text-[var(--color-text-primary)]">
+                      <div className="mt-4 flex items-end gap-3">
+                        <span className="text-4xl font-semibold leading-none text-[var(--color-text-primary)]">
                           {stats.postsThisMonth}
                         </span>
-                        <span className="text-sm font-semibold text-[var(--color-text-secondary)]">
+                        <span className="pb-1 text-lg font-semibold text-[var(--color-text-secondary)]">
                           / {stats.postLimit}
                         </span>
                       </div>
                     </div>
-                    <Icon>
-                      <svg
-                        aria-hidden="true"
-                        viewBox="0 0 24 24"
-                        className="h-4 w-4"
-                        fill="currentColor"
-                      >
-                        <path d="M4.5 6.75A2.25 2.25 0 0 1 6.75 4.5h10.5A2.25 2.25 0 0 1 19.5 6.75v10.5A2.25 2.25 0 0 1 17.25 19.5H6.75A2.25 2.25 0 0 1 4.5 17.25V6.75Zm5.25.75a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5Zm0 4.5a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5Z" />
-                      </svg>
-                    </Icon>
                   </div>
-                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                    You are on track to hit your February goal.
+                  <div className="relative mt-5">
+                    <div className="h-2.5 w-full rounded-full bg-[var(--color-border)]">
+                      <div
+                        className={`h-2.5 rounded-full bg-gradient-to-r ${billingMeta.meter} transition-all duration-500 ease-out`}
+                        style={{ width: `${usagePercent}%` }}
+                      />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-xs font-medium text-[var(--color-text-secondary)]">
+                      <span>Used: {stats.postsThisMonth}</span>
+                      <span>Remaining: {postsRemaining}</span>
+                    </div>
+                  </div>
+                  <p className="relative mt-4 text-sm text-[var(--color-text-secondary)]">
+                    {postsRemaining} posts left in this cycle. {billingMeta.note}
                   </p>
                 </Card>
 
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                        Usage
-                      </p>
-                      <div className="mt-3 flex items-baseline gap-3">
-                        <span className="text-3xl font-semibold text-[var(--color-text-primary)]">
-                          {usageRatio}%
-                        </span>
-                        <span className="text-sm font-semibold text-[var(--color-text-secondary)]">
-                          this month
-                        </span>
+                <Card className="group relative overflow-hidden p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_36px_80px_-58px_rgba(15,23,42,0.45)]">
+                  <div className="pointer-events-none absolute -left-10 -top-12 h-40 w-40 rounded-full bg-white/60 blur-2xl" />
+                  <div className="pointer-events-none absolute -right-20 top-2 h-52 w-52 rounded-full bg-[var(--color-primary)]/20 blur-3xl" />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[var(--color-primary)]/12 via-white/70 to-[var(--color-accent)]/16" />
+                  <div className="relative">
+                    <div className="mt-1 flex items-end gap-3">
+                      <span className="text-4xl font-semibold leading-none tracking-[-0.02em] text-[var(--color-text-primary)]">
+                        {currentSeriesPoint?.count ?? 0}
+                      </span>
+                      <span className="pb-1 text-sm font-semibold text-[var(--color-text-secondary)]">
+                        posts this month
+                      </span>
+                    </div>
+
+                    <div className="mt-5 rounded-2xl border border-[var(--color-border)]/70 bg-white/60 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                      {!selectedAccountId ? (
+                        <p className="mb-3 text-xs font-medium text-[var(--color-text-secondary)]">
+                          Connect an account to load post metrics.
+                        </p>
+                      ) : null}
+                      {selectedAccountId && isPostMetricsLoading ? (
+                        <p className="mb-3 text-xs font-medium text-[var(--color-text-secondary)]">
+                          Loading metrics...
+                        </p>
+                      ) : null}
+                      {postMetricsError ? (
+                        <p className="mb-3 text-xs font-medium text-amber-700">
+                          {postMetricsError}
+                        </p>
+                      ) : null}
+                      <svg
+                        viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+                        className="h-auto w-full"
+                        role="img"
+                        aria-label={chartAriaLabel}
+                      >
+                        <defs>
+                          <linearGradient id="posts-6m-fill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#5B5CF6" stopOpacity="0.3" />
+                            <stop offset="100%" stopColor="#5B5CF6" stopOpacity="0.02" />
+                          </linearGradient>
+                          <linearGradient id="posts-6m-stroke" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#5B5CF6" />
+                            <stop offset="100%" stopColor="#2FA5F7" />
+                          </linearGradient>
+                        </defs>
+                        {yTicks.map((tick) => {
+                          const y = chartPadding.top + ((yMax - tick) / yMax) * plotHeight;
+                          return (
+                            <g key={tick}>
+                              <line
+                                x1={chartPadding.left}
+                                y1={y}
+                                x2={chartWidth - chartPadding.right}
+                                y2={y}
+                                stroke="#E3E8F4"
+                                strokeWidth="1"
+                              />
+                              <text
+                                x={chartPadding.left - 6}
+                                y={y + 3}
+                                textAnchor="end"
+                                fontSize="10"
+                                fill="#8B97B0"
+                                fontWeight="600"
+                              >
+                                {tick}
+                              </text>
+                            </g>
+                          );
+                        })}
+                        <path d={areaPath} fill="url(#posts-6m-fill)" />
+                        <polyline
+                          points={polylinePoints}
+                          fill="none"
+                          stroke="url(#posts-6m-stroke)"
+                          strokeWidth="1.75"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        {chartPoints.map((point, index) => (
+                          <circle
+                            key={`${point.month}-${index}`}
+                            cx={point.x}
+                            cy={point.y}
+                            r={index === chartPoints.length - 1 ? 4 : 2.5}
+                            fill={index === chartPoints.length - 1 ? "#5B5CF6" : "#8B97B0"}
+                          />
+                        ))}
+                        {lastPoint ? (
+                          <>
+                            <rect
+                              x={tooltipX}
+                              y={tooltipY}
+                              width={tooltipWidth}
+                              height={tooltipHeight}
+                              rx="10"
+                              fill="#111827"
+                              opacity="0.9"
+                            />
+                            <text
+                              x={tooltipTextX}
+                              y={tooltipY + 14}
+                              textAnchor="middle"
+                              fontSize="10"
+                              fill="#FFFFFF"
+                              fontWeight="600"
+                            >
+                              {tooltipText}
+                            </text>
+                          </>
+                        ) : null}
+                      </svg>
+                      <div className="mt-2 grid grid-cols-6 text-center text-[11px] font-semibold text-[var(--color-text-secondary)]">
+                        {sixMonthSeries.map((point) => (
+                          <span key={point.month}>{point.month}</span>
+                        ))}
                       </div>
                     </div>
-                    <Icon>
-                      <svg
-                        aria-hidden="true"
-                        viewBox="0 0 24 24"
-                        className="h-4 w-4"
-                        fill="currentColor"
-                      >
-                        <path d="M3.75 12a8.25 8.25 0 0 1 14.25-5.7.75.75 0 0 1-1.06 1.06A6.75 6.75 0 1 0 18.75 12a.75.75 0 0 1 1.5 0 8.25 8.25 0 0 1-16.5 0Z" />
-                        <path d="M12 6.75a.75.75 0 0 1 .75.75v4.19l2.47 2.47a.75.75 0 1 1-1.06 1.06l-2.69-2.69a.75.75 0 0 1-.22-.53V7.5a.75.75 0 0 1 .75-.75Z" />
-                      </svg>
-                    </Icon>
-                  </div>
-                  <div className="mt-4 h-2 w-full rounded-full bg-[var(--color-border)]">
-                    <div
-                      className="h-2 rounded-full bg-[var(--color-primary)]"
-                      style={{ width: `${stats.usagePercent}%` }}
-                    />
                   </div>
                 </Card>
               </section>
@@ -470,24 +933,47 @@ export default function DashboardPage({
                 </div>
               </Card>
 
-              <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+              <section className="grid gap-6 lg:grid-cols-2">
                 <Card className="p-6">
                   <div className="flex items-center justify-between">
                     <h2 className="font-[var(--font-sora)] text-xl font-semibold text-[var(--color-text-primary)]">
                       Drafts
                     </h2>
-                    <PillButton variant="ghost">View all</PillButton>
+                    {canToggleDrafts ? (
+                      <PillButton
+                        variant="ghost"
+                        onClick={() => setIsViewingAllDrafts((value) => !value)}
+                      >
+                        {isViewingAllDrafts ? "Show less" : "View all"}
+                      </PillButton>
+                    ) : null}
                   </div>
                   <div className="mt-6 flex flex-col gap-4">
-                    {drafts.map((draft) => (
-                      <ListItem
-                        key={draft.title}
-                        title={draft.title}
-                        subtitle={`Updated ${draft.updatedAt}`}
-                        badge={draft.status}
-                        icon={<PenSquare className="h-4 w-4" />}
-                      />
-                    ))}
+                    {isPostsLoading ? (
+                      <p className="text-sm text-[var(--color-text-secondary)]">
+                        Loading drafts...
+                      </p>
+                    ) : null}
+                    {postsError ? (
+                      <p className="text-sm text-amber-700">{postsError}</p>
+                    ) : null}
+                    {!isPostsLoading && !postsError && displayedDraftPosts.length === 0 ? (
+                      <p className="text-sm text-[var(--color-text-secondary)]">
+                        No drafts for this month.
+                      </p>
+                    ) : null}
+                    {!isPostsLoading && !postsError
+                      ? displayedDraftPosts.map((post) => (
+                          <ListItem
+                            key={post._id}
+                            title={getTitleFromContent(post.content)}
+                            subtitle={`Updated ${formatDraftUpdatedLabel(
+                              post.updatedAt ?? post.createdAt,
+                            )}`}
+                            status="DRAFT"
+                          />
+                        ))
+                      : null}
                   </div>
                 </Card>
 
@@ -508,31 +994,55 @@ export default function DashboardPage({
                   </div>
                   <div className="mt-3 grid grid-cols-7 gap-2">
                     {monthGrid.map((cell, index) => (
-                      <div
-                        key={`day-${index}`}
-                        className={`flex h-9 items-center justify-center rounded-2xl text-xs font-semibold transition ${
+                      (() => {
+                        const isScheduledDay =
+                          cell.day !== null && scheduledDaysInCurrentMonth.has(cell.day);
+                        const dayClass =
                           cell.day === null
                             ? "text-transparent"
+                            : cell.isToday && isScheduledDay
+                            ? "border border-[var(--color-secondary)] bg-[var(--color-secondary)] text-white shadow-[0_12px_30px_-20px_rgba(28,27,39,0.45)]"
                             : cell.isToday
                             ? "bg-[var(--color-secondary)] text-white shadow-[0_12px_30px_-20px_rgba(28,27,39,0.45)]"
-                            : "border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-white/70"
-                        }`}
-                      >
-                        {cell.day ?? "0"}
-                      </div>
+                            : isScheduledDay
+                            ? "border border-[#DCCFA4] bg-[#F6F1DE] text-[#7A5A00]"
+                            : "border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-white/70";
+                        return (
+                          <div
+                            key={`day-${index}`}
+                            className={`flex h-9 items-center justify-center rounded-2xl text-xs font-semibold transition ${dayClass}`}
+                          >
+                            {cell.day ?? "0"}
+                          </div>
+                        );
+                      })()
                     ))}
                   </div>
 
                   <div className="mt-6 space-y-3">
-                    {scheduledPosts.map((post) => (
-                      <ListItem
-                        key={post.title}
-                        title={post.title}
-                        subtitle={post.date}
-                        badge="Scheduled"
-                        icon={<CalendarClock className="h-4 w-4" />}
-                      />
-                    ))}
+                    {isPostsLoading ? (
+                      <p className="text-sm text-[var(--color-text-secondary)]">
+                        Loading scheduled posts...
+                      </p>
+                    ) : null}
+                    {postsError ? (
+                      <p className="text-sm text-amber-700">{postsError}</p>
+                    ) : null}
+                    {!isPostsLoading && !postsError && nearestScheduledPosts.length === 0 ? (
+                      <p className="text-sm text-[var(--color-text-secondary)]">
+                        No upcoming scheduled posts this month.
+                      </p>
+                    ) : null}
+                    {!isPostsLoading && !postsError
+                      ? nearestScheduledPosts.map((post) => (
+                          <ListItem
+                            key={post._id}
+                            title={getTitleFromContent(post.content)}
+                            subtitle={formatScheduledLocalDateTime(post.scheduledAt)}
+                            status="SCHEDULED"
+                          />
+                        ))
+                      : null}
                   </div>
                 </Card>
               </section>

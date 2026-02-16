@@ -38,6 +38,7 @@ export default function Sidebar({
   items,
   accounts,
   primaryAccountIndex = 0,
+  selectedAccountId,
   showAccounts = true,
   collapsed = false,
   onToggle,
@@ -46,11 +47,13 @@ export default function Sidebar({
   isConnectingLinkedIn = false,
   onToggleConnectMenu,
   onConnectLinkedIn,
+  onSelectAccount,
 }: {
   user: SidebarUser;
   items: SidebarItem[];
   accounts: SidebarAccount[];
   primaryAccountIndex?: number;
+  selectedAccountId?: string;
   showAccounts?: boolean;
   collapsed?: boolean;
   onToggle?: () => void;
@@ -59,9 +62,13 @@ export default function Sidebar({
   isConnectingLinkedIn?: boolean;
   onToggleConnectMenu?: () => void;
   onConnectLinkedIn?: () => void;
+  onSelectAccount?: (accountId: string) => void;
 }) {
   const [accountsExpanded, setAccountsExpanded] = useState(false);
-  const primaryAccount = accounts[primaryAccountIndex] ?? accounts[0];
+  const selectedAccount = selectedAccountId
+    ? accounts.find((account) => account.id === selectedAccountId)
+    : null;
+  const primaryAccount = selectedAccount ?? accounts[primaryAccountIndex] ?? accounts[0];
   const connectedAccounts = accounts.filter(
     (account) => account.profile?.name || account.profile?.email,
   );
@@ -278,7 +285,20 @@ export default function Sidebar({
                   {connectedAccounts.map((account) => (
                     <div
                       key={account.id}
-                      className="flex items-center justify-between rounded-2xl border border-[var(--color-border)] bg-white/80 px-3 py-2"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onSelectAccount?.(account.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onSelectAccount?.(account.id);
+                        }
+                      }}
+                      className={`flex items-center justify-between rounded-2xl border px-3 py-2 transition ${
+                        primaryAccount.id === account.id
+                          ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10"
+                          : "border-[var(--color-border)] bg-white/80 hover:border-[var(--color-primary)]/45"
+                      }`}
                     >
                       <div className="flex items-center gap-3">
                         {accountAvatarWithProviderBadge({
