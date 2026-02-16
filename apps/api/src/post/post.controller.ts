@@ -26,7 +26,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 @UseGuards(JwtAuthGuard)
 @Controller('posts')
 export class PostController {
-  constructor(private readonly postService: PostService) {}
+  constructor(private readonly postService: PostService) { }
 
   @HttpCode(HttpStatus.CREATED)
   @Post(':id/draft')
@@ -96,11 +96,13 @@ export class PostController {
   async getPosts(
     @GetUser() user: User,
     @Query('accountConnected') accountConnected?: string,
+    @Query('status') status?: string,
+    @Query('month') month?: string,
   ): Promise<IAppResponse> {
     return {
       statusCode: HttpStatus.OK,
       message: 'Posts retrieved successfully',
-      data: await this.postService.getPosts(user, accountConnected),
+      data: await this.postService.getPosts(user, accountConnected, status, month),
     };
   }
 
@@ -126,6 +128,19 @@ export class PostController {
     return {
       statusCode: HttpStatus.OK,
       message: 'Post deleted successfully',
+    };
+  }
+
+
+  @Get('metrics/:connectedAccountId')
+  async getPostMetrics(
+    @GetUser() user: User,
+    @Param('connectedAccountId') connectedAccountId: string,
+  ): Promise<IAppResponse> {
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Post metrics retrieved successfully',
+      data: await this.postService.getPostMetrics(user, connectedAccountId),
     };
   }
 

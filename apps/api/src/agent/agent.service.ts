@@ -114,7 +114,7 @@ export class AgentService {
     }
   }
   async searchWithFallbacks(queries: string[]): Promise<YoutubeSearchResult[]> {
-    const targetCount = 3;
+    const targetCount = 4;
     const seen = new Set<string>();
     const result: YoutubeSearchResult[] = [];
     for (const query of queries) {
