@@ -70,3 +70,17 @@ export type LinkedinAuthUrlResponse = {
   message?: string;
   data?: string;
 };
+
+export type PostMetricsMonthlyItem = {
+  count: number;
+  month: string;
+};
+
+export type PostMetricsResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: {
+    total?: number;
+    monthly?: PostMetricsMonthlyItem[];
+  };
+};
