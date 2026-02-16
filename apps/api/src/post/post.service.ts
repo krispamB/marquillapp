@@ -37,7 +37,7 @@ export class PostService {
     @InjectModel(ConnectedAccount.name)
     private readonly connectedAccountModel: Model<ConnectedAccount>,
     private readonly encryptionService: EncryptionService,
-  ) {}
+  ) { }
 
   async createDraft(user: User, accountId: string, dto: InputDto) {
     const draft = new this.postDraftModel({
@@ -179,11 +179,11 @@ export class PostService {
         : undefined,
       content: post.media
         ? {
-            media: {
-              id: post.media[0].id,
-              title: post.media[0].title,
-            },
-          }
+          media: {
+            id: post.media[0].id,
+            title: post.media[0].title,
+          },
+        }
         : undefined,
       visibility: 'PUBLIC',
       distribution: {
@@ -354,6 +354,65 @@ export class PostService {
       },
     );
 
+
     return initializeUploadRequest.data.value.image;
   }
+
+  async getPostMetrics(user: User, connectedAccountId: string) {
+    const connectedAccount = await this.connectedAccountModel.findById(
+      connectedAccountId,
+    );
+    if (!connectedAccount) {
+      throw new NotFoundException('Connected account not found');
+    }
+
+    if (connectedAccount.user.toString() !== user._id.toString()) {
+      throw new ForbiddenException(
+        'You are not authorized to view metrics for this account',
+      );
+    }
+
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    const metrics = await this.postDraftModel.aggregate([
+      {
+        $match: {
+          user: user._id,
+          connectedAccount: new Types.ObjectId(connectedAccountId),
+          createdAt: { $gte: sixMonthsAgo },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: "%Y-%m",
+              date: "$createdAt"
+            }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { _id: 1 }
+      },
+      {
+        $project: {
+          _id: 0,
+          month: "$_id",
+          count: 1
+        }
+      }
+    ]);
+
+
+    const total = metrics.reduce((sum, item) => sum + item.count, 0);
+
+    return {
+      total,
+      monthly: metrics
+    };
+  }
 }
+
