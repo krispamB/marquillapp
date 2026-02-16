@@ -65,12 +65,32 @@ export class PostService {
     return { state, progress: job.progress };
   }
 
-  async getPosts(user: User, accountConnected?: string) {
+  async getPosts(
+    user: User,
+    accountConnected?: string,
+    status?: string,
+    month?: string,
+  ) {
     const filter: any = { user: user._id };
+
     if (accountConnected) {
       filter.connectedAccount = new Types.ObjectId(accountConnected);
     }
-    return this.postDraftModel.find(filter).exec();
+
+    if (status) {
+      filter.status = status;
+    }
+
+    if (month) {
+      const [year, monthNum] = month.split('-').map(Number);
+      if (!isNaN(year) && !isNaN(monthNum)) {
+        const start = new Date(year, monthNum - 1, 1);
+        const end = new Date(year, monthNum, 1);
+        filter.createdAt = { $gte: start, $lt: end };
+      }
+    }
+
+    return this.postDraftModel.find(filter).select('-userIntent').sort({ createdAt: -1 }).exec();
   }
 
   async updateContent(user: User, postId: string, dto: UpdatePostDto) {

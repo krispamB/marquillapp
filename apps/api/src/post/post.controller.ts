@@ -96,11 +96,13 @@ export class PostController {
   async getPosts(
     @GetUser() user: User,
     @Query('accountConnected') accountConnected?: string,
+    @Query('status') status?: string,
+    @Query('month') month?: string,
   ): Promise<IAppResponse> {
     return {
       statusCode: HttpStatus.OK,
       message: 'Posts retrieved successfully',
-      data: await this.postService.getPosts(user, accountConnected),
+      data: await this.postService.getPosts(user, accountConnected, status, month),
     };
   }
 
