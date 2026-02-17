@@ -102,3 +102,46 @@ export type DashboardPostsResponse = {
 };
 
 export type PostStatus = "DRAFT" | "SCHEDULED" | "PUBLISHED";
+
+export type CreateDraftRequest = {
+  input: string;
+  contentType: "quickPostLinkedin" | "insightPostLinkedin";
+};
+
+export type CreateDraftResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: string;
+};
+
+export type DraftStatusProgress = {
+  percentage?: number;
+  currentStep?: string;
+};
+
+export type DraftStatusData = {
+  state?: string;
+  progress?: DraftStatusProgress;
+  status?: string;
+};
+
+export type DraftStatusResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: DraftStatusData;
+};
+
+export type PostDetailData = {
+  _id?: string;
+  type?: string;
+  status?: string;
+  content?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type PostDetailResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: PostDetailData;
+};

@@ -9,6 +9,11 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Sidebar from "./Sidebar";
+import NewPostModal, {
+  type NewDraftGeneratePayload,
+  type NewDraftGenerateResult,
+  type NewPostSubmitPayload,
+} from "./NewPostModal";
 import {
   Card,
   ConnectAccountCta,
@@ -16,12 +21,17 @@ import {
   PillButton,
   UserAvatar,
 } from "./components";
+import { useNewPostModal } from "./useNewPostModal";
 import type {
   ConnectedAccount,
+  CreateDraftRequest,
+  CreateDraftResponse,
   DashboardPost,
   DashboardPostsResponse,
+  DraftStatusResponse,
   LinkedinAuthUrlResponse,
   PostMetricsResponse,
+  PostDetailResponse,
   UserProfile,
 } from "../lib/types";
 
@@ -214,6 +224,9 @@ export default function DashboardPage({
   const [postsError, setPostsError] = useState<string | null>(null);
   const [isViewingAllDrafts, setIsViewingAllDrafts] = useState(false);
   const [draftVisibleLimit, setDraftVisibleLimit] = useState(4);
+  const [generatedDraftId, setGeneratedDraftId] = useState<string | null>(null);
+  const { state: newPostModalState, openCreate, openEdit, close: closeNewPostModal } =
+    useNewPostModal();
   const connectMenuBoundaryRef = useRef<HTMLDivElement | null>(null);
   const popupWatcherRef = useRef<number | null>(null);
   const now = useMemo(() => new Date(), []);
@@ -227,6 +240,12 @@ export default function DashboardPage({
   const initials = getInitials(user.name, user.email);
   const hasConnectedAccounts =
     connectedAccounts.length > 0 && Boolean(selectedAccountId);
+  const selectedConnectedAccount = useMemo(
+    () =>
+      connectedAccounts.find((account) => account.id === selectedAccountId) ??
+      connectedAccounts[0],
+    [connectedAccounts, selectedAccountId],
+  );
   const usagePercent = Math.max(
     0,
     Math.min(100, Math.round((stats.postsThisMonth / stats.postLimit) * 100)),
@@ -517,6 +536,12 @@ export default function DashboardPage({
   }, [connectFeedback]);
 
   useEffect(() => {
+    if (newPostModalState.isOpen && newPostModalState.mode === "create") {
+      setGeneratedDraftId(null);
+    }
+  }, [newPostModalState.isOpen, newPostModalState.mode]);
+
+  useEffect(() => {
     if (!isConnectMenuOpen) {
       return;
     }
@@ -646,6 +671,126 @@ export default function DashboardPage({
     } finally {
       setIsConnectingLinkedIn(false);
     }
+  };
+
+  const handleModalAction = async (
+    kind: "publish" | "schedule" | "draft",
+    payload: NewPostSubmitPayload,
+  ) => {
+    const trimmedContent = payload.content.trim();
+    if (!trimmedContent) {
+      setConnectFeedback("Please add post content before continuing.");
+      return;
+    }
+
+    if (kind === "draft") {
+      setConnectFeedback("Draft changes saved locally. Backend save wiring comes next.");
+      return;
+    }
+
+    if (kind === "publish") {
+      setConnectFeedback("Publish action is connected to the new modal UI.");
+      closeNewPostModal();
+      return;
+    }
+
+    setConnectFeedback("Schedule action is connected to the new modal UI.");
+    closeNewPostModal();
+  };
+
+  const handleGenerateDraft = async (
+    payload: NewDraftGeneratePayload,
+  ): Promise<NewDraftGenerateResult> => {
+    const input = payload.input.trim();
+    if (!input) {
+      throw new Error("Please add a prompt before generating a draft.");
+    }
+
+    if (!selectedAccountId) {
+      const message = "Please select a connected account first.";
+      setConnectFeedback(message);
+      throw new Error(message);
+    }
+
+    const requestBody: CreateDraftRequest = {
+      input,
+      contentType: payload.contentType,
+    };
+
+    const response = await fetch(`${apiBase}/posts/${selectedAccountId}/draft`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    let parsedResponse: CreateDraftResponse | null = null;
+    try {
+      parsedResponse = (await response.json()) as CreateDraftResponse;
+    } catch {
+      parsedResponse = null;
+    }
+
+    if (!response.ok) {
+      const message = parsedResponse?.message || "Unable to generate draft.";
+      setConnectFeedback(message);
+      throw new Error(message);
+    }
+
+    const createdDraftId = parsedResponse?.data;
+    if (!createdDraftId) {
+      const message = "Draft ID missing from response.";
+      setConnectFeedback(message);
+      throw new Error(message);
+    }
+
+    setGeneratedDraftId(createdDraftId);
+    const message = parsedResponse?.message || "Draft created successfully";
+    setConnectFeedback(message);
+    return {
+      draftId: createdDraftId,
+      message,
+    };
+  };
+
+  const handleGetDraftStatus = async (draftId: string): Promise<DraftStatusResponse> => {
+    const response = await fetch(`${apiBase}/posts/${draftId}/status`, {
+      credentials: "include",
+    });
+
+    let parsedResponse: DraftStatusResponse | null = null;
+    try {
+      parsedResponse = (await response.json()) as DraftStatusResponse;
+    } catch {
+      parsedResponse = null;
+    }
+
+    if (!response.ok) {
+      throw new Error(parsedResponse?.message || "Unable to retrieve draft status.");
+    }
+
+    return parsedResponse ?? {};
+  };
+
+  const handleGetDraftById = async (draftId: string): Promise<PostDetailResponse> => {
+    const response = await fetch(`${apiBase}/posts/${draftId}`, {
+      credentials: "include",
+    });
+
+    let parsedResponse: PostDetailResponse | null = null;
+    try {
+      parsedResponse = (await response.json()) as PostDetailResponse;
+    } catch {
+      parsedResponse = null;
+    }
+
+    if (!response.ok) {
+      throw new Error(parsedResponse?.message || "Unable to retrieve generated draft.");
+    }
+
+    return parsedResponse ?? {};
   };
 
   return (
@@ -920,7 +1065,10 @@ export default function DashboardPage({
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-3">
-                    <PillButton icon={<PenSquare className="h-4 w-4" />}>
+                    <PillButton
+                      icon={<PenSquare className="h-4 w-4" />}
+                      onClick={openCreate}
+                    >
                       New post
                     </PillButton>
                     <PillButton
@@ -971,6 +1119,17 @@ export default function DashboardPage({
                               post.updatedAt ?? post.createdAt,
                             )}`}
                             status="DRAFT"
+                            onClick={() => {
+                              if (!post._id) {
+                                return;
+                              }
+                              openEdit({
+                                postId: post._id,
+                                initialContent: post.content ?? "",
+                                initialImageUrl: undefined,
+                              });
+                            }}
+                            ariaLabel={`Edit draft: ${getTitleFromContent(post.content)}`}
                           />
                         ))
                       : null}
@@ -1050,6 +1209,25 @@ export default function DashboardPage({
           </main>
         </div>
       </div>
+      <NewPostModal
+        isOpen={newPostModalState.isOpen}
+        mode={newPostModalState.mode}
+        postId={newPostModalState.postId ?? generatedDraftId ?? undefined}
+        initialContent={newPostModalState.initialContent}
+        initialImageUrl={newPostModalState.initialImageUrl}
+        account={{
+          name: selectedConnectedAccount?.profile?.name,
+          avatarUrl: selectedConnectedAccount?.profile?.picture,
+          provider: selectedConnectedAccount?.provider,
+        }}
+        onClose={closeNewPostModal}
+        onPublish={(payload) => handleModalAction("publish", payload)}
+        onSchedule={(payload) => handleModalAction("schedule", payload)}
+        onSaveDraft={(payload) => handleModalAction("draft", payload)}
+        onGenerateDraft={handleGenerateDraft}
+        onGetDraftStatus={handleGetDraftStatus}
+        onGetDraftById={handleGetDraftById}
+      />
     </div>
   );
 }
