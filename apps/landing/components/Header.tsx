@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { normalizeAppUrl } from '@/config/urls';
 
 const navItems = [
   { label: 'How it works', targetId: 'how-it-works' },
@@ -12,6 +13,7 @@ const navItems = [
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
+  const appUrl = normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL);
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
@@ -67,22 +69,28 @@ export default function Header() {
         </div>
 
         <div className={`hidden md:flex items-center transition-all duration-300 ${isCompact ? 'gap-2' : 'gap-3'}`}>
-          <button
-            className={`text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors ${
-              isCompact ? 'px-3 py-1.5' : 'px-4 py-2'
+          <label className="sr-only" htmlFor="desktop-language-selector">
+            Language
+          </label>
+          <select
+            id="desktop-language-selector"
+            aria-label="Language selector"
+            defaultValue="en"
+            className={`rounded-full border border-slate-200 bg-white px-3 text-sm font-semibold text-text-secondary outline-none transition-colors hover:text-text-primary ${
+              isCompact ? 'py-1.5' : 'py-2'
             }`}
-            aria-label="Log in to Marquill"
           >
-            Log in
-          </button>
-          <button
+            <option value="en">English (EN)</option>
+          </select>
+          <a
+            href={appUrl}
             className={`text-sm font-semibold text-white rounded-full bg-gradient-to-r from-[#5B5CF6] via-[#6C62FF] to-[#7C72FF] shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all ${
               isCompact ? 'px-4 py-2' : 'px-5 py-2.5'
             }`}
-            aria-label="Start free trial"
+            aria-label="Get started now"
           >
-            Start free
-          </button>
+            Get started now &rarr;
+          </a>
         </div>
 
         <div className="md:hidden">
@@ -121,18 +129,24 @@ export default function Header() {
                 {item.label}
               </a>
             ))}
-            <button
-              className="w-full rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-text-secondary"
-              aria-label="Log in to Marquill"
+            <label className="sr-only" htmlFor="mobile-language-selector">
+              Language
+            </label>
+            <select
+              id="mobile-language-selector"
+              aria-label="Language selector"
+              defaultValue="en"
+              className="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-text-secondary outline-none"
             >
-              Log in
-            </button>
-            <button
+              <option value="en">English (EN)</option>
+            </select>
+            <a
+              href={appUrl}
               className="w-full rounded-full bg-gradient-to-r from-[#5B5CF6] via-[#6C62FF] to-[#7C72FF] px-4 py-2 text-sm font-semibold text-white shadow-lg"
-              aria-label="Start free trial"
+              aria-label="Get started now"
             >
-              Start free
-            </button>
+              Get started now &rarr;
+            </a>
           </div>
         </div>
       )}

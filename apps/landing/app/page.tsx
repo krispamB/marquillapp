@@ -1,4 +1,5 @@
 import InformateCarousel from '@/components/InformateCarousel';
+import { normalizeAppUrl } from '@/config/urls';
 
 export const metadata = {
   title: 'Marquill - AI-Powered LinkedIn Content Platform',
@@ -91,6 +92,8 @@ const faqs = [
 ];
 
 export default function Home() {
+  const appUrl = normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL);
+
   return (
     <div className="bg-gradient-to-b from-white via-[#F6F2FF] to-[#EAF1FF]">
       <section className="relative overflow-hidden">
@@ -115,9 +118,13 @@ export default function Home() {
                 across personal and company pages in minutes.
               </p>
               <div className="mt-8 flex flex-wrap justify-center gap-4">
-                <button className="rounded-full bg-[#1B1C2A] px-6 py-3 text-sm font-semibold text-white shadow-lg">
-                  Start free
-                </button>
+                <a
+                  href={appUrl}
+                  className="rounded-full bg-[#1B1C2A] px-6 py-3 text-sm font-semibold text-white shadow-lg"
+                  aria-label="Get started now"
+                >
+                  Get started now &rarr;
+                </a>
                 <a
                   href="#how-it-works"
                   className="rounded-full border border-[#CBD2FF] bg-white/80 px-6 py-3 text-sm font-semibold text-text-primary"
@@ -318,15 +325,21 @@ export default function Home() {
                   {plan.price !== '$0' && <span className="text-sm text-text-secondary">/month</span>}
                 </div>
                 <p className="mt-3 text-sm text-text-secondary">{plan.description}</p>
-                <button
-                  className={`mt-6 w-full rounded-full px-4 py-3 text-sm font-semibold ${
-                    plan.featured
-                      ? 'bg-[#1B1C2A] text-white'
-                      : 'border border-[#D8DCFF] text-text-primary'
-                  }`}
-                >
-                  {plan.featured ? 'Start creator plan' : 'Start free'}
-                </button>
+                {plan.featured ? (
+                  <button
+                    className="mt-6 w-full rounded-full bg-[#1B1C2A] px-4 py-3 text-sm font-semibold text-white"
+                  >
+                    Start creator plan
+                  </button>
+                ) : (
+                  <a
+                    href={appUrl}
+                    className="mt-6 block w-full rounded-full border border-[#D8DCFF] px-4 py-3 text-center text-sm font-semibold text-text-primary"
+                    aria-label="Get started now"
+                  >
+                    Get started now &rarr;
+                  </a>
+                )}
                 <ul className="mt-6 space-y-3 text-sm text-text-secondary">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-center gap-2">
