@@ -220,14 +220,23 @@ export function ListItem({
   subtitle,
   status,
   badge,
+  onClick,
+  ariaLabel,
 }: {
   title: string;
   subtitle: string;
   status?: PostStatus;
   badge?: string;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+  ariaLabel?: string;
 }) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--color-border)] bg-white/85 px-4 py-3 transition hover:-translate-y-0.5">
+  const containerClassName = `flex w-full flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--color-border)] bg-white/85 px-4 py-3 text-left transition ${
+    onClick
+      ? "cursor-pointer hover:-translate-y-0.5 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/30"
+      : "hover:-translate-y-0.5"
+  }`;
+  const content = (
+    <>
       <div className="min-w-0 flex-1">
         <p className="truncate whitespace-nowrap text-sm font-semibold text-[var(--color-text-primary)]">
           {title}
@@ -244,8 +253,18 @@ export function ListItem({
           </span>
         ) : null}
       </div>
-    </div>
+    </>
   );
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} aria-label={ariaLabel} className={containerClassName}>
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={containerClassName}>{content}</div>;
 }
 
 const statusVisuals: Record<
