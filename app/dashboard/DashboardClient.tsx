@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   CalendarClock,
@@ -815,7 +815,7 @@ export default function DashboardPage({
     return parsedResponse ?? {};
   };
 
-  const handleGetDraftById = async (draftId: string): Promise<PostDetailResponse> => {
+  const handleGetDraftById = useCallback(async (draftId: string): Promise<PostDetailResponse> => {
     const response = await fetch(`${apiBase}/posts/${draftId}`, {
       credentials: "include",
     });
@@ -832,9 +832,9 @@ export default function DashboardPage({
     }
 
     return parsedResponse ?? {};
-  };
+  }, [apiBase]);
 
-  const handleGetLinkedinImageByUrn = async (
+  const handleGetLinkedinImageByUrn = useCallback(async (
     urn: string,
   ): Promise<LinkedinImageDetailsResponse> => {
     const response = await fetch(`${apiBase}/posts/linkedin/image/${encodeURIComponent(urn)}`, {
@@ -855,7 +855,7 @@ export default function DashboardPage({
     }
 
     return parsedResponse ?? {};
-  };
+  }, [apiBase]);
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-[var(--color-background)]">

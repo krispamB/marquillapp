@@ -89,6 +89,13 @@ type CachedLinkedinImage = {
   downloadUrlExpiresAt?: number;
 };
 
+type PreviewMediaFetchStatus = "idle" | "loading" | "done";
+
+type PreviewMediaFetchState = {
+  postId: string | null;
+  status: PreviewMediaFetchStatus;
+};
+
 function withUnsplashReferral(url?: string) {
   if (!url) {
     return "https://unsplash.com";
@@ -203,7 +210,14 @@ export default function NewPostModal({
   const pollTimerRef = useRef<number | null>(null);
   const streamTimerRef = useRef<number | null>(null);
   const pollInFlightRef = useRef(false);
-  const hasFetchedPostMediaRef = useRef(false);
+  const previewMediaFetchStateRef = useRef<PreviewMediaFetchState>({
+    postId: null,
+    status: "idle",
+  });
+  const activePreviewPostIdRef = useRef<string | null>(null);
+  const mediaFetchRequestSeqRef = useRef(0);
+  const mediaResolveRequestSeqRef = useRef(0);
+  const previousEditPostIdRef = useRef<string | undefined>(undefined);
   const isUnmountedRef = useRef(false);
   const isOpenRef = useRef(false);
   const selectionRangeRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
@@ -250,7 +264,7 @@ export default function NewPostModal({
     setPostMediaUrns([]);
     setIsResolvingPreviewMedia(false);
     setHasUserSelectedUnsplashImage(false);
-    hasFetchedPostMediaRef.current = false;
+    previewMediaFetchStateRef.current = { postId: null, status: "idle" };
     unsplashInFlightRef.current = "";
     pollInFlightRef.current = false;
     if (pollTimerRef.current !== null) {
@@ -274,7 +288,9 @@ export default function NewPostModal({
     setIsUnsplashModalOpen(false);
     setIsResolvingPreviewMedia(false);
     setResolvedLinkedinPreviewUrl(null);
-    hasFetchedPostMediaRef.current = false;
+    previewMediaFetchStateRef.current = { postId: null, status: "idle" };
+    activePreviewPostIdRef.current = null;
+    previousEditPostIdRef.current = undefined;
     unsplashInFlightRef.current = "";
     if (pollTimerRef.current !== null) {
       window.clearInterval(pollTimerRef.current);
@@ -285,6 +301,25 @@ export default function NewPostModal({
       streamTimerRef.current = null;
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || mode !== "edit") {
+      return;
+    }
+    if (previousEditPostIdRef.current === postId) {
+      return;
+    }
+
+    previousEditPostIdRef.current = postId;
+    activePreviewPostIdRef.current = postId ?? null;
+    previewMediaFetchStateRef.current = { postId: postId ?? null, status: "idle" };
+    setPostMediaUrns([]);
+    setResolvedLinkedinPreviewUrl(null);
+    setIsResolvingPreviewMedia(false);
+    setImageFile(undefined);
+    setImagePreviewUrl(initialImageUrl);
+    setHasUserSelectedUnsplashImage(false);
+  }, [initialImageUrl, isOpen, mode, postId]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -638,7 +673,7 @@ export default function NewPostModal({
 
     setPhase("editor");
     setPostMediaUrns(resolvedMediaUrns);
-    hasFetchedPostMediaRef.current = true;
+    previewMediaFetchStateRef.current = { postId: draftId, status: "done" };
     streamContentInChunks(generatedContent);
   };
 
@@ -952,23 +987,56 @@ export default function NewPostModal({
     if (!isOpen || !isPreviewVisible) {
       return;
     }
-    if (!postId || !onGetDraftById || postMediaUrns.length > 0 || hasFetchedPostMediaRef.current) {
+    if (!postId || !onGetDraftById || postMediaUrns.length > 0) {
+      return;
+    }
+
+    const currentFetchState = previewMediaFetchStateRef.current;
+    if (currentFetchState.postId !== postId) {
+      previewMediaFetchStateRef.current = { postId, status: "idle" };
+    } else if (currentFetchState.status === "loading" || currentFetchState.status === "done") {
       return;
     }
 
     let cancelled = false;
-    hasFetchedPostMediaRef.current = true;
+    let completed = false;
+    const targetPostId = postId;
+    const requestSeq = mediaFetchRequestSeqRef.current + 1;
+    mediaFetchRequestSeqRef.current = requestSeq;
+    previewMediaFetchStateRef.current = { postId: targetPostId, status: "loading" };
+    activePreviewPostIdRef.current = targetPostId;
 
     const fetchPostMediaUrns = async () => {
       try {
-        const postPayload = await onGetDraftById(postId);
+        const postPayload = await onGetDraftById(targetPostId);
         const urns = extractMediaUrns(postPayload?.data?.media);
-        if (!cancelled) {
+        if (
+          !cancelled &&
+          mediaFetchRequestSeqRef.current === requestSeq &&
+          activePreviewPostIdRef.current === targetPostId
+        ) {
           setPostMediaUrns(urns);
+          if (urns.length === 0) {
+            setResolvedLinkedinPreviewUrl(null);
+          }
+          previewMediaFetchStateRef.current = { postId: targetPostId, status: "done" };
+          completed = true;
         }
       } catch {
-        if (!cancelled) {
-          hasFetchedPostMediaRef.current = false;
+        if (
+          !cancelled &&
+          mediaFetchRequestSeqRef.current === requestSeq &&
+          activePreviewPostIdRef.current === targetPostId
+        ) {
+          previewMediaFetchStateRef.current = { postId: targetPostId, status: "idle" };
+        }
+      } finally {
+        if (
+          !completed &&
+          mediaFetchRequestSeqRef.current === requestSeq &&
+          activePreviewPostIdRef.current === targetPostId
+        ) {
+          previewMediaFetchStateRef.current = { postId: targetPostId, status: "idle" };
         }
       }
     };
@@ -990,21 +1058,41 @@ export default function NewPostModal({
     if (!isOpen || !isPreviewVisible) {
       return;
     }
-    if (imageFile || hasUserSelectedUnsplashImage || isResolvingPreviewMedia || postMediaUrns.length === 0) {
+    if (postMediaUrns.length === 0) {
+      if (!imagePreviewUrl) {
+        setResolvedLinkedinPreviewUrl(null);
+      }
+      return;
+    }
+    if (imageFile || hasUserSelectedUnsplashImage || isResolvingPreviewMedia) {
       return;
     }
 
     let cancelled = false;
+    const targetPostId = postId ?? null;
+    const requestSeq = mediaResolveRequestSeqRef.current + 1;
+    mediaResolveRequestSeqRef.current = requestSeq;
 
     const resolvePreviewMedia = async () => {
       setIsResolvingPreviewMedia(true);
       try {
         const resolvedUrl = await resolveLinkedinMediaUrlFromCacheOrApi(postMediaUrns);
-        if (!cancelled && resolvedUrl && !imageFile && !hasUserSelectedUnsplashImage) {
+        if (
+          !cancelled &&
+          mediaResolveRequestSeqRef.current === requestSeq &&
+          activePreviewPostIdRef.current === targetPostId &&
+          resolvedUrl &&
+          !imageFile &&
+          !hasUserSelectedUnsplashImage
+        ) {
           setResolvedLinkedinPreviewUrl(resolvedUrl);
         }
       } finally {
-        if (!cancelled) {
+        if (
+          !cancelled &&
+          mediaResolveRequestSeqRef.current === requestSeq &&
+          activePreviewPostIdRef.current === targetPostId
+        ) {
           setIsResolvingPreviewMedia(false);
         }
       }
@@ -1018,9 +1106,11 @@ export default function NewPostModal({
   }, [
     hasUserSelectedUnsplashImage,
     imageFile,
+    imagePreviewUrl,
     isOpen,
     isPreviewVisible,
     isResolvingPreviewMedia,
+    postId,
     postMediaUrns,
     resolveLinkedinMediaUrlFromCacheOrApi,
   ]);
