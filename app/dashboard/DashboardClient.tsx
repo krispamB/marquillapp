@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   CalendarClock,
@@ -29,6 +29,8 @@ import type {
   DashboardPost,
   DashboardPostsResponse,
   DraftStatusResponse,
+  ImageUploadResponse,
+  LinkedinImageDetailsResponse,
   LinkedinAuthUrlResponse,
   PostMetricsResponse,
   PostDetailResponse,
@@ -683,6 +685,39 @@ export default function DashboardPage({
       return;
     }
 
+    if (payload.imageFile) {
+      if (!payload.postId) {
+        setConnectFeedback("Please save or generate this draft first before uploading a local image.");
+        return;
+      }
+      try {
+        await uploadImageForPost(payload.postId, payload.imageFile);
+      } catch (error) {
+        setConnectFeedback(
+          error instanceof Error ? error.message : "Image upload failed.",
+        );
+        return;
+      }
+    } else if (payload.imageSource === "unsplash" && payload.imageUrl) {
+      if (!payload.postId) {
+        setConnectFeedback("Please save or generate this draft first before uploading an Unsplash image.");
+        return;
+      }
+      try {
+        const remoteFile = await buildFileFromRemoteImage(
+          payload.imageUrl,
+          "unsplash-image",
+          payload.imageMimeType,
+        );
+        await uploadImageForPost(payload.postId, remoteFile);
+      } catch (error) {
+        setConnectFeedback(
+          error instanceof Error ? error.message : "Unsplash image upload failed.",
+        );
+        return;
+      }
+    }
+
     if (kind === "draft") {
       setConnectFeedback("Draft changes saved locally. Backend save wiring comes next.");
       return;
@@ -696,6 +731,59 @@ export default function DashboardPage({
 
     setConnectFeedback("Schedule action is connected to the new modal UI.");
     closeNewPostModal();
+  };
+
+  const uploadImageForPost = async (postId: string, file: File): Promise<void> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`${apiBase}/posts/${postId}/image`, {
+      method: "PUT",
+      credentials: "include",
+      body: formData,
+    });
+
+    let parsedResponse: ImageUploadResponse | null = null;
+    try {
+      parsedResponse = (await response.json()) as ImageUploadResponse;
+    } catch {
+      parsedResponse = null;
+    }
+
+    if (!response.ok) {
+      throw new Error(parsedResponse?.message || "Image upload failed.");
+    }
+
+    setConnectFeedback(parsedResponse?.message || "Image upload successful.");
+  };
+
+  const buildFileFromRemoteImage = async (
+    imageUrl: string,
+    fallbackName: string,
+    fallbackMimeType?: string,
+  ): Promise<File> => {
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw new Error("Unable to fetch selected Unsplash image.");
+    }
+
+    const blob = await response.blob();
+    const buffer = await blob.arrayBuffer();
+    const contentTypeHeader = response.headers.get("Content-Type")?.split(";")[0]?.trim();
+    const mimeType = blob.type || contentTypeHeader || fallbackMimeType || "image/jpeg";
+
+    const extensionByMimeType: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/jpg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/gif": "gif",
+      "image/avif": "avif",
+    };
+    const extension = extensionByMimeType[mimeType.toLowerCase()] || "jpg";
+    const fileName = `${fallbackName}.${extension}`;
+
+    return new File([buffer], fileName, { type: mimeType });
   };
 
   const handleGenerateDraft = async (
@@ -774,7 +862,7 @@ export default function DashboardPage({
     return parsedResponse ?? {};
   };
 
-  const handleGetDraftById = async (draftId: string): Promise<PostDetailResponse> => {
+  const handleGetDraftById = useCallback(async (draftId: string): Promise<PostDetailResponse> => {
     const response = await fetch(`${apiBase}/posts/${draftId}`, {
       credentials: "include",
     });
@@ -791,7 +879,30 @@ export default function DashboardPage({
     }
 
     return parsedResponse ?? {};
-  };
+  }, [apiBase]);
+
+  const handleGetLinkedinImageByUrn = useCallback(async (
+    urn: string,
+  ): Promise<LinkedinImageDetailsResponse> => {
+    const response = await fetch(`${apiBase}/posts/linkedin/image/${encodeURIComponent(urn)}`, {
+      credentials: "include",
+    });
+
+    let parsedResponse: LinkedinImageDetailsResponse | null = null;
+    try {
+      parsedResponse = (await response.json()) as LinkedinImageDetailsResponse;
+    } catch {
+      parsedResponse = null;
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        parsedResponse?.message || "Unable to retrieve LinkedIn image details.",
+      );
+    }
+
+    return parsedResponse ?? {};
+  }, [apiBase]);
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-[var(--color-background)]">
@@ -1227,6 +1338,7 @@ export default function DashboardPage({
         onGenerateDraft={handleGenerateDraft}
         onGetDraftStatus={handleGetDraftStatus}
         onGetDraftById={handleGetDraftById}
+        onGetLinkedinImageByUrn={handleGetLinkedinImageByUrn}
       />
     </div>
   );

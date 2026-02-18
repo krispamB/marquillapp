@@ -136,6 +136,7 @@ export type PostDetailData = {
   type?: string;
   status?: string;
   content?: string;
+  media?: PostMediaItem[];
   createdAt?: string;
   updatedAt?: string;
 };
@@ -144,4 +145,27 @@ export type PostDetailResponse = {
   statusCode?: number;
   message?: string;
   data?: PostDetailData;
+};
+
+export type ImageUploadResponse = {
+  statusCode?: number;
+  message?: string;
+};
+
+export type PostMediaItem = {
+  id?: string;
+  title?: string;
+  altText?: string;
+  _id?: string;
+};
+
+export type LinkedinImageDetailsData = {
+  downloadUrl?: string;
+  downloadUrlExpiresAt?: number;
+};
+
+export type LinkedinImageDetailsResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: LinkedinImageDetailsData;
 };

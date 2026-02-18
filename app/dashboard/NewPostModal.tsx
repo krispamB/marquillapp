@@ -1,11 +1,11 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type DragEvent,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -17,8 +17,8 @@ import {
   ImagePlus,
   Info,
   MessageSquareText,
-  RefreshCw,
   Repeat2,
+  Search,
   Send,
   SmilePlus,
   Sparkles,
@@ -26,7 +26,12 @@ import {
   X,
 } from "lucide-react";
 import { UserAvatar } from "./components";
-import type { DraftStatusResponse, PostDetailResponse } from "../lib/types";
+import type {
+  DraftStatusResponse,
+  LinkedinImageDetailsResponse,
+  PostDetailResponse,
+  PostMediaItem,
+} from "../lib/types";
 import type { NewPostMode } from "./useNewPostModal";
 
 export type NewPostModalAccount = {
@@ -41,6 +46,8 @@ export type NewPostSubmitPayload = {
   content: string;
   imageFile?: File;
   imageUrl?: string;
+  imageSource?: "device" | "unsplash" | "existing";
+  imageMimeType?: string;
   aiPrompt?: string;
   postType?: "quickPostLinkedin" | "insightPostLinkedin";
 };
@@ -56,6 +63,68 @@ export type NewDraftGenerateResult = {
 };
 
 type ComposerPhase = "ai_prompt" | "ai_progress" | "editor";
+const EMOJI_OPTIONS = ["😀", "🎉", "🚀", "🔥", "💡", "👏", "✅", "📈", "🤝", "🙌"];
+const DEFAULT_UNSPLASH_QUERY = "nature";
+const UNSPLASH_PAGE_SIZE = 10;
+
+type UnsplashPhoto = {
+  id: string;
+  alt_description?: string | null;
+  urls?: {
+    small?: string;
+    regular?: string;
+  };
+  user?: {
+    name?: string;
+    links?: {
+      html?: string;
+    };
+  };
+};
+
+type UnsplashSearchResponse = {
+  results?: UnsplashPhoto[];
+};
+
+type CachedLinkedinImage = {
+  downloadUrl?: string;
+  downloadUrlExpiresAt?: number;
+};
+
+type PreviewMediaFetchStatus = "idle" | "loading" | "done";
+
+type PreviewMediaFetchState = {
+  postId: string | null;
+  status: PreviewMediaFetchStatus;
+};
+
+function withUnsplashReferral(url?: string) {
+  if (!url) {
+    return "https://unsplash.com";
+  }
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}utm_source=marquill&utm_medium=referral`;
+}
+
+function dedupeUnsplashPhotos(photos: UnsplashPhoto[]) {
+  const seen = new Set<string>();
+  return photos.filter((photo) => {
+    if (!photo?.id || seen.has(photo.id)) {
+      return false;
+    }
+    seen.add(photo.id);
+    return true;
+  });
+}
+
+function extractMediaUrns(mediaItems?: PostMediaItem[]) {
+  if (!Array.isArray(mediaItems)) {
+    return [];
+  }
+  return mediaItems
+    .map((item) => item?.id?.trim())
+    .filter((id): id is string => Boolean(id));
+}
 
 export default function NewPostModal({
   isOpen,
@@ -72,6 +141,7 @@ export default function NewPostModal({
   onGenerateDraft,
   onGetDraftStatus,
   onGetDraftById,
+  onGetLinkedinImageByUrn,
 }: {
   isOpen: boolean;
   mode: NewPostMode;
@@ -87,6 +157,7 @@ export default function NewPostModal({
   onGenerateDraft?: (payload: NewDraftGeneratePayload) => Promise<NewDraftGenerateResult>;
   onGetDraftStatus?: (draftId: string) => Promise<DraftStatusResponse>;
   onGetDraftById?: (draftId: string) => Promise<PostDetailResponse>;
+  onGetLinkedinImageByUrn?: (urn: string) => Promise<LinkedinImageDetailsResponse>;
 }) {
   const [mounted, setMounted] = useState(false);
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
@@ -100,6 +171,13 @@ export default function NewPostModal({
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | undefined>(
     initialImageUrl,
   );
+  const [imageSource, setImageSource] = useState<"device" | "unsplash" | "existing" | undefined>(
+    initialImageUrl ? "existing" : undefined,
+  );
+  const [imageMimeType, setImageMimeType] = useState<string | undefined>(undefined);
+  const [resolvedLinkedinPreviewUrl, setResolvedLinkedinPreviewUrl] = useState<string | null>(
+    null,
+  );
   const [pendingAction, setPendingAction] = useState<
     "publish" | "schedule" | "save" | "generate" | null
   >(null);
@@ -109,19 +187,49 @@ export default function NewPostModal({
   const [progressStepLabel, setProgressStepLabel] = useState("Starting draft generation");
   const [isPolling, setIsPolling] = useState(false);
   const [pollStartedAt, setPollStartedAt] = useState<number | null>(null);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [isMediaMenuOpen, setIsMediaMenuOpen] = useState(false);
+  const [selectedMediaSource, setSelectedMediaSource] = useState<"device" | "unsplash">("device");
+  const [isUnsplashModalOpen, setIsUnsplashModalOpen] = useState(false);
+  const [unsplashQuery, setUnsplashQuery] = useState(DEFAULT_UNSPLASH_QUERY);
+  const [unsplashCommittedQuery, setUnsplashCommittedQuery] = useState(DEFAULT_UNSPLASH_QUERY);
+  const [unsplashImages, setUnsplashImages] = useState<UnsplashPhoto[]>([]);
+  const [unsplashPage, setUnsplashPage] = useState(0);
+  const [unsplashHasMore, setUnsplashHasMore] = useState(true);
+  const [unsplashIsLoading, setUnsplashIsLoading] = useState(false);
+  const [unsplashError, setUnsplashError] = useState<string | null>(null);
+  const [postMediaUrns, setPostMediaUrns] = useState<string[]>([]);
+  const [isResolvingPreviewMedia, setIsResolvingPreviewMedia] = useState(false);
+  const [hasUserSelectedUnsplashImage, setHasUserSelectedUnsplashImage] = useState(false);
 
   const modalRef = useRef<HTMLDivElement | null>(null);
   const aiPromptRef = useRef<HTMLTextAreaElement | null>(null);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
+  const emojiPickerRef = useRef<HTMLDivElement | null>(null);
+  const mediaMenuRef = useRef<HTMLDivElement | null>(null);
+  const unsplashModalRef = useRef<HTMLDivElement | null>(null);
+  const unsplashScrollRef = useRef<HTMLDivElement | null>(null);
+  const unsplashSentinelRef = useRef<HTMLDivElement | null>(null);
+  const unsplashInFlightRef = useRef<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const generatedObjectUrlRef = useRef<string | null>(null);
   const pollTimerRef = useRef<number | null>(null);
   const streamTimerRef = useRef<number | null>(null);
   const pollInFlightRef = useRef(false);
+  const previewMediaFetchStateRef = useRef<PreviewMediaFetchState>({
+    postId: null,
+    status: "idle",
+  });
+  const activePreviewPostIdRef = useRef<string | null>(null);
+  const mediaFetchRequestSeqRef = useRef(0);
+  const mediaResolveRequestSeqRef = useRef(0);
+  const previousEditPostIdRef = useRef<string | undefined>(undefined);
   const isUnmountedRef = useRef(false);
   const isOpenRef = useRef(false);
+  const selectionRangeRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
   const POLL_INTERVAL_MS = 3000;
   const POLL_TIMEOUT_MS = 240000;
+  const unsplashAccessKey = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY?.trim() ?? "";
 
   useEffect(() => {
     setMounted(true);
@@ -141,12 +249,31 @@ export default function NewPostModal({
     setContent(initialContent ?? "");
     setImageFile(undefined);
     setImagePreviewUrl(initialImageUrl);
+    setImageSource(initialImageUrl ? "existing" : undefined);
+    setImageMimeType(undefined);
+    setResolvedLinkedinPreviewUrl(null);
     setPromptError(null);
     setActiveDraftId(null);
     setProgressPercent(0);
     setProgressStepLabel("Starting draft generation");
     setIsPolling(false);
     setPollStartedAt(null);
+    setIsEmojiPickerOpen(false);
+    setIsMediaMenuOpen(false);
+    setSelectedMediaSource("device");
+    setIsUnsplashModalOpen(false);
+    setUnsplashQuery(DEFAULT_UNSPLASH_QUERY);
+    setUnsplashCommittedQuery(DEFAULT_UNSPLASH_QUERY);
+    setUnsplashImages([]);
+    setUnsplashPage(0);
+    setUnsplashHasMore(true);
+    setUnsplashIsLoading(false);
+    setUnsplashError(null);
+    setPostMediaUrns([]);
+    setIsResolvingPreviewMedia(false);
+    setHasUserSelectedUnsplashImage(false);
+    previewMediaFetchStateRef.current = { postId: null, status: "idle" };
+    unsplashInFlightRef.current = "";
     pollInFlightRef.current = false;
     if (pollTimerRef.current !== null) {
       window.clearInterval(pollTimerRef.current);
@@ -166,6 +293,13 @@ export default function NewPostModal({
     pollInFlightRef.current = false;
     setIsPolling(false);
     setPollStartedAt(null);
+    setIsUnsplashModalOpen(false);
+    setIsResolvingPreviewMedia(false);
+    setResolvedLinkedinPreviewUrl(null);
+    previewMediaFetchStateRef.current = { postId: null, status: "idle" };
+    activePreviewPostIdRef.current = null;
+    previousEditPostIdRef.current = undefined;
+    unsplashInFlightRef.current = "";
     if (pollTimerRef.current !== null) {
       window.clearInterval(pollTimerRef.current);
       pollTimerRef.current = null;
@@ -175,6 +309,27 @@ export default function NewPostModal({
       streamTimerRef.current = null;
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || mode !== "edit") {
+      return;
+    }
+    if (previousEditPostIdRef.current === postId) {
+      return;
+    }
+
+    previousEditPostIdRef.current = postId;
+    activePreviewPostIdRef.current = postId ?? null;
+    previewMediaFetchStateRef.current = { postId: postId ?? null, status: "idle" };
+    setPostMediaUrns([]);
+    setResolvedLinkedinPreviewUrl(null);
+    setIsResolvingPreviewMedia(false);
+    setImageFile(undefined);
+    setImagePreviewUrl(initialImageUrl);
+    setImageSource(initialImageUrl ? "existing" : undefined);
+    setImageMimeType(undefined);
+    setHasUserSelectedUnsplashImage(false);
+  }, [initialImageUrl, isOpen, mode, postId]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -205,6 +360,21 @@ export default function NewPostModal({
 
     const handleKeydown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (isUnsplashModalOpen) {
+          event.preventDefault();
+          setIsUnsplashModalOpen(false);
+          return;
+        }
+        if (isMediaMenuOpen) {
+          event.preventDefault();
+          setIsMediaMenuOpen(false);
+          return;
+        }
+        if (isEmojiPickerOpen) {
+          event.preventDefault();
+          setIsEmojiPickerOpen(false);
+          return;
+        }
         event.preventDefault();
         onClose();
         return;
@@ -214,7 +384,7 @@ export default function NewPostModal({
         return;
       }
 
-      const modal = modalRef.current;
+      const modal = isUnsplashModalOpen ? unsplashModalRef.current : modalRef.current;
       if (!modal) {
         return;
       }
@@ -247,7 +417,149 @@ export default function NewPostModal({
 
     document.addEventListener("keydown", handleKeydown);
     return () => document.removeEventListener("keydown", handleKeydown);
-  }, [isOpen, onClose]);
+  }, [isEmojiPickerOpen, isMediaMenuOpen, isOpen, isUnsplashModalOpen, onClose]);
+
+  useEffect(() => {
+    if (!isEmojiPickerOpen) {
+      return;
+    }
+    const handlePointerDown = (event: globalThis.MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) {
+        return;
+      }
+      if (emojiPickerRef.current?.contains(target)) {
+        return;
+      }
+      if (target instanceof Element && target.closest("[data-emoji-trigger='true']")) {
+        return;
+      }
+      setIsEmojiPickerOpen(false);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [isEmojiPickerOpen]);
+
+  useEffect(() => {
+    if (!isMediaMenuOpen) {
+      return;
+    }
+    const handlePointerDown = (event: globalThis.MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) {
+        return;
+      }
+      if (mediaMenuRef.current?.contains(target)) {
+        return;
+      }
+      if (target instanceof Element && target.closest("[data-media-trigger='true']")) {
+        return;
+      }
+      setIsMediaMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [isMediaMenuOpen]);
+
+  useEffect(() => {
+    if (!isUnsplashModalOpen || unsplashPage < 1) {
+      return;
+    }
+    if (!unsplashAccessKey) {
+      setUnsplashError("Unsplash access key is missing.");
+      setUnsplashHasMore(false);
+      return;
+    }
+
+    const inFlightKey = `${unsplashCommittedQuery}:${unsplashPage}`;
+    if (unsplashInFlightRef.current === inFlightKey) {
+      return;
+    }
+    unsplashInFlightRef.current = inFlightKey;
+
+    const controller = new AbortController();
+    const query = unsplashCommittedQuery.trim() || DEFAULT_UNSPLASH_QUERY;
+    const params = new URLSearchParams({
+      query,
+      page: String(unsplashPage),
+      per_page: String(UNSPLASH_PAGE_SIZE),
+    });
+
+    setUnsplashIsLoading(true);
+
+    void (async () => {
+      try {
+        const response = await fetch(`https://api.unsplash.com/search/photos?${params.toString()}`, {
+          headers: {
+            Authorization: `Client-ID ${unsplashAccessKey}`,
+          },
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as UnsplashSearchResponse;
+        if (!response.ok) {
+          throw new Error("Unable to load Unsplash images.");
+        }
+
+        const results = Array.isArray(payload?.results)
+          ? dedupeUnsplashPhotos(payload.results)
+          : [];
+
+        setUnsplashImages((current) =>
+          unsplashPage === 1
+            ? results
+            : dedupeUnsplashPhotos([...current, ...results]),
+        );
+        setUnsplashHasMore(results.length === UNSPLASH_PAGE_SIZE);
+        setUnsplashError(null);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        setUnsplashError(
+          error instanceof Error ? error.message : "Unable to load Unsplash images.",
+        );
+        setUnsplashHasMore(false);
+      } finally {
+        setUnsplashIsLoading(false);
+        if (unsplashInFlightRef.current === inFlightKey) {
+          unsplashInFlightRef.current = "";
+        }
+      }
+    })();
+
+    return () => controller.abort();
+  }, [isUnsplashModalOpen, unsplashAccessKey, unsplashCommittedQuery, unsplashPage]);
+
+  useEffect(() => {
+    if (!isUnsplashModalOpen || !unsplashHasMore || unsplashIsLoading) {
+      return;
+    }
+    const root = unsplashScrollRef.current;
+    const target = unsplashSentinelRef.current;
+    if (!root || !target) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const isIntersecting = entries.some((entry) => entry.isIntersecting);
+        if (!isIntersecting || unsplashInFlightRef.current) {
+          return;
+        }
+        setUnsplashPage((current) => current + 1);
+      },
+      {
+        root,
+        threshold: 0.2,
+        rootMargin: "180px 0px",
+      },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [isUnsplashModalOpen, unsplashHasMore, unsplashIsLoading]);
 
   useEffect(() => {
     isUnmountedRef.current = false;
@@ -272,7 +584,7 @@ export default function NewPostModal({
   const isNearLimit = charsUsed >= Math.floor(maxChars * 0.85);
   const isOverLimit = charsUsed > maxChars;
   const hasContent = content.trim().length > 0;
-  const hasPreviewContent = hasContent || Boolean(imagePreviewUrl);
+  const hasPreviewContent = hasContent || Boolean(imagePreviewUrl ?? resolvedLinkedinPreviewUrl);
   const progressSegments = [0, 1, 2, 3].map((index) => {
     const segmentStart = index * 25;
     const segmentFill = ((progressPercent - segmentStart) / 25) * 100;
@@ -349,12 +661,14 @@ export default function NewPostModal({
     setProgressStepLabel("Finalizing draft");
 
     let generatedContent = "";
+    let resolvedMediaUrns: string[] = [];
     try {
       if (!onGetDraftById) {
         throw new Error("Draft retrieval is not available right now.");
       }
       const postPayload = await onGetDraftById(draftId);
       generatedContent = postPayload?.data?.content ?? "";
+      resolvedMediaUrns = extractMediaUrns(postPayload?.data?.media);
       setPromptError(null);
     } catch (error) {
       setPromptError(
@@ -368,6 +682,8 @@ export default function NewPostModal({
     }
 
     setPhase("editor");
+    setPostMediaUrns(resolvedMediaUrns);
+    previewMediaFetchStateRef.current = { postId: draftId, status: "done" };
     streamContentInChunks(generatedContent);
   };
 
@@ -512,13 +828,308 @@ export default function NewPostModal({
     generatedObjectUrlRef.current = objectUrl;
     setImageFile(file);
     setImagePreviewUrl(objectUrl);
+    setImageSource("device");
+    setImageMimeType(file.type || undefined);
+    setResolvedLinkedinPreviewUrl(null);
+    setHasUserSelectedUnsplashImage(false);
   };
 
-  const onDropImage = (event: DragEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    const file = event.dataTransfer.files?.[0];
-    handleFileChange(file);
+  const openUnsplashModal = () => {
+    setUnsplashQuery(DEFAULT_UNSPLASH_QUERY);
+    setUnsplashCommittedQuery(DEFAULT_UNSPLASH_QUERY);
+    setUnsplashImages([]);
+    setUnsplashPage(1);
+    setUnsplashHasMore(true);
+    setUnsplashError(null);
+    setIsUnsplashModalOpen(true);
   };
+
+  const openSelectedMediaSource = () => {
+    if (selectedMediaSource === "device") {
+      fileInputRef.current?.click();
+      return;
+    }
+    openUnsplashModal();
+  };
+
+  const runUnsplashSearch = () => {
+    const query = unsplashQuery.trim() || DEFAULT_UNSPLASH_QUERY;
+    setUnsplashCommittedQuery(query);
+    setUnsplashImages([]);
+    setUnsplashPage(1);
+    setUnsplashHasMore(true);
+    setUnsplashError(null);
+    unsplashInFlightRef.current = "";
+  };
+
+  const handleSelectUnsplashPhoto = (photo: UnsplashPhoto) => {
+    const selectedUrl = photo.urls?.regular ?? photo.urls?.small;
+    if (!selectedUrl) {
+      return;
+    }
+    setImageFile(undefined);
+    setImagePreviewUrl(selectedUrl);
+    setImageSource("unsplash");
+    setImageMimeType(undefined);
+    setResolvedLinkedinPreviewUrl(null);
+    setIsUnsplashModalOpen(false);
+    setSelectedMediaSource("unsplash");
+    setHasUserSelectedUnsplashImage(true);
+    window.requestAnimationFrame(() => {
+      editorRef.current?.focus();
+    });
+  };
+
+  const syncEditorSelection = () => {
+    const editorElement = editorRef.current;
+    if (!editorElement) {
+      return;
+    }
+    selectionRangeRef.current = {
+      start: editorElement.selectionStart ?? 0,
+      end: editorElement.selectionEnd ?? 0,
+    };
+  };
+
+  const resizeEditorToContent = () => {
+    const editorElement = editorRef.current;
+    if (!editorElement) {
+      return;
+    }
+    editorElement.style.height = "auto";
+    editorElement.style.height = `${editorElement.scrollHeight}px`;
+  };
+
+  useEffect(() => {
+    if (!isOpen || phase !== "editor") {
+      return;
+    }
+    const rafId = window.requestAnimationFrame(() => {
+      resizeEditorToContent();
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [content, isOpen, phase]);
+
+  const insertTextAtCursor = (textToInsert: string) => {
+    const editorElement = editorRef.current;
+    const currentSelection = selectionRangeRef.current;
+    const rawStart = editorElement?.selectionStart ?? currentSelection.start ?? content.length;
+    const rawEnd = editorElement?.selectionEnd ?? currentSelection.end ?? content.length;
+    const safeStart = Math.max(0, Math.min(rawStart, content.length));
+    const safeEnd = Math.max(safeStart, Math.min(rawEnd, content.length));
+    const nextContent = `${content.slice(0, safeStart)}${textToInsert}${content.slice(safeEnd)}`;
+    const nextCursorIndex = safeStart + textToInsert.length;
+
+    setContent(nextContent);
+    selectionRangeRef.current = { start: nextCursorIndex, end: nextCursorIndex };
+
+    window.requestAnimationFrame(() => {
+      const editor = editorRef.current;
+      if (!editor) {
+        return;
+      }
+      editor.focus();
+      editor.setSelectionRange(nextCursorIndex, nextCursorIndex);
+      resizeEditorToContent();
+    });
+  };
+
+  const resolveLinkedinMediaUrlFromCacheOrApi = useCallback(
+    async (urns: string[]): Promise<string | undefined> => {
+      if (!onGetLinkedinImageByUrn) {
+        return undefined;
+      }
+
+      for (const urn of urns) {
+        const normalizedUrn = urn.trim();
+        if (!normalizedUrn) {
+          continue;
+        }
+
+        try {
+          const cachedRaw = window.localStorage.getItem(normalizedUrn);
+          if (cachedRaw) {
+            const cached = JSON.parse(cachedRaw) as CachedLinkedinImage;
+            const cachedUrl = cached?.downloadUrl;
+            const cachedExpiry = cached?.downloadUrlExpiresAt;
+            if (
+              typeof cachedUrl === "string" &&
+              cachedUrl.length > 0 &&
+              typeof cachedExpiry === "number" &&
+              cachedExpiry > Date.now()
+            ) {
+              return cachedUrl;
+            }
+          }
+        } catch {
+          // Ignore localStorage/cache parsing issues and fallback to API.
+        }
+
+        try {
+          const details = await onGetLinkedinImageByUrn(normalizedUrn);
+          const resolvedUrl = details?.data?.downloadUrl;
+          const resolvedExpiry = details?.data?.downloadUrlExpiresAt;
+          if (
+            typeof resolvedUrl === "string" &&
+            resolvedUrl.length > 0 &&
+            typeof resolvedExpiry === "number"
+          ) {
+            try {
+              window.localStorage.setItem(
+                normalizedUrn,
+                JSON.stringify({
+                  downloadUrl: resolvedUrl,
+                  downloadUrlExpiresAt: resolvedExpiry,
+                } satisfies CachedLinkedinImage),
+              );
+            } catch {
+              // Ignore storage write errors and continue with resolved URL.
+            }
+            return resolvedUrl;
+          }
+        } catch {
+          // Try next URN if available.
+        }
+      }
+
+      return undefined;
+    },
+    [onGetLinkedinImageByUrn],
+  );
+
+  useEffect(() => {
+    if (!isOpen || !isPreviewVisible) {
+      return;
+    }
+    if (!postId || !onGetDraftById || postMediaUrns.length > 0) {
+      return;
+    }
+
+    const currentFetchState = previewMediaFetchStateRef.current;
+    if (currentFetchState.postId !== postId) {
+      previewMediaFetchStateRef.current = { postId, status: "idle" };
+    } else if (currentFetchState.status === "loading" || currentFetchState.status === "done") {
+      return;
+    }
+
+    let cancelled = false;
+    let completed = false;
+    const targetPostId = postId;
+    const requestSeq = mediaFetchRequestSeqRef.current + 1;
+    mediaFetchRequestSeqRef.current = requestSeq;
+    previewMediaFetchStateRef.current = { postId: targetPostId, status: "loading" };
+    activePreviewPostIdRef.current = targetPostId;
+
+    const fetchPostMediaUrns = async () => {
+      try {
+        const postPayload = await onGetDraftById(targetPostId);
+        const urns = extractMediaUrns(postPayload?.data?.media);
+        if (
+          !cancelled &&
+          mediaFetchRequestSeqRef.current === requestSeq &&
+          activePreviewPostIdRef.current === targetPostId
+        ) {
+          setPostMediaUrns(urns);
+          if (urns.length === 0) {
+            setResolvedLinkedinPreviewUrl(null);
+          }
+          previewMediaFetchStateRef.current = { postId: targetPostId, status: "done" };
+          completed = true;
+        }
+      } catch {
+        if (
+          !cancelled &&
+          mediaFetchRequestSeqRef.current === requestSeq &&
+          activePreviewPostIdRef.current === targetPostId
+        ) {
+          previewMediaFetchStateRef.current = { postId: targetPostId, status: "idle" };
+        }
+      } finally {
+        if (
+          !completed &&
+          mediaFetchRequestSeqRef.current === requestSeq &&
+          activePreviewPostIdRef.current === targetPostId
+        ) {
+          previewMediaFetchStateRef.current = { postId: targetPostId, status: "idle" };
+        }
+      }
+    };
+
+    void fetchPostMediaUrns();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isOpen,
+    isPreviewVisible,
+    onGetDraftById,
+    postId,
+    postMediaUrns.length,
+  ]);
+
+  useEffect(() => {
+    if (!isOpen || !isPreviewVisible) {
+      return;
+    }
+    if (postMediaUrns.length === 0) {
+      if (!imagePreviewUrl) {
+        setResolvedLinkedinPreviewUrl(null);
+      }
+      return;
+    }
+    if (imageFile || hasUserSelectedUnsplashImage || isResolvingPreviewMedia) {
+      return;
+    }
+
+    let cancelled = false;
+    const targetPostId = postId ?? null;
+    const requestSeq = mediaResolveRequestSeqRef.current + 1;
+    mediaResolveRequestSeqRef.current = requestSeq;
+
+    const resolvePreviewMedia = async () => {
+      setIsResolvingPreviewMedia(true);
+      try {
+        const resolvedUrl = await resolveLinkedinMediaUrlFromCacheOrApi(postMediaUrns);
+        if (
+          !cancelled &&
+          mediaResolveRequestSeqRef.current === requestSeq &&
+          activePreviewPostIdRef.current === targetPostId &&
+          resolvedUrl &&
+          !imageFile &&
+          !hasUserSelectedUnsplashImage
+        ) {
+          setResolvedLinkedinPreviewUrl(resolvedUrl);
+        }
+      } finally {
+        if (
+          !cancelled &&
+          mediaResolveRequestSeqRef.current === requestSeq &&
+          activePreviewPostIdRef.current === targetPostId
+        ) {
+          setIsResolvingPreviewMedia(false);
+        }
+      }
+    };
+
+    void resolvePreviewMedia();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    hasUserSelectedUnsplashImage,
+    imageFile,
+    imagePreviewUrl,
+    isOpen,
+    isPreviewVisible,
+    isResolvingPreviewMedia,
+    postId,
+    postMediaUrns,
+    resolveLinkedinMediaUrlFromCacheOrApi,
+  ]);
+
+  const previewImageSrc = imagePreviewUrl ?? resolvedLinkedinPreviewUrl ?? undefined;
 
   const buildPayload = (): NewPostSubmitPayload => ({
     mode,
@@ -526,6 +1137,8 @@ export default function NewPostModal({
     content,
     imageFile,
     imageUrl: imagePreviewUrl,
+    imageSource,
+    imageMimeType,
     aiPrompt,
     postType,
   });
@@ -547,10 +1160,11 @@ export default function NewPostModal({
   }
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#12111A]/45 px-3 py-4 backdrop-blur-[2px] sm:px-6"
-      onMouseDown={handleBackdropClick}
-    >
+    <>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-[#12111A]/45 px-3 py-4 backdrop-blur-[2px] sm:px-6"
+        onMouseDown={handleBackdropClick}
+      >
       <div
         ref={modalRef}
         role="dialog"
@@ -703,68 +1317,182 @@ export default function NewPostModal({
               </div>
             ) : (
               <div className="flex min-h-full flex-col gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <UserAvatar
-                      initials={accountInitials}
-                      avatarUrl={account.avatarUrl}
-                      sizeClass="h-11 w-11"
-                    />
-                    <span className="absolute -bottom-1 -right-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white bg-white shadow-[0_6px_16px_-8px_rgba(15,23,42,0.45)]">
-                      <img src="/LinkedIn_Icon_1.webp" alt="LinkedIn" className="h-3.5 w-3.5" />
-                    </span>
-                  </div>
-                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">{accountName}</p>
-                </div>
                 {promptError ? (
                   <p className="text-sm font-medium text-rose-600">{promptError}</p>
                 ) : null}
+                <div className="overflow-visible rounded-2xl border border-[#d6dae3] bg-white">
+                  <div className="p-4 sm:p-5">
+                    <div className="flex items-start gap-3">
+                      <div className="relative">
+                        <UserAvatar
+                          initials={accountInitials}
+                          avatarUrl={account.avatarUrl}
+                          sizeClass="h-11 w-11"
+                        />
+                        <span className="absolute -bottom-1 -right-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white bg-white shadow-[0_6px_16px_-8px_rgba(15,23,42,0.45)]">
+                          <img src="/LinkedIn_Icon_1.webp" alt="LinkedIn" className="h-3.5 w-3.5" />
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1 rounded-xl border border-transparent bg-transparent px-1 transition">
+                        <textarea
+                          ref={editorRef}
+                          value={content}
+                          onChange={(event) => setContent(event.target.value)}
+                          onSelect={syncEditorSelection}
+                          onClick={syncEditorSelection}
+                          onKeyUp={syncEditorSelection}
+                          placeholder="Write your post..."
+                          className="min-h-[260px] w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-[15px] leading-9 text-[var(--color-text-primary)] outline-none placeholder:text-[#6d7482]"
+                        />
+                      </div>
+                    </div>
 
-                <textarea
-                  ref={editorRef}
-                  value={content}
-                  onChange={(event) => setContent(event.target.value)}
-                  placeholder="Write your post..."
-                  className="min-h-[180px] w-full resize-y rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3 text-[15px] leading-6 text-[var(--color-text-primary)] outline-none transition placeholder:text-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/15"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  onDrop={onDropImage}
-                  onDragOver={(event) => event.preventDefault()}
-                  className="group flex min-h-[132px] w-full flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--color-border-inset)] bg-[var(--color-background)]/45 px-4 py-6 text-center transition hover:border-[var(--color-primary)]/45 hover:bg-[var(--color-background)]"
-                >
-                  <ImagePlus className="h-7 w-7 text-[var(--color-text-secondary)] transition group-hover:text-[var(--color-primary)]" />
-                  <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                    Drag and drop an image, or <span className="font-semibold text-[var(--color-primary)]">choose file</span>
-                  </p>
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className="hidden"
-                  onChange={(event) => handleFileChange(event.target.files?.[0])}
-                />
-
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--color-border)] pt-3">
-                  <div className="flex items-center gap-1">
-                    <ToolChip label="Rewrite" icon={<RefreshCw className="h-4 w-4" />} />
-                    <ToolChip label="Emoji" icon={<SmilePlus className="h-4 w-4" />} />
-                    <ToolChip label="Hashtag" icon={<Hash className="h-4 w-4" />} />
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={(event) => handleFileChange(event.target.files?.[0])}
+                    />
                   </div>
-                  <span
-                    className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                      isOverLimit
-                        ? "border-rose-200 bg-rose-50 text-rose-600"
-                        : isNearLimit
-                        ? "border-amber-200 bg-amber-50 text-amber-700"
-                        : "border-[var(--color-border)] bg-white text-[var(--color-text-secondary)]"
-                    }`}
-                  >
-                    {charsUsed}/{maxChars}
-                  </span>
+
+                  <div className="border-t border-[#dbe0ea] px-4 py-3 sm:px-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="relative flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={openSelectedMediaSource}
+                          aria-label="Upload media"
+                          data-media-trigger="true"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-text-primary)] transition hover:bg-[#f2f4f9]"
+                        >
+                          <ImagePlus className="h-5 w-5" />
+                        </button>
+                        <span className="h-7 w-px bg-[#d9dee8]" />
+                        <button
+                          type="button"
+                          onClick={() => setIsMediaMenuOpen((value) => !value)}
+                          aria-haspopup="menu"
+                          aria-expanded={isMediaMenuOpen}
+                          aria-controls="editor-media-menu"
+                          aria-label="More media options"
+                          data-media-trigger="true"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-text-primary)] transition hover:bg-[#f2f4f9]"
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </button>
+                        {isMediaMenuOpen ? (
+                          <div
+                            id="editor-media-menu"
+                            ref={mediaMenuRef}
+                            role="menu"
+                            aria-label="Media source options"
+                            className="absolute left-0 top-full z-[70] mt-2 min-w-[224px] rounded-xl border border-[#d6dae3] bg-white p-1 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.45)]"
+                          >
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                setSelectedMediaSource("device");
+                                setIsMediaMenuOpen(false);
+                                fileInputRef.current?.click();
+                              }}
+                              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium transition hover:bg-[#f2f4f9] ${
+                                selectedMediaSource === "device"
+                                  ? "bg-[#eef3ff] text-[#1e40af]"
+                                  : "text-[var(--color-text-primary)]"
+                              }`}
+                            >
+                              <span>From your device</span>
+                              {selectedMediaSource === "device" ? (
+                                <span className="text-xs font-semibold uppercase tracking-[0.08em]">Default</span>
+                              ) : null}
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                setSelectedMediaSource("unsplash");
+                                setIsMediaMenuOpen(false);
+                                openUnsplashModal();
+                              }}
+                              className={`mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition hover:bg-[#f2f4f9] ${
+                                selectedMediaSource === "unsplash"
+                                  ? "bg-[#eef3ff] text-[#1e40af]"
+                                  : "text-[var(--color-text-primary)]"
+                              }`}
+                            >
+                              <img src="/unsplash.svg" alt="" aria-hidden="true" className="h-4 w-4" />
+                              <span>Browse Unsplash</span>
+                            </button>
+                          </div>
+                        ) : null}
+                        <span className="h-7 w-px bg-[#d9dee8]" />
+
+                        <div className="relative">
+                          <button
+                            type="button"
+                            data-emoji-trigger="true"
+                            onMouseDown={syncEditorSelection}
+                            onClick={() => setIsEmojiPickerOpen((value) => !value)}
+                            aria-expanded={isEmojiPickerOpen}
+                            aria-haspopup="dialog"
+                            aria-label="Insert emoji"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-text-primary)] transition hover:bg-[#f2f4f9]"
+                          >
+                            <SmilePlus className="h-5 w-5" />
+                          </button>
+                          {isEmojiPickerOpen ? (
+                            <div
+                              ref={emojiPickerRef}
+                              role="dialog"
+                              aria-label="Emoji picker"
+                              className="absolute bottom-full left-0 z-50 mb-2 w-[224px] rounded-xl border border-[#d6dae3] bg-white p-2 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.45)]"
+                            >
+                              <div className="grid grid-cols-5 gap-1">
+                                {EMOJI_OPTIONS.map((emoji) => (
+                                  <button
+                                    key={emoji}
+                                    type="button"
+                                    onClick={() => {
+                                      insertTextAtCursor(emoji);
+                                      setIsEmojiPickerOpen(false);
+                                    }}
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-lg transition hover:bg-[#f3f5fa]"
+                                    aria-label={`Insert ${emoji}`}
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <button
+                          type="button"
+                          onMouseDown={syncEditorSelection}
+                          onClick={() => insertTextAtCursor("#")}
+                          aria-label="Insert hashtag"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-text-primary)] transition hover:bg-[#f2f4f9]"
+                        >
+                          <Hash className="h-5 w-5" />
+                        </button>
+                      </div>
+                      <span
+                        className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${
+                          isOverLimit
+                            ? "border-rose-200 bg-rose-50 text-rose-600"
+                            : isNearLimit
+                            ? "border-amber-200 bg-amber-50 text-amber-700"
+                            : "border-[#7c828f] bg-white text-[#5c6370]"
+                        }`}
+                      >
+                        {charsUsed}
+                      </span>
+                    </div>
+                  </div>
+
                 </div>
               </div>
             )}
@@ -825,10 +1553,16 @@ export default function NewPostModal({
                       {content}
                     </p>
                   ) : null}
-                  {imagePreviewUrl ? (
+                  {previewImageSrc ? (
                     <img
-                      src={imagePreviewUrl}
+                      src={previewImageSrc}
                       alt="Post preview"
+                      referrerPolicy="no-referrer"
+                      onError={() => {
+                        if (!imagePreviewUrl) {
+                          setResolvedLinkedinPreviewUrl(null);
+                        }
+                      }}
                       className="mt-4 max-h-[360px] w-full rounded-xl border border-[var(--color-border)] object-cover"
                     />
                   ) : null}
@@ -889,7 +1623,123 @@ export default function NewPostModal({
           </div>
         </footer>
       </div>
-    </div>,
+      {isUnsplashModalOpen ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-[#12111A]/40 px-3 py-4 backdrop-blur-[1px] sm:px-6"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setIsUnsplashModalOpen(false);
+            }
+          }}
+        >
+          <div
+            ref={unsplashModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="unsplash-modal-title"
+            className="flex h-[min(90vh,860px)] w-full max-w-[1280px] flex-col rounded-2xl border border-[#d6dae3] bg-white shadow-[0_28px_90px_-45px_rgba(15,23,42,0.55)]"
+          >
+            <header className="flex items-center justify-between border-b border-[#dbe0ea] px-5 py-4">
+              <div className="flex items-center gap-3">
+                <img src="/unsplash.svg" alt="" aria-hidden="true" className="h-5 w-5" />
+                <h3 id="unsplash-modal-title" className="text-[32px] font-semibold text-[var(--color-text-primary)]">
+                  Unsplash
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsUnsplashModalOpen(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-text-secondary)] transition hover:bg-[#f2f4f9] hover:text-[var(--color-text-primary)]"
+                aria-label="Close Unsplash search"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </header>
+
+            <div className="flex items-center gap-3 border-b border-[#dbe0ea] px-5 py-4">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-secondary)]" />
+                <input
+                  type="text"
+                  value={unsplashQuery}
+                  onChange={(event) => setUnsplashQuery(event.target.value)}
+                  placeholder="Search free high resolution photos"
+                  className="h-12 w-full rounded-lg border border-[#cfd5e1] bg-white pl-10 pr-3 text-base text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/15"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={runUnsplashSearch}
+                className="inline-flex h-12 items-center justify-center rounded-lg bg-[#2f54eb] px-6 text-base font-semibold text-white transition hover:brightness-95"
+              >
+                Search
+              </button>
+            </div>
+
+            <div ref={unsplashScrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+              {unsplashError ? (
+                <p className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {unsplashError}
+                </p>
+              ) : null}
+              {!unsplashIsLoading && !unsplashError && unsplashImages.length === 0 ? (
+                <p className="text-sm text-[var(--color-text-secondary)]">No images found. Try another search.</p>
+              ) : null}
+              <div className="columns-1 gap-5 md:columns-2 lg:columns-3">
+                {unsplashImages.map((photo) => {
+                  const previewUrl = photo.urls?.small;
+                  const creatorName = photo.user?.name || "Unknown creator";
+                  const creatorUrl = withUnsplashReferral(photo.user?.links?.html);
+                  const altText = photo.alt_description?.trim() || `Unsplash image by ${creatorName}`;
+
+                  return (
+                    <article key={photo.id} className="mb-5 break-inside-avoid">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectUnsplashPhoto(photo)}
+                        className="w-full overflow-hidden rounded-md border border-[#d6dae3] bg-white text-left transition hover:shadow-[0_14px_32px_-24px_rgba(15,23,42,0.45)]"
+                      >
+                        {previewUrl ? (
+                          <img src={previewUrl} alt={altText} className="h-auto w-full object-cover" />
+                        ) : (
+                          <div className="grid h-48 w-full place-items-center bg-[#f4f6fb] text-sm text-[var(--color-text-secondary)]">
+                            Image unavailable
+                          </div>
+                        )}
+                      </button>
+                      <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+                        <a
+                          href={creatorUrl}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="underline underline-offset-2 hover:text-[var(--color-text-primary)]"
+                        >
+                          {creatorName}
+                        </a>{" "}
+                        for{" "}
+                        <a
+                          href={withUnsplashReferral("https://unsplash.com")}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="underline underline-offset-2 hover:text-[var(--color-text-primary)]"
+                        >
+                          Unsplash
+                        </a>
+                      </p>
+                    </article>
+                  );
+                })}
+              </div>
+              <div ref={unsplashSentinelRef} className="h-8 w-full" />
+              {unsplashIsLoading ? (
+                <p className="py-2 text-center text-sm text-[var(--color-text-secondary)]">Loading images...</p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+      </div>
+    </>,
     document.body,
   );
 }
@@ -922,20 +1772,6 @@ function formatDraftStep(stepValue: string) {
       return word.charAt(0).toUpperCase() + word.slice(1);
     })
     .join(" ");
-}
-
-function ToolChip({ label, icon }: { label: string; icon: ReactNode }) {
-  return (
-    <button
-      type="button"
-      className="inline-flex items-center gap-1 rounded-full border border-[var(--color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-      aria-label={label}
-      title={label}
-    >
-      {icon}
-      {label}
-    </button>
-  );
 }
 
 function PreviewAction({ icon, ariaLabel }: { icon: ReactNode; ariaLabel: string }) {
