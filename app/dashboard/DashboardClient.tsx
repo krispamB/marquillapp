@@ -29,6 +29,8 @@ import type {
   DashboardPost,
   DashboardPostsResponse,
   DraftStatusResponse,
+  ImageUploadResponse,
+  LinkedinImageDetailsResponse,
   LinkedinAuthUrlResponse,
   PostMetricsResponse,
   PostDetailResponse,
@@ -683,6 +685,21 @@ export default function DashboardPage({
       return;
     }
 
+    if (payload.imageFile) {
+      if (!payload.postId) {
+        setConnectFeedback("Please save or generate this draft first before uploading a local image.");
+        return;
+      }
+      try {
+        await uploadLocalImageForPost(payload.postId, payload.imageFile);
+      } catch (error) {
+        setConnectFeedback(
+          error instanceof Error ? error.message : "Image upload failed.",
+        );
+        return;
+      }
+    }
+
     if (kind === "draft") {
       setConnectFeedback("Draft changes saved locally. Backend save wiring comes next.");
       return;
@@ -696,6 +713,30 @@ export default function DashboardPage({
 
     setConnectFeedback("Schedule action is connected to the new modal UI.");
     closeNewPostModal();
+  };
+
+  const uploadLocalImageForPost = async (postId: string, file: File): Promise<void> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`${apiBase}/posts/${postId}/image`, {
+      method: "PUT",
+      credentials: "include",
+      body: formData,
+    });
+
+    let parsedResponse: ImageUploadResponse | null = null;
+    try {
+      parsedResponse = (await response.json()) as ImageUploadResponse;
+    } catch {
+      parsedResponse = null;
+    }
+
+    if (!response.ok) {
+      throw new Error(parsedResponse?.message || "Image upload failed.");
+    }
+
+    setConnectFeedback(parsedResponse?.message || "Image upload successful.");
   };
 
   const handleGenerateDraft = async (
@@ -788,6 +829,29 @@ export default function DashboardPage({
 
     if (!response.ok) {
       throw new Error(parsedResponse?.message || "Unable to retrieve generated draft.");
+    }
+
+    return parsedResponse ?? {};
+  };
+
+  const handleGetLinkedinImageByUrn = async (
+    urn: string,
+  ): Promise<LinkedinImageDetailsResponse> => {
+    const response = await fetch(`${apiBase}/posts/linkedin/image/${encodeURIComponent(urn)}`, {
+      credentials: "include",
+    });
+
+    let parsedResponse: LinkedinImageDetailsResponse | null = null;
+    try {
+      parsedResponse = (await response.json()) as LinkedinImageDetailsResponse;
+    } catch {
+      parsedResponse = null;
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        parsedResponse?.message || "Unable to retrieve LinkedIn image details.",
+      );
     }
 
     return parsedResponse ?? {};
@@ -1227,6 +1291,7 @@ export default function DashboardPage({
         onGenerateDraft={handleGenerateDraft}
         onGetDraftStatus={handleGetDraftStatus}
         onGetDraftById={handleGetDraftById}
+        onGetLinkedinImageByUrn={handleGetLinkedinImageByUrn}
       />
     </div>
   );
