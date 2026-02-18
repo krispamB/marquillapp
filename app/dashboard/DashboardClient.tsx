@@ -691,10 +691,28 @@ export default function DashboardPage({
         return;
       }
       try {
-        await uploadLocalImageForPost(payload.postId, payload.imageFile);
+        await uploadImageForPost(payload.postId, payload.imageFile);
       } catch (error) {
         setConnectFeedback(
           error instanceof Error ? error.message : "Image upload failed.",
+        );
+        return;
+      }
+    } else if (payload.imageSource === "unsplash" && payload.imageUrl) {
+      if (!payload.postId) {
+        setConnectFeedback("Please save or generate this draft first before uploading an Unsplash image.");
+        return;
+      }
+      try {
+        const remoteFile = await buildFileFromRemoteImage(
+          payload.imageUrl,
+          "unsplash-image",
+          payload.imageMimeType,
+        );
+        await uploadImageForPost(payload.postId, remoteFile);
+      } catch (error) {
+        setConnectFeedback(
+          error instanceof Error ? error.message : "Unsplash image upload failed.",
         );
         return;
       }
@@ -715,7 +733,7 @@ export default function DashboardPage({
     closeNewPostModal();
   };
 
-  const uploadLocalImageForPost = async (postId: string, file: File): Promise<void> => {
+  const uploadImageForPost = async (postId: string, file: File): Promise<void> => {
     const formData = new FormData();
     formData.append("file", file);
 
@@ -737,6 +755,35 @@ export default function DashboardPage({
     }
 
     setConnectFeedback(parsedResponse?.message || "Image upload successful.");
+  };
+
+  const buildFileFromRemoteImage = async (
+    imageUrl: string,
+    fallbackName: string,
+    fallbackMimeType?: string,
+  ): Promise<File> => {
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw new Error("Unable to fetch selected Unsplash image.");
+    }
+
+    const blob = await response.blob();
+    const buffer = await blob.arrayBuffer();
+    const contentTypeHeader = response.headers.get("Content-Type")?.split(";")[0]?.trim();
+    const mimeType = blob.type || contentTypeHeader || fallbackMimeType || "image/jpeg";
+
+    const extensionByMimeType: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/jpg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/gif": "gif",
+      "image/avif": "avif",
+    };
+    const extension = extensionByMimeType[mimeType.toLowerCase()] || "jpg";
+    const fileName = `${fallbackName}.${extension}`;
+
+    return new File([buffer], fileName, { type: mimeType });
   };
 
   const handleGenerateDraft = async (

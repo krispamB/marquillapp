@@ -46,6 +46,8 @@ export type NewPostSubmitPayload = {
   content: string;
   imageFile?: File;
   imageUrl?: string;
+  imageSource?: "device" | "unsplash" | "existing";
+  imageMimeType?: string;
   aiPrompt?: string;
   postType?: "quickPostLinkedin" | "insightPostLinkedin";
 };
@@ -169,6 +171,10 @@ export default function NewPostModal({
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | undefined>(
     initialImageUrl,
   );
+  const [imageSource, setImageSource] = useState<"device" | "unsplash" | "existing" | undefined>(
+    initialImageUrl ? "existing" : undefined,
+  );
+  const [imageMimeType, setImageMimeType] = useState<string | undefined>(undefined);
   const [resolvedLinkedinPreviewUrl, setResolvedLinkedinPreviewUrl] = useState<string | null>(
     null,
   );
@@ -243,6 +249,8 @@ export default function NewPostModal({
     setContent(initialContent ?? "");
     setImageFile(undefined);
     setImagePreviewUrl(initialImageUrl);
+    setImageSource(initialImageUrl ? "existing" : undefined);
+    setImageMimeType(undefined);
     setResolvedLinkedinPreviewUrl(null);
     setPromptError(null);
     setActiveDraftId(null);
@@ -318,6 +326,8 @@ export default function NewPostModal({
     setIsResolvingPreviewMedia(false);
     setImageFile(undefined);
     setImagePreviewUrl(initialImageUrl);
+    setImageSource(initialImageUrl ? "existing" : undefined);
+    setImageMimeType(undefined);
     setHasUserSelectedUnsplashImage(false);
   }, [initialImageUrl, isOpen, mode, postId]);
 
@@ -818,6 +828,8 @@ export default function NewPostModal({
     generatedObjectUrlRef.current = objectUrl;
     setImageFile(file);
     setImagePreviewUrl(objectUrl);
+    setImageSource("device");
+    setImageMimeType(file.type || undefined);
     setResolvedLinkedinPreviewUrl(null);
     setHasUserSelectedUnsplashImage(false);
   };
@@ -857,6 +869,8 @@ export default function NewPostModal({
     }
     setImageFile(undefined);
     setImagePreviewUrl(selectedUrl);
+    setImageSource("unsplash");
+    setImageMimeType(undefined);
     setResolvedLinkedinPreviewUrl(null);
     setIsUnsplashModalOpen(false);
     setSelectedMediaSource("unsplash");
@@ -1123,6 +1137,8 @@ export default function NewPostModal({
     content,
     imageFile,
     imageUrl: imagePreviewUrl,
+    imageSource,
+    imageMimeType,
     aiPrompt,
     postType,
   });
