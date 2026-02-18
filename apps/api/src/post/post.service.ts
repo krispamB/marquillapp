@@ -378,6 +378,42 @@ export class PostService {
     return initializeUploadRequest.data.value.image;
   }
 
+  async getLinkedinImage(user: User, urn: string) {
+    const connectedAccount = await this.connectedAccountModel.findOne({
+      user: user._id,
+      provider: AccountProvider.LINKEDIN,
+    });
+
+    if (!connectedAccount) {
+      throw new NotFoundException('Connected account not found');
+    }
+
+    const accessToken = await this.encryptionService.decrypt(
+      connectedAccount.accessToken,
+    );
+
+    const url = `${this.LINKEDIN_API_BASE}/images/${encodeURIComponent(urn)}`;
+
+    try {
+      const { response, data } = await apiFetch<any>(url, {
+        method: 'GET',
+        headers: {
+          'X-Restli-Protocol-Version': '2.0.0',
+          'LinkedIn-Version': '202601',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      return {
+        downloadUrl: data.downloadUrl,
+        downloadUrlExpiresAt: data.downloadUrlExpiresAt,
+      };
+    } catch (error) {
+      this.logger.error(error);
+      throw new InternalServerErrorException('Failed to fetch LinkedIn image details');
+    }
+  }
+
   async getPostMetrics(user: User, connectedAccountId: string) {
     const connectedAccount = await this.connectedAccountModel.findById(
       connectedAccountId,
