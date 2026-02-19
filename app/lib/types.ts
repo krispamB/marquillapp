@@ -158,6 +158,12 @@ export type PublishPostResponse = {
   message?: string;
 };
 
+export type SchedulePostResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: PostDetailData;
+};
+
 export type ImageUploadResponse = {
   statusCode?: number;
   message?: string;

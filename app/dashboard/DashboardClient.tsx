@@ -33,6 +33,7 @@ import type {
   LinkedinImageDetailsResponse,
   LinkedinAuthUrlResponse,
   PublishPostResponse,
+  SchedulePostResponse,
   PostMetricsResponse,
   PostDetailResponse,
   UpdatePostResponse,
@@ -743,8 +744,7 @@ export default function DashboardPage({
       }
       try {
         const response = await publishPost(payload.postId);
-        setConnectFeedback(response.message || "Post published successfully");
-        closeNewPostModal();
+        finalizeAndReload(response.message || "Post published successfully");
       } catch (error) {
         setConnectFeedback(
           error instanceof Error ? error.message : "Unable to publish post.",
@@ -753,8 +753,28 @@ export default function DashboardPage({
       return;
     }
 
-    setConnectFeedback("Schedule action is connected to the new modal UI.");
+    if (!payload.postId) {
+      setConnectFeedback("Unable to schedule because post ID is missing.");
+      return;
+    }
+    if (!payload.scheduledTime) {
+      setConnectFeedback("Please choose a valid schedule date and time.");
+      return;
+    }
+    try {
+      const response = await schedulePost(payload.postId, payload.scheduledTime);
+      finalizeAndReload(response.message || "Post scheduled successfully");
+    } catch (error) {
+      setConnectFeedback(
+        error instanceof Error ? error.message : "Unable to schedule post.",
+      );
+    }
+  };
+
+  const finalizeAndReload = (message: string) => {
+    setConnectFeedback(message);
     closeNewPostModal();
+    window.location.reload();
   };
 
   const uploadImageForPost = async (postId: string, file: File): Promise<void> => {
@@ -852,6 +872,33 @@ export default function DashboardPage({
 
     if (!response.ok) {
       throw new Error(parsedResponse?.message || "Unable to publish post.");
+    }
+
+    return parsedResponse ?? {};
+  };
+
+  const schedulePost = async (
+    postId: string,
+    scheduledTime: string,
+  ): Promise<SchedulePostResponse> => {
+    const response = await fetch(`${apiBase}/posts/${postId}/schedule`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ scheduledTime }),
+    });
+
+    let parsedResponse: SchedulePostResponse | null = null;
+    try {
+      parsedResponse = (await response.json()) as SchedulePostResponse;
+    } catch {
+      parsedResponse = null;
+    }
+
+    if (!response.ok) {
+      throw new Error(parsedResponse?.message || "Unable to schedule post.");
     }
 
     return parsedResponse ?? {};
