@@ -147,6 +147,17 @@ export type PostDetailResponse = {
   data?: PostDetailData;
 };
 
+export type UpdatePostResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: PostDetailData;
+};
+
+export type PublishPostResponse = {
+  statusCode?: number;
+  message?: string;
+};
+
 export type ImageUploadResponse = {
   statusCode?: number;
   message?: string;

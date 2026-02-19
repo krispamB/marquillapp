@@ -32,8 +32,10 @@ import type {
   ImageUploadResponse,
   LinkedinImageDetailsResponse,
   LinkedinAuthUrlResponse,
+  PublishPostResponse,
   PostMetricsResponse,
   PostDetailResponse,
+  UpdatePostResponse,
   UserProfile,
 } from "../lib/types";
 
@@ -719,13 +721,35 @@ export default function DashboardPage({
     }
 
     if (kind === "draft") {
-      setConnectFeedback("Draft changes saved locally. Backend save wiring comes next.");
+      if (!payload.postId) {
+        setConnectFeedback("Unable to save draft because post ID is missing.");
+        return;
+      }
+      try {
+        const response = await updatePostContent(payload.postId, payload.content);
+        setConnectFeedback(response.message || "Post content updated successfully.");
+      } catch (error) {
+        setConnectFeedback(
+          error instanceof Error ? error.message : "Unable to save draft changes.",
+        );
+      }
       return;
     }
 
     if (kind === "publish") {
-      setConnectFeedback("Publish action is connected to the new modal UI.");
-      closeNewPostModal();
+      if (!payload.postId) {
+        setConnectFeedback("Unable to publish because post ID is missing.");
+        return;
+      }
+      try {
+        const response = await publishPost(payload.postId);
+        setConnectFeedback(response.message || "Post published successfully");
+        closeNewPostModal();
+      } catch (error) {
+        setConnectFeedback(
+          error instanceof Error ? error.message : "Unable to publish post.",
+        );
+      }
       return;
     }
 
@@ -784,6 +808,53 @@ export default function DashboardPage({
     const fileName = `${fallbackName}.${extension}`;
 
     return new File([buffer], fileName, { type: mimeType });
+  };
+
+  const updatePostContent = async (
+    postId: string,
+    content: string,
+  ): Promise<UpdatePostResponse> => {
+    const response = await fetch(`${apiBase}/posts/${postId}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ content }),
+    });
+
+    let parsedResponse: UpdatePostResponse | null = null;
+    try {
+      parsedResponse = (await response.json()) as UpdatePostResponse;
+    } catch {
+      parsedResponse = null;
+    }
+
+    if (!response.ok) {
+      throw new Error(parsedResponse?.message || "Unable to update post content.");
+    }
+
+    return parsedResponse ?? {};
+  };
+
+  const publishPost = async (postId: string): Promise<PublishPostResponse> => {
+    const response = await fetch(`${apiBase}/posts/${postId}/publish`, {
+      method: "POST",
+      credentials: "include",
+    });
+
+    let parsedResponse: PublishPostResponse | null = null;
+    try {
+      parsedResponse = (await response.json()) as PublishPostResponse;
+    } catch {
+      parsedResponse = null;
+    }
+
+    if (!response.ok) {
+      throw new Error(parsedResponse?.message || "Unable to publish post.");
+    }
+
+    return parsedResponse ?? {};
   };
 
   const handleGenerateDraft = async (

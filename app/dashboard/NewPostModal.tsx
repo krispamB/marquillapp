@@ -126,6 +126,13 @@ function extractMediaUrns(mediaItems?: PostMediaItem[]) {
     .filter((id): id is string => Boolean(id));
 }
 
+function buildImageFingerprint(
+  source: "device" | "unsplash" | "existing" | undefined,
+  imageUrl: string | undefined,
+) {
+  return `${source ?? "none"}|${imageUrl ?? ""}`;
+}
+
 export default function NewPostModal({
   isOpen,
   mode,
@@ -201,6 +208,7 @@ export default function NewPostModal({
   const [postMediaUrns, setPostMediaUrns] = useState<string[]>([]);
   const [isResolvingPreviewMedia, setIsResolvingPreviewMedia] = useState(false);
   const [hasUserSelectedUnsplashImage, setHasUserSelectedUnsplashImage] = useState(false);
+  const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
 
   const modalRef = useRef<HTMLDivElement | null>(null);
   const aiPromptRef = useRef<HTMLTextAreaElement | null>(null);
@@ -212,6 +220,7 @@ export default function NewPostModal({
   const unsplashSentinelRef = useRef<HTMLDivElement | null>(null);
   const unsplashInFlightRef = useRef<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const keepEditingButtonRef = useRef<HTMLButtonElement | null>(null);
   const generatedObjectUrlRef = useRef<string | null>(null);
   const pollTimerRef = useRef<number | null>(null);
   const streamTimerRef = useRef<number | null>(null);
@@ -227,6 +236,10 @@ export default function NewPostModal({
   const isUnmountedRef = useRef(false);
   const isOpenRef = useRef(false);
   const selectionRangeRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+  const initialContentRef = useRef(initialContent ?? "");
+  const initialImageFingerprintRef = useRef(
+    buildImageFingerprint(initialImageUrl ? "existing" : undefined, initialImageUrl),
+  );
   const POLL_INTERVAL_MS = 3000;
   const POLL_TIMEOUT_MS = 240000;
   const unsplashAccessKey = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY?.trim() ?? "";
@@ -272,7 +285,13 @@ export default function NewPostModal({
     setPostMediaUrns([]);
     setIsResolvingPreviewMedia(false);
     setHasUserSelectedUnsplashImage(false);
+    setIsDiscardConfirmOpen(false);
     previewMediaFetchStateRef.current = { postId: null, status: "idle" };
+    initialContentRef.current = initialContent ?? "";
+    initialImageFingerprintRef.current = buildImageFingerprint(
+      initialImageUrl ? "existing" : undefined,
+      initialImageUrl,
+    );
     unsplashInFlightRef.current = "";
     pollInFlightRef.current = false;
     if (pollTimerRef.current !== null) {
@@ -296,6 +315,7 @@ export default function NewPostModal({
     setIsUnsplashModalOpen(false);
     setIsResolvingPreviewMedia(false);
     setResolvedLinkedinPreviewUrl(null);
+    setIsDiscardConfirmOpen(false);
     previewMediaFetchStateRef.current = { postId: null, status: "idle" };
     activePreviewPostIdRef.current = null;
     previousEditPostIdRef.current = undefined;
@@ -329,7 +349,13 @@ export default function NewPostModal({
     setImageSource(initialImageUrl ? "existing" : undefined);
     setImageMimeType(undefined);
     setHasUserSelectedUnsplashImage(false);
-  }, [initialImageUrl, isOpen, mode, postId]);
+    setIsDiscardConfirmOpen(false);
+    initialContentRef.current = initialContent ?? "";
+    initialImageFingerprintRef.current = buildImageFingerprint(
+      initialImageUrl ? "existing" : undefined,
+      initialImageUrl,
+    );
+  }, [initialContent, initialImageUrl, isOpen, mode, postId]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -353,6 +379,18 @@ export default function NewPostModal({
     target?.focus();
   }, [isOpen, phase]);
 
+  const requestClose = useCallback(() => {
+    const isContentDirty = content !== initialContentRef.current;
+    const isImageDirty =
+      buildImageFingerprint(imageSource, imagePreviewUrl) !== initialImageFingerprintRef.current;
+    const shouldConfirmDiscard = mode === "edit" && phase === "editor" && (isContentDirty || isImageDirty);
+    if (shouldConfirmDiscard) {
+      setIsDiscardConfirmOpen(true);
+      return;
+    }
+    onClose();
+  }, [content, imagePreviewUrl, imageSource, mode, onClose, phase]);
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -360,6 +398,11 @@ export default function NewPostModal({
 
     const handleKeydown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (isDiscardConfirmOpen) {
+          event.preventDefault();
+          setIsDiscardConfirmOpen(false);
+          return;
+        }
         if (isUnsplashModalOpen) {
           event.preventDefault();
           setIsUnsplashModalOpen(false);
@@ -376,7 +419,7 @@ export default function NewPostModal({
           return;
         }
         event.preventDefault();
-        onClose();
+        requestClose();
         return;
       }
 
@@ -417,7 +460,14 @@ export default function NewPostModal({
 
     document.addEventListener("keydown", handleKeydown);
     return () => document.removeEventListener("keydown", handleKeydown);
-  }, [isEmojiPickerOpen, isMediaMenuOpen, isOpen, isUnsplashModalOpen, onClose]);
+  }, [
+    isDiscardConfirmOpen,
+    isEmojiPickerOpen,
+    isMediaMenuOpen,
+    isOpen,
+    isUnsplashModalOpen,
+    requestClose,
+  ]);
 
   useEffect(() => {
     if (!isEmojiPickerOpen) {
@@ -440,6 +490,16 @@ export default function NewPostModal({
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [isEmojiPickerOpen]);
+
+  useEffect(() => {
+    if (!isDiscardConfirmOpen) {
+      return;
+    }
+    const rafId = window.requestAnimationFrame(() => {
+      keepEditingButtonRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [isDiscardConfirmOpen]);
 
   useEffect(() => {
     if (!isMediaMenuOpen) {
@@ -579,10 +639,19 @@ export default function NewPostModal({
     };
   }, []);
 
-  const canSaveDraft = mode === "edit" && Boolean(postId);
   const charsUsed = content.length;
   const isNearLimit = charsUsed >= Math.floor(maxChars * 0.85);
   const isOverLimit = charsUsed > maxChars;
+  const isContentDirty = content !== initialContentRef.current;
+  const isImageDirty =
+    buildImageFingerprint(imageSource, imagePreviewUrl) !== initialImageFingerprintRef.current;
+  const isDirty = isContentDirty || isImageDirty;
+  const canSaveDraft =
+    mode === "edit" &&
+    Boolean(postId) &&
+    isDirty &&
+    !isOverLimit &&
+    pendingAction === null;
   const hasContent = content.trim().length > 0;
   const hasPreviewContent = hasContent || Boolean(imagePreviewUrl ?? resolvedLinkedinPreviewUrl);
   const progressSegments = [0, 1, 2, 3].map((index) => {
@@ -605,7 +674,7 @@ export default function NewPostModal({
 
   const handleBackdropClick = (event: MouseEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) {
-      onClose();
+      requestClose();
     }
   };
 
@@ -1150,6 +1219,10 @@ export default function NewPostModal({
     setPendingAction(action);
     try {
       await callback(buildPayload());
+      if (action === "save") {
+        initialContentRef.current = content;
+        initialImageFingerprintRef.current = buildImageFingerprint(imageSource, imagePreviewUrl);
+      }
     } finally {
       setPendingAction(null);
     }
@@ -1198,7 +1271,7 @@ export default function NewPostModal({
             ) : null}
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
               className="grid h-10 w-10 place-items-center rounded-full text-[var(--color-text-secondary)] transition hover:bg-[var(--color-background)] hover:text-[var(--color-text-primary)]"
               aria-label="Close"
             >
@@ -1623,6 +1696,52 @@ export default function NewPostModal({
           </div>
         </footer>
       </div>
+      {isDiscardConfirmOpen ? (
+        <div className="fixed inset-0 z-[85] flex items-center justify-center bg-[#12111A]/55 px-3 py-4 sm:px-6">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="discard-changes-title"
+            aria-describedby="discard-changes-description"
+            className="w-full max-w-[560px] overflow-hidden rounded-2xl bg-white shadow-[0_28px_90px_-45px_rgba(15,23,42,0.55)]"
+          >
+            <div className="px-6 py-7 sm:px-7 sm:py-8">
+              <h3
+                id="discard-changes-title"
+                className="text-3xl font-semibold leading-tight text-[#1f2328] sm:text-4xl"
+              >
+                Discard Changes?
+              </h3>
+              <p
+                id="discard-changes-description"
+                className="mt-4 text-base leading-relaxed text-[#25282d] sm:text-lg"
+              >
+                You&apos;ll permanently lose any changes you&apos;ve made
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-[#d6dae3] px-6 py-4 sm:px-7 sm:py-5">
+              <button
+                ref={keepEditingButtonRef}
+                type="button"
+                onClick={() => setIsDiscardConfirmOpen(false)}
+                className="inline-flex items-center rounded-xl border-2 border-[#4c6ef5] bg-white px-5 py-2.5 text-base font-semibold text-[#1f2328] transition hover:bg-[#f7f9ff] sm:text-lg"
+              >
+                Keep Editing
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDiscardConfirmOpen(false);
+                  onClose();
+                }}
+                className="inline-flex items-center rounded-xl bg-[#e3345e] px-5 py-2.5 text-base font-semibold text-white transition hover:brightness-95 sm:text-lg"
+              >
+                Discard Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {isUnsplashModalOpen ? (
         <div
           className="fixed inset-0 z-[80] flex items-center justify-center bg-[#12111A]/40 px-3 py-4 backdrop-blur-[1px] sm:px-6"
