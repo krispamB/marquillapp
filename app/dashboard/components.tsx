@@ -1,4 +1,5 @@
 import type { MouseEventHandler, ReactNode } from "react";
+import Link from "next/link";
 import { CalendarClock, CheckCheck, PenLine, Plug } from "lucide-react";
 import type { PostStatus, UserProfile } from "../lib/types";
 
@@ -192,25 +193,45 @@ export function NavItem({
   label,
   active,
   icon,
+  href,
+  disabled = false,
   collapsed = false,
 }: {
   label: string;
   active?: boolean;
   icon: ReactNode;
+  href?: string;
+  disabled?: boolean;
   collapsed?: boolean;
 }) {
-  return (
-    <button
-      className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition ${
-        active
-          ? "bg-[var(--color-primary)] text-white shadow-[0_18px_35px_-26px_rgba(91,92,246,0.45)]"
-          : "text-[var(--color-text-secondary)] hover:bg-white/70"
-      }`}
-    >
+  const className = `flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition ${
+    disabled
+      ? "cursor-not-allowed opacity-45"
+      : active
+      ? "bg-[var(--color-primary)] text-white shadow-[0_18px_35px_-26px_rgba(91,92,246,0.45)]"
+      : "text-[var(--color-text-secondary)] hover:bg-white/70"
+  }`;
+
+  const content = (
+    <>
       <span className="grid h-9 w-9 place-items-center rounded-full bg-white/80 text-[var(--color-secondary)]">
         {icon}
       </span>
       {collapsed ? null : <span>{label}</span>}
+    </>
+  );
+
+  if (href && !disabled) {
+    return (
+      <Link href={href} className={className}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button type="button" disabled={disabled} aria-disabled={disabled} className={className}>
+      {content}
     </button>
   );
 }

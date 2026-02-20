@@ -89,7 +89,15 @@ export type DashboardPost = {
   _id: string;
   connectedAccount?: string;
   status?: string;
+  type?: "quickPostLinkedin" | "insightPostLinkedin" | string;
   content?: string;
+  youtubeResearch?: Array<{
+    videoId?: string;
+    title?: string;
+    thumbnail?: string;
+    channelTitle?: string;
+    publishedAt?: string;
+  }>;
   scheduledAt?: string;
   createdAt?: string;
   updatedAt?: string;

@@ -41,10 +41,15 @@ import type {
 } from "../lib/types";
 
 const navItems = [
-  { label: "Overview", active: true, icon: <LayoutDashboard className="h-4 w-4" /> },
-  { label: "Posts", active: false, icon: <PenSquare className="h-4 w-4" /> },
-  { label: "Calendar", active: false, icon: <CalendarClock className="h-4 w-4" /> },
-  { label: "Analytics", active: false, icon: <TrendingUp className="h-4 w-4" /> },
+  {
+    label: "Overview",
+    active: true,
+    href: "/dashboard",
+    icon: <LayoutDashboard className="h-4 w-4" />,
+  },
+  { label: "Posts", active: false, href: "/posts", icon: <PenSquare className="h-4 w-4" /> },
+  { label: "Calendar", active: false, disabled: true, icon: <CalendarClock className="h-4 w-4" /> },
+  { label: "Analytics", active: false, disabled: true, icon: <TrendingUp className="h-4 w-4" /> },
 ];
 
 const stats = {
