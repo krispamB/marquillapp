@@ -89,7 +89,15 @@ export type DashboardPost = {
   _id: string;
   connectedAccount?: string;
   status?: string;
+  type?: "quickPostLinkedin" | "insightPostLinkedin" | string;
   content?: string;
+  youtubeResearch?: Array<{
+    videoId?: string;
+    title?: string;
+    thumbnail?: string;
+    channelTitle?: string;
+    publishedAt?: string;
+  }>;
   scheduledAt?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -142,6 +150,23 @@ export type PostDetailData = {
 };
 
 export type PostDetailResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: PostDetailData;
+};
+
+export type UpdatePostResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: PostDetailData;
+};
+
+export type PublishPostResponse = {
+  statusCode?: number;
+  message?: string;
+};
+
+export type SchedulePostResponse = {
   statusCode?: number;
   message?: string;
   data?: PostDetailData;

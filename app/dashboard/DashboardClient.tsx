@@ -32,16 +32,24 @@ import type {
   ImageUploadResponse,
   LinkedinImageDetailsResponse,
   LinkedinAuthUrlResponse,
+  PublishPostResponse,
+  SchedulePostResponse,
   PostMetricsResponse,
   PostDetailResponse,
+  UpdatePostResponse,
   UserProfile,
 } from "../lib/types";
 
 const navItems = [
-  { label: "Overview", active: true, icon: <LayoutDashboard className="h-4 w-4" /> },
-  { label: "Posts", active: false, icon: <PenSquare className="h-4 w-4" /> },
-  { label: "Calendar", active: false, icon: <CalendarClock className="h-4 w-4" /> },
-  { label: "Analytics", active: false, icon: <TrendingUp className="h-4 w-4" /> },
+  {
+    label: "Overview",
+    active: true,
+    href: "/dashboard",
+    icon: <LayoutDashboard className="h-4 w-4" />,
+  },
+  { label: "Posts", active: false, href: "/posts", icon: <PenSquare className="h-4 w-4" /> },
+  { label: "Calendar", active: false, disabled: true, icon: <CalendarClock className="h-4 w-4" /> },
+  { label: "Analytics", active: false, disabled: true, icon: <TrendingUp className="h-4 w-4" /> },
 ];
 
 const stats = {
@@ -719,18 +727,59 @@ export default function DashboardPage({
     }
 
     if (kind === "draft") {
-      setConnectFeedback("Draft changes saved locally. Backend save wiring comes next.");
+      if (!payload.postId) {
+        setConnectFeedback("Unable to save draft because post ID is missing.");
+        return;
+      }
+      try {
+        const response = await updatePostContent(payload.postId, payload.content);
+        setConnectFeedback(response.message || "Post content updated successfully.");
+      } catch (error) {
+        setConnectFeedback(
+          error instanceof Error ? error.message : "Unable to save draft changes.",
+        );
+      }
       return;
     }
 
     if (kind === "publish") {
-      setConnectFeedback("Publish action is connected to the new modal UI.");
-      closeNewPostModal();
+      if (!payload.postId) {
+        setConnectFeedback("Unable to publish because post ID is missing.");
+        return;
+      }
+      try {
+        const response = await publishPost(payload.postId);
+        finalizeAndReload(response.message || "Post published successfully");
+      } catch (error) {
+        setConnectFeedback(
+          error instanceof Error ? error.message : "Unable to publish post.",
+        );
+      }
       return;
     }
 
-    setConnectFeedback("Schedule action is connected to the new modal UI.");
+    if (!payload.postId) {
+      setConnectFeedback("Unable to schedule because post ID is missing.");
+      return;
+    }
+    if (!payload.scheduledTime) {
+      setConnectFeedback("Please choose a valid schedule date and time.");
+      return;
+    }
+    try {
+      const response = await schedulePost(payload.postId, payload.scheduledTime);
+      finalizeAndReload(response.message || "Post scheduled successfully");
+    } catch (error) {
+      setConnectFeedback(
+        error instanceof Error ? error.message : "Unable to schedule post.",
+      );
+    }
+  };
+
+  const finalizeAndReload = (message: string) => {
+    setConnectFeedback(message);
     closeNewPostModal();
+    window.location.reload();
   };
 
   const uploadImageForPost = async (postId: string, file: File): Promise<void> => {
@@ -784,6 +833,80 @@ export default function DashboardPage({
     const fileName = `${fallbackName}.${extension}`;
 
     return new File([buffer], fileName, { type: mimeType });
+  };
+
+  const updatePostContent = async (
+    postId: string,
+    content: string,
+  ): Promise<UpdatePostResponse> => {
+    const response = await fetch(`${apiBase}/posts/${postId}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ content }),
+    });
+
+    let parsedResponse: UpdatePostResponse | null = null;
+    try {
+      parsedResponse = (await response.json()) as UpdatePostResponse;
+    } catch {
+      parsedResponse = null;
+    }
+
+    if (!response.ok) {
+      throw new Error(parsedResponse?.message || "Unable to update post content.");
+    }
+
+    return parsedResponse ?? {};
+  };
+
+  const publishPost = async (postId: string): Promise<PublishPostResponse> => {
+    const response = await fetch(`${apiBase}/posts/${postId}/publish`, {
+      method: "POST",
+      credentials: "include",
+    });
+
+    let parsedResponse: PublishPostResponse | null = null;
+    try {
+      parsedResponse = (await response.json()) as PublishPostResponse;
+    } catch {
+      parsedResponse = null;
+    }
+
+    if (!response.ok) {
+      throw new Error(parsedResponse?.message || "Unable to publish post.");
+    }
+
+    return parsedResponse ?? {};
+  };
+
+  const schedulePost = async (
+    postId: string,
+    scheduledTime: string,
+  ): Promise<SchedulePostResponse> => {
+    const response = await fetch(`${apiBase}/posts/${postId}/schedule`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ scheduledTime }),
+    });
+
+    let parsedResponse: SchedulePostResponse | null = null;
+    try {
+      parsedResponse = (await response.json()) as SchedulePostResponse;
+    } catch {
+      parsedResponse = null;
+    }
+
+    if (!response.ok) {
+      throw new Error(parsedResponse?.message || "Unable to schedule post.");
+    }
+
+    return parsedResponse ?? {};
   };
 
   const handleGenerateDraft = async (

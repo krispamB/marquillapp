@@ -20,6 +20,8 @@ type SidebarItem = {
   label: string;
   icon: ReactNode;
   active?: boolean;
+  href?: string;
+  disabled?: boolean;
 };
 
 type SidebarAccount = {
@@ -212,6 +214,8 @@ export default function Sidebar({
                 label={item.label}
                 active={item.active}
                 icon={item.icon}
+                href={item.href}
+                disabled={item.disabled}
                 collapsed={collapsed}
               />
             ))}

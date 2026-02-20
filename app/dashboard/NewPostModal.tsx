@@ -11,7 +11,9 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import {
+  CalendarClock,
   ChevronDown,
+  Clock3,
   Eye,
   Hash,
   ImagePlus,
@@ -48,6 +50,8 @@ export type NewPostSubmitPayload = {
   imageUrl?: string;
   imageSource?: "device" | "unsplash" | "existing";
   imageMimeType?: string;
+  scheduledTime?: string;
+  timezone?: string;
   aiPrompt?: string;
   postType?: "quickPostLinkedin" | "insightPostLinkedin";
 };
@@ -126,6 +130,33 @@ function extractMediaUrns(mediaItems?: PostMediaItem[]) {
     .filter((id): id is string => Boolean(id));
 }
 
+function buildImageFingerprint(
+  source: "device" | "unsplash" | "existing" | undefined,
+  imageUrl: string | undefined,
+) {
+  return `${source ?? "none"}|${imageUrl ?? ""}`;
+}
+
+function formatUtcOffsetLabel(offsetMinutes: number) {
+  const totalMinutes = -offsetMinutes;
+  const sign = totalMinutes >= 0 ? "+" : "-";
+  const absoluteMinutes = Math.abs(totalMinutes);
+  const hours = String(Math.floor(absoluteMinutes / 60)).padStart(2, "0");
+  const minutes = String(absoluteMinutes % 60).padStart(2, "0");
+  return `UTC${sign}${hours}:${minutes}`;
+}
+
+function formatOffsetDateTime(localDate: Date) {
+  const year = localDate.getFullYear();
+  const month = String(localDate.getMonth() + 1).padStart(2, "0");
+  const day = String(localDate.getDate()).padStart(2, "0");
+  const hours = String(localDate.getHours()).padStart(2, "0");
+  const minutes = String(localDate.getMinutes()).padStart(2, "0");
+  const seconds = String(localDate.getSeconds()).padStart(2, "0");
+  const offset = formatUtcOffsetLabel(localDate.getTimezoneOffset());
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offset.slice(3)}`;
+}
+
 export default function NewPostModal({
   isOpen,
   mode,
@@ -191,6 +222,10 @@ export default function NewPostModal({
   const [isMediaMenuOpen, setIsMediaMenuOpen] = useState(false);
   const [selectedMediaSource, setSelectedMediaSource] = useState<"device" | "unsplash">("device");
   const [isUnsplashModalOpen, setIsUnsplashModalOpen] = useState(false);
+  const [isSchedulePopoverOpen, setIsSchedulePopoverOpen] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [unsplashQuery, setUnsplashQuery] = useState(DEFAULT_UNSPLASH_QUERY);
   const [unsplashCommittedQuery, setUnsplashCommittedQuery] = useState(DEFAULT_UNSPLASH_QUERY);
   const [unsplashImages, setUnsplashImages] = useState<UnsplashPhoto[]>([]);
@@ -201,17 +236,21 @@ export default function NewPostModal({
   const [postMediaUrns, setPostMediaUrns] = useState<string[]>([]);
   const [isResolvingPreviewMedia, setIsResolvingPreviewMedia] = useState(false);
   const [hasUserSelectedUnsplashImage, setHasUserSelectedUnsplashImage] = useState(false);
+  const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
 
   const modalRef = useRef<HTMLDivElement | null>(null);
   const aiPromptRef = useRef<HTMLTextAreaElement | null>(null);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
   const mediaMenuRef = useRef<HTMLDivElement | null>(null);
+  const schedulePopoverRef = useRef<HTMLDivElement | null>(null);
+  const scheduleDateInputRef = useRef<HTMLInputElement | null>(null);
   const unsplashModalRef = useRef<HTMLDivElement | null>(null);
   const unsplashScrollRef = useRef<HTMLDivElement | null>(null);
   const unsplashSentinelRef = useRef<HTMLDivElement | null>(null);
   const unsplashInFlightRef = useRef<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const keepEditingButtonRef = useRef<HTMLButtonElement | null>(null);
   const generatedObjectUrlRef = useRef<string | null>(null);
   const pollTimerRef = useRef<number | null>(null);
   const streamTimerRef = useRef<number | null>(null);
@@ -227,9 +266,21 @@ export default function NewPostModal({
   const isUnmountedRef = useRef(false);
   const isOpenRef = useRef(false);
   const selectionRangeRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+  const initialContentRef = useRef(initialContent ?? "");
+  const initialImageFingerprintRef = useRef(
+    buildImageFingerprint(initialImageUrl ? "existing" : undefined, initialImageUrl),
+  );
   const POLL_INTERVAL_MS = 3000;
   const POLL_TIMEOUT_MS = 240000;
   const unsplashAccessKey = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY?.trim() ?? "";
+  const userTimezone = useMemo(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    [],
+  );
+  const timezoneLabel = useMemo(
+    () => `${formatUtcOffsetLabel(new Date().getTimezoneOffset())} (${userTimezone})`,
+    [userTimezone],
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -262,6 +313,10 @@ export default function NewPostModal({
     setIsMediaMenuOpen(false);
     setSelectedMediaSource("device");
     setIsUnsplashModalOpen(false);
+    setIsSchedulePopoverOpen(false);
+    setScheduleDate("");
+    setScheduleTime("");
+    setScheduleError(null);
     setUnsplashQuery(DEFAULT_UNSPLASH_QUERY);
     setUnsplashCommittedQuery(DEFAULT_UNSPLASH_QUERY);
     setUnsplashImages([]);
@@ -272,7 +327,13 @@ export default function NewPostModal({
     setPostMediaUrns([]);
     setIsResolvingPreviewMedia(false);
     setHasUserSelectedUnsplashImage(false);
+    setIsDiscardConfirmOpen(false);
     previewMediaFetchStateRef.current = { postId: null, status: "idle" };
+    initialContentRef.current = initialContent ?? "";
+    initialImageFingerprintRef.current = buildImageFingerprint(
+      initialImageUrl ? "existing" : undefined,
+      initialImageUrl,
+    );
     unsplashInFlightRef.current = "";
     pollInFlightRef.current = false;
     if (pollTimerRef.current !== null) {
@@ -294,8 +355,11 @@ export default function NewPostModal({
     setIsPolling(false);
     setPollStartedAt(null);
     setIsUnsplashModalOpen(false);
+    setIsSchedulePopoverOpen(false);
+    setScheduleError(null);
     setIsResolvingPreviewMedia(false);
     setResolvedLinkedinPreviewUrl(null);
+    setIsDiscardConfirmOpen(false);
     previewMediaFetchStateRef.current = { postId: null, status: "idle" };
     activePreviewPostIdRef.current = null;
     previousEditPostIdRef.current = undefined;
@@ -329,7 +393,15 @@ export default function NewPostModal({
     setImageSource(initialImageUrl ? "existing" : undefined);
     setImageMimeType(undefined);
     setHasUserSelectedUnsplashImage(false);
-  }, [initialImageUrl, isOpen, mode, postId]);
+    setIsDiscardConfirmOpen(false);
+    setIsSchedulePopoverOpen(false);
+    setScheduleError(null);
+    initialContentRef.current = initialContent ?? "";
+    initialImageFingerprintRef.current = buildImageFingerprint(
+      initialImageUrl ? "existing" : undefined,
+      initialImageUrl,
+    );
+  }, [initialContent, initialImageUrl, isOpen, mode, postId]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -353,6 +425,23 @@ export default function NewPostModal({
     target?.focus();
   }, [isOpen, phase]);
 
+  const requestClose = useCallback(() => {
+    if (isSchedulePopoverOpen) {
+      setIsSchedulePopoverOpen(false);
+      setScheduleError(null);
+      return;
+    }
+    const isContentDirty = content !== initialContentRef.current;
+    const isImageDirty =
+      buildImageFingerprint(imageSource, imagePreviewUrl) !== initialImageFingerprintRef.current;
+    const shouldConfirmDiscard = mode === "edit" && phase === "editor" && (isContentDirty || isImageDirty);
+    if (shouldConfirmDiscard) {
+      setIsDiscardConfirmOpen(true);
+      return;
+    }
+    onClose();
+  }, [content, imagePreviewUrl, imageSource, isSchedulePopoverOpen, mode, onClose, phase]);
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -360,9 +449,20 @@ export default function NewPostModal({
 
     const handleKeydown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (isDiscardConfirmOpen) {
+          event.preventDefault();
+          setIsDiscardConfirmOpen(false);
+          return;
+        }
         if (isUnsplashModalOpen) {
           event.preventDefault();
           setIsUnsplashModalOpen(false);
+          return;
+        }
+        if (isSchedulePopoverOpen) {
+          event.preventDefault();
+          setIsSchedulePopoverOpen(false);
+          setScheduleError(null);
           return;
         }
         if (isMediaMenuOpen) {
@@ -376,7 +476,7 @@ export default function NewPostModal({
           return;
         }
         event.preventDefault();
-        onClose();
+        requestClose();
         return;
       }
 
@@ -417,7 +517,15 @@ export default function NewPostModal({
 
     document.addEventListener("keydown", handleKeydown);
     return () => document.removeEventListener("keydown", handleKeydown);
-  }, [isEmojiPickerOpen, isMediaMenuOpen, isOpen, isUnsplashModalOpen, onClose]);
+  }, [
+    isDiscardConfirmOpen,
+    isEmojiPickerOpen,
+    isMediaMenuOpen,
+    isOpen,
+    isSchedulePopoverOpen,
+    isUnsplashModalOpen,
+    requestClose,
+  ]);
 
   useEffect(() => {
     if (!isEmojiPickerOpen) {
@@ -442,6 +550,16 @@ export default function NewPostModal({
   }, [isEmojiPickerOpen]);
 
   useEffect(() => {
+    if (!isDiscardConfirmOpen) {
+      return;
+    }
+    const rafId = window.requestAnimationFrame(() => {
+      keepEditingButtonRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [isDiscardConfirmOpen]);
+
+  useEffect(() => {
     if (!isMediaMenuOpen) {
       return;
     }
@@ -462,6 +580,39 @@ export default function NewPostModal({
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [isMediaMenuOpen]);
+
+  useEffect(() => {
+    if (!isSchedulePopoverOpen) {
+      return;
+    }
+    const handlePointerDown = (event: globalThis.MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) {
+        return;
+      }
+      if (schedulePopoverRef.current?.contains(target)) {
+        return;
+      }
+      if (target instanceof Element && target.closest("[data-schedule-trigger='true']")) {
+        return;
+      }
+      setIsSchedulePopoverOpen(false);
+      setScheduleError(null);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [isSchedulePopoverOpen]);
+
+  useEffect(() => {
+    if (!isSchedulePopoverOpen) {
+      return;
+    }
+    const rafId = window.requestAnimationFrame(() => {
+      scheduleDateInputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [isSchedulePopoverOpen]);
 
   useEffect(() => {
     if (!isUnsplashModalOpen || unsplashPage < 1) {
@@ -579,10 +730,19 @@ export default function NewPostModal({
     };
   }, []);
 
-  const canSaveDraft = mode === "edit" && Boolean(postId);
   const charsUsed = content.length;
   const isNearLimit = charsUsed >= Math.floor(maxChars * 0.85);
   const isOverLimit = charsUsed > maxChars;
+  const isContentDirty = content !== initialContentRef.current;
+  const isImageDirty =
+    buildImageFingerprint(imageSource, imagePreviewUrl) !== initialImageFingerprintRef.current;
+  const isDirty = isContentDirty || isImageDirty;
+  const canSaveDraft =
+    mode === "edit" &&
+    Boolean(postId) &&
+    isDirty &&
+    !isOverLimit &&
+    pendingAction === null;
   const hasContent = content.trim().length > 0;
   const hasPreviewContent = hasContent || Boolean(imagePreviewUrl ?? resolvedLinkedinPreviewUrl);
   const progressSegments = [0, 1, 2, 3].map((index) => {
@@ -605,7 +765,7 @@ export default function NewPostModal({
 
   const handleBackdropClick = (event: MouseEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) {
-      onClose();
+      requestClose();
     }
   };
 
@@ -1131,7 +1291,43 @@ export default function NewPostModal({
 
   const previewImageSrc = imagePreviewUrl ?? resolvedLinkedinPreviewUrl ?? undefined;
 
-  const buildPayload = (): NewPostSubmitPayload => ({
+  const getScheduledTimeValue = () => {
+    if (!scheduleDate || !scheduleTime) {
+      return { error: "Please select both date and time." } as const;
+    }
+    const [year, month, day] = scheduleDate.split("-").map((value) => Number(value));
+    const [hours, minutes] = scheduleTime.split(":").map((value) => Number(value));
+    if (
+      !Number.isFinite(year) ||
+      !Number.isFinite(month) ||
+      !Number.isFinite(day) ||
+      !Number.isFinite(hours) ||
+      !Number.isFinite(minutes)
+    ) {
+      return { error: "Please provide a valid date and time." } as const;
+    }
+
+    const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+    if (
+      Number.isNaN(localDate.getTime()) ||
+      localDate.getFullYear() !== year ||
+      localDate.getMonth() !== month - 1 ||
+      localDate.getDate() !== day
+    ) {
+      return { error: "Please provide a valid date and time." } as const;
+    }
+
+    const minLeadTimeMs = 5 * 60 * 1000;
+    if (localDate.getTime() < Date.now() + minLeadTimeMs) {
+      return { error: "Choose a time at least 5 minutes in the future." } as const;
+    }
+
+    return { scheduledTime: formatOffsetDateTime(localDate) } as const;
+  };
+
+  const buildPayload = (
+    overrides?: Partial<Pick<NewPostSubmitPayload, "scheduledTime" | "timezone">>,
+  ): NewPostSubmitPayload => ({
     mode,
     postId,
     content,
@@ -1141,18 +1337,38 @@ export default function NewPostModal({
     imageMimeType,
     aiPrompt,
     postType,
+    ...overrides,
   });
 
   const runAction = async (
     action: "publish" | "schedule" | "save",
     callback: (payload: NewPostSubmitPayload) => Promise<void> | void,
+    payloadOverrides?: Partial<Pick<NewPostSubmitPayload, "scheduledTime" | "timezone">>,
   ) => {
     setPendingAction(action);
     try {
-      await callback(buildPayload());
+      await callback(buildPayload(payloadOverrides));
+      if (action === "save") {
+        initialContentRef.current = content;
+        initialImageFingerprintRef.current = buildImageFingerprint(imageSource, imagePreviewUrl);
+      }
     } finally {
       setPendingAction(null);
     }
+  };
+
+  const handleConfirmSchedule = () => {
+    const result = getScheduledTimeValue();
+    if ("error" in result) {
+      setScheduleError(result.error);
+      return;
+    }
+    setScheduleError(null);
+    setIsSchedulePopoverOpen(false);
+    void runAction("schedule", onSchedule, {
+      scheduledTime: result.scheduledTime,
+      timezone: userTimezone,
+    });
   };
 
   if (!mounted || !isOpen) {
@@ -1198,7 +1414,7 @@ export default function NewPostModal({
             ) : null}
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
               className="grid h-10 w-10 place-items-center rounded-full text-[var(--color-text-secondary)] transition hover:bg-[var(--color-background)] hover:text-[var(--color-text-primary)]"
               aria-label="Close"
             >
@@ -1595,7 +1811,7 @@ export default function NewPostModal({
           >
             {charsUsed}/{maxChars}
           </span>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex flex-wrap items-center gap-2">
             <button
               type="button"
               disabled={!canSaveDraft || pendingAction !== null}
@@ -1607,7 +1823,14 @@ export default function NewPostModal({
             <button
               type="button"
               disabled={!hasContent || isOverLimit || pendingAction !== null}
-              onClick={() => runAction("schedule", onSchedule)}
+              onClick={() => {
+                setScheduleError(null);
+                setIsSchedulePopoverOpen(true);
+              }}
+              data-schedule-trigger="true"
+              aria-haspopup="dialog"
+              aria-expanded={isSchedulePopoverOpen}
+              aria-controls="schedule-popover"
               className="inline-flex items-center rounded-full border border-[#DCCFA4] bg-[#F6F1DE] px-4 py-2 text-sm font-semibold text-[#7A5A00] transition hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50"
             >
               {pendingAction === "schedule" ? "Scheduling..." : "Schedule Post"}
@@ -1620,9 +1843,122 @@ export default function NewPostModal({
             >
               {pendingAction === "publish" ? "Publishing..." : "Publish"}
             </button>
+            {isSchedulePopoverOpen ? (
+              <div
+                id="schedule-popover"
+                ref={schedulePopoverRef}
+                role="dialog"
+                aria-label="Schedule post"
+                className="absolute bottom-full right-0 z-[72] mb-3 w-[min(92vw,380px)] rounded-2xl border border-[#d6dae3] bg-white p-4 shadow-[0_20px_44px_-28px_rgba(15,23,42,0.45)]"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#eef3ff] text-[#3451d1]">
+                    <CalendarClock className="h-4 w-4" />
+                  </span>
+                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">Schedule Post</p>
+                </div>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-secondary)]">
+                      Date
+                    </span>
+                    <input
+                      ref={scheduleDateInputRef}
+                      type="date"
+                      value={scheduleDate}
+                      onChange={(event) => setScheduleDate(event.target.value)}
+                      className="h-11 w-full rounded-xl border border-[#cfd5e1] bg-white px-3 text-sm text-[var(--color-text-primary)] outline-none transition focus:border-[#5575F5] focus:ring-2 focus:ring-[#5575F5]/20"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-secondary)]">
+                      Time
+                    </span>
+                    <input
+                      type="time"
+                      value={scheduleTime}
+                      onChange={(event) => setScheduleTime(event.target.value)}
+                      className="h-11 w-full rounded-xl border border-[#cfd5e1] bg-white px-3 text-sm text-[var(--color-text-primary)] outline-none transition focus:border-[#5575F5] focus:ring-2 focus:ring-[#5575F5]/20"
+                    />
+                  </label>
+                </div>
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#e2e7f2] bg-[#f7f9ff] px-3 py-2 text-xs font-medium text-[#445065]">
+                  <Clock3 className="h-4 w-4 text-[#5575F5]" />
+                  <span>{timezoneLabel}</span>
+                </div>
+                {scheduleError ? (
+                  <p className="mt-2 text-xs font-medium text-rose-600">{scheduleError}</p>
+                ) : null}
+                <div className="mt-4 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSchedulePopoverOpen(false);
+                      setScheduleError(null);
+                    }}
+                    className="inline-flex items-center rounded-full border border-[#d4dae6] bg-white px-4 py-2 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:text-[var(--color-text-primary)]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmSchedule}
+                    className="inline-flex items-center rounded-full bg-[var(--color-secondary)] px-4 py-2 text-xs font-semibold text-white transition hover:brightness-95"
+                  >
+                    Confirm Schedule
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </footer>
       </div>
+      {isDiscardConfirmOpen ? (
+        <div className="fixed inset-0 z-[85] flex items-center justify-center bg-[#12111A]/55 px-3 py-4 sm:px-6">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="discard-changes-title"
+            aria-describedby="discard-changes-description"
+            className="w-full max-w-[560px] overflow-hidden rounded-2xl bg-white shadow-[0_28px_90px_-45px_rgba(15,23,42,0.55)]"
+          >
+            <div className="px-6 py-7 sm:px-7 sm:py-8">
+              <h3
+                id="discard-changes-title"
+                className="text-3xl font-semibold leading-tight text-[#1f2328] sm:text-4xl"
+              >
+                Discard Changes?
+              </h3>
+              <p
+                id="discard-changes-description"
+                className="mt-4 text-base leading-relaxed text-[#25282d] sm:text-lg"
+              >
+                You&apos;ll permanently lose any changes you&apos;ve made
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-[#d6dae3] px-6 py-4 sm:px-7 sm:py-5">
+              <button
+                ref={keepEditingButtonRef}
+                type="button"
+                onClick={() => setIsDiscardConfirmOpen(false)}
+                className="inline-flex items-center rounded-xl border-2 border-[#4c6ef5] bg-white px-5 py-2.5 text-base font-semibold text-[#1f2328] transition hover:bg-[#f7f9ff] sm:text-lg"
+              >
+                Keep Editing
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDiscardConfirmOpen(false);
+                  onClose();
+                }}
+                className="inline-flex items-center rounded-xl bg-[#e3345e] px-5 py-2.5 text-base font-semibold text-white transition hover:brightness-95 sm:text-lg"
+              >
+                Discard Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {isUnsplashModalOpen ? (
         <div
           className="fixed inset-0 z-[80] flex items-center justify-center bg-[#12111A]/40 px-3 py-4 backdrop-blur-[1px] sm:px-6"
