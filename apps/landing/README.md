@@ -31,6 +31,18 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to view the site in development mode.
 
+### Environment Variables
+
+Set the app URL used by login buttons:
+
+```bash
+NEXT_PUBLIC_APP_URL=https://your-app.example.com
+```
+
+If you omit the protocol, the app normalizes it automatically:
+- `localhost:3000` -> `http://localhost:3000`
+- `app.example.com` -> `https://app.example.com`
+
 ### Build
 
 ```bash
