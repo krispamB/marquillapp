@@ -144,6 +144,18 @@ export class PostController {
     };
   }
 
+  @Get('linkedin/image/:urn')
+  async getLinkedinImage(
+    @GetUser() user: User,
+    @Param('urn') urn: string,
+  ): Promise<IAppResponse> {
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Image details retrieved successfully',
+      data: await this.postService.getLinkedinImage(user, urn),
+    };
+  }
+
   @Get(':id')
   async getPostById(
     @GetUser() user: User,

@@ -4,6 +4,7 @@ import { User } from './user.schema';
 import { ConnectedAccount } from './connected-account.schema';
 import { ContentType } from '../../workflow/workflow.constants';
 import type {
+  CompressionResult,
   UserIntent,
   YoutubeSearchResult,
 } from '../../agent/agent.interface';
@@ -59,6 +60,9 @@ export class PostDraft extends Document {
 
   @Prop({ type: Object })
   userIntent?: UserIntent;
+
+  @Prop({ type: Object })
+  compressionResult?: CompressionResult;
 
   @Prop()
   channelPostId?: string;
