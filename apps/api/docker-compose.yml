@@ -27,7 +27,7 @@ services:
     image: venatum/bull-board
     container_name: bullmq_dashboard
     ports:
-      - "3000:3000"
+      - "8080:3000"
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379

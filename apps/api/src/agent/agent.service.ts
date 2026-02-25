@@ -65,16 +65,17 @@ export class AgentService {
     return this.parser.parseObject<UserIntent>(response);
   }
 
-  async generateSearchKeywords(input: UserIntent): Promise<string[]> {
+  async generateSearchKeywords(input: UserIntent): Promise<string> {
     const response = await this.llmService.generateCompletions(
       LLMProvider.OPENROUTER,
       [
         { role: MessageRole.System, content: SEARCH_KEYWORDS_SYSTEM_PROMPT },
         { role: MessageRole.User, content: JSON.stringify(input) },
       ],
+      { model: "google/gemini-3-flash-preview" }
     );
 
-    return this.parser.parseArray<string>(response);
+    return response;
   }
 
   async searchYoutube(
@@ -90,7 +91,7 @@ export class AgentService {
         maxResults,
         order: 'relevance',
         videoDuration: 'medium',
-        videoCaption: 'closedCaption',
+        // videoCaption: 'closedCaption',
       });
 
       if (!response.data.items || response.data.items.length === 0) {
@@ -113,22 +114,22 @@ export class AgentService {
       throw new Error('Failed to search YouTube videos');
     }
   }
-  async searchWithFallbacks(queries: string[]): Promise<YoutubeSearchResult[]> {
-    const targetCount = 4;
+  async searchWithFallbacks(query: string, targetCount: number = 4): Promise<YoutubeSearchResult[]> {
     const seen = new Set<string>();
     const result: YoutubeSearchResult[] = [];
-    for (const query of queries) {
-      const videos = await this.searchYoutube(query, 2);
-      for (const video of videos) {
-        if (result.length >= targetCount) break;
-        if (!video.videoId || seen.has(video.videoId)) continue;
 
-        seen.add(video.videoId);
-        result.push(video);
-      }
 
+    const videos = await this.searchYoutube(query, 10);
+
+    for (const video of videos) {
       if (result.length >= targetCount) break;
+
+      if (!video.videoId || seen.has(video.videoId)) continue;
+
+      seen.add(video.videoId);
+      result.push(video);
     }
+
     return result;
   }
 

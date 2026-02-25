@@ -1,7 +1,7 @@
 import { UserIntent } from 'src/agent/agent.interface';
 import { StepHandler, WorkflowState } from '../engine/workflow.types';
 
-export const getQueriesStep: StepHandler<UserIntent, string[]> = async (
+export const getQueriesStep: StepHandler<UserIntent, string> = async (
   state,
   _job,
   ctx,
