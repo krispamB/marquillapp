@@ -13,9 +13,22 @@ const sofiaSans = Sofia_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Marquill",
-  description: "AI-powered LinkedIn content platform for creators.",
-};
+  title: 'Marquill - AI-Powered LinkedIn Content Platform',
+  description:
+    'Marquill helps LinkedIn creators generate posts from YouTube research, schedule content, and publish faster.',
+  keywords: 'LinkedIn content, AI post generator, YouTube research, scheduling, publishing',
+  openGraph: {
+    title: 'Marquill - AI-Powered LinkedIn Content Platform',
+    description: 'Generate LinkedIn posts from YouTube research, schedule, and publish in one place.',
+    type: 'website',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Marquill - AI-Powered LinkedIn Content Platform',
+    description: 'Generate LinkedIn posts from YouTube research, schedule, and publish in one place.',
+  },
+};;
 
 export default function RootLayout({
   children,
