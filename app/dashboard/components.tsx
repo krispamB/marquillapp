@@ -1,7 +1,12 @@
 import type { MouseEventHandler, ReactNode } from "react";
 import Link from "next/link";
 import { CalendarClock, CheckCheck, PenLine, Plug } from "lucide-react";
-import type { PostStatus, UserProfile } from "../lib/types";
+import type {
+  ConnectedAccount,
+  ConnectedAccountProvider,
+  PostStatus,
+  UserProfile,
+} from "../lib/types";
 
 export function Icon({
   children,
@@ -262,7 +267,7 @@ export function ListItem({
         <p className="truncate whitespace-nowrap text-sm font-semibold text-[var(--color-text-primary)]">
           {title}
         </p>
-        <p className="text-xs text-[var(--color-text-secondary)]">
+        <p className="truncate whitespace-nowrap text-xs text-[var(--color-text-secondary)]">
           {subtitle}
         </p>
       </div>
@@ -364,5 +369,184 @@ export function UserAvatar({
         )}
       </div>
     </div>
+  );
+}
+
+function getProviderLabel(provider: ConnectedAccountProvider) {
+  switch (provider) {
+    case "LINKEDIN":
+      return "LinkedIn";
+    default:
+      return "Connected";
+  }
+}
+
+function getProviderInitials(provider: ConnectedAccountProvider) {
+  const label = getProviderLabel(provider);
+  return label.slice(0, 2).toUpperCase();
+}
+
+function getAccountLabel(account?: ConnectedAccount) {
+  return account?.profile?.name || account?.profile?.email || "No connected account";
+}
+
+export function MobileAccountChip({
+  account,
+  onOpenSwitcher,
+  disabled = false,
+}: {
+  account?: ConnectedAccount;
+  onOpenSwitcher: () => void;
+  disabled?: boolean;
+}) {
+  const providerLabel = account ? getProviderLabel(account.provider) : "Account";
+  const providerInitials = account ? getProviderInitials(account.provider) : "AC";
+
+  return (
+    <button
+      type="button"
+      onClick={onOpenSwitcher}
+      disabled={disabled}
+      className="inline-flex h-11 w-full items-center justify-between gap-3 rounded-full border border-[var(--color-border)] bg-white/90 px-4 text-sm font-semibold text-[var(--color-text-primary)] shadow-[0_16px_36px_-30px_rgba(15,23,42,0.6)] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
+      aria-label="Open connected account selector"
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)]/12 text-[11px] font-semibold text-[var(--color-primary)]">
+          {providerInitials}
+        </span>
+        <span className="min-w-0 truncate">{getAccountLabel(account)}</span>
+      </span>
+      <span className="shrink-0 text-xs text-[var(--color-text-secondary)]">
+        {providerLabel}
+      </span>
+    </button>
+  );
+}
+
+export function MobileAccountSwitcherSheet({
+  isOpen,
+  accounts,
+  selectedAccountId,
+  onClose,
+  onSelectAccount,
+}: {
+  isOpen: boolean;
+  accounts: ConnectedAccount[];
+  selectedAccountId?: string;
+  onClose: () => void;
+  onSelectAccount: (accountId: string) => void;
+}) {
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/35"
+        onClick={onClose}
+        aria-label="Close account selector"
+      />
+      <div className="absolute inset-x-0 bottom-0 rounded-t-3xl border border-[var(--color-border)] bg-white p-4 pb-6 shadow-[0_-24px_60px_-40px_rgba(15,23,42,0.6)]">
+        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-[var(--color-border)]" />
+        <h3 className="text-base font-semibold text-[var(--color-text-primary)]">
+          Connected accounts
+        </h3>
+        <div className="mt-4 flex max-h-[45vh] flex-col gap-2 overflow-y-auto">
+          {accounts.length === 0 ? (
+            <p className="rounded-2xl border border-[var(--color-border)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">
+              No connected accounts yet.
+            </p>
+          ) : null}
+          {accounts.map((account) => {
+            const isSelected = account.id === selectedAccountId;
+            return (
+              <button
+                key={account.id}
+                type="button"
+                onClick={() => {
+                  onSelectAccount(account.id);
+                  onClose();
+                }}
+                className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                  isSelected
+                    ? "border-[var(--color-primary)] bg-[var(--color-primary)]/8 text-[var(--color-text-primary)]"
+                    : "border-[var(--color-border)] bg-white text-[var(--color-text-secondary)]"
+                }`}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-[var(--color-text-primary)]">
+                    {getAccountLabel(account)}
+                  </span>
+                  <span className="block text-xs">{getProviderLabel(account.provider)}</span>
+                </span>
+                {isSelected ? (
+                  <span className="rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-[10px] font-semibold text-white">
+                    Active
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function MobileBottomNav({
+  items,
+}: {
+  items: Array<{
+    label: string;
+    icon: ReactNode;
+    href?: string;
+    active?: boolean;
+    disabled?: boolean;
+  }>;
+}) {
+  return (
+    <nav
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--color-border)] bg-white/90 px-2 py-2 backdrop-blur-md md:hidden"
+      aria-label="Mobile dashboard navigation"
+    >
+      <ul className="grid grid-cols-4 gap-1">
+        {items.map((item) => {
+          const itemClass = `flex h-12 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-semibold transition ${
+            item.disabled
+              ? "opacity-45"
+              : item.active
+              ? "bg-[var(--color-secondary)] text-white"
+              : "text-[var(--color-text-secondary)] hover:bg-[var(--color-primary)]/8"
+          }`;
+          const content = (
+            <>
+              <span className="text-sm">{item.icon}</span>
+              <span className="leading-none">{item.label}</span>
+            </>
+          );
+
+          return (
+            <li key={item.label}>
+              {item.href && !item.disabled ? (
+                <Link href={item.href} className={itemClass}>
+                  {content}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  aria-disabled="true"
+                  className={`${itemClass} w-full`}
+                >
+                  {content}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }

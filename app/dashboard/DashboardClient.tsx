@@ -18,8 +18,10 @@ import {
   Card,
   ConnectAccountCta,
   ListItem,
+  MobileAccountChip,
+  MobileAccountSwitcherSheet,
+  MobileBottomNav,
   PillButton,
-  UserAvatar,
 } from "./components";
 import { useNewPostModal } from "./useNewPostModal";
 import type {
@@ -56,6 +58,8 @@ const stats = {
   postsThisMonth: 12,
   postLimit: 30,
 };
+
+type ScheduledFilter = "TODAY" | "NEXT_7_DAYS" | "THIS_MONTH";
 
 function buildMonthGrid(baseDate: Date) {
   const year = baseDate.getFullYear();
@@ -234,6 +238,8 @@ export default function DashboardPage({
   const [postsError, setPostsError] = useState<string | null>(null);
   const [isViewingAllDrafts, setIsViewingAllDrafts] = useState(false);
   const [draftVisibleLimit, setDraftVisibleLimit] = useState(4);
+  const [isMobileAccountSheetOpen, setIsMobileAccountSheetOpen] = useState(false);
+  const [scheduledFilter, setScheduledFilter] = useState<ScheduledFilter>("TODAY");
   const [generatedDraftId, setGeneratedDraftId] = useState<string | null>(null);
   const { state: newPostModalState, openCreate, openEdit, close: closeNewPostModal } =
     useNewPostModal();
@@ -356,6 +362,39 @@ export default function DashboardPage({
       .sort((a, b) => a.scheduledDate.getTime() - b.scheduledDate.getTime())
       .slice(0, 3);
   }, [scheduledPosts]);
+  const mobileScheduledPosts = useMemo(() => {
+    const nowDate = new Date();
+    const dayStart = new Date(
+      nowDate.getFullYear(),
+      nowDate.getMonth(),
+      nowDate.getDate(),
+    );
+    const tomorrowStart = new Date(dayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+    const nextWeekStart = new Date(dayStart);
+    nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+
+    return [...scheduledPosts]
+      .filter((post) => post.scheduledDate.getTime() >= nowDate.getTime())
+      .sort((a, b) => a.scheduledDate.getTime() - b.scheduledDate.getTime())
+      .filter((post) => {
+        const postDate = post.scheduledDate;
+        switch (scheduledFilter) {
+          case "TODAY":
+            return postDate >= dayStart && postDate < tomorrowStart;
+          case "NEXT_7_DAYS":
+            return postDate >= dayStart && postDate < nextWeekStart;
+          case "THIS_MONTH":
+            return (
+              postDate.getFullYear() === nowDate.getFullYear() &&
+              postDate.getMonth() === nowDate.getMonth()
+            );
+          default:
+            return true;
+        }
+      })
+      .slice(0, 5);
+  }, [scheduledFilter, scheduledPosts]);
   const scheduledDaysInCurrentMonth = useMemo(() => {
     const days = new Set<number>();
     const currentYear = now.getFullYear();
@@ -1032,32 +1071,48 @@ export default function DashboardPage({
       <div className="pointer-events-none absolute -left-28 top-10 h-80 w-80 rounded-full bg-[var(--color-accent)]/25 blur-[140px]" />
       <div className="pointer-events-none absolute right-6 top-24 h-64 w-64 rounded-full bg-[var(--color-primary)]/20 blur-[120px]" />
 
-      <div className="relative flex min-h-screen w-full flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8">
+      <div className="relative flex min-h-screen w-full flex-col gap-8 px-4 pb-24 pt-8 sm:px-6 sm:pt-10 md:pb-10 lg:px-8">
         <header className="flex flex-col gap-4 md:hidden">
+          <div className="flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--color-text-secondary)]">
+                Good afternoon, {user.name.split(" ")[0]}
+              </p>
+              <h1 className="mt-1 truncate font-[var(--font-sora)] text-3xl font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
+                Dashboard
+              </h1>
+            </div>
+            <PillButton
+              variant="secondary"
+              icon={<CalendarClock className="h-4 w-4" />}
+              className="shrink-0"
+            >
+              {monthLabel}
+            </PillButton>
+          </div>
+          <MobileAccountChip
+            account={selectedConnectedAccount}
+            disabled={connectedAccounts.length === 0}
+            onOpenSwitcher={() => setIsMobileAccountSheetOpen(true)}
+          />
           <Card className="flex items-center justify-between gap-3 px-4 py-3">
-            <div className="flex items-center gap-3">
-              <UserAvatar initials={initials} avatarUrl={user.avatar} />
+            <div className="min-w-0">
               <div>
-                <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                  {user.name}
+                <p className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
+                  {selectedConnectedAccount?.profile?.name ?? user.name}
                 </p>
-                <p className="text-xs text-[var(--color-text-secondary)]">
-                  {user.email}
+                <p className="truncate text-xs text-[var(--color-text-secondary)]">
+                  {selectedConnectedAccount?.profile?.email ?? user.email}
                 </p>
               </div>
             </div>
-            <PillButton variant="secondary">Settings</PillButton>
+            <PillButton
+              variant="secondary"
+              onClick={() => setIsMobileAccountSheetOpen(true)}
+            >
+              Accounts
+            </PillButton>
           </Card>
-          <nav className="flex gap-3 overflow-x-auto pb-1 text-sm">
-            {navItems.map((item) => (
-              <PillButton
-                key={item.label}
-                variant={item.active ? "primary" : "secondary"}
-              >
-                {item.label}
-              </PillButton>
-            ))}
-          </nav>
         </header>
 
         <div
@@ -1097,7 +1152,7 @@ export default function DashboardPage({
               </div>
             ) : null}
 
-            <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="hidden flex-wrap items-end justify-between gap-4 md:flex">
               <div>
                 <p className="text-sm font-semibold text-[var(--color-text-secondary)]">
                   Good afternoon, {user.name.split(" ")[0]}
@@ -1380,12 +1435,35 @@ export default function DashboardPage({
                     </PillButton>
                   </div>
 
-                  <div className="mt-5 grid grid-cols-7 gap-2 text-center text-[11px] font-semibold text-[var(--color-text-secondary)]">
+                  <div className="mt-5 flex flex-wrap gap-2 md:hidden">
+                    {[
+                      { value: "TODAY", label: "Today" },
+                      { value: "NEXT_7_DAYS", label: "Next 7 days" },
+                      { value: "THIS_MONTH", label: "This month" },
+                    ].map((filterOption) => (
+                      <PillButton
+                        key={filterOption.value}
+                        variant={
+                          scheduledFilter === filterOption.value
+                            ? "primary"
+                            : "secondary"
+                        }
+                        className="h-10"
+                        onClick={() =>
+                          setScheduledFilter(filterOption.value as ScheduledFilter)
+                        }
+                      >
+                        {filterOption.label}
+                      </PillButton>
+                    ))}
+                  </div>
+
+                  <div className="mt-5 hidden grid-cols-7 gap-2 text-center text-[11px] font-semibold text-[var(--color-text-secondary)] md:grid">
                     {["S", "M", "T", "W", "T", "F", "S"].map((label, index) => (
                       <div key={`${label}-${index}`}>{label}</div>
                     ))}
                   </div>
-                  <div className="mt-3 grid grid-cols-7 gap-2">
+                  <div className="mt-3 hidden grid-cols-7 gap-2 md:grid">
                     {monthGrid.map((cell, index) => (
                       (() => {
                         const isScheduledDay =
@@ -1412,7 +1490,33 @@ export default function DashboardPage({
                     ))}
                   </div>
 
-                  <div className="mt-6 space-y-3">
+                  <div className="mt-6 space-y-3 md:hidden">
+                    {isPostsLoading ? (
+                      <p className="text-sm text-[var(--color-text-secondary)]">
+                        Loading scheduled posts...
+                      </p>
+                    ) : null}
+                    {postsError ? (
+                      <p className="text-sm text-amber-700">{postsError}</p>
+                    ) : null}
+                    {!isPostsLoading && !postsError && mobileScheduledPosts.length === 0 ? (
+                      <p className="text-sm text-[var(--color-text-secondary)]">
+                        No scheduled posts for this filter.
+                      </p>
+                    ) : null}
+                    {!isPostsLoading && !postsError
+                      ? mobileScheduledPosts.map((post) => (
+                          <ListItem
+                            key={post._id}
+                            title={getTitleFromContent(post.content)}
+                            subtitle={formatScheduledLocalDateTime(post.scheduledAt)}
+                            status="SCHEDULED"
+                          />
+                        ))
+                      : null}
+                  </div>
+
+                  <div className="mt-6 space-y-3 hidden md:block">
                     {isPostsLoading ? (
                       <p className="text-sm text-[var(--color-text-secondary)]">
                         Loading scheduled posts...
@@ -1443,6 +1547,14 @@ export default function DashboardPage({
           </main>
         </div>
       </div>
+      <MobileAccountSwitcherSheet
+        isOpen={isMobileAccountSheetOpen}
+        accounts={connectedAccounts}
+        selectedAccountId={selectedAccountId}
+        onClose={() => setIsMobileAccountSheetOpen(false)}
+        onSelectAccount={setSelectedAccountId}
+      />
+      <MobileBottomNav items={navItems} />
       <NewPostModal
         isOpen={newPostModalState.isOpen}
         mode={newPostModalState.mode}
