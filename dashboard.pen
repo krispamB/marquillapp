@@ -1,0 +1,405 @@
+{
+  "version": "2.8",
+  "children": [
+    {
+      "type": "frame",
+      "id": "18kzt",
+      "x": 0,
+      "y": 0,
+      "name": "Mobile Dashboard Wireframe",
+      "width": 390,
+      "height": 788,
+      "fill": "#F3F4FA",
+      "layout": "vertical",
+      "gap": 12,
+      "padding": 16,
+      "children": [
+        {
+          "type": "frame",
+          "id": "znVgR",
+          "name": "Header",
+          "width": "fill_container",
+          "fill": "#FFFFFF",
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 12,
+          "children": [
+            {
+              "type": "frame",
+              "id": "fgDM3",
+              "name": "titleRow",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "dmFZB",
+                  "name": "titleText",
+                  "fill": "#111827",
+                  "content": "Dashboard",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "semibold"
+                },
+                {
+                  "type": "text",
+                  "id": "i9t8O",
+                  "name": "monthPill",
+                  "fill": "#374151",
+                  "content": "February 2026",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "OTAEX",
+              "name": "accountChip",
+              "width": "fill_container",
+              "fill": "#EEF0F6",
+              "gap": 8,
+              "padding": 10,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "pchaH",
+                  "name": "providerBadge",
+                  "fill": "#374151",
+                  "content": "LI",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "semibold"
+                },
+                {
+                  "type": "text",
+                  "id": "Z1IEq",
+                  "name": "accountText",
+                  "fill": "#111827",
+                  "content": "Christopher Pam · LinkedIn",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "hv7Kf",
+          "name": "Usage Card",
+          "width": "fill_container",
+          "fill": "#FFFFFF",
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 12,
+          "children": [
+            {
+              "type": "text",
+              "id": "Mdlpo",
+              "name": "usageTitle",
+              "fill": "#111827",
+              "content": "Posts this billing cycle",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "semibold"
+            },
+            {
+              "type": "text",
+              "id": "UeoIv",
+              "name": "usageValue",
+              "fill": "#111827",
+              "content": "12 / 30",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "semibold"
+            },
+            {
+              "type": "frame",
+              "id": "8siws",
+              "name": "usageBar",
+              "width": "fill_container",
+              "height": 8,
+              "fill": "#D9DCE5"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Ndce5",
+          "name": "Posts Metric Card",
+          "width": "fill_container",
+          "fill": "#FFFFFF",
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 12,
+          "children": [
+            {
+              "type": "text",
+              "id": "pFl54",
+              "name": "metricTitle",
+              "fill": "#111827",
+              "content": "Posts this month",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "semibold"
+            },
+            {
+              "type": "text",
+              "id": "oOt6K",
+              "name": "metricValue",
+              "fill": "#111827",
+              "content": "20",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "semibold"
+            },
+            {
+              "type": "frame",
+              "id": "ibFrN",
+              "name": "metricChart",
+              "width": "fill_container",
+              "height": 88,
+              "fill": "#EEF0F6"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "J3UTx",
+          "name": "Quick Actions",
+          "width": "fill_container",
+          "fill": "#FFFFFF",
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 12,
+          "children": [
+            {
+              "type": "text",
+              "id": "KJOPM",
+              "name": "quickTitle",
+              "fill": "#111827",
+              "content": "Quick actions",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "semibold"
+            },
+            {
+              "type": "frame",
+              "id": "6IOZo",
+              "name": "quickActions",
+              "width": "fill_container",
+              "gap": 8,
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "4TMvV",
+                  "name": "newPostBtn",
+                  "fill": "#111827",
+                  "content": "New Post",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "isF9b",
+                  "name": "scheduleBtn",
+                  "fill": "#111827",
+                  "content": "Schedule",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "QVVFW",
+          "name": "Drafts",
+          "width": "fill_container",
+          "fill": "#FFFFFF",
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 12,
+          "children": [
+            {
+              "type": "text",
+              "id": "QrFxH",
+              "name": "draftsTitle",
+              "fill": "#111827",
+              "content": "Drafts",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "semibold"
+            },
+            {
+              "type": "text",
+              "id": "5QPKA",
+              "name": "draftRow1",
+              "fill": "#374151",
+              "content": "Draft: AI developer playbook (4h ago)",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "fCqXA",
+              "name": "draftRow2",
+              "fill": "#374151",
+              "content": "Draft: Eden.so workflow post (17h ago)",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dKtwy",
+          "name": "Scheduled",
+          "width": "fill_container",
+          "fill": "#FFFFFF",
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 12,
+          "children": [
+            {
+              "type": "text",
+              "id": "322sJ",
+              "name": "scheduledTitle",
+              "fill": "#111827",
+              "content": "Scheduled",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "semibold"
+            },
+            {
+              "type": "frame",
+              "id": "wcPTy",
+              "name": "filterRow",
+              "width": "fill_container",
+              "gap": 8,
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "OuV4f",
+                  "name": "filterToday",
+                  "fill": "#111827",
+                  "content": "Today",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "wvHTv",
+                  "name": "filterWeek",
+                  "fill": "#111827",
+                  "content": "Next 7 days",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "4BsEw",
+                  "name": "filterMonth",
+                  "fill": "#111827",
+                  "content": "This month",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "VLGFD",
+              "name": "scheduledRow1",
+              "fill": "#374151",
+              "content": "If handlers do heavy work...  Feb 26, 10:00 AM",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "f00yV",
+              "name": "scheduledRow2",
+              "fill": "#374151",
+              "content": "Launch teaser post  Feb 27, 2:30 PM",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "5qLLX",
+          "name": "Bottom Nav",
+          "width": "fill_container",
+          "fill": "#FFFFFF",
+          "gap": 8,
+          "padding": 10,
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "Xf8W3",
+              "name": "navOverview",
+              "fill": "#111827",
+              "content": "Overview",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "lt0e8",
+              "name": "navPosts",
+              "fill": "#111827",
+              "content": "Posts",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "oaqfb",
+              "name": "navCalendar",
+              "fill": "#111827",
+              "content": "Calendar",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "ye9kx",
+              "name": "navAnalytics",
+              "fill": "#111827",
+              "content": "Analytics",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
