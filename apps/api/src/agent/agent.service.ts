@@ -72,7 +72,7 @@ export class AgentService {
         { role: MessageRole.System, content: SEARCH_KEYWORDS_SYSTEM_PROMPT },
         { role: MessageRole.User, content: JSON.stringify(input) },
       ],
-      { model: "google/gemini-3-flash-preview" }
+      { model: 'google/gemini-3-flash-preview' },
     );
 
     return response;
