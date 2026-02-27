@@ -72,7 +72,7 @@ export class AgentService {
         { role: MessageRole.System, content: SEARCH_KEYWORDS_SYSTEM_PROMPT },
         { role: MessageRole.User, content: JSON.stringify(input) },
       ],
-      { model: "google/gemini-3-flash-preview" }
+      { model: 'google/gemini-3-flash-preview' },
     );
 
     return response;
@@ -84,28 +84,47 @@ export class AgentService {
   ): Promise<YoutubeSearchResult[]> {
     this.logger.log(query);
     try {
-      const response = await this.youtube.search.list({
-        part: ['snippet'],
-        q: query,
-        type: ['video'],
-        maxResults,
-        order: 'relevance',
-        videoDuration: 'medium',
-        // videoCaption: 'closedCaption',
-      });
+      const mapResults = (items: youtube_v3.Schema$SearchResult[]) =>
+        items.slice(0, maxResults).map((item) => ({
+          videoId: item.id?.videoId || '',
+          title: item.snippet?.title || 'No title',
+          thumbnail: item.snippet?.thumbnails?.high?.url || '',
+          channelTitle: item.snippet?.channelTitle || '',
+          publishedAt: item.snippet?.publishedAt || '',
+        }));
 
-      if (!response.data.items || response.data.items.length === 0) {
-        this.logger.warn(`No results found for query: ${query}`);
+      const runSearch = (searchQuery: string) =>
+        this.youtube.search.list({
+          part: ['snippet'],
+          q: searchQuery,
+          type: ['video'],
+          maxResults,
+          order: 'relevance',
+          videoDuration: 'medium',
+          // videoCaption: 'closedCaption',
+        });
+
+      const response = await runSearch(query);
+      const items = response.data.items || [];
+      if (items.length > 0) {
+        return mapResults(items);
+      }
+
+      this.logger.warn(`No results found for query: ${query}`);
+
+      const fallbackQuery = query.split('|')[0]?.trim() || '';
+      if (!fallbackQuery || fallbackQuery === query.trim()) {
         return [];
       }
 
-      return response.data.items?.slice(0, maxResults).map((item) => ({
-        videoId: item.id?.videoId || '',
-        title: item.snippet?.title || 'No title',
-        thumbnail: item.snippet?.thumbnails?.high?.url || '',
-        channelTitle: item.snippet?.channelTitle || '',
-        publishedAt: item.snippet?.publishedAt || '',
-      }));
+      const fallbackResponse = await runSearch(fallbackQuery);
+      const fallbackItems = fallbackResponse.data.items || [];
+      if (fallbackItems.length === 0) {
+        this.logger.warn(`No results found for fallback query: ${fallbackQuery}`);
+        return [];
+      }
+
+      return mapResults(fallbackItems);
     } catch (error) {
       this.logger.error(
         `YouTube search failed: ${error?.message}`,

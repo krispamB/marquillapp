@@ -21,6 +21,7 @@ import { ConfigService } from '@nestjs/config';
 import { EncryptionModule } from './encryption/encryption.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { PaymentModule } from './payment/payment.module';
+import { YoutubeTranscriptModule } from './youtube-transcript';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { PaymentModule } from './payment/payment.module';
     UserModule,
     PostModule,
     EncryptionModule,
+    YoutubeTranscriptModule,
   ],
   controllers: [AppController],
   providers: [AppService],
