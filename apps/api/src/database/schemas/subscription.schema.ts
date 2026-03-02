@@ -1,22 +1,22 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Schema as MongooseSchema, Types } from 'mongoose';
+import { Document, Types } from 'mongoose';
 import { User } from './user.schema';
 import { Tier } from './tier.schema';
 
 export enum SubscriptionStatus {
-    ACTIVE = 'ACTIVE',
-    CANCELLED = 'CANCELLED',
-    EXPIRED = 'EXPIRED',
-    PAST_DUE = 'PAST_DUE',
-    PENDING = 'PENDING',
+    ACTIVE = 'active',
+    CANCELED = 'canceled',
+    EXPIRED = 'expired',
+    PAST_DUE = 'past_due',
 }
 
-export enum BillingCycle {
-    MONTHLY = 'MONTHLY',
-    YEARLY = 'YEARLY',
+export enum BillingInterval {
+    MONTHLY = 'monthly',
+    YEARLY = 'yearly',
 }
 
 export enum PaymentProvider {
+    POLAR = 'POLAR',
     STRIPE = 'STRIPE',
     LEMON_SQUEEZY = 'LEMON_SQUEEZY',
     PAYPAL = 'PAYPAL',
@@ -24,27 +24,17 @@ export enum PaymentProvider {
 
 @Schema({ timestamps: true })
 export class Subscription extends Document {
-    @Prop({ type: Types.ObjectId, ref: User.name, required: true })
-    user: User;
+    @Prop({ type: Types.ObjectId, ref: User.name, required: true, unique: true })
+    userId: User | Types.ObjectId;
 
     @Prop({ type: Types.ObjectId, ref: Tier.name, required: true })
-    tier: Tier;
+    tierId: Tier | Types.ObjectId;
 
-    @Prop({ required: true, enum: BillingCycle })
-    billingCycle: BillingCycle;
+    @Prop({ required: true, enum: BillingInterval })
+    billingInterval: BillingInterval;
 
-    @Prop({
-        required: true,
-        enum: SubscriptionStatus,
-        default: SubscriptionStatus.PENDING,
-    })
+    @Prop({ required: true, enum: SubscriptionStatus })
     status: SubscriptionStatus;
-
-    @Prop({ required: true })
-    startDate: Date;
-
-    @Prop()
-    endDate?: Date;
 
     @Prop({ required: true })
     currentPeriodStart: Date;
@@ -55,17 +45,8 @@ export class Subscription extends Document {
     @Prop({ default: false })
     cancelAtPeriodEnd: boolean;
 
-    @Prop({ enum: PaymentProvider })
-    provider?: PaymentProvider;
-
-    @Prop({ required: true })
-    amountPaid: number;
-
-    @Prop({ required: true })
-    currency: string;
-
-    @Prop()
-    providerSubscriptionId?: string;
+    @Prop({ unique: true, sparse: true })
+    polarSubscriptionId?: string;
 }
 
 export const SubscriptionSchema = SchemaFactory.createForClass(Subscription);

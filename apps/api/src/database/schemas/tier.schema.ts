@@ -12,6 +12,12 @@ export class Tier extends Document {
     @Prop({ default: 0 })
     yearlyPrice: number;
 
+    @Prop()
+    polarMonthlyPriceId?: string;
+
+    @Prop()
+    polarYearlyPriceId?: string;
+
     @Prop({ default: false })
     isDefault: boolean;
 

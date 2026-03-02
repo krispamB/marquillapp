@@ -17,7 +17,7 @@ import {
 import { PostService } from './post.service';
 import { InputDto } from '../agent/dto';
 import { UpdatePostDto, SchedulePostDto } from './dto';
-import { JwtAuthGuard } from '../common/guards';
+import { JwtAuthGuard, SubscriptionAccessGuard } from '../common/guards';
 import { IAppResponse } from 'src/common/interfaces';
 import { GetUser } from 'src/common/decorators';
 import { User } from 'src/database/schemas';
@@ -29,6 +29,7 @@ export class PostController {
   constructor(private readonly postService: PostService) { }
 
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(SubscriptionAccessGuard)
   @Post(':id/draft')
   async createDraft(
     @GetUser() user: User,

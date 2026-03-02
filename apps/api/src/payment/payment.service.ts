@@ -1,44 +1,464 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { IPaymentProvider, SubscriptionInput, PaymentResult } from './payment.interface';
-import { StripeProvider } from './providers/stripe.provider';
-import { PayPalProvider } from './providers/paypal.provider';
-import { User } from '../database/schemas/user.schema';
-import { PaymentProvider } from 'src/database/schemas';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { ConfigService } from '@nestjs/config';
+import { Model, Types } from 'mongoose';
+import { createHash } from 'crypto';
+import {
+  BillingInterval,
+  BillingCustomer,
+  PaymentProvider,
+  Subscription,
+  SubscriptionStatus,
+  Tier,
+  User,
+} from '../database/schemas';
+import { PolarClient } from './polar.client';
+import { RedisService } from '../redis/redis.service';
+
+const WEBHOOK_DEDUPE_TTL_SECONDS = 172800; // 48h
+const WEBHOOK_REDIS_KEY_PREFIX = 'billing:webhook:polar:event:';
+
+type PolarWebhookPayload = {
+  id?: string;
+  event_id?: string;
+  type?: string;
+  data?: Record<string, any>;
+  subscription?: Record<string, any>;
+};
+
+type WebhookState = {
+  provider: 'polar';
+  eventId: string;
+  eventType: string;
+  status: 'processing' | 'processed' | 'ignored' | 'failed';
+  receivedAt: string;
+  processedAt?: string;
+  error?: string;
+  payload: PolarWebhookPayload;
+};
 
 @Injectable()
 export class PaymentService {
-    private readonly logger = new Logger(PaymentService.name);
-    private providers: Map<PaymentProvider, IPaymentProvider>;
+  private readonly logger = new Logger(PaymentService.name);
 
-    constructor(
-        private stripeProvider: StripeProvider,
-        private paypalProvider: PayPalProvider,
+  constructor(
+    @InjectModel(User.name) private readonly userModel: Model<User>,
+    @InjectModel(Tier.name) private readonly tierModel: Model<Tier>,
+    @InjectModel(Subscription.name)
+    private readonly subscriptionModel: Model<Subscription>,
+    @InjectModel(BillingCustomer.name)
+    private readonly billingCustomerModel: Model<BillingCustomer>,
+    private readonly polarClient: PolarClient,
+    private readonly configService: ConfigService,
+    private readonly redisService: RedisService,
+  ) {}
+
+  async createCheckoutSession(userId: string, billingInterval: BillingInterval) {
+    const userObjectId = new Types.ObjectId(userId);
+    const user = await this.userModel.findById(userObjectId).lean();
+    if (!user) throw new NotFoundException('User not found');
+
+    const activeSubscription = await this.subscriptionModel
+      .findOne({ userId: userObjectId })
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    let targetTier: Tier | null = null;
+    if (
+      activeSubscription &&
+      activeSubscription.status === SubscriptionStatus.ACTIVE &&
+      activeSubscription.currentPeriodEnd > new Date()
     ) {
-        this.providers = new Map();
-        this.providers.set(PaymentProvider.STRIPE, stripeProvider);
-        this.providers.set(PaymentProvider.PAYPAL, paypalProvider);
+      targetTier = await this.tierModel.findById(activeSubscription.tierId).lean();
     }
 
-    private getProvider(type: PaymentProvider): IPaymentProvider {
-        const provider = this.providers.get(type);
-        if (!provider) {
-            throw new BadRequestException(`Payment provider ${type} not supported`);
-        }
-        return provider;
+    if (!targetTier) {
+      targetTier = await this.tierModel.findOne({ isDefault: true, isActive: true }).lean();
     }
 
-    async createCustomer(user: User, providerType: PaymentProvider): Promise<string> {
-        const provider = this.getProvider(providerType);
-        return provider.createCustomer(user);
+    if (!targetTier) {
+      throw new NotFoundException('No available tier found for checkout');
     }
 
-    async createSubscription(input: SubscriptionInput, providerType: PaymentProvider): Promise<PaymentResult> {
-        const provider = this.getProvider(providerType);
-        return provider.createSubscription(input);
+    const priceId =
+      billingInterval === BillingInterval.MONTHLY
+        ? targetTier.polarMonthlyPriceId
+        : targetTier.polarYearlyPriceId;
+
+    if (!priceId) {
+      throw new BadRequestException(
+        `Tier "${targetTier.name}" is missing Polar ${billingInterval} price ID`,
+      );
     }
 
-    async cancelSubscription(subscriptionId: string, providerType: PaymentProvider): Promise<void> {
-        const provider = this.getProvider(providerType);
-        return provider.cancelSubscription(subscriptionId);
+    const successUrl = this.configService.get<string>('POLAR_CHECKOUT_SUCCESS_URL');
+    const cancelUrl = this.configService.get<string>('POLAR_CHECKOUT_CANCEL_URL');
+
+    if (!successUrl || !cancelUrl) {
+      throw new InternalServerErrorException(
+        'POLAR_CHECKOUT_SUCCESS_URL and POLAR_CHECKOUT_CANCEL_URL must be configured',
+      );
     }
+
+    const checkout = await this.polarClient.createCheckoutSession({
+      priceId,
+      userId: user._id.toString(),
+      successUrl,
+      cancelUrl,
+    });
+
+    return {
+      checkout,
+      tier: {
+        id: targetTier._id.toString(),
+        name: targetTier.name,
+      },
+      billingInterval,
+    };
+  }
+
+  async handlePolarWebhook(rawBody: Buffer, signatureHeader?: string) {
+    this.polarClient.verifyWebhookSignature(rawBody, signatureHeader);
+
+    const payload = this.parseWebhookBody(rawBody);
+    const eventType = payload.type ?? 'unknown';
+    const eventId = this.resolveEventId(payload, rawBody);
+    const key = `${WEBHOOK_REDIS_KEY_PREFIX}${eventId}`;
+
+    const stored = await this.storeWebhookPayloadIfNew(key, {
+      provider: 'polar',
+      eventId,
+      eventType,
+      status: 'processing',
+      receivedAt: new Date().toISOString(),
+      payload,
+    });
+
+    if (!stored) {
+      return { processed: false, duplicate: true, eventId };
+    }
+
+    if (!this.isSubscriptionEvent(eventType)) {
+      this.logger.warn(`Ignoring unknown Polar event type: ${eventType} (${eventId})`);
+      await this.updateWebhookPayload(key, {
+        provider: 'polar',
+        eventId,
+        eventType,
+        status: 'ignored',
+        receivedAt: new Date().toISOString(),
+        processedAt: new Date().toISOString(),
+        payload,
+      });
+      return { processed: true, duplicate: false, ignored: true, eventId };
+    }
+
+    try {
+      await this.syncSubscriptionFromEvent(payload);
+      await this.updateWebhookPayload(key, {
+        provider: 'polar',
+        eventId,
+        eventType,
+        status: 'processed',
+        receivedAt: new Date().toISOString(),
+        processedAt: new Date().toISOString(),
+        payload,
+      });
+      return { processed: true, duplicate: false, eventId };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown processing error';
+      this.logger.error(`Failed processing Polar event ${eventId}: ${message}`);
+      await this.updateWebhookPayload(key, {
+        provider: 'polar',
+        eventId,
+        eventType,
+        status: 'failed',
+        receivedAt: new Date().toISOString(),
+        processedAt: new Date().toISOString(),
+        error: message,
+        payload,
+      });
+      throw error;
+    }
+  }
+
+  async getBillingSummary(userId: string) {
+    const userObjectId = new Types.ObjectId(userId);
+    const now = new Date();
+
+    const subscription = await this.subscriptionModel
+      .findOne({ userId: userObjectId })
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const isActivePaid =
+      !!subscription &&
+      subscription.status === SubscriptionStatus.ACTIVE &&
+      subscription.currentPeriodEnd > now;
+
+    if (isActivePaid) {
+      const paidTier = await this.tierModel.findById(subscription.tierId).lean();
+      return {
+        tier: paidTier
+          ? { id: paidTier._id.toString(), name: paidTier.name, isDefault: paidTier.isDefault }
+          : null,
+        billingInterval: subscription.billingInterval,
+        nextRenewalDate: subscription.currentPeriodEnd,
+        subscriptionStatus: subscription.status,
+      };
+    }
+
+    const defaultTier = await this.tierModel.findOne({ isDefault: true, isActive: true }).lean();
+    if (!defaultTier) {
+      throw new NotFoundException('Default tier not configured');
+    }
+
+    return {
+      tier: {
+        id: defaultTier._id.toString(),
+        name: defaultTier.name,
+        isDefault: defaultTier.isDefault,
+      },
+      billingInterval: null,
+      nextRenewalDate: null,
+      subscriptionStatus: subscription?.status ?? SubscriptionStatus.EXPIRED,
+    };
+  }
+
+  async getInvoiceHistory(userId: string) {
+    const userObjectId = new Types.ObjectId(userId);
+    const user = await this.userModel.findById(userObjectId).lean();
+    if (!user) throw new NotFoundException('User not found');
+
+    const paymentsIterator = await this.polarClient.listInvoices({
+      customerEmail: user.email,
+    });
+
+    const items: any[] = [];
+    for await (const page of paymentsIterator) {
+      items.push(...(page.result?.items ?? []));
+    }
+
+    return { items };
+  }
+
+  private parseWebhookBody(rawBody: Buffer): PolarWebhookPayload {
+    try {
+      return JSON.parse(rawBody.toString('utf-8')) as PolarWebhookPayload;
+    } catch {
+      throw new BadRequestException('Invalid webhook body');
+    }
+  }
+
+  private resolveEventId(payload: PolarWebhookPayload, rawBody: Buffer): string {
+    return (
+      payload.id ??
+      payload.event_id ??
+      `polar_${createHash('sha256').update(rawBody).digest('hex')}`
+    );
+  }
+
+  private isSubscriptionEvent(eventType: string): boolean {
+    return (
+      eventType === 'subscription.created' ||
+      eventType === 'subscription.updated' ||
+      eventType === 'subscription.canceled' ||
+      eventType === 'subscription.active' ||
+      eventType === 'subscription.revoked' ||
+      eventType === 'subscription.uncanceled'
+    );
+  }
+
+  private async syncSubscriptionFromEvent(payload: PolarWebhookPayload) {
+    const data = payload.data ?? {};
+    const subscription = (data.subscription ?? payload.subscription ?? data) as Record<string, any>;
+    const metadata = (subscription.metadata ?? data.metadata ?? {}) as Record<string, any>;
+
+    const userId = this.readString([
+      metadata.userId,
+      metadata.user_id,
+      subscription.user_id,
+      data.user_id,
+    ]);
+
+    if (!userId) {
+      throw new BadRequestException('Webhook payload missing userId metadata');
+    }
+
+    const customerId = this.readString([
+      subscription.customer_id,
+      data.customer_id,
+      data.customerId,
+    ]);
+
+    if (customerId) {
+      await this.billingCustomerModel.findOneAndUpdate(
+        { user: new Types.ObjectId(userId), provider: PaymentProvider.POLAR },
+        {
+          user: new Types.ObjectId(userId),
+          provider: PaymentProvider.POLAR,
+          providerCustomerId: customerId,
+        },
+        { upsert: true, new: true },
+      );
+    }
+
+    const priceId = this.readString([
+      subscription.price_id,
+      subscription.priceId,
+      subscription.product_price_id,
+      data.price_id,
+      data.priceId,
+    ]);
+
+    const tierAndInterval = await this.resolveTierAndIntervalByPriceId(priceId);
+    const existingSubscription = await this.subscriptionModel
+      .findOne({ userId: new Types.ObjectId(userId) })
+      .lean();
+
+    const tierId =
+      tierAndInterval?.tierId ??
+      (existingSubscription?.tierId ? existingSubscription.tierId.toString() : null);
+    const billingInterval =
+      tierAndInterval?.billingInterval ?? existingSubscription?.billingInterval ?? null;
+
+    if (!tierId || !billingInterval) {
+      throw new BadRequestException('Unable to map Polar price to tier');
+    }
+
+    const periodStartRaw = this.readString([
+      subscription.current_period_start,
+      subscription.currentPeriodStart,
+      data.current_period_start,
+      data.currentPeriodStart,
+    ]);
+    const periodEndRaw = this.readString([
+      subscription.current_period_end,
+      subscription.currentPeriodEnd,
+      data.current_period_end,
+      data.currentPeriodEnd,
+    ]);
+
+    const currentPeriodStart = periodStartRaw ? new Date(periodStartRaw) : new Date();
+    const currentPeriodEnd = periodEndRaw
+      ? new Date(periodEndRaw)
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    const status = this.mapPolarStatus(
+      this.readString([subscription.status, data.status, payload.type]),
+    );
+    const cancelAtPeriodEnd = this.readBoolean([
+      subscription.cancel_at_period_end,
+      subscription.cancelAtPeriodEnd,
+      data.cancel_at_period_end,
+      data.cancelAtPeriodEnd,
+    ]);
+
+    const polarSubscriptionId = this.readString([
+      subscription.id,
+      subscription.subscription_id,
+      data.subscription_id,
+      data.id,
+    ]);
+
+    await this.subscriptionModel.findOneAndUpdate(
+      { userId: new Types.ObjectId(userId) },
+      {
+        userId: new Types.ObjectId(userId),
+        tierId: new Types.ObjectId(tierId),
+        billingInterval,
+        status,
+        currentPeriodStart,
+        currentPeriodEnd,
+        cancelAtPeriodEnd,
+        polarSubscriptionId: polarSubscriptionId ?? undefined,
+      },
+      { upsert: true, new: true },
+    );
+  }
+
+  private async resolveTierAndIntervalByPriceId(priceId: string | null): Promise<{
+    tierId: string;
+    billingInterval: BillingInterval;
+  } | null> {
+    if (!priceId) return null;
+
+    const tier = await this.tierModel
+      .findOne({
+        $or: [{ polarMonthlyPriceId: priceId }, { polarYearlyPriceId: priceId }],
+      })
+      .lean();
+    if (!tier) return null;
+
+    if (tier.polarMonthlyPriceId === priceId) {
+      return { tierId: tier._id.toString(), billingInterval: BillingInterval.MONTHLY };
+    }
+
+    return { tierId: tier._id.toString(), billingInterval: BillingInterval.YEARLY };
+  }
+
+  private mapPolarStatus(status: string | null): SubscriptionStatus {
+    switch ((status ?? '').toLowerCase()) {
+      case 'active':
+      case 'subscription.active':
+      case 'subscription.uncanceled':
+        return SubscriptionStatus.ACTIVE;
+      case 'past_due':
+      case 'past-due':
+      case 'subscription.past_due':
+        return SubscriptionStatus.PAST_DUE;
+      case 'canceled':
+      case 'cancelled':
+      case 'subscription.canceled':
+      case 'subscription.revoked':
+        return SubscriptionStatus.CANCELED;
+      case 'expired':
+        return SubscriptionStatus.EXPIRED;
+      default:
+        return SubscriptionStatus.EXPIRED;
+    }
+  }
+
+  private readString(values: unknown[]): string | null {
+    for (const value of values) {
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+    return null;
+  }
+
+  private readBoolean(values: unknown[]): boolean {
+    for (const value of values) {
+      if (typeof value === 'boolean') return value;
+    }
+    return false;
+  }
+
+  private async storeWebhookPayloadIfNew(key: string, state: WebhookState): Promise<boolean> {
+    const client = this.redisService.getClient();
+    const response = await client.set(
+      key,
+      JSON.stringify(state),
+      'EX',
+      WEBHOOK_DEDUPE_TTL_SECONDS,
+      'NX',
+    );
+    return response === 'OK';
+  }
+
+  private async updateWebhookPayload(key: string, state: WebhookState): Promise<void> {
+    const client = this.redisService.getClient();
+    const payload = JSON.stringify(state);
+    const response = await client.set(key, payload, 'KEEPTTL', 'XX');
+
+    if (response !== 'OK') {
+      await client.set(key, payload, 'EX', WEBHOOK_DEDUPE_TTL_SECONDS);
+    }
+  }
 }
