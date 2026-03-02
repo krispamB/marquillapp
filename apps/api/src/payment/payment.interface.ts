@@ -1,10 +1,10 @@
 import { User } from '../database/schemas/user.schema';
-import { BillingCycle } from '../database/schemas/subscription.schema';
+import { BillingInterval } from '../database/schemas/subscription.schema';
 
 export interface SubscriptionInput {
     userId: string;
     tierId: string;
-    billingCycle: BillingCycle;
+    billingInterval: BillingInterval;
     paymentMethodId?: string; // Token from frontend
     metadata?: Record<string, any>;
 }
