@@ -10,7 +10,7 @@ import {
 } from './prompts';
 import { ResponseParserService } from '../llm/parsers/responseParser.service';
 import { ActorsService } from '../actors/actors.service';
-import { google, youtube_v3 } from 'googleapis';
+import { youtube, youtube_v3 } from '@googleapis/youtube';
 import { delay } from '../common/HelperFn';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -43,10 +43,7 @@ export class AgentService {
     if (!apiKey) {
       throw new Error('YOUTUBE_API_KEY is not configured');
     }
-    this.youtube = google.youtube({
-      version: 'v3',
-      auth: apiKey,
-    });
+    this.youtube = youtube('v3');
 
     this.supadata = new Supadata({
       apiKey: this.config.get<string>('SUPADATA_KEY')!,
