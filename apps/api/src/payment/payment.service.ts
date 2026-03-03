@@ -8,7 +8,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
 import { Model, Types } from 'mongoose';
-import { createHash } from 'crypto';
+import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
 import {
   BillingInterval,
   BillingCustomer,
@@ -22,25 +22,12 @@ import { PolarClient } from './polar.client';
 import { RedisService } from '../redis/redis.service';
 
 const WEBHOOK_DEDUPE_TTL_SECONDS = 172800; // 48h
-const WEBHOOK_REDIS_KEY_PREFIX = 'billing:webhook:polar:event:';
+const WEBHOOK_REDIS_KEY_PREFIX = 'billing:webhook:polar:id:';
 
 type PolarWebhookPayload = {
-  id?: string;
-  event_id?: string;
   type?: string;
   data?: Record<string, any>;
   subscription?: Record<string, any>;
-};
-
-type WebhookState = {
-  provider: 'polar';
-  eventId: string;
-  eventType: string;
-  status: 'processing' | 'processed' | 'ignored' | 'failed';
-  receivedAt: string;
-  processedAt?: string;
-  error?: string;
-  payload: PolarWebhookPayload;
 };
 
 @Injectable()
@@ -123,66 +110,50 @@ export class PaymentService {
     };
   }
 
-  async handlePolarWebhook(rawBody: Buffer, signatureHeader?: string) {
-    this.polarClient.verifyWebhookSignature(rawBody, signatureHeader);
+  async handlePolarWebhook(
+    rawBody: Buffer,
+    headers: Record<string, string | string[] | undefined>,
+  ) {
+    const webhookSecret = this.configService.get<string>('POLAR_WEBHOOK_SECRET');
+    if (!webhookSecret) {
+      throw new InternalServerErrorException('POLAR_WEBHOOK_SECRET is not configured');
+    }
 
-    const payload = this.parseWebhookBody(rawBody);
+    const normalizedHeaders = this.normalizeHeaders(headers);
+    let payload: PolarWebhookPayload;
+
+    try {
+      payload = validateEvent(rawBody, normalizedHeaders, webhookSecret) as PolarWebhookPayload;
+    } catch (error) {
+      if (error instanceof WebhookVerificationError) throw error;
+      throw new BadRequestException('Invalid webhook payload');
+    }
+
     const eventType = payload.type ?? 'unknown';
-    const eventId = this.resolveEventId(payload, rawBody);
+    const webhookId = normalizedHeaders['webhook-id'];
+    if (!webhookId) {
+      throw new BadRequestException('Missing webhook-id header');
+    }
+
+    const eventId = webhookId;
     const key = `${WEBHOOK_REDIS_KEY_PREFIX}${eventId}`;
 
-    const stored = await this.storeWebhookPayloadIfNew(key, {
-      provider: 'polar',
-      eventId,
-      eventType,
-      status: 'processing',
-      receivedAt: new Date().toISOString(),
-      payload,
-    });
-
+    const stored = await this.storeWebhookTypeIfNew(key, eventType);
     if (!stored) {
       return { processed: false, duplicate: true, eventId };
     }
 
     if (!this.isSubscriptionEvent(eventType)) {
       this.logger.warn(`Ignoring unknown Polar event type: ${eventType} (${eventId})`);
-      await this.updateWebhookPayload(key, {
-        provider: 'polar',
-        eventId,
-        eventType,
-        status: 'ignored',
-        receivedAt: new Date().toISOString(),
-        processedAt: new Date().toISOString(),
-        payload,
-      });
       return { processed: true, duplicate: false, ignored: true, eventId };
     }
 
     try {
       await this.syncSubscriptionFromEvent(payload);
-      await this.updateWebhookPayload(key, {
-        provider: 'polar',
-        eventId,
-        eventType,
-        status: 'processed',
-        receivedAt: new Date().toISOString(),
-        processedAt: new Date().toISOString(),
-        payload,
-      });
       return { processed: true, duplicate: false, eventId };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown processing error';
       this.logger.error(`Failed processing Polar event ${eventId}: ${message}`);
-      await this.updateWebhookPayload(key, {
-        provider: 'polar',
-        eventId,
-        eventType,
-        status: 'failed',
-        receivedAt: new Date().toISOString(),
-        processedAt: new Date().toISOString(),
-        error: message,
-        payload,
-      });
       throw error;
     }
   }
@@ -245,22 +216,6 @@ export class PaymentService {
     }
 
     return { items };
-  }
-
-  private parseWebhookBody(rawBody: Buffer): PolarWebhookPayload {
-    try {
-      return JSON.parse(rawBody.toString('utf-8')) as PolarWebhookPayload;
-    } catch {
-      throw new BadRequestException('Invalid webhook body');
-    }
-  }
-
-  private resolveEventId(payload: PolarWebhookPayload, rawBody: Buffer): string {
-    return (
-      payload.id ??
-      payload.event_id ??
-      `polar_${createHash('sha256').update(rawBody).digest('hex')}`
-    );
   }
 
   private isSubscriptionEvent(eventType: string): boolean {
@@ -440,11 +395,11 @@ export class PaymentService {
     return false;
   }
 
-  private async storeWebhookPayloadIfNew(key: string, state: WebhookState): Promise<boolean> {
+  private async storeWebhookTypeIfNew(key: string, eventType: string): Promise<boolean> {
     const client = this.redisService.getClient();
     const response = await client.set(
       key,
-      JSON.stringify(state),
+      eventType,
       'EX',
       WEBHOOK_DEDUPE_TTL_SECONDS,
       'NX',
@@ -452,13 +407,19 @@ export class PaymentService {
     return response === 'OK';
   }
 
-  private async updateWebhookPayload(key: string, state: WebhookState): Promise<void> {
-    const client = this.redisService.getClient();
-    const payload = JSON.stringify(state);
-    const response = await client.set(key, payload, 'KEEPTTL', 'XX');
+  private normalizeHeaders(
+    headers: Record<string, string | string[] | undefined>,
+  ): Record<string, string> {
+    const normalized: Record<string, string> = {};
 
-    if (response !== 'OK') {
-      await client.set(key, payload, 'EX', WEBHOOK_DEDUPE_TTL_SECONDS);
+    for (const [key, value] of Object.entries(headers)) {
+      if (typeof value === 'string') {
+        normalized[key.toLowerCase()] = value;
+      } else if (Array.isArray(value) && value.length > 0) {
+        normalized[key.toLowerCase()] = value[0];
+      }
     }
+
+    return normalized;
   }
 }
