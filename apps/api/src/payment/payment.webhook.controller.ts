@@ -1,7 +1,7 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Controller,
-  Headers,
   HttpCode,
   HttpStatus,
   Logger,
@@ -9,6 +9,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { WebhookVerificationError } from '@polar-sh/sdk/webhooks';
 import { PaymentService } from './payment.service';
 
 type RawBodyRequest = Request & { rawBody?: Buffer };
@@ -21,22 +22,21 @@ export class PaymentWebhookController {
 
   @Post('polar')
   @HttpCode(HttpStatus.OK)
-  async handlePolarWebhook(
-    @Req() request: RawBodyRequest,
-    @Headers('x-polar-signature') signatureHeader?: string,
-    @Headers('polar-signature') fallbackSignatureHeader?: string,
-  ) {
+  async handlePolarWebhook(@Req() request: RawBodyRequest) {
     const rawBody = request.rawBody;
     if (!rawBody) {
       this.logger.error('Polar webhook missing raw body. Ensure rawBody is enabled.');
       throw new BadRequestException('Webhook raw body not available');
     }
 
-    const result = await this.paymentService.handlePolarWebhook(
-      rawBody,
-      signatureHeader ?? fallbackSignatureHeader,
-    );
-
-    return { ok: true, ...result };
+    try {
+      const result = await this.paymentService.handlePolarWebhook(rawBody, request.headers);
+      return { ok: true, ...result };
+    } catch (error) {
+      if (error instanceof WebhookVerificationError) {
+        throw new ForbiddenException('Invalid webhook signature');
+      }
+      throw error;
+    }
   }
 }
