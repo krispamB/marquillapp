@@ -1,8 +1,18 @@
-import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Request } from 'express';
 import { Model, Types } from 'mongoose';
-import { Subscription, SubscriptionStatus, Tier, User } from '../../database/schemas';
+import {
+  Subscription,
+  SubscriptionStatus,
+  Tier,
+  User,
+} from '../../database/schemas';
 
 type RequestWithEntitlement = Request & {
   user: User;
@@ -44,7 +54,9 @@ export class SubscriptionAccessGuard implements CanActivate {
       subscription.status === SubscriptionStatus.ACTIVE &&
       subscription.currentPeriodEnd > now
     ) {
-      const paidTier = await this.tierModel.findById(subscription.tierId).lean();
+      const paidTier = await this.tierModel
+        .findById(subscription.tierId)
+        .lean();
       if (paidTier) {
         request.entitlementTier = paidTier as Tier;
         request.entitlementSource = 'subscription';
@@ -53,7 +65,9 @@ export class SubscriptionAccessGuard implements CanActivate {
       }
     }
 
-    const defaultTier = await this.tierModel.findOne({ isDefault: true, isActive: true }).lean();
+    const defaultTier = await this.tierModel
+      .findOne({ isDefault: true, isActive: true })
+      .lean();
     if (!defaultTier) {
       this.logger.warn('Default tier missing during subscription fallback');
       request.entitlementTier = null;

@@ -6,7 +6,12 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { AccountProvider, ConnectedAccount, User, Tier } from '../database/schemas';
+import {
+  AccountProvider,
+  ConnectedAccount,
+  User,
+  Tier,
+} from '../database/schemas';
 import { ConfigService } from '@nestjs/config';
 import { apiFetch } from 'src/common/HelperFn';
 import { EncryptionService } from '../encryption/encryption.service';
@@ -23,7 +28,7 @@ export class AuthService {
     @InjectModel(Tier.name) private tierModel: Model<Tier>,
     private configService: ConfigService,
     private encryptionService: EncryptionService,
-  ) { }
+  ) {}
 
   async validateGoogleUser(details: {
     email: string;
@@ -76,8 +81,12 @@ export class AuthService {
     const connectedAccount = await this.connectedAccountModel.findOne({
       user: new Types.ObjectId(state),
     });
-    if (connectedAccount && connectedAccount.profileMetadata && connectedAccount.profileMetadata['sub'] != profileMetadata.sub) {
-      return false
+    if (
+      connectedAccount &&
+      connectedAccount.profileMetadata &&
+      connectedAccount.profileMetadata['sub'] != profileMetadata.sub
+    ) {
+      return false;
     }
 
     await this.connectedAccountModel.findOneAndUpdate(

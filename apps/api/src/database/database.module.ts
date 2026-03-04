@@ -41,7 +41,7 @@ import {
 export class DatabaseModule implements OnModuleInit {
   private readonly logger = new Logger(DatabaseModule.name);
 
-  constructor(@InjectConnection() private readonly connection: Connection) { }
+  constructor(@InjectConnection() private readonly connection: Connection) {}
 
   onModuleInit() {
     if (this.connection.readyState === 1) {

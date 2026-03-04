@@ -17,7 +17,9 @@ export class SubscriptionService {
   ) {}
 
   async findByUserId(userId: string): Promise<Subscription | null> {
-    return this.subscriptionModel.findOne({ userId: new Types.ObjectId(userId) });
+    return this.subscriptionModel.findOne({
+      userId: new Types.ObjectId(userId),
+    });
   }
 
   async getEntitlementTier(userId: string): Promise<Tier> {
@@ -34,7 +36,10 @@ export class SubscriptionService {
       if (paidTier) return paidTier;
     }
 
-    const defaultTier = await this.tierModel.findOne({ isDefault: true, isActive: true });
+    const defaultTier = await this.tierModel.findOne({
+      isDefault: true,
+      isActive: true,
+    });
     if (!defaultTier) {
       throw new NotFoundException('Default tier not configured');
     }

@@ -94,7 +94,10 @@ describe('AgentService.searchYoutube', () => {
     expect(list).toHaveBeenCalledTimes(2);
     expect(list).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ q: 'nestjs tutorial | overview', maxResults: 3 }),
+      expect.objectContaining({
+        q: 'nestjs tutorial | overview',
+        maxResults: 3,
+      }),
     );
     expect(list).toHaveBeenNthCalledWith(
       2,

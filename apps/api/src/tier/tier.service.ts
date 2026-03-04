@@ -12,7 +12,10 @@ export class TierService {
   ) {}
 
   async getActiveTiers(): Promise<Tier[]> {
-    return this.tierModel.find({ isActive: true }).sort({ monthlyPrice: 1, name: 1 }).exec();
+    return this.tierModel
+      .find({ isActive: true })
+      .sort({ monthlyPrice: 1, name: 1 })
+      .exec();
   }
 
   async getMyTier(userId: string): Promise<Tier> {

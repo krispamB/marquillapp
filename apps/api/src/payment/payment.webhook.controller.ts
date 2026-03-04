@@ -25,12 +25,17 @@ export class PaymentWebhookController {
   async handlePolarWebhook(@Req() request: RawBodyRequest) {
     const rawBody = request.rawBody;
     if (!rawBody) {
-      this.logger.error('Polar webhook missing raw body. Ensure rawBody is enabled.');
+      this.logger.error(
+        'Polar webhook missing raw body. Ensure rawBody is enabled.',
+      );
       throw new BadRequestException('Webhook raw body not available');
     }
 
     try {
-      const result = await this.paymentService.handlePolarWebhook(rawBody, request.headers);
+      const result = await this.paymentService.handlePolarWebhook(
+        rawBody,
+        request.headers,
+      );
       return { ok: true, ...result };
     } catch (error) {
       if (error instanceof WebhookVerificationError) {

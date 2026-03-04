@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-} from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Polar } from '@polar-sh/sdk';
 
@@ -11,7 +8,8 @@ export class PolarClient {
   private readonly accessToken: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.accessToken = this.configService.getOrThrow<string>('POLAR_ACCESS_TOKEN') ?? '';
+    this.accessToken =
+      this.configService.getOrThrow<string>('POLAR_ACCESS_TOKEN') ?? '';
 
     this.client = new Polar({
       accessToken: this.accessToken || undefined,
@@ -26,7 +24,9 @@ export class PolarClient {
     cancelUrl: string;
   }) {
     if (!this.accessToken) {
-      throw new InternalServerErrorException('POLAR_ACCESS_TOKEN is not configured');
+      throw new InternalServerErrorException(
+        'POLAR_ACCESS_TOKEN is not configured',
+      );
     }
 
     return this.client.checkouts.create({
@@ -35,13 +35,14 @@ export class PolarClient {
       metadata: {
         userId: input.userId,
       },
-      }
-    );
+    });
   }
 
   async listInvoices(input: { customerEmail?: string }) {
     if (!this.accessToken) {
-      throw new InternalServerErrorException('POLAR_ACCESS_TOKEN is not configured');
+      throw new InternalServerErrorException(
+        'POLAR_ACCESS_TOKEN is not configured',
+      );
     }
 
     return this.client.payments.list({

@@ -8,7 +8,10 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
 import { Model, Types } from 'mongoose';
-import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
+import {
+  validateEvent,
+  WebhookVerificationError,
+} from '@polar-sh/sdk/webhooks';
 import {
   BillingInterval,
   BillingCustomer,
@@ -46,12 +49,18 @@ export class PaymentService {
     private readonly redisService: RedisService,
   ) {}
 
-  async createCheckoutSession(userId: string, tierId: string, billingInterval: BillingInterval) {
+  async createCheckoutSession(
+    userId: string,
+    tierId: string,
+    billingInterval: BillingInterval,
+  ) {
     const userObjectId = new Types.ObjectId(userId);
     const user = await this.userModel.findById(userObjectId).lean();
     if (!user) throw new NotFoundException('User not found');
 
-    const targetTier = await this.tierModel.findById(new Types.ObjectId(tierId)).lean();
+    const targetTier = await this.tierModel
+      .findById(new Types.ObjectId(tierId))
+      .lean();
 
     if (!targetTier) {
       throw new NotFoundException('Tier not found');
@@ -72,8 +81,12 @@ export class PaymentService {
       );
     }
 
-    const successUrl = this.configService.get<string>('POLAR_CHECKOUT_SUCCESS_URL');
-    const cancelUrl = this.configService.get<string>('POLAR_CHECKOUT_CANCEL_URL');
+    const successUrl = this.configService.get<string>(
+      'POLAR_CHECKOUT_SUCCESS_URL',
+    );
+    const cancelUrl = this.configService.get<string>(
+      'POLAR_CHECKOUT_CANCEL_URL',
+    );
 
     if (!successUrl || !cancelUrl) {
       throw new InternalServerErrorException(
@@ -102,16 +115,24 @@ export class PaymentService {
     rawBody: Buffer,
     headers: Record<string, string | string[] | undefined>,
   ) {
-    const webhookSecret = this.configService.get<string>('POLAR_WEBHOOK_SECRET');
+    const webhookSecret = this.configService.get<string>(
+      'POLAR_WEBHOOK_SECRET',
+    );
     if (!webhookSecret) {
-      throw new InternalServerErrorException('POLAR_WEBHOOK_SECRET is not configured');
+      throw new InternalServerErrorException(
+        'POLAR_WEBHOOK_SECRET is not configured',
+      );
     }
 
     const normalizedHeaders = this.normalizeHeaders(headers);
     let payload: PolarWebhookPayload;
 
     try {
-      payload = validateEvent(rawBody, normalizedHeaders, webhookSecret) as PolarWebhookPayload;
+      payload = validateEvent(
+        rawBody,
+        normalizedHeaders,
+        webhookSecret,
+      ) as PolarWebhookPayload;
     } catch (error) {
       if (error instanceof WebhookVerificationError) throw error;
       throw new BadRequestException('Invalid webhook payload');
@@ -132,7 +153,9 @@ export class PaymentService {
     }
 
     if (!this.isSubscriptionEvent(eventType)) {
-      this.logger.warn(`Ignoring unknown Polar event type: ${eventType} (${eventId})`);
+      this.logger.warn(
+        `Ignoring unknown Polar event type: ${eventType} (${eventId})`,
+      );
       return { processed: true, duplicate: false, ignored: true, eventId };
     }
 
@@ -140,7 +163,8 @@ export class PaymentService {
       await this.syncSubscriptionFromEvent(payload);
       return { processed: true, duplicate: false, eventId };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown processing error';
+      const message =
+        error instanceof Error ? error.message : 'Unknown processing error';
       this.logger.error(`Failed processing Polar event ${eventId}: ${message}`);
       throw error;
     }
@@ -161,10 +185,16 @@ export class PaymentService {
       subscription.currentPeriodEnd > now;
 
     if (isActivePaid) {
-      const paidTier = await this.tierModel.findById(subscription.tierId).lean();
+      const paidTier = await this.tierModel
+        .findById(subscription.tierId)
+        .lean();
       return {
         tier: paidTier
-          ? { id: paidTier._id.toString(), name: paidTier.name, isDefault: paidTier.isDefault }
+          ? {
+              id: paidTier._id.toString(),
+              name: paidTier.name,
+              isDefault: paidTier.isDefault,
+            }
           : null,
         billingInterval: subscription.billingInterval,
         nextRenewalDate: subscription.currentPeriodEnd,
@@ -172,7 +202,9 @@ export class PaymentService {
       };
     }
 
-    const defaultTier = await this.tierModel.findOne({ isDefault: true, isActive: true }).lean();
+    const defaultTier = await this.tierModel
+      .findOne({ isDefault: true, isActive: true })
+      .lean();
     if (!defaultTier) {
       throw new NotFoundException('Default tier not configured');
     }
@@ -221,19 +253,13 @@ export class PaymentService {
     const data = payload.data ?? {};
     const metadata = (data.metadata ?? {}) as Record<string, any>;
 
-    const userId = this.readString([
-      metadata.userId,
-      metadata.user_id,
-    ]);
+    const userId = this.readString([metadata.userId, metadata.user_id]);
 
     if (!userId) {
       throw new BadRequestException('Webhook payload missing userId metadata');
     }
 
-    const customerId = this.readString([
-      data.customer_id,
-      data.customerId,
-    ]);
+    const customerId = this.readString([data.customer_id, data.customerId]);
 
     if (customerId) {
       await this.billingCustomerModel.findOneAndUpdate(
@@ -247,10 +273,7 @@ export class PaymentService {
       );
     }
 
-    const priceId = this.readString([
-      data.product_id,
-      data.productId,
-    ]);
+    const priceId = this.readString([data.product_id, data.productId]);
 
     const tierAndInterval = await this.resolveTierAndIntervalByPriceId(priceId);
     const existingSubscription = await this.subscriptionModel
@@ -259,9 +282,13 @@ export class PaymentService {
 
     const tierId =
       tierAndInterval?.tierId ??
-      (existingSubscription?.tierId ? existingSubscription.tierId.toString() : null);
+      (existingSubscription?.tierId
+        ? existingSubscription.tierId.toString()
+        : null);
     const billingInterval =
-      tierAndInterval?.billingInterval ?? existingSubscription?.billingInterval ?? null;
+      tierAndInterval?.billingInterval ??
+      existingSubscription?.billingInterval ??
+      null;
 
     if (!tierId || !billingInterval) {
       throw new BadRequestException('Unable to map Polar price to tier');
@@ -312,7 +339,9 @@ export class PaymentService {
     );
   }
 
-  private async resolveTierAndIntervalByPriceId(priceId: string | null): Promise<{
+  private async resolveTierAndIntervalByPriceId(
+    priceId: string | null,
+  ): Promise<{
     tierId: string;
     billingInterval: BillingInterval;
   } | null> {
@@ -320,16 +349,25 @@ export class PaymentService {
 
     const tier = await this.tierModel
       .findOne({
-        $or: [{ polarMonthlyPriceId: priceId }, { polarYearlyPriceId: priceId }],
+        $or: [
+          { polarMonthlyPriceId: priceId },
+          { polarYearlyPriceId: priceId },
+        ],
       })
       .lean();
     if (!tier) return null;
 
     if (tier.polarMonthlyPriceId === priceId) {
-      return { tierId: tier._id.toString(), billingInterval: BillingInterval.MONTHLY };
+      return {
+        tierId: tier._id.toString(),
+        billingInterval: BillingInterval.MONTHLY,
+      };
     }
 
-    return { tierId: tier._id.toString(), billingInterval: BillingInterval.YEARLY };
+    return {
+      tierId: tier._id.toString(),
+      billingInterval: BillingInterval.YEARLY,
+    };
   }
 
   private mapPolarStatus(status: string | null): SubscriptionStatus {
@@ -370,7 +408,10 @@ export class PaymentService {
     return false;
   }
 
-  private async storeWebhookTypeIfNew(key: string, eventType: string): Promise<boolean> {
+  private async storeWebhookTypeIfNew(
+    key: string,
+    eventType: string,
+  ): Promise<boolean> {
     const client = this.redisService.getClient();
     const response = await client.set(
       key,

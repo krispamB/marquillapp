@@ -24,4 +24,4 @@ import { EncryptionModule } from '../encryption/encryption.module';
   controllers: [AuthController],
   providers: [AuthService, GoogleStrategy, JwtStrategy],
 })
-export class AuthModule { }
+export class AuthModule {}
