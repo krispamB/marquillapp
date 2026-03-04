@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, ObjectId, Types } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { AccountProvider, ConnectedAccount, User, Tier } from '../database/schemas';
 import { ConfigService } from '@nestjs/config';
 import { apiFetch } from 'src/common/HelperFn';

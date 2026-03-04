@@ -11,12 +11,11 @@ export class PolarClient {
   private readonly accessToken: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.accessToken = this.configService.get<string>('POLAR_ACCESS_TOKEN') ?? '';
-    const serverURL = this.configService.get<string>('POLAR_API_BASE_URL');
+    this.accessToken = this.configService.getOrThrow<string>('POLAR_ACCESS_TOKEN') ?? '';
 
     this.client = new Polar({
       accessToken: this.accessToken || undefined,
-      serverURL: serverURL || undefined,
+      server: this.configService.get<'production' | 'sandbox'>('POLAR_MODE'),
     });
   }
 
@@ -30,15 +29,14 @@ export class PolarClient {
       throw new InternalServerErrorException('POLAR_ACCESS_TOKEN is not configured');
     }
 
-    return this.client.checkoutLinks.create({
-      productPriceId: input.priceId,
-      paymentProcessor: 'stripe',
+    return this.client.checkouts.create({
+      products: [input.priceId],
       successUrl: input.successUrl,
-      returnUrl: input.cancelUrl,
       metadata: {
         userId: input.userId,
       },
-    });
+      }
+    );
   }
 
   async listInvoices(input: { customerEmail?: string }) {

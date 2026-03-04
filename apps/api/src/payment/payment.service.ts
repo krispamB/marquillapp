@@ -46,31 +46,19 @@ export class PaymentService {
     private readonly redisService: RedisService,
   ) {}
 
-  async createCheckoutSession(userId: string, billingInterval: BillingInterval) {
+  async createCheckoutSession(userId: string, tierId: string, billingInterval: BillingInterval) {
     const userObjectId = new Types.ObjectId(userId);
     const user = await this.userModel.findById(userObjectId).lean();
     if (!user) throw new NotFoundException('User not found');
 
-    const activeSubscription = await this.subscriptionModel
-      .findOne({ userId: userObjectId })
-      .sort({ updatedAt: -1 })
-      .lean();
-
-    let targetTier: Tier | null = null;
-    if (
-      activeSubscription &&
-      activeSubscription.status === SubscriptionStatus.ACTIVE &&
-      activeSubscription.currentPeriodEnd > new Date()
-    ) {
-      targetTier = await this.tierModel.findById(activeSubscription.tierId).lean();
-    }
+    const targetTier = await this.tierModel.findById(new Types.ObjectId(tierId)).lean();
 
     if (!targetTier) {
-      targetTier = await this.tierModel.findOne({ isDefault: true, isActive: true }).lean();
+      throw new NotFoundException('Tier not found');
     }
 
-    if (!targetTier) {
-      throw new NotFoundException('No available tier found for checkout');
+    if (!targetTier.isActive) {
+      throw new BadRequestException(`Tier "${targetTier.name}" is not active`);
     }
 
     const priceId =
@@ -101,7 +89,7 @@ export class PaymentService {
     });
 
     return {
-      checkout,
+      url: checkout.url,
       tier: {
         id: targetTier._id.toString(),
         name: targetTier.name,
@@ -231,14 +219,11 @@ export class PaymentService {
 
   private async syncSubscriptionFromEvent(payload: PolarWebhookPayload) {
     const data = payload.data ?? {};
-    const subscription = (data.subscription ?? payload.subscription ?? data) as Record<string, any>;
-    const metadata = (subscription.metadata ?? data.metadata ?? {}) as Record<string, any>;
+    const metadata = (data.metadata ?? {}) as Record<string, any>;
 
     const userId = this.readString([
       metadata.userId,
       metadata.user_id,
-      subscription.user_id,
-      data.user_id,
     ]);
 
     if (!userId) {
@@ -246,7 +231,6 @@ export class PaymentService {
     }
 
     const customerId = this.readString([
-      subscription.customer_id,
       data.customer_id,
       data.customerId,
     ]);
@@ -264,11 +248,8 @@ export class PaymentService {
     }
 
     const priceId = this.readString([
-      subscription.price_id,
-      subscription.priceId,
-      subscription.product_price_id,
-      data.price_id,
-      data.priceId,
+      data.product_id,
+      data.productId,
     ]);
 
     const tierAndInterval = await this.resolveTierAndIntervalByPriceId(priceId);
@@ -287,36 +268,30 @@ export class PaymentService {
     }
 
     const periodStartRaw = this.readString([
-      subscription.current_period_start,
-      subscription.currentPeriodStart,
       data.current_period_start,
       data.currentPeriodStart,
     ]);
     const periodEndRaw = this.readString([
-      subscription.current_period_end,
-      subscription.currentPeriodEnd,
       data.current_period_end,
       data.currentPeriodEnd,
     ]);
 
-    const currentPeriodStart = periodStartRaw ? new Date(periodStartRaw) : new Date();
+    const currentPeriodStart = periodStartRaw
+      ? new Date(periodStartRaw)
+      : new Date();
     const currentPeriodEnd = periodEndRaw
       ? new Date(periodEndRaw)
       : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
     const status = this.mapPolarStatus(
-      this.readString([subscription.status, data.status, payload.type]),
+      this.readString([data.status, payload.type]),
     );
     const cancelAtPeriodEnd = this.readBoolean([
-      subscription.cancel_at_period_end,
-      subscription.cancelAtPeriodEnd,
       data.cancel_at_period_end,
       data.cancelAtPeriodEnd,
     ]);
 
     const polarSubscriptionId = this.readString([
-      subscription.id,
-      subscription.subscription_id,
       data.subscription_id,
       data.id,
     ]);
