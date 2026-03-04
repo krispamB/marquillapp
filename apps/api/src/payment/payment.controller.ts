@@ -13,7 +13,11 @@ export class PaymentController {
   @Post('checkout')
   @HttpCode(HttpStatus.OK)
   async createCheckout(@GetUser() user: User, @Body() dto: CreateCheckoutDto) {
-    return this.paymentService.createCheckoutSession(user._id.toString(), dto.billingInterval);
+    return this.paymentService.createCheckoutSession(
+      user._id.toString(),
+      dto.tierId,
+      dto.billingInterval,
+    );
   }
 
   @Get('subscription')

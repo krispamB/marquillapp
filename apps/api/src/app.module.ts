@@ -22,11 +22,13 @@ import { EncryptionModule } from './encryption/encryption.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { PaymentModule } from './payment/payment.module';
 import { YoutubeTranscriptModule } from './youtube-transcript';
+import { TierModule } from './tier/tier.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     SubscriptionModule,
+    TierModule,
     PaymentModule,
     AgentModule,
     LlmModule,
