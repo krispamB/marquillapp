@@ -1,8 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
-import { ChevronDown, ChevronLeft, Settings } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { ChevronDown, ChevronLeft, Settings, LogOut, Zap } from "lucide-react";
 import {
   Card,
   ConnectProviderMenu,
@@ -67,6 +67,45 @@ export default function Sidebar({
   onSelectAccount?: (accountId: string) => void;
 }) {
   const [accountsExpanded, setAccountsExpanded] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isDefaultTier, setIsDefaultTier] = useState(true);
+  const settingsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
+    fetch(`${apiBase}/payment/subscription`, { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch subscription tier");
+        return res.json();
+      })
+      .then((data) => {
+        if (data?.tier?.isDefault !== undefined) {
+          setIsDefaultTier(data.tier.isDefault);
+        }
+      })
+      .catch((err) => console.error("Error fetching subscription tier:", err));
+  }, []);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setIsSettingsOpen(false);
+      }
+    };
+    if (isSettingsOpen) {
+      document.addEventListener("mousedown", handleOutsideClick);
+    }
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [isSettingsOpen]);
+
+  const handleLogout = () => {
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, `=;expires=${new Date(0).toUTCString()};path=/`);
+    });
+    window.location.href = process.env.NEXT_PUPLIC_LANDING || process.env.NEXT_PUBLIC_LANDING || "http://localhost:3001";
+  };
   const selectedAccount = selectedAccountId
     ? accounts.find((account) => account.id === selectedAccountId)
     : null;
@@ -146,14 +185,12 @@ export default function Sidebar({
 
   return (
     <aside
-      className={`hidden md:fixed md:left-0 md:top-0 md:z-30 md:flex md:h-screen ${
-        collapsed ? "md:w-[120px] lg:w-[140px]" : "md:w-[260px] lg:w-[280px]"
-      }`}
+      className={`hidden md:fixed md:left-0 md:top-0 md:z-30 md:flex md:h-screen ${collapsed ? "md:w-[120px] lg:w-[140px]" : "md:w-[260px] lg:w-[280px]"
+        }`}
     >
       <Card
-        className={`flex h-full w-full flex-col gap-6 overflow-y-auto rounded-none p-5 ${
-          collapsed ? "items-center px-3" : ""
-        }`}
+        className={`flex h-full w-full flex-col gap-6 overflow-y-auto rounded-none p-5 ${collapsed ? "items-center px-3" : ""
+          }`}
       >
         <div className="flex w-full items-center justify-between">
           <div className={`${collapsed ? "w-full" : ""}`}>
@@ -174,9 +211,8 @@ export default function Sidebar({
               type="button"
             >
               <ChevronLeft
-                className={`h-4 w-4 transition ${
-                  collapsed ? "rotate-180" : ""
-                }`}
+                className={`h-4 w-4 transition ${collapsed ? "rotate-180" : ""
+                  }`}
               />
             </button>
           ) : null}
@@ -261,11 +297,10 @@ export default function Sidebar({
                     }
                     return (
                       <p
-                        className={`mt-1 text-[11px] font-semibold ${
-                          expiry.isDanger
-                            ? "text-rose-500"
-                            : "text-[var(--color-text-secondary)]"
-                        }`}
+                        className={`mt-1 text-[11px] font-semibold ${expiry.isDanger
+                          ? "text-rose-500"
+                          : "text-[var(--color-text-secondary)]"
+                          }`}
                       >
                         {expiry.label}
                       </p>
@@ -274,9 +309,8 @@ export default function Sidebar({
                 </div>
               </div>
               <ChevronDown
-                className={`h-4 w-4 text-[var(--color-text-secondary)] transition ${
-                  accountsExpanded ? "rotate-180" : ""
-                }`}
+                className={`h-4 w-4 text-[var(--color-text-secondary)] transition ${accountsExpanded ? "rotate-180" : ""
+                  }`}
               />
             </button>
 
@@ -298,11 +332,10 @@ export default function Sidebar({
                           onSelectAccount?.(account.id);
                         }
                       }}
-                      className={`flex items-center justify-between rounded-2xl border px-3 py-2 transition ${
-                        primaryAccount.id === account.id
-                          ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10"
-                          : "border-[var(--color-border)] bg-white/80 hover:border-[var(--color-primary)]/45"
-                      }`}
+                      className={`flex items-center justify-between rounded-2xl border px-3 py-2 transition ${primaryAccount.id === account.id
+                        ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10"
+                        : "border-[var(--color-border)] bg-white/80 hover:border-[var(--color-primary)]/45"
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         {accountAvatarWithProviderBadge({
@@ -333,11 +366,10 @@ export default function Sidebar({
                             }
                             return (
                               <p
-                                className={`text-[11px] font-semibold ${
-                                  expiry.isDanger
-                                    ? "text-rose-500"
-                                    : "text-[var(--color-text-secondary)]"
-                                }`}
+                                className={`text-[11px] font-semibold ${expiry.isDanger
+                                  ? "text-rose-500"
+                                  : "text-[var(--color-text-secondary)]"
+                                  }`}
                               >
                                 {expiry.label}
                               </p>
@@ -375,15 +407,63 @@ export default function Sidebar({
           </div>
         ) : null}
 
-        <div className="mt-auto w-full">
+        <div className={`mt-auto w-full flex ${collapsed ? "flex-col items-center gap-3" : "gap-3"}`}>
           {collapsed ? (
-            <button className="grid h-12 w-12 place-items-center rounded-2xl bg-white/80 text-[var(--color-text-secondary)] shadow-[0_14px_30px_-24px_rgba(15,23,42,0.4)] transition hover:text-[var(--color-primary)]">
-              <Settings className="h-4 w-4" />
-            </button>
+            <>
+              {isDefaultTier && (
+                <button className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-accent)] text-white shadow-[0_14px_30px_-24px_rgba(15,23,42,0.4)] transition hover:-translate-y-0.5">
+                  <Zap className="h-4 w-4" />
+                </button>
+              )}
+              <div className="relative" ref={settingsRef}>
+                <button
+                  onClick={() => setIsSettingsOpen((prev) => !prev)}
+                  className="grid h-12 w-12 place-items-center rounded-2xl bg-white/80 text-[var(--color-text-secondary)] shadow-[0_14px_30px_-24px_rgba(15,23,42,0.4)] transition hover:text-[var(--color-primary)]"
+                >
+                  <Settings className="h-4 w-4" />
+                </button>
+                {isSettingsOpen && (
+                  <div className="absolute bottom-0 left-16 z-50 w-40 rounded-2xl border border-[var(--color-border)] bg-white p-2 shadow-[0_24px_60px_-50px_rgba(15,23,42,0.35)]">
+                    <button
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-[var(--color-text-primary)] transition-colors hover:bg-rose-50 hover:text-rose-600"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
           ) : (
-            <PillButton variant="secondary" icon={<Settings className="h-4 w-4" />}>
-              Settings
-            </PillButton>
+            <>
+              {isDefaultTier && (
+                <button className="flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-white shadow-[0_18px_40px_-26px_rgba(91,92,246,0.55)] transition active:scale-[0.98] hover:-translate-y-0.5">
+                  Upgrade
+                </button>
+              )}
+              <div className="relative flex-1" ref={settingsRef}>
+                <PillButton
+                  variant="secondary"
+                  icon={<Settings className="h-4 w-4" />}
+                  className="w-full justify-center"
+                  onClick={() => setIsSettingsOpen((prev) => !prev)}
+                >
+                  Settings
+                </PillButton>
+                {isSettingsOpen && (
+                  <div className="absolute bottom-12 left-0 z-50 w-full rounded-2xl border border-[var(--color-border)] bg-white p-2 shadow-[0_24px_60px_-50px_rgba(15,23,42,0.35)]">
+                    <button
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-[var(--color-text-primary)] transition-colors hover:bg-rose-50 hover:text-rose-600"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       </Card>
