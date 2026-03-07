@@ -24,6 +24,16 @@ import { EncryptionService } from 'src/encryption/encryption.service';
 import { ILinkedInPost } from './post.interface';
 import { formatLinkedinContent } from 'src/common/HelperFn';
 
+interface PostFilters {
+  availableMonths: string[];
+  connectedAccountIds: string[];
+}
+
+export interface GetPostsResult {
+  data: PostDraft[];
+  filters: PostFilters;
+}
+
 @Injectable()
 export class PostService {
   private readonly logger = new Logger(PostService.name);
@@ -70,7 +80,7 @@ export class PostService {
     accountConnected?: string,
     status?: string,
     month?: string,
-  ) {
+  ): Promise<GetPostsResult> {
     const filter: any = { user: user._id };
 
     if (accountConnected) {
@@ -90,11 +100,60 @@ export class PostService {
       }
     }
 
-    return this.postDraftModel
+    const postsQuery = this.postDraftModel
       .find(filter)
       .select('-userIntent')
       .sort({ createdAt: -1 })
       .exec();
+
+    const availableMonthsQuery = this.postDraftModel.aggregate<{
+      month: string;
+    }>([
+      {
+        $match: {
+          user: user._id,
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: '%Y-%m',
+              date: '$createdAt',
+            },
+          },
+        },
+      },
+      {
+        $sort: { _id: -1 },
+      },
+      {
+        $project: {
+          _id: 0,
+          month: '$_id',
+        },
+      },
+    ]);
+
+    const connectedAccountIdsQuery = this.postDraftModel.distinct(
+      'connectedAccount',
+      { user: user._id },
+    );
+
+    const [posts, availableMonthsResult, connectedAccountIds] =
+      await Promise.all([
+        postsQuery,
+        availableMonthsQuery,
+        connectedAccountIdsQuery,
+      ]);
+
+    return {
+      data: posts,
+      filters: {
+        availableMonths: availableMonthsResult.map((item) => item.month),
+        connectedAccountIds: connectedAccountIds.map((id) => id.toString()),
+      },
+    };
   }
 
   async updateContent(user: User, postId: string, dto: UpdatePostDto) {

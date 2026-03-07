@@ -22,6 +22,7 @@ import { IAppResponse } from 'src/common/interfaces';
 import { GetUser } from 'src/common/decorators';
 import { User } from 'src/database/schemas';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { GetPostsResult } from './post.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('posts')
@@ -100,15 +101,18 @@ export class PostController {
     @Query('status') status?: string,
     @Query('month') month?: string,
   ): Promise<IAppResponse> {
+    const result: GetPostsResult = await this.postService.getPosts(
+      user,
+      accountConnected,
+      status,
+      month,
+    );
+
     return {
       statusCode: HttpStatus.OK,
       message: 'Posts retrieved successfully',
-      data: await this.postService.getPosts(
-        user,
-        accountConnected,
-        status,
-        month,
-      ),
+      data: result.data,
+      filters: result.filters,
     };
   }
 
