@@ -2,7 +2,8 @@
 
 import type { ReactNode } from "react";
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, ChevronLeft, Settings, LogOut, Zap } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, ChevronLeft, Settings, LogOut, Zap, Sparkles, CreditCard } from "lucide-react";
 import {
   Card,
   ConnectProviderMenu,
@@ -50,6 +51,7 @@ export default function Sidebar({
   onToggleConnectMenu,
   onConnectLinkedIn,
   onSelectAccount,
+  onSubscriptionLoaded,
 }: {
   user: SidebarUser;
   items: SidebarItem[];
@@ -65,11 +67,14 @@ export default function Sidebar({
   onToggleConnectMenu?: () => void;
   onConnectLinkedIn?: () => void;
   onSelectAccount?: (accountId: string) => void;
+  onSubscriptionLoaded?: (data: { tier?: { id: string; name: string; isDefault?: boolean } | null }) => void;
 }) {
   const [accountsExpanded, setAccountsExpanded] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDefaultTier, setIsDefaultTier] = useState(true);
+  const [tierName, setTierName] = useState("Free plan");
   const settingsRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
@@ -79,18 +84,30 @@ export default function Sidebar({
         return res.json();
       })
       .then((data) => {
+        if (onSubscriptionLoaded) {
+          onSubscriptionLoaded(data);
+        }
+        if (data?.tier?.name) {
+          setTierName(`${data.tier.name} plan`);
+        }
         if (data?.tier?.isDefault !== undefined) {
           setIsDefaultTier(data.tier.isDefault);
         }
       })
       .catch((err) => console.error("Error fetching subscription tier:", err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
-      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
-        setIsSettingsOpen(false);
+      const target = event.target as Node;
+      if (
+        (settingsRef.current && settingsRef.current.contains(target)) ||
+        (popoverRef.current && popoverRef.current.contains(target))
+      ) {
+        return;
       }
+      setIsSettingsOpen(false);
     };
     if (isSettingsOpen) {
       document.addEventListener("mousedown", handleOutsideClick);
@@ -218,24 +235,6 @@ export default function Sidebar({
           ) : null}
         </div>
 
-        <div className={`flex w-full items-center gap-4 ${collapsed ? "flex-col" : ""}`}>
-          <UserAvatar
-            initials={user.initials}
-            avatarUrl={user.avatar}
-            sizeClass="h-12 w-12"
-            textClass="text-base"
-          />
-          {collapsed ? null : (
-            <div>
-              <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                {user.name}
-              </p>
-              <p className="text-xs text-[var(--color-text-secondary)]">
-                {user.email}
-              </p>
-            </div>
-          )}
-        </div>
 
         <div className="flex w-full flex-col gap-2">
           {collapsed ? null : (
@@ -407,66 +406,89 @@ export default function Sidebar({
           </div>
         ) : null}
 
-        <div className={`mt-auto w-full flex ${collapsed ? "flex-col items-center gap-3" : "gap-3"}`}>
-          {collapsed ? (
-            <>
-              {isDefaultTier && (
-                <button className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-accent)] text-white shadow-[0_14px_30px_-24px_rgba(15,23,42,0.4)] transition hover:-translate-y-0.5">
-                  <Zap className="h-4 w-4" />
-                </button>
+        <div className="mt-auto w-full relative" ref={settingsRef}>
+          <button
+            onClick={() => setIsSettingsOpen((prev) => !prev)}
+            className={`flex items-center ${collapsed ? "justify-center w-12 h-12 mx-auto p-0 rounded-full" : "w-full justify-between gap-2 p-2 px-3 rounded-[26px]"} border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] transition hover:bg-gray-50`}
+          >
+            <div className={`flex items-center ${collapsed ? "justify-center" : "gap-3"}`}>
+              <UserAvatar
+                initials={user.initials}
+                avatarUrl={user.avatar}
+                sizeClass={collapsed ? "h-11 w-11" : "h-[38px] w-[38px]"}
+                textClass="text-sm bg-blue-100 text-blue-700 font-semibold"
+              />
+              {!collapsed && (
+                <div className="flex flex-col items-start pt-[2px]">
+                  <span className="text-[14px] font-semibold leading-snug line-clamp-1">{user.name}</span>
+                  <span className="text-[12px] text-[var(--color-text-secondary)] leading-snug capitalize truncate">{tierName}</span>
+                </div>
               )}
-              <div className="relative" ref={settingsRef}>
-                <button
-                  onClick={() => setIsSettingsOpen((prev) => !prev)}
-                  className="grid h-12 w-12 place-items-center rounded-2xl bg-white/80 text-[var(--color-text-secondary)] shadow-[0_14px_30px_-24px_rgba(15,23,42,0.4)] transition hover:text-[var(--color-primary)]"
-                >
-                  <Settings className="h-4 w-4" />
-                </button>
-                {isSettingsOpen && (
-                  <div className="absolute bottom-0 left-16 z-50 w-40 rounded-2xl border border-[var(--color-border)] bg-white p-2 shadow-[0_24px_60px_-50px_rgba(15,23,42,0.35)]">
-                    <button
-                      onClick={handleLogout}
-                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-[var(--color-text-primary)] transition-colors hover:bg-rose-50 hover:text-rose-600"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Logout
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>
-          ) : (
-            <>
-              {isDefaultTier && (
-                <button className="flex flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-white shadow-[0_18px_40px_-26px_rgba(91,92,246,0.55)] transition active:scale-[0.98] hover:-translate-y-0.5">
-                  Upgrade
-                </button>
-              )}
-              <div className="relative flex-1" ref={settingsRef}>
-                <PillButton
-                  variant="secondary"
-                  icon={<Settings className="h-4 w-4" />}
-                  className="w-full justify-center"
-                  onClick={() => setIsSettingsOpen((prev) => !prev)}
-                >
-                  Settings
-                </PillButton>
-                {isSettingsOpen && (
-                  <div className="absolute bottom-12 left-0 z-50 w-full rounded-2xl border border-[var(--color-border)] bg-white p-2 shadow-[0_24px_60px_-50px_rgba(15,23,42,0.35)]">
-                    <button
-                      onClick={handleLogout}
-                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-[var(--color-text-primary)] transition-colors hover:bg-rose-50 hover:text-rose-600"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Logout
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
+            </div>
+            {!collapsed && isDefaultTier && (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.location.href = '/pricing';
+                }}
+                className="rounded-[18px] border border-[var(--color-border)] bg-white px-[14px] py-[6px] text-[13px] font-medium text-[var(--color-text-primary)] shadow-sm transition hover:bg-gray-50 shrink-0"
+              >
+                Upgrade
+              </span>
+            )}
+          </button>
         </div>
       </Card>
+
+      {isSettingsOpen && (
+        <div
+          ref={popoverRef}
+          className={`
+            absolute z-[99] rounded-[24px] border border-[var(--color-border)] bg-white p-2.5 shadow-[0_24px_60px_-50px_rgba(15,23,42,0.35)] text-[var(--color-text-primary)]
+            ${collapsed ? "bottom-5 left-[calc(100%+8px)] w-[260px]" : "bottom-[84px] left-5 w-[calc(100%-40px)]"} 
+          `}
+        >
+          <div className="flex items-center gap-3 p-2 mb-1">
+            <UserAvatar
+              initials={user.initials}
+              avatarUrl={user.avatar}
+              sizeClass="h-10 w-10 border border-[var(--color-border)] min-w-[40px]"
+              textClass="text-sm bg-blue-100 text-blue-700 font-semibold"
+            />
+            <div className="flex flex-col min-w-0">
+              <span className="text-[15px] font-semibold text-[var(--color-text-primary)] leading-tight truncate">{user.name}</span>
+              <span className="text-[13px] text-[var(--color-text-secondary)] leading-tight truncate">
+                {user.email ? `@${user.email.split('@')[0]}` : `@${user.name.toLowerCase().replace(/\s+/g, '')}`}
+              </span>
+            </div>
+          </div>
+          <div className="mx-2 h-[1px] bg-gray-100 my-1"></div>
+          <div className="flex flex-col gap-0.5 mt-1.5">
+            <Link href="/pricing" className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-colors hover:bg-gray-50 text-[var(--color-text-primary)]" onClick={() => setIsSettingsOpen(false)}>
+              <Sparkles className="h-[18px] w-[18px] text-[var(--color-text-secondary)] shrink-0" />
+              Upgrade plan
+            </Link>
+            <Link href="/billing" className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-colors hover:bg-gray-50 text-[var(--color-text-primary)]" onClick={() => setIsSettingsOpen(false)}>
+              <CreditCard className="h-[18px] w-[18px] text-[var(--color-text-secondary)] shrink-0" />
+              Billing
+            </Link>
+            <button className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-colors hover:bg-gray-50 text-[var(--color-text-primary)]" onClick={() => { setIsSettingsOpen(false); }}>
+              <Settings className="h-[18px] w-[18px] text-[var(--color-text-secondary)] shrink-0" />
+              Settings
+            </button>
+          </div>
+          <div className="mx-2 h-[1px] bg-gray-100 my-1.5"></div>
+          <div className="mb-0.5 mt-0.5">
+            <button
+              onClick={handleLogout}
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-colors hover:bg-rose-50 text-[var(--color-text-primary)] hover:text-rose-600"
+            >
+              <LogOut className="h-[18px] w-[18px] text-rose-500 shrink-0" />
+              Log out
+            </button>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }
