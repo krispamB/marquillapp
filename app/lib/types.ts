@@ -107,6 +107,10 @@ export type DashboardPostsResponse = {
   statusCode?: number;
   message?: string;
   data?: DashboardPost[];
+  filters?: {
+    availableMonths?: string[];
+    connectedAccountIds?: string[];
+  };
 };
 
 export type PostStatus = "DRAFT" | "SCHEDULED" | "PUBLISHED";

@@ -106,16 +106,16 @@ export default function BillingClient({
     };
 
     const activeId = activePlan?.id ?? user?.tier?._id;
-    let tierMatch = tiers.find((t: Tier) => t._id === activeId);
-    if (!tierMatch && tiers.length > 0) {
-        tierMatch = tiers.find((t: Tier) => t.isDefault);
-    }
+    const tierMatch = tiers.find((t: Tier) => t._id === activeId) ||
+        tiers.find((t: Tier) => t.isDefault);
+
     const defaultFeatures = [
         "Connect up to 1 LinkedIn account",
         "Generate AI posts instantly",
         "Basic post analytics",
     ];
-    const activePlanFeatures = tierMatch?.metadata?.features ?? defaultFeatures;
+    // @ts-ignore - metadata.features is present in API response but absent from TierMetadata type
+    const activePlanFeatures = (tierMatch?.metadata as any)?.features ?? defaultFeatures;
     const planName = activePlan?.name ?? tierMatch?.name ?? user?.tier?.name ?? "Free";
 
     return (
@@ -198,7 +198,7 @@ export default function BillingClient({
                                                 {activePlanFeatures.length > 0 && (
                                                     <div className="mt-4">
                                                         <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                            {activePlanFeatures.map((feature, i) => (
+                                                            {activePlanFeatures.map((feature: string, i: number) => (
                                                                 <li key={i} className="flex items-start gap-3 text-[15px] font-medium text-[var(--color-text-secondary)]">
                                                                     <span className="flex mt-0.5 h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
                                                                         <Check className="h-3 w-3 stroke-[3]" />

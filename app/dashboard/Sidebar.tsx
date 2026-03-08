@@ -409,19 +409,19 @@ export default function Sidebar({
         <div className="mt-auto w-full relative" ref={settingsRef}>
           <button
             onClick={() => setIsSettingsOpen((prev) => !prev)}
-            className={`flex items-center ${collapsed ? "justify-center w-12 h-12 mx-auto p-0 rounded-full" : "w-full justify-between gap-2 p-2 px-3 rounded-[26px]"} border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] transition hover:bg-gray-50`}
+            className={`flex items-center ${collapsed ? "justify-center w-[46px] h-[46px] mx-auto p-0 rounded-full" : "w-full justify-between gap-1.5 p-1.5 pl-2 pr-3 rounded-[32px]"} border border-[var(--color-border)] bg-white text-[var(--color-text-primary)] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] transition hover:bg-gray-50`}
           >
-            <div className={`flex items-center ${collapsed ? "justify-center" : "gap-3"}`}>
+            <div className={`flex items-center min-w-0 ${collapsed ? "justify-center" : "gap-2"}`}>
               <UserAvatar
                 initials={user.initials}
                 avatarUrl={user.avatar}
-                sizeClass={collapsed ? "h-11 w-11" : "h-[38px] w-[38px]"}
-                textClass="text-sm bg-blue-100 text-blue-700 font-semibold"
+                sizeClass={collapsed ? "h-10 w-10 shrink-0" : "h-8 w-8 shrink-0"}
+                textClass="text-[12px] bg-blue-100 text-blue-700 font-semibold"
               />
               {!collapsed && (
-                <div className="flex flex-col items-start pt-[2px]">
-                  <span className="text-[14px] font-semibold leading-snug line-clamp-1">{user.name}</span>
-                  <span className="text-[12px] text-[var(--color-text-secondary)] leading-snug capitalize truncate">{tierName}</span>
+                <div className="flex flex-col items-start text-left min-w-0 py-0.5">
+                  <span className="text-[13px] font-medium leading-tight truncate w-full">{user.name}</span>
+                  <span className="text-[11px] text-[var(--color-text-secondary)] leading-tight capitalize truncate w-full">{tierName.replace(' plan', '')}</span>
                 </div>
               )}
             </div>
@@ -431,7 +431,7 @@ export default function Sidebar({
                   e.stopPropagation();
                   window.location.href = '/pricing';
                 }}
-                className="rounded-[18px] border border-[var(--color-border)] bg-white px-[14px] py-[6px] text-[13px] font-medium text-[var(--color-text-primary)] shadow-sm transition hover:bg-gray-50 shrink-0"
+                className="rounded-full border border-[var(--color-border)] bg-white px-2.5 py-1 text-[11px] font-medium text-[var(--color-text-primary)] shadow-sm transition hover:bg-gray-50 shrink-0"
               >
                 Upgrade
               </span>
@@ -488,7 +488,8 @@ export default function Sidebar({
             </button>
           </div>
         </div>
-      )}
-    </aside>
+      )
+      }
+    </aside >
   );
 }
