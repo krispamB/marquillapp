@@ -23,6 +23,7 @@ import { apiFetch } from 'src/common/HelperFn/apiFetch.helper';
 import { EncryptionService } from 'src/encryption/encryption.service';
 import { ILinkedInPost } from './post.interface';
 import { formatLinkedinContent } from 'src/common/HelperFn';
+import { FeatureGatingService } from '../feature-gating/feature-gating.service';
 
 interface PostFilters {
   availableMonths: string[];
@@ -47,9 +48,12 @@ export class PostService {
     @InjectModel(ConnectedAccount.name)
     private readonly connectedAccountModel: Model<ConnectedAccount>,
     private readonly encryptionService: EncryptionService,
+    private readonly featureGatingService: FeatureGatingService,
   ) {}
 
   async createDraft(user: User, accountId: string, dto: InputDto) {
+    await this.featureGatingService.assertAiDraftQuota(user._id.toString());
+
     const draft = new this.postDraftModel({
       user,
       connectedAccount: new Types.ObjectId(accountId),
@@ -64,6 +68,7 @@ export class PostService {
       workflowName: dto.contentType,
       input: dto,
     });
+    await this.featureGatingService.incrementAiDraftUsage(user._id.toString());
 
     return workflowId;
   }

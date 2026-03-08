@@ -4,15 +4,13 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
 import { Request } from 'express';
-import { Model, Types } from 'mongoose';
 import {
-  Subscription,
   SubscriptionStatus,
-  Tier,
-  User,
-} from '../../database/schemas';
+} from '../../database/schemas/subscription.schema';
+import { Tier } from '../../database/schemas/tier.schema';
+import { User } from '../../database/schemas/user.schema';
+import { FeatureGatingService } from '../../feature-gating/feature-gating.service';
 
 type RequestWithEntitlement = Request & {
   user: User;
@@ -25,12 +23,7 @@ type RequestWithEntitlement = Request & {
 export class SubscriptionAccessGuard implements CanActivate {
   private readonly logger = new Logger(SubscriptionAccessGuard.name);
 
-  constructor(
-    @InjectModel(Subscription.name)
-    private readonly subscriptionModel: Model<Subscription>,
-    @InjectModel(Tier.name)
-    private readonly tierModel: Model<Tier>,
-  ) {}
+  constructor(private readonly featureGatingService: FeatureGatingService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<RequestWithEntitlement>();
@@ -43,42 +36,18 @@ export class SubscriptionAccessGuard implements CanActivate {
       return true;
     }
 
-    const now = new Date();
-    const subscription = await this.subscriptionModel
-      .findOne({ userId: new Types.ObjectId(userId) })
-      .sort({ updatedAt: -1 })
-      .lean();
-
-    if (
-      subscription &&
-      subscription.status === SubscriptionStatus.ACTIVE &&
-      subscription.currentPeriodEnd > now
-    ) {
-      const paidTier = await this.tierModel
-        .findById(subscription.tierId)
-        .lean();
-      if (paidTier) {
-        request.entitlementTier = paidTier as Tier;
-        request.entitlementSource = 'subscription';
-        request.subscriptionStatus = subscription.status;
-        return true;
-      }
-    }
-
-    const defaultTier = await this.tierModel
-      .findOne({ isDefault: true, isActive: true })
-      .lean();
-    if (!defaultTier) {
+    const entitlement = await this.featureGatingService.resolveEntitlement(userId);
+    if (!entitlement.tier) {
       this.logger.warn('Default tier missing during subscription fallback');
       request.entitlementTier = null;
       request.entitlementSource = 'default';
-      request.subscriptionStatus = subscription?.status ?? null;
+      request.subscriptionStatus = entitlement.subscriptionStatus;
       return true;
     }
 
-    request.entitlementTier = defaultTier as Tier;
-    request.entitlementSource = 'default';
-    request.subscriptionStatus = subscription?.status ?? null;
+    request.entitlementTier = entitlement.tier as Tier;
+    request.entitlementSource = entitlement.source;
+    request.subscriptionStatus = entitlement.subscriptionStatus;
     return true;
   }
 }

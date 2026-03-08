@@ -7,11 +7,13 @@ import { AuthController } from './auth.controller';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { EncryptionModule } from '../encryption/encryption.module';
+import { FeatureGatingModule } from '../feature-gating';
 
 @Module({
   imports: [
     PassportModule,
     EncryptionModule,
+    FeatureGatingModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

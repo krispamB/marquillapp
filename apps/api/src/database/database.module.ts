@@ -15,6 +15,8 @@ import {
   SubscriptionSchema,
   BillingCustomer,
   BillingCustomerSchema,
+  Usage,
+  UsageSchema,
 } from './schemas';
 
 @Global()
@@ -34,6 +36,7 @@ import {
       { name: Tier.name, schema: TierSchema },
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: BillingCustomer.name, schema: BillingCustomerSchema },
+      { name: Usage.name, schema: UsageSchema },
     ]),
   ],
   exports: [MongooseModule],

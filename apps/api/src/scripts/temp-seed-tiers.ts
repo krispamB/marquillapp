@@ -17,6 +17,10 @@ type TierSeed = {
   polarYearlyPriceId?: string;
   isDefault: boolean;
   isActive: boolean;
+  limits: {
+    ai_drafts: number;
+    connected_accounts: number;
+  };
   metadata: {
     features: string[];
   };
@@ -31,6 +35,10 @@ const tierSeeds: TierSeed[] = [
     polarYearlyPriceId: undefined,
     isDefault: true,
     isActive: true,
+    limits: {
+      ai_drafts: 2,
+      connected_accounts: 1,
+    },
     metadata: {
       features: [
         '1 connected account',
@@ -47,6 +55,10 @@ const tierSeeds: TierSeed[] = [
     polarYearlyPriceId: undefined,
     isDefault: false,
     isActive: true,
+    limits: {
+      ai_drafts: 10,
+      connected_accounts: 1,
+    },
     metadata: {
       features: [
         '1 connected account',
@@ -63,6 +75,10 @@ const tierSeeds: TierSeed[] = [
     polarYearlyPriceId: undefined,
     isDefault: false,
     isActive: true,
+    limits: {
+      ai_drafts: 30,
+      connected_accounts: 1,
+    },
     metadata: {
       features: [
         '1 connected account',
@@ -79,6 +95,10 @@ const tierSeeds: TierSeed[] = [
     polarYearlyPriceId: undefined,
     isDefault: false,
     isActive: true,
+    limits: {
+      ai_drafts: 350,
+      connected_accounts: 10,
+    },
     metadata: {
       features: [
         '10 connected accounts',

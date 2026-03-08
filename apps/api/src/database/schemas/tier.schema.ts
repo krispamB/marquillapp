@@ -1,6 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
+export type Feature = 'ai_drafts' | 'connected_accounts';
+
 @Schema({ timestamps: true })
 export class Tier extends Document {
   @Prop({ required: true, unique: true })
@@ -23,6 +25,9 @@ export class Tier extends Document {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  @Prop({ type: Object })
+  limits: Record<Feature, number>;
 
   @Prop({ type: Object })
   metadata?: Record<string, any>;
