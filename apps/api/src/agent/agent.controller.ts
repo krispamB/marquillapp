@@ -3,5 +3,5 @@ import { AgentService } from './agent.service';
 
 @Controller('agent')
 export class AgentController {
-  constructor(private readonly agentService: AgentService) { }
+  constructor(private readonly agentService: AgentService) {}
 }

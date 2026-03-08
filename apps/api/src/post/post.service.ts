@@ -23,6 +23,17 @@ import { apiFetch } from 'src/common/HelperFn/apiFetch.helper';
 import { EncryptionService } from 'src/encryption/encryption.service';
 import { ILinkedInPost } from './post.interface';
 import { formatLinkedinContent } from 'src/common/HelperFn';
+import { FeatureGatingService } from '../feature-gating/feature-gating.service';
+
+interface PostFilters {
+  availableMonths: string[];
+  connectedAccountIds: string[];
+}
+
+export interface GetPostsResult {
+  data: PostDraft[];
+  filters: PostFilters;
+}
 
 @Injectable()
 export class PostService {
@@ -37,9 +48,12 @@ export class PostService {
     @InjectModel(ConnectedAccount.name)
     private readonly connectedAccountModel: Model<ConnectedAccount>,
     private readonly encryptionService: EncryptionService,
-  ) { }
+    private readonly featureGatingService: FeatureGatingService,
+  ) {}
 
   async createDraft(user: User, accountId: string, dto: InputDto) {
+    await this.featureGatingService.assertAiDraftQuota(user._id.toString());
+
     const draft = new this.postDraftModel({
       user,
       connectedAccount: new Types.ObjectId(accountId),
@@ -54,6 +68,7 @@ export class PostService {
       workflowName: dto.contentType,
       input: dto,
     });
+    await this.featureGatingService.incrementAiDraftUsage(user._id.toString());
 
     return workflowId;
   }
@@ -70,7 +85,7 @@ export class PostService {
     accountConnected?: string,
     status?: string,
     month?: string,
-  ) {
+  ): Promise<GetPostsResult> {
     const filter: any = { user: user._id };
 
     if (accountConnected) {
@@ -90,7 +105,60 @@ export class PostService {
       }
     }
 
-    return this.postDraftModel.find(filter).select('-userIntent').sort({ createdAt: -1 }).exec();
+    const postsQuery = this.postDraftModel
+      .find(filter)
+      .select('-userIntent')
+      .sort({ createdAt: -1 })
+      .exec();
+
+    const availableMonthsQuery = this.postDraftModel.aggregate<{
+      month: string;
+    }>([
+      {
+        $match: {
+          user: user._id,
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: '%Y-%m',
+              date: '$createdAt',
+            },
+          },
+        },
+      },
+      {
+        $sort: { _id: -1 },
+      },
+      {
+        $project: {
+          _id: 0,
+          month: '$_id',
+        },
+      },
+    ]);
+
+    const connectedAccountIdsQuery = this.postDraftModel.distinct(
+      'connectedAccount',
+      { user: user._id },
+    );
+
+    const [posts, availableMonthsResult, connectedAccountIds] =
+      await Promise.all([
+        postsQuery,
+        availableMonthsQuery,
+        connectedAccountIdsQuery,
+      ]);
+
+    return {
+      data: posts,
+      filters: {
+        availableMonths: availableMonthsResult.map((item) => item.month),
+        connectedAccountIds: connectedAccountIds.map((id) => id.toString()),
+      },
+    };
   }
 
   async updateContent(user: User, postId: string, dto: UpdatePostDto) {
@@ -195,15 +263,15 @@ export class PostService {
     const data: ILinkedInPost = {
       author: `urn:li:person:${connectedAccount.profileMetadata!.sub}`,
       commentary: post.content
-        ? formatLinkedinContent(post.content!)
+        ? formatLinkedinContent(post.content)
         : undefined,
       content: post.media
         ? {
-          media: {
-            id: post.media[0].id,
-            title: post.media[0].title,
-          },
-        }
+            media: {
+              id: post.media[0].id,
+              title: post.media[0].title,
+            },
+          }
         : undefined,
       visibility: 'PUBLIC',
       distribution: {
@@ -374,7 +442,6 @@ export class PostService {
       },
     );
 
-
     return initializeUploadRequest.data.value.image;
   }
 
@@ -410,14 +477,15 @@ export class PostService {
       };
     } catch (error) {
       this.logger.error(error);
-      throw new InternalServerErrorException('Failed to fetch LinkedIn image details');
+      throw new InternalServerErrorException(
+        'Failed to fetch LinkedIn image details',
+      );
     }
   }
 
   async getPostMetrics(user: User, connectedAccountId: string) {
-    const connectedAccount = await this.connectedAccountModel.findById(
-      connectedAccountId,
-    );
+    const connectedAccount =
+      await this.connectedAccountModel.findById(connectedAccountId);
     if (!connectedAccount) {
       throw new NotFoundException('Connected account not found');
     }
@@ -443,32 +511,30 @@ export class PostService {
         $group: {
           _id: {
             $dateToString: {
-              format: "%Y-%m",
-              date: "$createdAt"
-            }
+              format: '%Y-%m',
+              date: '$createdAt',
+            },
           },
-          count: { $sum: 1 }
-        }
+          count: { $sum: 1 },
+        },
       },
       {
-        $sort: { _id: 1 }
+        $sort: { _id: 1 },
       },
       {
         $project: {
           _id: 0,
-          month: "$_id",
-          count: 1
-        }
-      }
+          month: '$_id',
+          count: 1,
+        },
+      },
     ]);
-
 
     const total = metrics.reduce((sum, item) => sum + item.count, 0);
 
     return {
       total,
-      monthly: metrics
+      monthly: metrics,
     };
   }
 }
-

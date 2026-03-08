@@ -43,7 +43,7 @@ export class AgentService {
     if (!apiKey) {
       throw new Error('YOUTUBE_API_KEY is not configured');
     }
-    this.youtube = youtube('v3');
+    this.youtube = youtube({version: 'v3', auth: apiKey});
 
     this.supadata = new Supadata({
       apiKey: this.config.get<string>('SUPADATA_KEY')!,
@@ -117,7 +117,9 @@ export class AgentService {
       const fallbackResponse = await runSearch(fallbackQuery);
       const fallbackItems = fallbackResponse.data.items || [];
       if (fallbackItems.length === 0) {
-        this.logger.warn(`No results found for fallback query: ${fallbackQuery}`);
+        this.logger.warn(
+          `No results found for fallback query: ${fallbackQuery}`,
+        );
         return [];
       }
 
@@ -130,10 +132,12 @@ export class AgentService {
       throw new Error('Failed to search YouTube videos');
     }
   }
-  async searchWithFallbacks(query: string, targetCount: number = 4): Promise<YoutubeSearchResult[]> {
+  async searchWithFallbacks(
+    query: string,
+    targetCount: number = 4,
+  ): Promise<YoutubeSearchResult[]> {
     const seen = new Set<string>();
     const result: YoutubeSearchResult[] = [];
-
 
     const videos = await this.searchYoutube(query, 10);
 
@@ -248,5 +252,4 @@ export class AgentService {
   async updateDraft(draftId: string, draft: Partial<PostDraft>) {
     return this.draftModel.updateOne({ _id: draftId }, draft);
   }
-
 }

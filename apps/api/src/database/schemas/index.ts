@@ -4,3 +4,4 @@ export * from './post-draft.schema';
 export * from './tier.schema';
 export * from './subscription.schema';
 export * from './billing-customer.schema';
+export * from './usage.schema';

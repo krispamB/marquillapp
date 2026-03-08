@@ -32,4 +32,4 @@ import { PaymentWebhookController } from './payment.webhook.controller';
   providers: [PaymentService, PolarClient],
   exports: [PaymentService],
 })
-export class PaymentModule { }
+export class PaymentModule {}

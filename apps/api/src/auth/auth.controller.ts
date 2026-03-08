@@ -31,7 +31,7 @@ export class AuthController {
     res.cookie('access_token', jwt.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', 
+      sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000, // 1 day
     });
     //attach entire user to cookie

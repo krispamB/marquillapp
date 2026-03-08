@@ -1,10 +1,11 @@
 import { CompressionResult, UserIntent } from 'src/agent/agent.interface';
 import { StepHandler } from '../engine/workflow.types';
 
-export const runReasearchStep: StepHandler<
-  string,
-  CompressionResult
-> = async (state, _job, ctx) => {
+export const runReasearchStep: StepHandler<string, CompressionResult> = async (
+  state,
+  _job,
+  ctx,
+) => {
   ctx.logger.log(`Running Research...`);
   const videos = await ctx.agentService.searchWithFallbacks(state.data);
 
@@ -18,7 +19,7 @@ export const runReasearchStep: StepHandler<
     transcripts,
     state.metadata.intent as UserIntent,
   );
-  
+
   if (_job.id) {
     await ctx.agentService.updateDraft(_job.id, {
       compressionResult: insight,

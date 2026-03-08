@@ -2,23 +2,23 @@ import { User } from '../database/schemas/user.schema';
 import { BillingInterval } from '../database/schemas/subscription.schema';
 
 export interface SubscriptionInput {
-    userId: string;
-    tierId: string;
-    billingInterval: BillingInterval;
-    paymentMethodId?: string; // Token from frontend
-    metadata?: Record<string, any>;
+  userId: string;
+  tierId: string;
+  billingInterval: BillingInterval;
+  paymentMethodId?: string; // Token from frontend
+  metadata?: Record<string, any>;
 }
 
 export interface PaymentResult {
-    success: boolean;
-    subscriptionId?: string; // Provider's subscription ID
-    clientSecret?: string; // For frontend confirmation if needed
-    status: string;
-    metadata?: Record<string, any>;
+  success: boolean;
+  subscriptionId?: string; // Provider's subscription ID
+  clientSecret?: string; // For frontend confirmation if needed
+  status: string;
+  metadata?: Record<string, any>;
 }
 
 export interface IPaymentProvider {
-    createCustomer(user: User): Promise<string>; // Returns provider customer ID
-    createSubscription(input: SubscriptionInput): Promise<PaymentResult>;
-    cancelSubscription(subscriptionId: string): Promise<void>;
+  createCustomer(user: User): Promise<string>; // Returns provider customer ID
+  createSubscription(input: SubscriptionInput): Promise<PaymentResult>;
+  cancelSubscription(subscriptionId: string): Promise<void>;
 }

@@ -15,6 +15,8 @@ import {
   SubscriptionSchema,
   BillingCustomer,
   BillingCustomerSchema,
+  Usage,
+  UsageSchema,
 } from './schemas';
 
 @Global()
@@ -34,6 +36,7 @@ import {
       { name: Tier.name, schema: TierSchema },
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: BillingCustomer.name, schema: BillingCustomerSchema },
+      { name: Usage.name, schema: UsageSchema },
     ]),
   ],
   exports: [MongooseModule],
@@ -41,7 +44,7 @@ import {
 export class DatabaseModule implements OnModuleInit {
   private readonly logger = new Logger(DatabaseModule.name);
 
-  constructor(@InjectConnection() private readonly connection: Connection) { }
+  constructor(@InjectConnection() private readonly connection: Connection) {}
 
   onModuleInit() {
     if (this.connection.readyState === 1) {

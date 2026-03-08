@@ -6,10 +6,16 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { AccountProvider, ConnectedAccount, User, Tier } from '../database/schemas';
+import {
+  AccountProvider,
+  ConnectedAccount,
+} from '../database/schemas/connected-account.schema';
+import { User } from '../database/schemas/user.schema';
+import { Tier } from '../database/schemas/tier.schema';
 import { ConfigService } from '@nestjs/config';
 import { apiFetch } from 'src/common/HelperFn';
 import { EncryptionService } from '../encryption/encryption.service';
+import { FeatureGatingService } from '../feature-gating/feature-gating.service';
 
 @Injectable()
 export class AuthService {
@@ -23,7 +29,8 @@ export class AuthService {
     @InjectModel(Tier.name) private tierModel: Model<Tier>,
     private configService: ConfigService,
     private encryptionService: EncryptionService,
-  ) { }
+    private readonly featureGatingService: FeatureGatingService,
+  ) {}
 
   async validateGoogleUser(details: {
     email: string;
@@ -75,10 +82,20 @@ export class AuthService {
 
     const connectedAccount = await this.connectedAccountModel.findOne({
       user: new Types.ObjectId(state),
+      provider: AccountProvider.LINKEDIN,
     });
-    if (connectedAccount && connectedAccount.profileMetadata && connectedAccount.profileMetadata['sub'] != profileMetadata.sub) {
-      return false
+    if (
+      connectedAccount &&
+      connectedAccount.profileMetadata &&
+      connectedAccount.profileMetadata['sub'] != profileMetadata.sub
+    ) {
+      return false;
     }
+
+    await this.featureGatingService.assertConnectedAccountCapacity({
+      userId: state,
+      isReconnect: !!connectedAccount,
+    });
 
     await this.connectedAccountModel.findOneAndUpdate(
       {

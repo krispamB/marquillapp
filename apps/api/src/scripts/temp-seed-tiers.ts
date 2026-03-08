@@ -17,6 +17,10 @@ type TierSeed = {
   polarYearlyPriceId?: string;
   isDefault: boolean;
   isActive: boolean;
+  limits: {
+    ai_drafts: number;
+    connected_accounts: number;
+  };
   metadata: {
     features: string[];
   };
@@ -31,8 +35,16 @@ const tierSeeds: TierSeed[] = [
     polarYearlyPriceId: undefined,
     isDefault: true,
     isActive: true,
+    limits: {
+      ai_drafts: 2,
+      connected_accounts: 1,
+    },
     metadata: {
-      features: ['1 connected account', '2 AI posts per month', '30 day history'],
+      features: [
+        '1 connected account',
+        '2 AI posts per month',
+        '30 day history',
+      ],
     },
   },
   {
@@ -43,8 +55,16 @@ const tierSeeds: TierSeed[] = [
     polarYearlyPriceId: undefined,
     isDefault: false,
     isActive: true,
+    limits: {
+      ai_drafts: 10,
+      connected_accounts: 1,
+    },
     metadata: {
-      features: ['1 connected account', '10 AI posts per month', '90 day history'],
+      features: [
+        '1 connected account',
+        '10 AI posts per month',
+        '90 day history',
+      ],
     },
   },
   {
@@ -55,8 +75,16 @@ const tierSeeds: TierSeed[] = [
     polarYearlyPriceId: undefined,
     isDefault: false,
     isActive: true,
+    limits: {
+      ai_drafts: 30,
+      connected_accounts: 1,
+    },
     metadata: {
-      features: ['1 connected account', '30 AI posts per month', '1 year post history'],
+      features: [
+        '1 connected account',
+        '30 AI posts per month',
+        '1 year post history',
+      ],
     },
   },
   {
@@ -67,8 +95,16 @@ const tierSeeds: TierSeed[] = [
     polarYearlyPriceId: undefined,
     isDefault: false,
     isActive: true,
+    limits: {
+      ai_drafts: 350,
+      connected_accounts: 10,
+    },
     metadata: {
-      features: ['10 connected accounts', '350 AI posts per month', 'unlimited post history'],
+      features: [
+        '10 connected accounts',
+        '350 AI posts per month',
+        'unlimited post history',
+      ],
     },
   },
 ];

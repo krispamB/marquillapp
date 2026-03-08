@@ -71,12 +71,12 @@ describe('YoutubeTranscriptService', () => {
   });
 
   it('throws InvalidYouTubeVideoInputError for non-youtube or malformed input', async () => {
-    await expect(service.getTranscript('https://vimeo.com/123')).rejects.toBeInstanceOf(
-      InvalidYouTubeVideoInputError,
-    );
-    await expect(service.getTranscript('not-a-valid-id')).rejects.toBeInstanceOf(
-      InvalidYouTubeVideoInputError,
-    );
+    await expect(
+      service.getTranscript('https://vimeo.com/123'),
+    ).rejects.toBeInstanceOf(InvalidYouTubeVideoInputError);
+    await expect(
+      service.getTranscript('not-a-valid-id'),
+    ).rejects.toBeInstanceOf(InvalidYouTubeVideoInputError);
     await expect(service.getTranscript('   ')).rejects.toBeInstanceOf(
       InvalidYouTubeVideoInputError,
     );
