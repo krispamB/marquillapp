@@ -30,8 +30,14 @@ jest.mock(
   () => ({ EncryptionService: class EncryptionService {} }),
   { virtual: true },
 );
+jest.mock(
+  '../feature-gating/feature-gating.service',
+  () => ({ FeatureGatingService: class FeatureGatingService {} }),
+  { virtual: true },
+);
 
 import { PostService } from './post.service';
+import { apiFetch } from 'src/common/HelperFn/apiFetch.helper';
 
 describe('PostService.getPosts', () => {
   const createService = () => {
@@ -200,5 +206,167 @@ describe('PostService.createDraft', () => {
       'queue unavailable',
     );
     expect(incrementAiDraftUsage).not.toHaveBeenCalled();
+  });
+});
+
+describe('PostService.deletePost', () => {
+  const createService = () => {
+    const service = Object.create(PostService.prototype) as PostService;
+    const findById = jest.fn();
+    const deleteExec = jest.fn().mockResolvedValue({ deletedCount: 1 });
+    const deleteOne = jest.fn().mockReturnValue({ exec: deleteExec });
+    const findOne = jest.fn();
+    const decrypt = jest.fn().mockResolvedValue('token');
+    const getJob = jest.fn();
+
+    (service as any).postDraftModel = {
+      findById,
+      deleteOne,
+    };
+    (service as any).connectedAccountModel = {
+      findOne,
+    };
+    (service as any).encryptionService = {
+      decrypt,
+    };
+    (service as any).scheduleQueue = {
+      queue: {
+        getJob,
+      },
+    };
+    (service as any).LINKEDIN_API_BASE = 'https://api.linkedin.com/rest';
+
+    return {
+      service,
+      mocks: {
+        findById,
+        deleteOne,
+        deleteExec,
+        findOne,
+        decrypt,
+        getJob,
+      },
+    };
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('removes scheduled queue job before deleting the post when job exists', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const remove = jest.fn().mockResolvedValue(undefined);
+    const post = {
+      _id: postId,
+      user: userId,
+      status: 'SCHEDULED',
+    } as any;
+
+    mocks.findById.mockResolvedValue(post);
+    mocks.findOne.mockResolvedValue({
+      accessToken: 'encrypted-token',
+    });
+    mocks.getJob.mockResolvedValue({ remove });
+
+    await service.deletePost({ _id: userId } as any, postId.toString());
+
+    expect(mocks.getJob).toHaveBeenCalledWith(postId.toString());
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(mocks.deleteOne).toHaveBeenCalledTimes(1);
+    const deleteArg = mocks.deleteOne.mock.calls[0][0];
+    expect(deleteArg._id.toString()).toBe(postId.toString());
+  });
+
+  it('deletes scheduled post when queue job is already missing', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const post = {
+      _id: postId,
+      user: userId,
+      status: 'SCHEDULED',
+    } as any;
+
+    mocks.findById.mockResolvedValue(post);
+    mocks.findOne.mockResolvedValue({
+      accessToken: 'encrypted-token',
+    });
+    mocks.getJob.mockResolvedValue(null);
+
+    await service.deletePost({ _id: userId } as any, postId.toString());
+
+    expect(mocks.getJob).toHaveBeenCalledWith(postId.toString());
+    expect(mocks.deleteOne).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails deletion if scheduled queue job removal throws', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const remove = jest.fn().mockRejectedValue(new Error('remove failed'));
+    const post = {
+      _id: postId,
+      user: userId,
+      status: 'SCHEDULED',
+    } as any;
+
+    mocks.findById.mockResolvedValue(post);
+    mocks.findOne.mockResolvedValue({
+      accessToken: 'encrypted-token',
+    });
+    mocks.getJob.mockResolvedValue({ remove });
+
+    await expect(
+      service.deletePost({ _id: userId } as any, postId.toString()),
+    ).rejects.toThrow('remove failed');
+    expect(mocks.deleteOne).not.toHaveBeenCalled();
+  });
+
+  it('keeps non-scheduled delete behavior unchanged', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const post = {
+      _id: postId,
+      user: userId,
+      status: 'DRAFT',
+    } as any;
+
+    mocks.findById.mockResolvedValue(post);
+    mocks.findOne.mockResolvedValue({
+      accessToken: 'encrypted-token',
+    });
+
+    await service.deletePost({ _id: userId } as any, postId.toString());
+
+    expect(mocks.getJob).not.toHaveBeenCalled();
+    expect(mocks.deleteOne).toHaveBeenCalledTimes(1);
+  });
+
+  it('still calls LinkedIn delete for published posts', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const post = {
+      _id: postId,
+      user: userId,
+      status: 'PUBLISHED',
+      channelPostId: 'urn:li:share:123',
+    } as any;
+    const mockedApiFetch = apiFetch as jest.Mock;
+    mockedApiFetch.mockResolvedValue({ data: {}, response: {} });
+
+    mocks.findById.mockResolvedValue(post);
+    mocks.findOne.mockResolvedValue({
+      accessToken: 'encrypted-token',
+    });
+
+    await service.deletePost({ _id: userId } as any, postId.toString());
+
+    expect(mocks.getJob).not.toHaveBeenCalled();
+    expect(mockedApiFetch).toHaveBeenCalledTimes(1);
+    expect(mocks.deleteOne).toHaveBeenCalledTimes(1);
   });
 });

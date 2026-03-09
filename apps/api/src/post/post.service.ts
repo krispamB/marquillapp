@@ -200,6 +200,15 @@ export class PostService {
       connectedAccount.accessToken,
     );
 
+    if (post.status === PostDraftStatus.SCHEDULED) {
+      const scheduledJob = await this.scheduleQueue.queue.getJob(
+        post._id.toString(),
+      );
+      if (scheduledJob) {
+        await scheduledJob.remove();
+      }
+    }
+
     if (post.status === PostDraftStatus.PUBLISHED && post.channelPostId) {
       const externalUrl = `${this.LINKEDIN_API_BASE}/posts/${encodeURIComponent(post.channelPostId)}`;
       await apiFetch(externalUrl, {
