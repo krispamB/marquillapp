@@ -209,6 +209,193 @@ describe('PostService.createDraft', () => {
   });
 });
 
+describe('PostService.schedulePost', () => {
+  const createService = () => {
+    const service = Object.create(PostService.prototype) as PostService;
+    const findById = jest.fn();
+    const save = jest.fn().mockResolvedValue(undefined);
+    const addScheduleJob = jest.fn().mockResolvedValue(undefined);
+    const getJob = jest.fn();
+
+    (service as any).postDraftModel = {
+      findById,
+    };
+    (service as any).scheduleQueue = {
+      addScheduleJob,
+      queue: {
+        getJob,
+      },
+    };
+
+    return {
+      service,
+      mocks: {
+        findById,
+        save,
+        addScheduleJob,
+        getJob,
+      },
+    };
+  };
+
+  it('schedules a draft post without attempting to remove an existing queue job', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const post = {
+      _id: postId,
+      user: userId,
+      status: 'DRAFT',
+      save: mocks.save,
+    } as any;
+
+    mocks.findById.mockResolvedValue(post);
+
+    const result = await service.schedulePost(
+      { _id: userId } as any,
+      postId.toString(),
+      { scheduledTime } as any,
+    );
+
+    expect(mocks.getJob).not.toHaveBeenCalled();
+    expect(mocks.addScheduleJob).toHaveBeenCalledWith(
+      postId.toString(),
+      userId.toString(),
+      expect.any(Number),
+    );
+    expect(post.status).toBe('SCHEDULED');
+    expect(post.scheduledAt).toEqual(new Date(scheduledTime));
+    expect(mocks.save).toHaveBeenCalledTimes(1);
+    expect(result).toBe(post);
+  });
+
+  it('reschedules a scheduled post by removing the existing job first', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const scheduledTime = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const remove = jest.fn().mockResolvedValue(undefined);
+    const post = {
+      _id: postId,
+      user: userId,
+      status: 'SCHEDULED',
+      save: mocks.save,
+    } as any;
+
+    mocks.findById.mockResolvedValue(post);
+    mocks.getJob.mockResolvedValue({ remove });
+
+    await service.schedulePost(
+      { _id: userId } as any,
+      postId.toString(),
+      { scheduledTime } as any,
+    );
+
+    expect(mocks.getJob).toHaveBeenCalledWith(postId.toString());
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(mocks.addScheduleJob).toHaveBeenCalledWith(
+      postId.toString(),
+      userId.toString(),
+      expect.any(Number),
+    );
+    expect(post.scheduledAt).toEqual(new Date(scheduledTime));
+  });
+
+  it('reschedules even when the old scheduled job is already missing', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const scheduledTime = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const post = {
+      _id: postId,
+      user: userId,
+      status: 'SCHEDULED',
+      save: mocks.save,
+    } as any;
+
+    mocks.findById.mockResolvedValue(post);
+    mocks.getJob.mockResolvedValue(null);
+
+    await service.schedulePost(
+      { _id: userId } as any,
+      postId.toString(),
+      { scheduledTime } as any,
+    );
+
+    expect(mocks.getJob).toHaveBeenCalledWith(postId.toString());
+    expect(mocks.addScheduleJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails rescheduling if removing previous scheduled job throws', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const scheduledTime = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const remove = jest.fn().mockRejectedValue(new Error('remove failed'));
+    const post = {
+      _id: postId,
+      user: userId,
+      status: 'SCHEDULED',
+      save: mocks.save,
+    } as any;
+
+    mocks.findById.mockResolvedValue(post);
+    mocks.getJob.mockResolvedValue({ remove });
+
+    await expect(
+      service.schedulePost({ _id: userId } as any, postId.toString(), {
+        scheduledTime,
+      } as any),
+    ).rejects.toThrow('remove failed');
+    expect(mocks.addScheduleJob).not.toHaveBeenCalled();
+  });
+
+  it('still rejects scheduling for published posts', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const scheduledTime = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const post = {
+      _id: postId,
+      user: userId,
+      status: 'PUBLISHED',
+      save: mocks.save,
+    } as any;
+
+    mocks.findById.mockResolvedValue(post);
+
+    await expect(
+      service.schedulePost({ _id: userId } as any, postId.toString(), {
+        scheduledTime,
+      } as any),
+    ).rejects.toThrow('Post is already published');
+    expect(mocks.addScheduleJob).not.toHaveBeenCalled();
+  });
+
+  it('still rejects scheduling in the past', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const scheduledTime = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const post = {
+      _id: postId,
+      user: userId,
+      status: 'DRAFT',
+      save: mocks.save,
+    } as any;
+
+    mocks.findById.mockResolvedValue(post);
+
+    await expect(
+      service.schedulePost({ _id: userId } as any, postId.toString(), {
+        scheduledTime,
+      } as any),
+    ).rejects.toThrow('Scheduled time must be in the future');
+    expect(mocks.addScheduleJob).not.toHaveBeenCalled();
+  });
+});
+
 describe('PostService.deletePost', () => {
   const createService = () => {
     const service = Object.create(PostService.prototype) as PostService;

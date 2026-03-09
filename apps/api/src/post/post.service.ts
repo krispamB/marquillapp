@@ -340,6 +340,15 @@ export class PostService {
       throw new BadRequestException('Scheduled time must be in the future');
     }
 
+    if (post.status === PostDraftStatus.SCHEDULED) {
+      const scheduledJob = await this.scheduleQueue.queue.getJob(
+        post._id.toString(),
+      );
+      if (scheduledJob) {
+        await scheduledJob.remove();
+      }
+    }
+
     post.status = PostDraftStatus.SCHEDULED;
     post.scheduledAt = scheduledDate;
     await post.save();
