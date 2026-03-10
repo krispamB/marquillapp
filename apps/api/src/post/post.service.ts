@@ -101,7 +101,7 @@ export class PostService {
       if (!isNaN(year) && !isNaN(monthNum)) {
         const start = new Date(year, monthNum - 1, 1);
         const end = new Date(year, monthNum, 1);
-        filter.createdAt = { $gte: start, $lt: end };
+        filter.updatedAt = { $gte: start, $lt: end };
       }
     }
 
