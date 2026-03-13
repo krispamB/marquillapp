@@ -160,7 +160,7 @@ export class PaymentService {
     }
 
     try {
-      await this.syncSubscriptionFromEvent(payload);
+      await this.syncSubscriptionFromEvent(payload, eventType);
       return { processed: true, duplicate: false, eventId };
     } catch (error) {
       const message =
@@ -249,7 +249,10 @@ export class PaymentService {
     );
   }
 
-  private async syncSubscriptionFromEvent(payload: PolarWebhookPayload) {
+  private async syncSubscriptionFromEvent(
+    payload: PolarWebhookPayload,
+    eventType: string,
+  ) {
     const data = payload.data ?? {};
     const metadata = (data.metadata ?? {}) as Record<string, any>;
 
@@ -273,26 +276,9 @@ export class PaymentService {
       );
     }
 
-    const priceId = this.readString([data.product_id, data.productId]);
-
-    const tierAndInterval = await this.resolveTierAndIntervalByPriceId(priceId);
     const existingSubscription = await this.subscriptionModel
       .findOne({ userId: new Types.ObjectId(userId) })
       .lean();
-
-    const tierId =
-      tierAndInterval?.tierId ??
-      (existingSubscription?.tierId
-        ? existingSubscription.tierId.toString()
-        : null);
-    const billingInterval =
-      tierAndInterval?.billingInterval ??
-      existingSubscription?.billingInterval ??
-      null;
-
-    if (!tierId || !billingInterval) {
-      throw new BadRequestException('Unable to map Polar price to tier');
-    }
 
     const periodStartRaw = this.readString([
       data.current_period_start,
@@ -322,6 +308,29 @@ export class PaymentService {
       data.subscription_id,
       data.id,
     ]);
+
+    const isResubscriptionEvent = eventType === 'subscription.updated';
+    const shouldApplyTier =
+      isResubscriptionEvent && status === SubscriptionStatus.ACTIVE;
+    const shouldResolveTier = shouldApplyTier || !existingSubscription;
+
+    let tierId: string | null = existingSubscription?.tierId
+      ? existingSubscription.tierId.toString()
+      : null;
+    let billingInterval: BillingInterval | null =
+      existingSubscription?.billingInterval ?? null;
+
+    if (shouldResolveTier) {
+      const priceId = this.readString([data.product_id, data.productId]);
+      const tierAndInterval =
+        await this.resolveTierAndIntervalByPriceId(priceId);
+      tierId = tierAndInterval?.tierId ?? null;
+      billingInterval = tierAndInterval?.billingInterval ?? null;
+    }
+
+    if (!tierId || !billingInterval) {
+      throw new BadRequestException('Unable to map Polar price to tier');
+    }
 
     await this.subscriptionModel.findOneAndUpdate(
       { userId: new Types.ObjectId(userId) },
