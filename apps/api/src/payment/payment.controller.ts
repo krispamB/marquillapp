@@ -37,4 +37,10 @@ export class PaymentController {
   async getInvoices(@GetUser() user: User) {
     return this.paymentService.getInvoiceHistory(user._id.toString());
   }
+
+  @Post('cancel')
+  @HttpCode(HttpStatus.OK)
+  async cancelSubscription(@GetUser() user: User) {
+    return this.paymentService.cancelSubscription(user._id.toString());
+  }
 }

@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
@@ -236,6 +237,45 @@ export class PaymentService {
     }
 
     return { items };
+  }
+
+  async cancelSubscription(userId: string) {
+    const userObjectId = new Types.ObjectId(userId);
+    const subscription = await this.subscriptionModel
+      .findOne({ userId: userObjectId })
+      .lean();
+
+    if (!subscription) {
+      throw new NotFoundException('Subscription not found');
+    }
+
+    if (!subscription.polarSubscriptionId) {
+      throw new UnprocessableEntityException(
+        'Subscription is missing Polar reference. Please contact support.',
+      );
+    }
+
+    if (
+      subscription.cancelAtPeriodEnd ||
+      subscription.status === SubscriptionStatus.CANCELED ||
+      subscription.status === SubscriptionStatus.EXPIRED
+    ) {
+      return this.getBillingSummary(userId);
+    }
+
+    await this.polarClient.cancelSubscriptionAtPeriodEnd(
+      subscription.polarSubscriptionId,
+    );
+
+    await this.subscriptionModel.findOneAndUpdate(
+      { userId: userObjectId },
+      {
+        cancelAtPeriodEnd: true,
+      },
+      { new: true },
+    );
+
+    return this.getBillingSummary(userId);
   }
 
   private isSubscriptionEvent(eventType: string): boolean {
