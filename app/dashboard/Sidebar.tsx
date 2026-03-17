@@ -71,7 +71,7 @@ export default function Sidebar({
 }) {
   const [accountsExpanded, setAccountsExpanded] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isDefaultTier, setIsDefaultTier] = useState(true);
+  const [isDefaultTier, setIsDefaultTier] = useState(false);
   const [tierName, setTierName] = useState("Free plan");
   const settingsRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);

@@ -11,6 +11,7 @@ import {
   Search,
   Tags,
   TrendingUp,
+  Trash2,
 } from "lucide-react";
 import Sidebar from "../dashboard/Sidebar";
 import NewPostModal, {
@@ -25,6 +26,8 @@ import {
   StatusTag,
   UserAvatar,
 } from "../dashboard/components";
+import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
+import { ReschedulePopover } from "./ReschedulePopover";
 import { useNewPostModal } from "../dashboard/useNewPostModal";
 import type {
   ConnectedAccount,
@@ -41,7 +44,9 @@ import type {
   SchedulePostResponse,
   UpdatePostResponse,
   UserProfile,
+  FeatureLimitErrorResponse,
 } from "../lib/types";
+import { FeatureLimitExceededError } from "../lib/types";
 
 type PostTab = "DRAFT" | "SCHEDULED" | "PUBLISHED";
 type PostsViewMode = "list" | "calendar";
@@ -235,9 +240,33 @@ export default function PostsClient({
   );
   const [refreshKey, setRefreshKey] = useState(0);
   const [generatedDraftId, setGeneratedDraftId] = useState<string | null>(null);
+  const [actionMenuPostId, setActionMenuPostId] = useState<string | null>(null);
+  const [deleteModalState, setDeleteModalState] = useState<{
+    isOpen: boolean;
+    postId: string | null;
+    isPublished: boolean;
+  }>({
+    isOpen: false,
+    postId: null,
+    isPublished: false,
+  });
+  const [rescheduleModalState, setRescheduleModalState] = useState<{
+    isOpen: boolean;
+    postId: string | null;
+    initialDate: string;
+    initialTime: string;
+  }>({
+    isOpen: false,
+    postId: null,
+    initialDate: "",
+    initialTime: "",
+  });
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isRescheduling, setIsRescheduling] = useState(false);
   const { state: newPostModalState, openCreate, openEdit, close: closeNewPostModal } =
     useNewPostModal();
   const connectMenuBoundaryRef = useRef<HTMLDivElement | null>(null);
+  const actionMenuBoundaryRef = useRef<HTMLDivElement | null>(null);
   const popupWatcherRef = useRef<number | null>(null);
   const now = useMemo(() => new Date(), []);
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
@@ -468,6 +497,36 @@ export default function PostsClient({
       document.removeEventListener("keydown", handleEscape);
     };
   }, [isConnectMenuOpen]);
+
+  useEffect(() => {
+    if (!actionMenuPostId) {
+      return;
+    }
+
+    const handleOutsidePointer = (event: MouseEvent) => {
+      const boundary = actionMenuBoundaryRef.current;
+      if (!boundary) {
+        return;
+      }
+      if (event.target instanceof Node && !boundary.contains(event.target)) {
+        setActionMenuPostId(null);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setActionMenuPostId(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsidePointer);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsidePointer);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [actionMenuPostId]);
 
   useEffect(
     () => () => {
@@ -826,6 +885,12 @@ export default function PostsClient({
     }
 
     if (!response.ok) {
+      if (parsedResponse && "code" in parsedResponse && parsedResponse.code === "FEATURE_LIMIT_EXCEEDED") {
+        const errorData = parsedResponse as unknown as FeatureLimitErrorResponse;
+        const msg = errorData.upgradeHint || "Post draft limit exceeded.";
+        setConnectFeedback(msg);
+        throw new FeatureLimitExceededError(errorData);
+      }
       const message = parsedResponse?.message || "Unable to generate draft.";
       setConnectFeedback(message);
       throw new Error(message);
@@ -912,6 +977,72 @@ export default function PostsClient({
     [apiBase],
   );
 
+  const handleDeletePost = async () => {
+    const { postId } = deleteModalState;
+    if (!postId) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`${apiBase}/posts/${postId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        let msg = "Unable to delete post.";
+        try {
+          const body = await response.json();
+          if (body.message) {
+            msg = body.message;
+          }
+        } catch { }
+        throw new Error(msg);
+      }
+
+      setConnectFeedback("Post deleted successfully.");
+      setDeleteModalState({ isOpen: false, postId: null, isPublished: false });
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      setConnectFeedback(e instanceof Error ? e.message : "Unable to delete post.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleReschedulePost = async (scheduledTime: string, timezone: string) => {
+    const { postId } = rescheduleModalState;
+    if (!postId) return;
+
+    setIsRescheduling(true);
+    try {
+      const response = await fetch(`${apiBase}/posts/${postId}/schedule`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduledTime, timezone }),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        let msg = "Unable to reschedule post.";
+        try {
+          const body = await response.json();
+          if (body.message) {
+            msg = body.message;
+          }
+        } catch { }
+        throw new Error(msg);
+      }
+
+      setConnectFeedback("Post scheduled successfully.");
+      setRescheduleModalState({ isOpen: false, postId: null, initialDate: "", initialTime: "" });
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      setConnectFeedback(e instanceof Error ? e.message : "Unable to reschedule post.");
+    } finally {
+      setIsRescheduling(false);
+    }
+  };
+
   const toggleResearch = useCallback((postId: string) => {
     setExpandedResearchPostIds((previous) => {
       const next = new Set(previous);
@@ -989,8 +1120,8 @@ export default function PostsClient({
                   type="button"
                   onClick={() => setViewMode("list")}
                   className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${viewMode === "list"
-                      ? "bg-[var(--color-primary)] text-white"
-                      : "text-[var(--color-text-secondary)] hover:bg-white"
+                    ? "bg-[var(--color-primary)] text-white"
+                    : "text-[var(--color-text-secondary)] hover:bg-white"
                     }`}
                 >
                   List
@@ -999,8 +1130,8 @@ export default function PostsClient({
                   type="button"
                   onClick={() => setViewMode("calendar")}
                   className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${viewMode === "calendar"
-                      ? "bg-[var(--color-primary)] text-white"
-                      : "text-[var(--color-text-secondary)] hover:bg-white"
+                    ? "bg-[var(--color-primary)] text-white"
+                    : "text-[var(--color-text-secondary)] hover:bg-white"
                     }`}
                 >
                   Calendar
@@ -1027,8 +1158,8 @@ export default function PostsClient({
                       type="button"
                       onClick={() => setActiveTab(tab)}
                       className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition ${activeTab === tab
-                          ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
-                          : "border-[var(--color-border)] bg-white/80 text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]/40"
+                        ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
+                        : "border-[var(--color-border)] bg-white/80 text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]/40"
                         }`}
                     >
                       <span>{tab[0]}{tab.slice(1).toLowerCase()}</span>
@@ -1332,12 +1463,41 @@ export default function PostsClient({
                                       ) : null}
                                       <button
                                         type="button"
-                                        onClick={(event) => event.stopPropagation()}
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          setActionMenuPostId((prev) => (prev === post._id ? null : post._id));
+                                        }}
                                         className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--color-border)] bg-white text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
                                         aria-label="More actions"
+                                        aria-expanded={actionMenuPostId === post._id}
+                                        aria-haspopup="true"
                                       >
                                         <CircleEllipsis className="h-4 w-4" />
                                       </button>
+
+                                      {actionMenuPostId === post._id ? (
+                                        <div
+                                          ref={actionMenuBoundaryRef}
+                                          className="absolute right-0 top-full z-10 mt-2 w-40 rounded-xl border border-[var(--color-border)] bg-white p-1 shadow-lg"
+                                          onClick={(event) => event.stopPropagation()}
+                                        >
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setActionMenuPostId(null);
+                                              setDeleteModalState({
+                                                isOpen: true,
+                                                postId: post._id,
+                                                isPublished: isPublished,
+                                              });
+                                            }}
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                            Delete post
+                                          </button>
+                                        </div>
+                                      ) : null}
                                     </div>
                                   </div>
 
@@ -1438,6 +1598,13 @@ export default function PostsClient({
         onGetDraftStatus={handleGetDraftStatus}
         onGetDraftById={handleGetDraftById}
         onGetLinkedinImageByUrn={handleGetLinkedinImageByUrn}
+      />
+      <ConfirmDeleteModal
+        isOpen={deleteModalState.isOpen}
+        isPublished={deleteModalState.isPublished}
+        isDeleting={isDeleting}
+        onClose={() => setDeleteModalState((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={handleDeletePost}
       />
     </div>
   );
