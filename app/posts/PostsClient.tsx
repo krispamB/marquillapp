@@ -11,6 +11,7 @@ import {
   Search,
   Tags,
   TrendingUp,
+  Trash2,
 } from "lucide-react";
 import Sidebar from "../dashboard/Sidebar";
 import NewPostModal, {
@@ -25,6 +26,8 @@ import {
   StatusTag,
   UserAvatar,
 } from "../dashboard/components";
+import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
+import { ReschedulePopover } from "./ReschedulePopover";
 import { useNewPostModal } from "../dashboard/useNewPostModal";
 import type {
   ConnectedAccount,
@@ -41,7 +44,9 @@ import type {
   SchedulePostResponse,
   UpdatePostResponse,
   UserProfile,
+  FeatureLimitErrorResponse,
 } from "../lib/types";
+import { FeatureLimitExceededError } from "../lib/types";
 
 type PostTab = "DRAFT" | "SCHEDULED" | "PUBLISHED";
 type PostsViewMode = "list" | "calendar";
@@ -221,6 +226,9 @@ export default function PostsClient({
   const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(
     primaryAccountId ?? connectedAccounts[0]?.id,
   );
+  const [selectedMonth, setSelectedMonth] = useState<string>(toYearMonth(new Date()));
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
+  const [availableAccountIds, setAvailableAccountIds] = useState<string[]>([]);
   const [posts, setPosts] = useState<DashboardPost[]>([]);
   const [isPostsLoading, setIsPostsLoading] = useState(false);
   const [postsError, setPostsError] = useState<string | null>(null);
@@ -232,9 +240,33 @@ export default function PostsClient({
   );
   const [refreshKey, setRefreshKey] = useState(0);
   const [generatedDraftId, setGeneratedDraftId] = useState<string | null>(null);
+  const [actionMenuPostId, setActionMenuPostId] = useState<string | null>(null);
+  const [deleteModalState, setDeleteModalState] = useState<{
+    isOpen: boolean;
+    postId: string | null;
+    isPublished: boolean;
+  }>({
+    isOpen: false,
+    postId: null,
+    isPublished: false,
+  });
+  const [rescheduleModalState, setRescheduleModalState] = useState<{
+    isOpen: boolean;
+    postId: string | null;
+    initialDate: string;
+    initialTime: string;
+  }>({
+    isOpen: false,
+    postId: null,
+    initialDate: "",
+    initialTime: "",
+  });
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isRescheduling, setIsRescheduling] = useState(false);
   const { state: newPostModalState, openCreate, openEdit, close: closeNewPostModal } =
     useNewPostModal();
   const connectMenuBoundaryRef = useRef<HTMLDivElement | null>(null);
+  const actionMenuBoundaryRef = useRef<HTMLDivElement | null>(null);
   const popupWatcherRef = useRef<number | null>(null);
   const now = useMemo(() => new Date(), []);
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
@@ -344,10 +376,9 @@ export default function PostsClient({
       setPostsError(null);
 
       try {
-        const month = toYearMonth(new Date());
         const query = new URLSearchParams({
           accountConnected: selectedAccountId,
-          month,
+          month: selectedMonth,
         });
 
         const response = await fetch(`${apiBase}/posts?${query.toString()}`, {
@@ -368,6 +399,16 @@ export default function PostsClient({
 
         const resolvedPosts = payload?.data?.filter((post): post is DashboardPost => Boolean(post?._id));
         setPosts(resolvedPosts ?? []);
+
+        const filters = payload?.filters;
+        if (filters) {
+          if (filters.availableMonths) {
+            setAvailableMonths(filters.availableMonths);
+          }
+          if (filters.connectedAccountIds) {
+            setAvailableAccountIds(filters.connectedAccountIds);
+          }
+        }
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
@@ -380,7 +421,7 @@ export default function PostsClient({
         }
       }
     },
-    [apiBase, selectedAccountId],
+    [apiBase, selectedAccountId, selectedMonth],
   );
 
   useEffect(() => {
@@ -456,6 +497,36 @@ export default function PostsClient({
       document.removeEventListener("keydown", handleEscape);
     };
   }, [isConnectMenuOpen]);
+
+  useEffect(() => {
+    if (!actionMenuPostId) {
+      return;
+    }
+
+    const handleOutsidePointer = (event: MouseEvent) => {
+      const boundary = actionMenuBoundaryRef.current;
+      if (!boundary) {
+        return;
+      }
+      if (event.target instanceof Node && !boundary.contains(event.target)) {
+        setActionMenuPostId(null);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setActionMenuPostId(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsidePointer);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsidePointer);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [actionMenuPostId]);
 
   useEffect(
     () => () => {
@@ -814,6 +885,12 @@ export default function PostsClient({
     }
 
     if (!response.ok) {
+      if (parsedResponse && "code" in parsedResponse && parsedResponse.code === "FEATURE_LIMIT_EXCEEDED") {
+        const errorData = parsedResponse as unknown as FeatureLimitErrorResponse;
+        const msg = errorData.upgradeHint || "Post draft limit exceeded.";
+        setConnectFeedback(msg);
+        throw new FeatureLimitExceededError(errorData);
+      }
       const message = parsedResponse?.message || "Unable to generate draft.";
       setConnectFeedback(message);
       throw new Error(message);
@@ -900,6 +977,72 @@ export default function PostsClient({
     [apiBase],
   );
 
+  const handleDeletePost = async () => {
+    const { postId } = deleteModalState;
+    if (!postId) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`${apiBase}/posts/${postId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        let msg = "Unable to delete post.";
+        try {
+          const body = await response.json();
+          if (body.message) {
+            msg = body.message;
+          }
+        } catch { }
+        throw new Error(msg);
+      }
+
+      setConnectFeedback("Post deleted successfully.");
+      setDeleteModalState({ isOpen: false, postId: null, isPublished: false });
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      setConnectFeedback(e instanceof Error ? e.message : "Unable to delete post.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleReschedulePost = async (scheduledTime: string, timezone: string) => {
+    const { postId } = rescheduleModalState;
+    if (!postId) return;
+
+    setIsRescheduling(true);
+    try {
+      const response = await fetch(`${apiBase}/posts/${postId}/schedule`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduledTime, timezone }),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        let msg = "Unable to reschedule post.";
+        try {
+          const body = await response.json();
+          if (body.message) {
+            msg = body.message;
+          }
+        } catch { }
+        throw new Error(msg);
+      }
+
+      setConnectFeedback("Post scheduled successfully.");
+      setRescheduleModalState({ isOpen: false, postId: null, initialDate: "", initialTime: "" });
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      setConnectFeedback(e instanceof Error ? e.message : "Unable to reschedule post.");
+    } finally {
+      setIsRescheduling(false);
+    }
+  };
+
   const toggleResearch = useCallback((postId: string) => {
     setExpandedResearchPostIds((previous) => {
       const next = new Set(previous);
@@ -933,9 +1076,8 @@ export default function PostsClient({
 
         <div
           ref={connectMenuBoundaryRef}
-          className={`relative ${
-            sidebarCollapsed ? "md:pl-[136px] lg:pl-[156px]" : "md:pl-[276px] lg:pl-[296px]"
-          }`}
+          className={`relative ${sidebarCollapsed ? "md:pl-[136px] lg:pl-[156px]" : "md:pl-[276px] lg:pl-[296px]"
+            }`}
         >
           <Sidebar
             user={{ ...user, initials }}
@@ -977,22 +1119,20 @@ export default function PostsClient({
                 <button
                   type="button"
                   onClick={() => setViewMode("list")}
-                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                    viewMode === "list"
-                      ? "bg-[var(--color-primary)] text-white"
-                      : "text-[var(--color-text-secondary)] hover:bg-white"
-                  }`}
+                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${viewMode === "list"
+                    ? "bg-[var(--color-primary)] text-white"
+                    : "text-[var(--color-text-secondary)] hover:bg-white"
+                    }`}
                 >
                   List
                 </button>
                 <button
                   type="button"
                   onClick={() => setViewMode("calendar")}
-                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                    viewMode === "calendar"
-                      ? "bg-[var(--color-primary)] text-white"
-                      : "text-[var(--color-text-secondary)] hover:bg-white"
-                  }`}
+                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${viewMode === "calendar"
+                    ? "bg-[var(--color-primary)] text-white"
+                    : "text-[var(--color-text-secondary)] hover:bg-white"
+                    }`}
                 >
                   Calendar
                 </button>
@@ -1017,11 +1157,10 @@ export default function PostsClient({
                       key={tab}
                       type="button"
                       onClick={() => setActiveTab(tab)}
-                      className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition ${
-                        activeTab === tab
-                          ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
-                          : "border-[var(--color-border)] bg-white/80 text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]/40"
-                      }`}
+                      className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition ${activeTab === tab
+                        ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
+                        : "border-[var(--color-border)] bg-white/80 text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]/40"
+                        }`}
                     >
                       <span>{tab[0]}{tab.slice(1).toLowerCase()}</span>
                       <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs">{postCounts[tab]}</span>
@@ -1038,10 +1177,25 @@ export default function PostsClient({
                   Tags
                 </PillButton>
 
-                <label className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-white/85 px-3 py-2 text-xs font-semibold text-[var(--color-text-secondary)]">
-                  <CalendarDays className="h-4 w-4" />
-                  <span>{monthLabel}</span>
-                </label>
+                <div className="relative flex items-center">
+                  <CalendarDays className="pointer-events-none absolute left-3 h-4 w-4 text-[var(--color-text-secondary)]" />
+                  <select
+                    value={selectedMonth}
+                    onChange={(event) => setSelectedMonth(event.target.value)}
+                    className="appearance-none rounded-full border border-[var(--color-border)] bg-white/85 py-2 pl-9 pr-4 text-sm font-medium text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
+                    aria-label="Select month"
+                  >
+                    {availableMonths.length > 0 ? (
+                      availableMonths.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))
+                    ) : (
+                      <option value={selectedMonth}>{selectedMonth}</option>
+                    )}
+                  </select>
+                </div>
 
                 <select
                   value={selectedAccountId ?? ""}
@@ -1049,11 +1203,18 @@ export default function PostsClient({
                   className="rounded-full border border-[var(--color-border)] bg-white/85 px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
                   aria-label="Select connected account"
                 >
-                  {connectedAccounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.profile.name ?? account.profile.email ?? account.provider}
-                    </option>
-                  ))}
+                  {connectedAccounts
+                    .filter(
+                      (account) =>
+                        availableAccountIds.length === 0 ||
+                        availableAccountIds.includes(account.id) ||
+                        account.id === selectedAccountId
+                    )
+                    .map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.profile.name ?? account.profile.email ?? account.provider}
+                      </option>
+                    ))}
                 </select>
 
                 <label className="relative ml-auto min-w-[220px] flex-1 sm:max-w-[320px]">
@@ -1093,12 +1254,12 @@ export default function PostsClient({
                         cell.day === null
                           ? "text-transparent"
                           : cell.isToday && isScheduledDay
-                          ? "border border-[var(--color-secondary)] bg-[var(--color-secondary)] text-white shadow-[0_12px_30px_-20px_rgba(28,27,39,0.45)]"
-                          : cell.isToday
-                          ? "bg-[var(--color-secondary)] text-white shadow-[0_12px_30px_-20px_rgba(28,27,39,0.45)]"
-                          : isScheduledDay
-                          ? "border border-[#DCCFA4] bg-[#F6F1DE] text-[#7A5A00]"
-                          : "border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-white/70";
+                            ? "border border-[var(--color-secondary)] bg-[var(--color-secondary)] text-white shadow-[0_12px_30px_-20px_rgba(28,27,39,0.45)]"
+                            : cell.isToday
+                              ? "bg-[var(--color-secondary)] text-white shadow-[0_12px_30px_-20px_rgba(28,27,39,0.45)]"
+                              : isScheduledDay
+                                ? "border border-[#DCCFA4] bg-[#F6F1DE] text-[#7A5A00]"
+                                : "border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-white/70";
                       return (
                         <div
                           key={`day-${index}`}
@@ -1157,230 +1318,259 @@ export default function PostsClient({
 
                   {!isPostsLoading && !postsError
                     ? groupedPosts.map((group) => (
-                        <section key={group.dateKey} className="space-y-3">
-                          <h3 className="px-1 font-[var(--font-sora)] text-xl font-semibold text-[var(--color-text-primary)]">
-                            {group.label}
-                          </h3>
+                      <section key={group.dateKey} className="space-y-3">
+                        <h3 className="px-1 font-[var(--font-sora)] text-xl font-semibold text-[var(--color-text-primary)]">
+                          {group.label}
+                        </h3>
 
-                          <div className="space-y-3">
-                            {group.items.map((post) => {
-                              const status = normalizeStatus(post.status);
-                              const isPublished = status === "PUBLISHED";
-                              const isDraft = status === "DRAFT";
-                              const scheduleLabel = isDraft ? "Schedule" : "Reschedule";
-                              const canEdit = !isPublished;
-                              const researchVideos =
-                                post.type === "insightPostLinkedin" &&
+                        <div className="space-y-3">
+                          {group.items.map((post) => {
+                            const status = normalizeStatus(post.status);
+                            const isPublished = status === "PUBLISHED";
+                            const isDraft = status === "DRAFT";
+                            const scheduleLabel = isDraft ? "Schedule" : "Reschedule";
+                            const canEdit = !isPublished;
+                            const researchVideos =
+                              post.type === "insightPostLinkedin" &&
                                 Array.isArray(post.youtubeResearch)
-                                  ? post.youtubeResearch.filter((video) =>
-                                      Boolean(
-                                        video &&
-                                          (video.title ||
-                                            video.videoId ||
-                                            video.channelTitle),
-                                      ),
-                                    )
-                                  : [];
-                              const researchCount = researchVideos.length;
-                              const isResearchExpanded = expandedResearchPostIds.has(post._id);
-                              const researchPanelId = `research-panel-${post._id}`;
-                              const onEdit = () => {
-                                if (!canEdit) {
-                                  return;
-                                }
-                                openEdit({
-                                  postId: post._id,
-                                  initialContent: post.content ?? "",
-                                  initialImageUrl: undefined,
-                                });
-                              };
+                                ? post.youtubeResearch.filter((video) =>
+                                  Boolean(
+                                    video &&
+                                    (video.title ||
+                                      video.videoId ||
+                                      video.channelTitle),
+                                  ),
+                                )
+                                : [];
+                            const researchCount = researchVideos.length;
+                            const isResearchExpanded = expandedResearchPostIds.has(post._id);
+                            const researchPanelId = `research-panel-${post._id}`;
+                            const onEdit = () => {
+                              if (!canEdit) {
+                                return;
+                              }
+                              openEdit({
+                                postId: post._id,
+                                initialContent: post.content ?? "",
+                                initialImageUrl: undefined,
+                              });
+                            };
 
-                              return (
-                                <article
-                                  key={post._id}
-                                  {...(canEdit
-                                    ? {
-                                        role: "button" as const,
-                                        tabIndex: 0,
-                                        onClick: onEdit,
-                                        onKeyDown: (event) => {
-                                          if (event.key === "Enter" || event.key === " ") {
-                                            event.preventDefault();
-                                            onEdit();
-                                          }
-                                        },
+                            return (
+                              <article
+                                key={post._id}
+                                {...(canEdit
+                                  ? {
+                                    role: "button" as const,
+                                    tabIndex: 0,
+                                    onClick: onEdit,
+                                    onKeyDown: (event) => {
+                                      if (event.key === "Enter" || event.key === " ") {
+                                        event.preventDefault();
+                                        onEdit();
                                       }
-                                    : {})}
-                                  className="grid gap-3 rounded-2xl border border-[var(--color-border)] bg-white/90 p-4 transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-28px_rgba(15,23,42,0.4)] md:grid-cols-[132px_1fr]"
-                                >
-                                  <div className="flex flex-col gap-2 border-b border-[var(--color-border)] pb-3 md:border-b-0 md:border-r md:pb-0 md:pr-3">
-                                    <p className="text-2xl font-semibold text-[var(--color-text-primary)]">
-                                      {formatTimelineTime(post.scheduledAt ?? post.updatedAt ?? post.createdAt)}
-                                    </p>
-                                    <StatusTag status={status} />
-                                  </div>
+                                    },
+                                  }
+                                  : {})}
+                                className="grid gap-3 rounded-2xl border border-[var(--color-border)] bg-white/90 p-4 transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-28px_rgba(15,23,42,0.4)] md:grid-cols-[132px_1fr]"
+                              >
+                                <div className="flex flex-col gap-2 border-b border-[var(--color-border)] pb-3 md:border-b-0 md:border-r md:pb-0 md:pr-3">
+                                  <p className="text-2xl font-semibold text-[var(--color-text-primary)]">
+                                    {formatTimelineTime(post.scheduledAt ?? post.updatedAt ?? post.createdAt)}
+                                  </p>
+                                  <StatusTag status={status} />
+                                </div>
 
-                                  <div className="space-y-4">
-                                    <div className="flex items-start justify-between gap-3">
-                                      <div className="flex items-center gap-3">
-                                        <UserAvatar
-                                          initials={initials}
-                                          avatarUrl={selectedConnectedAccount?.profile?.picture ?? user.avatar}
-                                          sizeClass="h-10 w-10"
-                                          textClass="text-sm"
-                                        />
-                                        <div>
-                                          <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                                            {selectedConnectedAccount?.profile?.name ?? user.name}
-                                          </p>
-                                          <p className="text-xs text-[var(--color-text-secondary)]">
-                                            {selectedConnectedAccount?.profile?.email ?? "LinkedIn account"}
-                                          </p>
-                                        </div>
+                                <div className="space-y-4">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                      <UserAvatar
+                                        initials={initials}
+                                        avatarUrl={selectedConnectedAccount?.profile?.picture ?? user.avatar}
+                                        sizeClass="h-10 w-10"
+                                        textClass="text-sm"
+                                      />
+                                      <div>
+                                        <p className="text-base font-semibold text-[var(--color-text-primary)]">
+                                          {selectedConnectedAccount?.profile?.name ?? user.name}
+                                        </p>
+                                        <p className="text-xs text-[var(--color-text-secondary)]">
+                                          {selectedConnectedAccount?.profile?.email ?? "LinkedIn account"}
+                                        </p>
                                       </div>
                                     </div>
+                                  </div>
 
-                                    <p className="text-lg leading-relaxed text-[var(--color-text-tertiary)]">
-                                      {getTitleFromContent(post.content)}
-                                    </p>
+                                  <p className="text-lg leading-relaxed text-[var(--color-text-tertiary)]">
+                                    {getTitleFromContent(post.content)}
+                                  </p>
 
-                                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-border)] pt-3">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <p className="text-sm text-[var(--color-text-secondary)]">
-                                          Updated {formatRelativeUpdateLabel(post.updatedAt ?? post.createdAt)}
-                                        </p>
-                                        {researchCount > 0 ? (
-                                          <button
-                                            type="button"
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              toggleResearch(post._id);
-                                            }}
-                                            aria-expanded={isResearchExpanded}
-                                            aria-controls={researchPanelId}
-                                            className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-white/85 px-3 py-1.5 text-sm font-semibold text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary)]/45 hover:text-[var(--color-primary)]"
-                                          >
-                                            <span className="grid h-5 w-5 place-items-center rounded-full bg-[#FF0033]">
-                                              <svg
-                                                aria-hidden="true"
-                                                viewBox="0 0 24 24"
-                                                className="h-3.5 w-3.5 fill-white"
-                                              >
-                                                <path d="M10 8l6 4-6 4V8z" />
-                                              </svg>
-                                            </span>
-                                            <span>YouTube +{researchCount}</span>
-                                          </button>
-                                        ) : null}
-                                      </div>
-
-                                      <div className="flex items-center gap-2">
-                                        {!isPublished ? (
-                                          <PillButton
-                                            variant="secondary"
-                                            icon={<CalendarClock className="h-4 w-4" />}
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              onEdit();
-                                            }}
-                                          >
-                                            {scheduleLabel}
-                                          </PillButton>
-                                        ) : null}
-                                        {canEdit ? (
-                                          <button
-                                            type="button"
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              onEdit();
-                                            }}
-                                            className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--color-border)] bg-white text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-                                            aria-label="Edit post"
-                                          >
-                                            <Edit3 className="h-4 w-4" />
-                                          </button>
-                                        ) : null}
+                                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--color-border)] pt-3">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <p className="text-sm text-[var(--color-text-secondary)]">
+                                        Updated {formatRelativeUpdateLabel(post.updatedAt ?? post.createdAt)}
+                                      </p>
+                                      {researchCount > 0 ? (
                                         <button
                                           type="button"
-                                          onClick={(event) => event.stopPropagation()}
-                                          className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--color-border)] bg-white text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-                                          aria-label="More actions"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            toggleResearch(post._id);
+                                          }}
+                                          aria-expanded={isResearchExpanded}
+                                          aria-controls={researchPanelId}
+                                          className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-white/85 px-3 py-1.5 text-sm font-semibold text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary)]/45 hover:text-[var(--color-primary)]"
                                         >
-                                          <CircleEllipsis className="h-4 w-4" />
+                                          <span className="grid h-5 w-5 place-items-center rounded-full bg-[#FF0033]">
+                                            <svg
+                                              aria-hidden="true"
+                                              viewBox="0 0 24 24"
+                                              className="h-3.5 w-3.5 fill-white"
+                                            >
+                                              <path d="M10 8l6 4-6 4V8z" />
+                                            </svg>
+                                          </span>
+                                          <span>YouTube +{researchCount}</span>
                                         </button>
-                                      </div>
+                                      ) : null}
                                     </div>
 
-                                    {researchCount > 0 && isResearchExpanded ? (
-                                      <div
-                                        id={researchPanelId}
-                                        onClick={(event) => event.stopPropagation()}
-                                        className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-overlay)] p-3 text-[var(--color-text-primary)] shadow-[0_24px_60px_-45px_rgba(15,23,42,0.32)]"
+                                    <div className="flex items-center gap-2">
+                                      {!isPublished ? (
+                                        <PillButton
+                                          variant="secondary"
+                                          icon={<CalendarClock className="h-4 w-4" />}
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            onEdit();
+                                          }}
+                                        >
+                                          {scheduleLabel}
+                                        </PillButton>
+                                      ) : null}
+                                      {canEdit ? (
+                                        <button
+                                          type="button"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            onEdit();
+                                          }}
+                                          className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--color-border)] bg-white text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                                          aria-label="Edit post"
+                                        >
+                                          <Edit3 className="h-4 w-4" />
+                                        </button>
+                                      ) : null}
+                                      <button
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          setActionMenuPostId((prev) => (prev === post._id ? null : post._id));
+                                        }}
+                                        className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--color-border)] bg-white text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                                        aria-label="More actions"
+                                        aria-expanded={actionMenuPostId === post._id}
+                                        aria-haspopup="true"
                                       >
-                                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--color-text-secondary)]">
-                                          Research videos
-                                        </p>
-                                        <div className="max-h-[240px] space-y-2 overflow-y-auto pr-1">
-                                          {researchVideos.map((video, index) => {
-                                            const videoHref = video.videoId
-                                              ? `https://www.youtube.com/watch?v=${video.videoId}`
-                                              : undefined;
-                                            const rowContent = (
-                                              <>
-                                                {video.thumbnail ? (
-                                                  <img
-                                                    src={video.thumbnail}
-                                                    alt={video.title ?? "YouTube video thumbnail"}
-                                                    className="h-14 w-20 shrink-0 rounded-lg border border-[var(--color-border)] object-cover"
-                                                  />
-                                                ) : (
-                                                  <div className="h-14 w-20 shrink-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)]" />
-                                                )}
-                                                <div className="min-w-0">
-                                                  <p className="line-clamp-2 text-sm font-semibold text-[var(--color-text-primary)]">
-                                                    {video.title ?? "Research video"}
-                                                  </p>
-                                                  <p className="mt-1 truncate text-xs text-[var(--color-text-secondary)]">
-                                                    {video.channelTitle ?? "YouTube"}
-                                                  </p>
-                                                </div>
-                                              </>
-                                            );
+                                        <CircleEllipsis className="h-4 w-4" />
+                                      </button>
 
-                                            if (videoHref) {
-                                              return (
-                                                <a
-                                                  key={`${video.videoId ?? "video"}-${index}`}
-                                                  href={videoHref}
-                                                  target="_blank"
-                                                  rel="noreferrer noopener"
-                                                  onClick={(event) => event.stopPropagation()}
-                                                  className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-white/85 p-2 transition hover:border-[var(--color-primary)]/45"
-                                                >
-                                                  {rowContent}
-                                                </a>
-                                              );
-                                            }
+                                      {actionMenuPostId === post._id ? (
+                                        <div
+                                          ref={actionMenuBoundaryRef}
+                                          className="absolute right-0 top-full z-10 mt-2 w-40 rounded-xl border border-[var(--color-border)] bg-white p-1 shadow-lg"
+                                          onClick={(event) => event.stopPropagation()}
+                                        >
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setActionMenuPostId(null);
+                                              setDeleteModalState({
+                                                isOpen: true,
+                                                postId: post._id,
+                                                isPublished: isPublished,
+                                              });
+                                            }}
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                            Delete post
+                                          </button>
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  </div>
 
+                                  {researchCount > 0 && isResearchExpanded ? (
+                                    <div
+                                      id={researchPanelId}
+                                      onClick={(event) => event.stopPropagation()}
+                                      className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-overlay)] p-3 text-[var(--color-text-primary)] shadow-[0_24px_60px_-45px_rgba(15,23,42,0.32)]"
+                                    >
+                                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--color-text-secondary)]">
+                                        Research videos
+                                      </p>
+                                      <div className="max-h-[240px] space-y-2 overflow-y-auto pr-1">
+                                        {researchVideos.map((video, index) => {
+                                          const videoHref = video.videoId
+                                            ? `https://www.youtube.com/watch?v=${video.videoId}`
+                                            : undefined;
+                                          const rowContent = (
+                                            <>
+                                              {video.thumbnail ? (
+                                                <img
+                                                  src={video.thumbnail}
+                                                  alt={video.title ?? "YouTube video thumbnail"}
+                                                  className="h-14 w-20 shrink-0 rounded-lg border border-[var(--color-border)] object-cover"
+                                                />
+                                              ) : (
+                                                <div className="h-14 w-20 shrink-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)]" />
+                                              )}
+                                              <div className="min-w-0">
+                                                <p className="line-clamp-2 text-sm font-semibold text-[var(--color-text-primary)]">
+                                                  {video.title ?? "Research video"}
+                                                </p>
+                                                <p className="mt-1 truncate text-xs text-[var(--color-text-secondary)]">
+                                                  {video.channelTitle ?? "YouTube"}
+                                                </p>
+                                              </div>
+                                            </>
+                                          );
+
+                                          if (videoHref) {
                                             return (
-                                              <div
-                                                key={`video-fallback-${index}`}
-                                                className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-white/85 p-2"
+                                              <a
+                                                key={`${video.videoId ?? "video"}-${index}`}
+                                                href={videoHref}
+                                                target="_blank"
+                                                rel="noreferrer noopener"
+                                                onClick={(event) => event.stopPropagation()}
+                                                className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-white/85 p-2 transition hover:border-[var(--color-primary)]/45"
                                               >
                                                 {rowContent}
-                                              </div>
+                                              </a>
                                             );
-                                          })}
-                                        </div>
+                                          }
+
+                                          return (
+                                            <div
+                                              key={`video-fallback-${index}`}
+                                              className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-white/85 p-2"
+                                            >
+                                              {rowContent}
+                                            </div>
+                                          );
+                                        })}
                                       </div>
-                                    ) : null}
-                                  </div>
-                                </article>
-                              );
-                            })}
-                          </div>
-                        </section>
-                      ))
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </article>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    ))
                     : null}
                 </div>
               )}
@@ -1408,6 +1598,13 @@ export default function PostsClient({
         onGetDraftStatus={handleGetDraftStatus}
         onGetDraftById={handleGetDraftById}
         onGetLinkedinImageByUrn={handleGetLinkedinImageByUrn}
+      />
+      <ConfirmDeleteModal
+        isOpen={deleteModalState.isOpen}
+        isPublished={deleteModalState.isPublished}
+        isDeleting={isDeleting}
+        onClose={() => setDeleteModalState((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={handleDeletePost}
       />
     </div>
   );

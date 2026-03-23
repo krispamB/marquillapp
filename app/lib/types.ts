@@ -107,6 +107,10 @@ export type DashboardPostsResponse = {
   statusCode?: number;
   message?: string;
   data?: DashboardPost[];
+  filters?: {
+    availableMonths?: string[];
+    connectedAccountIds?: string[];
+  };
 };
 
 export type PostStatus = "DRAFT" | "SCHEDULED" | "PUBLISHED";
@@ -138,6 +142,36 @@ export type DraftStatusResponse = {
   message?: string;
   data?: DraftStatusData;
 };
+
+export type FeatureLimitErrorResponse = {
+  code: "FEATURE_LIMIT_EXCEEDED";
+  feature: string;
+  limit: number;
+  currentUsage: number;
+  tier: {
+    id: string;
+    name: string;
+  };
+  upgradeHint: string;
+};
+
+export class FeatureLimitExceededError extends Error {
+  public feature: string;
+  public limit: number;
+  public currentUsage: number;
+  public tier: { id: string; name: string };
+  public upgradeHint: string;
+
+  constructor(response: FeatureLimitErrorResponse) {
+    super(response.upgradeHint);
+    this.name = "FeatureLimitExceededError";
+    this.feature = response.feature;
+    this.limit = response.limit;
+    this.currentUsage = response.currentUsage;
+    this.tier = response.tier;
+    this.upgradeHint = response.upgradeHint;
+  }
+}
 
 export type PostDetailData = {
   _id?: string;

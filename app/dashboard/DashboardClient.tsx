@@ -40,7 +40,9 @@ import type {
   PostDetailResponse,
   UpdatePostResponse,
   UserProfile,
+  FeatureLimitErrorResponse,
 } from "../lib/types";
+import { FeatureLimitExceededError } from "../lib/types";
 
 const navItems = [
   {
@@ -317,8 +319,8 @@ export default function DashboardPage({
   const areaPath =
     chartPoints.length > 0
       ? `M ${chartPoints[0].x} ${chartPadding.top + plotHeight} L ${chartPoints
-          .map((point) => `${point.x} ${point.y}`)
-          .join(" L ")} L ${chartPoints[chartPoints.length - 1].x} ${chartPadding.top + plotHeight} Z`
+        .map((point) => `${point.x} ${point.y}`)
+        .join(" L ")} L ${chartPoints[chartPoints.length - 1].x} ${chartPadding.top + plotHeight} Z`
       : "";
   const lastPoint = chartPoints[chartPoints.length - 1];
   const tooltipText = lastPoint ? `${lastPoint.month}:${lastPoint.count}` : "";
@@ -331,9 +333,9 @@ export default function DashboardPage({
   );
   const tooltipX = lastPoint
     ? Math.min(
-        chartWidth - chartPadding.right - tooltipWidth,
-        Math.max(chartPadding.left, lastPoint.x - tooltipWidth / 2),
-      )
+      chartWidth - chartPadding.right - tooltipWidth,
+      Math.max(chartPadding.left, lastPoint.x - tooltipWidth / 2),
+    )
     : chartPadding.left;
   const tooltipY = lastPoint ? Math.max(chartPadding.top, lastPoint.y - 28) : chartPadding.top;
   const tooltipTextX = tooltipX + tooltipWidth / 2;
@@ -984,6 +986,12 @@ export default function DashboardPage({
     }
 
     if (!response.ok) {
+      if (parsedResponse && "code" in parsedResponse && parsedResponse.code === "FEATURE_LIMIT_EXCEEDED") {
+        const errorData = parsedResponse as unknown as FeatureLimitErrorResponse;
+        const msg = errorData.upgradeHint || "Post draft limit exceeded.";
+        setConnectFeedback(msg);
+        throw new FeatureLimitExceededError(errorData);
+      }
       const message = parsedResponse?.message || "Unable to generate draft.";
       setConnectFeedback(message);
       throw new Error(message);
@@ -1117,11 +1125,10 @@ export default function DashboardPage({
 
         <div
           ref={connectMenuBoundaryRef}
-          className={`relative ${
-            sidebarCollapsed
-              ? "md:pl-[136px] lg:pl-[156px]"
-              : "md:pl-[276px] lg:pl-[296px]"
-          }`}
+          className={`relative ${sidebarCollapsed
+            ? "md:pl-[136px] lg:pl-[156px]"
+            : "md:pl-[276px] lg:pl-[296px]"
+            }`}
         >
           <Sidebar
             user={{ ...user, initials }}
@@ -1179,9 +1186,8 @@ export default function DashboardPage({
             ) : null}
 
             <div
-              className={`flex flex-col gap-8 ${
-                hasConnectedAccounts ? "" : "pointer-events-none opacity-60"
-              }`}
+              className={`flex flex-col gap-8 ${hasConnectedAccounts ? "" : "pointer-events-none opacity-60"
+                }`}
               aria-disabled={!hasConnectedAccounts}
             >
               <section className="grid gap-4 lg:grid-cols-2">
@@ -1401,26 +1407,26 @@ export default function DashboardPage({
                     ) : null}
                     {!isPostsLoading && !postsError
                       ? displayedDraftPosts.map((post) => (
-                          <ListItem
-                            key={post._id}
-                            title={getTitleFromContent(post.content)}
-                            subtitle={`Updated ${formatDraftUpdatedLabel(
-                              post.updatedAt ?? post.createdAt,
-                            )}`}
-                            status="DRAFT"
-                            onClick={() => {
-                              if (!post._id) {
-                                return;
-                              }
-                              openEdit({
-                                postId: post._id,
-                                initialContent: post.content ?? "",
-                                initialImageUrl: undefined,
-                              });
-                            }}
-                            ariaLabel={`Edit draft: ${getTitleFromContent(post.content)}`}
-                          />
-                        ))
+                        <ListItem
+                          key={post._id}
+                          title={getTitleFromContent(post.content)}
+                          subtitle={`Updated ${formatDraftUpdatedLabel(
+                            post.updatedAt ?? post.createdAt,
+                          )}`}
+                          status="DRAFT"
+                          onClick={() => {
+                            if (!post._id) {
+                              return;
+                            }
+                            openEdit({
+                              postId: post._id,
+                              initialContent: post.content ?? "",
+                              initialImageUrl: undefined,
+                            });
+                          }}
+                          ariaLabel={`Edit draft: ${getTitleFromContent(post.content)}`}
+                        />
+                      ))
                       : null}
                   </div>
                 </Card>
@@ -1472,12 +1478,12 @@ export default function DashboardPage({
                           cell.day === null
                             ? "text-transparent"
                             : cell.isToday && isScheduledDay
-                            ? "border border-[var(--color-secondary)] bg-[var(--color-secondary)] text-white shadow-[0_12px_30px_-20px_rgba(28,27,39,0.45)]"
-                            : cell.isToday
-                            ? "bg-[var(--color-secondary)] text-white shadow-[0_12px_30px_-20px_rgba(28,27,39,0.45)]"
-                            : isScheduledDay
-                            ? "border border-[#DCCFA4] bg-[#F6F1DE] text-[#7A5A00]"
-                            : "border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-white/70";
+                              ? "border border-[var(--color-secondary)] bg-[var(--color-secondary)] text-white shadow-[0_12px_30px_-20px_rgba(28,27,39,0.45)]"
+                              : cell.isToday
+                                ? "bg-[var(--color-secondary)] text-white shadow-[0_12px_30px_-20px_rgba(28,27,39,0.45)]"
+                                : isScheduledDay
+                                  ? "border border-[#DCCFA4] bg-[#F6F1DE] text-[#7A5A00]"
+                                  : "border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-white/70";
                         return (
                           <div
                             key={`day-${index}`}
@@ -1506,13 +1512,13 @@ export default function DashboardPage({
                     ) : null}
                     {!isPostsLoading && !postsError
                       ? mobileScheduledPosts.map((post) => (
-                          <ListItem
-                            key={post._id}
-                            title={getTitleFromContent(post.content)}
-                            subtitle={formatScheduledLocalDateTime(post.scheduledAt)}
-                            status="SCHEDULED"
-                          />
-                        ))
+                        <ListItem
+                          key={post._id}
+                          title={getTitleFromContent(post.content)}
+                          subtitle={formatScheduledLocalDateTime(post.scheduledAt)}
+                          status="SCHEDULED"
+                        />
+                      ))
                       : null}
                   </div>
 
@@ -1532,13 +1538,13 @@ export default function DashboardPage({
                     ) : null}
                     {!isPostsLoading && !postsError
                       ? nearestScheduledPosts.map((post) => (
-                          <ListItem
-                            key={post._id}
-                            title={getTitleFromContent(post.content)}
-                            subtitle={formatScheduledLocalDateTime(post.scheduledAt)}
-                            status="SCHEDULED"
-                          />
-                        ))
+                        <ListItem
+                          key={post._id}
+                          title={getTitleFromContent(post.content)}
+                          subtitle={formatScheduledLocalDateTime(post.scheduledAt)}
+                          status="SCHEDULED"
+                        />
+                      ))
                       : null}
                   </div>
                 </Card>
