@@ -13,6 +13,7 @@ import { UpdatePostDto, SchedulePostDto } from './dto';
 import {
   AccountProvider,
   ConnectedAccount,
+  LinkedinAccountType,
   PostDraft,
   PostDraftStatus,
   User,
@@ -53,6 +54,7 @@ export class PostService {
 
   async createDraft(user: User, accountId: string, dto: InputDto) {
     await this.featureGatingService.assertAiDraftQuota(user._id.toString());
+    await this.getOwnedLinkedinConnectedAccount(user._id.toString(), accountId);
 
     const draft = new this.postDraftModel({
       user,
@@ -187,14 +189,10 @@ export class PostService {
       );
     }
 
-    const connectedAccount = await this.connectedAccountModel.findOne({
-      user: post.user,
-      provider: AccountProvider.LINKEDIN,
-    });
-
-    if (!connectedAccount) {
-      throw new NotFoundException('Connected account not found');
-    }
+    const connectedAccount = await this.getOwnedLinkedinConnectedAccount(
+      user._id.toString(),
+      post.connectedAccount.toString(),
+    );
 
     const accessToken = await this.encryptionService.decrypt(
       connectedAccount.accessToken,
@@ -255,14 +253,10 @@ export class PostService {
       throw new BadRequestException('Post is already published');
     }
 
-    const connectedAccount = await this.connectedAccountModel.findOne({
-      user: post.user,
-      provider: AccountProvider.LINKEDIN,
-    });
-
-    if (!connectedAccount) {
-      throw new NotFoundException('Connected account not found');
-    }
+    const connectedAccount = await this.getOwnedLinkedinConnectedAccount(
+      user._id.toString(),
+      post.connectedAccount.toString(),
+    );
 
     const accessToken = await this.encryptionService.decrypt(
       connectedAccount.accessToken,
@@ -270,7 +264,7 @@ export class PostService {
 
     const url = `${this.LINKEDIN_API_BASE}/posts`;
     const data: ILinkedInPost = {
-      author: `urn:li:person:${connectedAccount.profileMetadata!.sub}`,
+      author: this.resolveLinkedinAuthorUrn(connectedAccount),
       commentary: post.content
         ? formatLinkedinContent(post.content)
         : undefined,
@@ -380,21 +374,17 @@ export class PostService {
       throw new BadRequestException('Post is already published');
     }
 
-    const connectedAccount = await this.connectedAccountModel.findOne({
-      user: post.user,
-      provider: AccountProvider.LINKEDIN,
-    });
-
-    if (!connectedAccount) {
-      throw new NotFoundException('Connected account not found');
-    }
+    const connectedAccount = await this.getOwnedLinkedinConnectedAccount(
+      user._id.toString(),
+      post.connectedAccount.toString(),
+    );
 
     const accessToken = await this.encryptionService.decrypt(
       connectedAccount.accessToken,
     );
 
     const urn = await this.uploadLinkedinImage(
-      `urn:li:person:${connectedAccount.profileMetadata!.sub}`,
+      this.resolveLinkedinAuthorUrn(connectedAccount),
       accessToken,
       file,
     );
@@ -554,5 +544,55 @@ export class PostService {
       total,
       monthly: metrics,
     };
+  }
+
+  private async getOwnedLinkedinConnectedAccount(
+    userId: string,
+    connectedAccountId: string,
+  ): Promise<ConnectedAccount> {
+    const connectedAccount =
+      await this.connectedAccountModel.findById(connectedAccountId);
+    if (!connectedAccount) {
+      throw new NotFoundException('Connected account not found');
+    }
+
+    if (connectedAccount.user.toString() !== userId) {
+      throw new ForbiddenException('Connected account is not owned by user');
+    }
+
+    if (connectedAccount.provider !== AccountProvider.LINKEDIN) {
+      throw new BadRequestException('Connected account must be LinkedIn');
+    }
+
+    return connectedAccount;
+  }
+
+  private resolveLinkedinAuthorUrn(connectedAccount: ConnectedAccount): string {
+    if (
+      connectedAccount.accountType === LinkedinAccountType.ORGANIZATION ||
+      connectedAccount.profileMetadata?.organizationUrn
+    ) {
+      const organizationId =
+        connectedAccount.externalId ??
+        connectedAccount.profileMetadata?.organizationUrn?.split(':').pop();
+      if (!organizationId) {
+        throw new BadRequestException(
+          'Connected organization account is missing organization identifier',
+        );
+      }
+      return `urn:li:organization:${organizationId}`;
+    }
+
+    const profileSub =
+      connectedAccount.profileMetadata?.sub ??
+      connectedAccount.externalId ??
+      connectedAccount.impersonatorUrn?.split(':').pop();
+    if (!profileSub) {
+      throw new BadRequestException(
+        'Connected personal account is missing LinkedIn profile identifier',
+      );
+    }
+
+    return `urn:li:person:${profileSub}`;
   }
 }

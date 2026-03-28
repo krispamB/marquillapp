@@ -5,9 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request } from 'express';
-import {
-  SubscriptionStatus,
-} from '../../database/schemas/subscription.schema';
+import { SubscriptionStatus } from '../../database/schemas/subscription.schema';
 import { Tier } from '../../database/schemas/tier.schema';
 import { User } from '../../database/schemas/user.schema';
 import { FeatureGatingService } from '../../feature-gating/feature-gating.service';
@@ -36,7 +34,8 @@ export class SubscriptionAccessGuard implements CanActivate {
       return true;
     }
 
-    const entitlement = await this.featureGatingService.resolveEntitlement(userId);
+    const entitlement =
+      await this.featureGatingService.resolveEntitlement(userId);
     if (!entitlement.tier) {
       this.logger.warn('Default tier missing during subscription fallback');
       request.entitlementTier = null;
@@ -45,7 +44,7 @@ export class SubscriptionAccessGuard implements CanActivate {
       return true;
     }
 
-    request.entitlementTier = entitlement.tier as Tier;
+    request.entitlementTier = entitlement.tier;
     request.entitlementSource = entitlement.source;
     request.subscriptionStatus = entitlement.subscriptionStatus;
     return true;

@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   UseGuards,
@@ -15,6 +16,7 @@ import { GetUser } from '../common/decorators';
 import { User } from '../database/schemas';
 import { JwtAuthGuard } from 'src/common/guards';
 import type { IAppResponse } from 'src/common/interfaces';
+import { ConnectLinkedinOrganizationsDto } from './dto/connect-linkedin-organizations.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -71,6 +73,35 @@ export class AuthController {
   ) {
     return this.authService.linkedinCallback(code, state);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('linkedin/orgs')
+  async getLinkedinOrganizations(@GetUser() user: User): Promise<IAppResponse> {
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'LinkedIn organizations fetched successfully',
+      data: await this.authService.getLinkedinOrganizations(
+        user._id.toString(),
+      ),
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('linkedin/orgs')
+  async connectLinkedinOrganizations(
+    @GetUser() user: User,
+    @Body() dto: ConnectLinkedinOrganizationsDto,
+  ): Promise<IAppResponse> {
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'LinkedIn organizations connected successfully',
+      data: await this.authService.connectLinkedinOrganizations(
+        user._id.toString(),
+        dto.organizationIds,
+      ),
+    };
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('connected-accounts')
   async getConnectedAccounts(@GetUser() user: User): Promise<IAppResponse> {

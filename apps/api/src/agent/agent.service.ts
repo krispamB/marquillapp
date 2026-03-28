@@ -43,7 +43,7 @@ export class AgentService {
     if (!apiKey) {
       throw new Error('YOUTUBE_API_KEY is not configured');
     }
-    this.youtube = youtube({version: 'v3', auth: apiKey});
+    this.youtube = youtube({ version: 'v3', auth: apiKey });
 
     this.supadata = new Supadata({
       apiKey: this.config.get<string>('SUPADATA_KEY')!,

@@ -1,9 +1,17 @@
 import { Types } from 'mongoose';
-import { AccountProvider } from '../database/schemas/connected-account.schema';
+import {
+  AccountProvider,
+  LinkedinAccountType,
+} from '../database/schemas/connected-account.schema';
 
 jest.mock('src/common/HelperFn', () => ({ apiFetch: jest.fn() }), {
   virtual: true,
 });
+jest.mock(
+  '../feature-gating/feature-gating.service',
+  () => ({ FeatureGatingService: class FeatureGatingService {} }),
+  { virtual: true },
+);
 
 import { AuthService } from './auth.service';
 
@@ -14,6 +22,7 @@ describe('AuthService.linkedinCallback', () => {
     const connectedAccountModel = {
       findOne: jest.fn(),
       findOneAndUpdate: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({}),
     };
     const tierModel = {};
     const configService = {};
@@ -94,6 +103,10 @@ describe('AuthService.linkedinCallback', () => {
     expect(mocks.connectedAccountModel.findOne).toHaveBeenCalledWith({
       user: new Types.ObjectId(userId),
       provider: AccountProvider.LINKEDIN,
+      $or: [
+        { accountType: LinkedinAccountType.PERSON },
+        { accountType: { $exists: false } },
+      ],
     });
   });
 

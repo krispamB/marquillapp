@@ -62,9 +62,9 @@ describe('PaymentService.cancelSubscription', () => {
 
     const result = await service.cancelSubscription(userId);
 
-    expect(mocks.polarClient.cancelSubscriptionAtPeriodEnd).toHaveBeenCalledWith(
-      'sub_123',
-    );
+    expect(
+      mocks.polarClient.cancelSubscriptionAtPeriodEnd,
+    ).toHaveBeenCalledWith('sub_123');
     expect(mocks.subscriptionModel.findOneAndUpdate).toHaveBeenCalledWith(
       { userId: expect.any(Types.ObjectId) },
       { cancelAtPeriodEnd: true },
@@ -93,7 +93,9 @@ describe('PaymentService.cancelSubscription', () => {
 
     const result = await service.cancelSubscription(userId);
 
-    expect(mocks.polarClient.cancelSubscriptionAtPeriodEnd).not.toHaveBeenCalled();
+    expect(
+      mocks.polarClient.cancelSubscriptionAtPeriodEnd,
+    ).not.toHaveBeenCalled();
     expect(mocks.subscriptionModel.findOneAndUpdate).not.toHaveBeenCalled();
     expect(result).toBe(billingSummary);
   });
