@@ -37,6 +37,9 @@ export class ConnectedAccount extends Document {
   avatarUrl?: string;
 
   @Prop()
+  avatarUrlExpiresAt?: Date;
+
+  @Prop()
   impersonatorUrn?: string;
 
   @Prop({ required: true })
