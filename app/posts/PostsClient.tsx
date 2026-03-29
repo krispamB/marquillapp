@@ -664,7 +664,7 @@ export default function PostsClient({
   ): Promise<File> => {
     const response = await fetch(imageUrl);
     if (!response.ok) {
-      throw new Error("Unable to fetch selected Unsplash image.");
+      throw new Error("Unable to fetch selected stock image.");
     }
 
     const blob = await response.blob();
@@ -781,21 +781,25 @@ export default function PostsClient({
         setConnectFeedback(error instanceof Error ? error.message : "Image upload failed.");
         return;
       }
-    } else if (payload.imageSource === "unsplash" && payload.imageUrl) {
+    } else if (
+      (payload.imageSource === "unsplash" || payload.imageSource === "pexels") &&
+      payload.imageUrl
+    ) {
+      const sourceLabel = payload.imageSource === "pexels" ? "Pexels" : "Unsplash";
       if (!payload.postId) {
-        setConnectFeedback("Please save or generate this draft first before uploading an Unsplash image.");
+        setConnectFeedback(`Please save or generate this draft first before uploading a ${sourceLabel} image.`);
         return;
       }
       try {
         const remoteFile = await buildFileFromRemoteImage(
           payload.imageUrl,
-          "unsplash-image",
+          payload.imageSource === "pexels" ? "pexels-image" : "unsplash-image",
           payload.imageMimeType,
         );
         await uploadImageForPost(payload.postId, remoteFile);
       } catch (error) {
         setConnectFeedback(
-          error instanceof Error ? error.message : "Unsplash image upload failed.",
+          error instanceof Error ? error.message : `${sourceLabel} image upload failed.`,
         );
         return;
       }

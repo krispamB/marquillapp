@@ -49,7 +49,7 @@ export type NewPostSubmitPayload = {
   content: string;
   imageFile?: File;
   imageUrl?: string;
-  imageSource?: "device" | "unsplash" | "existing";
+  imageSource?: "device" | "unsplash" | "pexels" | "existing";
   imageMimeType?: string;
   scheduledTime?: string;
   timezone?: string;
@@ -91,6 +91,24 @@ type UnsplashSearchResponse = {
   results?: UnsplashPhoto[];
 };
 
+type PexelsPhoto = {
+  id: number;
+  alt?: string;
+  src?: {
+    medium?: string;
+    large?: string;
+    large2x?: string;
+    original?: string;
+  };
+  photographer?: string;
+  photographer_url?: string;
+  url?: string;
+};
+
+type PexelsSearchResponse = {
+  photos?: PexelsPhoto[];
+};
+
 type CachedLinkedinImage = {
   downloadUrl?: string;
   downloadUrlExpiresAt?: number;
@@ -122,6 +140,17 @@ function dedupeUnsplashPhotos(photos: UnsplashPhoto[]) {
   });
 }
 
+function dedupePexelsPhotos(photos: PexelsPhoto[]) {
+  const seen = new Set<number>();
+  return photos.filter((photo) => {
+    if (!photo?.id || seen.has(photo.id)) {
+      return false;
+    }
+    seen.add(photo.id);
+    return true;
+  });
+}
+
 function extractMediaUrns(mediaItems?: PostMediaItem[]) {
   if (!Array.isArray(mediaItems)) {
     return [];
@@ -132,7 +161,7 @@ function extractMediaUrns(mediaItems?: PostMediaItem[]) {
 }
 
 function buildImageFingerprint(
-  source: "device" | "unsplash" | "existing" | undefined,
+  source: "device" | "unsplash" | "pexels" | "existing" | undefined,
   imageUrl: string | undefined,
 ) {
   return `${source ?? "none"}|${imageUrl ?? ""}`;
@@ -203,7 +232,7 @@ export default function NewPostModal({
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | undefined>(
     initialImageUrl,
   );
-  const [imageSource, setImageSource] = useState<"device" | "unsplash" | "existing" | undefined>(
+  const [imageSource, setImageSource] = useState<"device" | "unsplash" | "pexels" | "existing" | undefined>(
     initialImageUrl ? "existing" : undefined,
   );
   const [imageMimeType, setImageMimeType] = useState<string | undefined>(undefined);
@@ -221,8 +250,9 @@ export default function NewPostModal({
   const [pollStartedAt, setPollStartedAt] = useState<number | null>(null);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isMediaMenuOpen, setIsMediaMenuOpen] = useState(false);
-  const [selectedMediaSource, setSelectedMediaSource] = useState<"device" | "unsplash">("device");
+  const [selectedMediaSource, setSelectedMediaSource] = useState<"device" | "unsplash" | "pexels">("device");
   const [isUnsplashModalOpen, setIsUnsplashModalOpen] = useState(false);
+  const [isPexelsModalOpen, setIsPexelsModalOpen] = useState(false);
   const [isSchedulePopoverOpen, setIsSchedulePopoverOpen] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
@@ -234,9 +264,16 @@ export default function NewPostModal({
   const [unsplashHasMore, setUnsplashHasMore] = useState(true);
   const [unsplashIsLoading, setUnsplashIsLoading] = useState(false);
   const [unsplashError, setUnsplashError] = useState<string | null>(null);
+  const [pexelsQuery, setPexelsQuery] = useState(DEFAULT_UNSPLASH_QUERY);
+  const [pexelsCommittedQuery, setPexelsCommittedQuery] = useState(DEFAULT_UNSPLASH_QUERY);
+  const [pexelsImages, setPexelsImages] = useState<PexelsPhoto[]>([]);
+  const [pexelsPage, setPexelsPage] = useState(0);
+  const [pexelsHasMore, setPexelsHasMore] = useState(true);
+  const [pexelsIsLoading, setPexelsIsLoading] = useState(false);
+  const [pexelsError, setPexelsError] = useState<string | null>(null);
   const [postMediaUrns, setPostMediaUrns] = useState<string[]>([]);
   const [isResolvingPreviewMedia, setIsResolvingPreviewMedia] = useState(false);
-  const [hasUserSelectedUnsplashImage, setHasUserSelectedUnsplashImage] = useState(false);
+  const [hasUserSelectedStockImage, setHasUserSelectedStockImage] = useState(false);
   const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
 
   const modalRef = useRef<HTMLDivElement | null>(null);
@@ -250,6 +287,10 @@ export default function NewPostModal({
   const unsplashScrollRef = useRef<HTMLDivElement | null>(null);
   const unsplashSentinelRef = useRef<HTMLDivElement | null>(null);
   const unsplashInFlightRef = useRef<string>("");
+  const pexelsModalRef = useRef<HTMLDivElement | null>(null);
+  const pexelsScrollRef = useRef<HTMLDivElement | null>(null);
+  const pexelsSentinelRef = useRef<HTMLDivElement | null>(null);
+  const pexelsInFlightRef = useRef<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const keepEditingButtonRef = useRef<HTMLButtonElement | null>(null);
   const generatedObjectUrlRef = useRef<string | null>(null);
@@ -274,6 +315,7 @@ export default function NewPostModal({
   const POLL_INTERVAL_MS = 6000;
   const POLL_TIMEOUT_MS = 240000;
   const unsplashAccessKey = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY?.trim() ?? "";
+  const pexelsAccessKey = process.env.NEXT_PUBLIC_PEXELS_ACCESS_KEY?.trim() ?? "";
   const userTimezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     [],
@@ -314,6 +356,7 @@ export default function NewPostModal({
     setIsMediaMenuOpen(false);
     setSelectedMediaSource("device");
     setIsUnsplashModalOpen(false);
+    setIsPexelsModalOpen(false);
     setIsSchedulePopoverOpen(false);
     setScheduleDate("");
     setScheduleTime("");
@@ -325,9 +368,16 @@ export default function NewPostModal({
     setUnsplashHasMore(true);
     setUnsplashIsLoading(false);
     setUnsplashError(null);
+    setPexelsQuery(DEFAULT_UNSPLASH_QUERY);
+    setPexelsCommittedQuery(DEFAULT_UNSPLASH_QUERY);
+    setPexelsImages([]);
+    setPexelsPage(0);
+    setPexelsHasMore(true);
+    setPexelsIsLoading(false);
+    setPexelsError(null);
     setPostMediaUrns([]);
     setIsResolvingPreviewMedia(false);
-    setHasUserSelectedUnsplashImage(false);
+    setHasUserSelectedStockImage(false);
     setIsDiscardConfirmOpen(false);
     previewMediaFetchStateRef.current = { postId: null, status: "idle" };
     initialContentRef.current = initialContent ?? "";
@@ -336,6 +386,7 @@ export default function NewPostModal({
       initialImageUrl,
     );
     unsplashInFlightRef.current = "";
+    pexelsInFlightRef.current = "";
     pollInFlightRef.current = false;
     if (pollTimerRef.current !== null) {
       window.clearInterval(pollTimerRef.current);
@@ -356,6 +407,7 @@ export default function NewPostModal({
     setIsPolling(false);
     setPollStartedAt(null);
     setIsUnsplashModalOpen(false);
+    setIsPexelsModalOpen(false);
     setIsSchedulePopoverOpen(false);
     setScheduleError(null);
     setIsResolvingPreviewMedia(false);
@@ -365,6 +417,7 @@ export default function NewPostModal({
     activePreviewPostIdRef.current = null;
     previousEditPostIdRef.current = undefined;
     unsplashInFlightRef.current = "";
+    pexelsInFlightRef.current = "";
     if (pollTimerRef.current !== null) {
       window.clearInterval(pollTimerRef.current);
       pollTimerRef.current = null;
@@ -393,7 +446,7 @@ export default function NewPostModal({
     setImagePreviewUrl(initialImageUrl);
     setImageSource(initialImageUrl ? "existing" : undefined);
     setImageMimeType(undefined);
-    setHasUserSelectedUnsplashImage(false);
+    setHasUserSelectedStockImage(false);
     setIsDiscardConfirmOpen(false);
     setIsSchedulePopoverOpen(false);
     setScheduleError(null);
@@ -460,6 +513,11 @@ export default function NewPostModal({
           setIsUnsplashModalOpen(false);
           return;
         }
+        if (isPexelsModalOpen) {
+          event.preventDefault();
+          setIsPexelsModalOpen(false);
+          return;
+        }
         if (isSchedulePopoverOpen) {
           event.preventDefault();
           setIsSchedulePopoverOpen(false);
@@ -485,7 +543,11 @@ export default function NewPostModal({
         return;
       }
 
-      const modal = isUnsplashModalOpen ? unsplashModalRef.current : modalRef.current;
+      const modal = isUnsplashModalOpen
+        ? unsplashModalRef.current
+        : isPexelsModalOpen
+          ? pexelsModalRef.current
+          : modalRef.current;
       if (!modal) {
         return;
       }
@@ -524,6 +586,7 @@ export default function NewPostModal({
     isMediaMenuOpen,
     isOpen,
     isSchedulePopoverOpen,
+    isPexelsModalOpen,
     isUnsplashModalOpen,
     requestClose,
   ]);
@@ -712,6 +775,104 @@ export default function NewPostModal({
     observer.observe(target);
     return () => observer.disconnect();
   }, [isUnsplashModalOpen, unsplashHasMore, unsplashIsLoading]);
+
+  useEffect(() => {
+    if (!isPexelsModalOpen || pexelsPage < 1) {
+      return;
+    }
+    if (!pexelsAccessKey) {
+      setPexelsError("Pexels access key is missing.");
+      setPexelsHasMore(false);
+      return;
+    }
+
+    const inFlightKey = `${pexelsCommittedQuery}:${pexelsPage}`;
+    if (pexelsInFlightRef.current === inFlightKey) {
+      return;
+    }
+    pexelsInFlightRef.current = inFlightKey;
+
+    const controller = new AbortController();
+    const query = pexelsCommittedQuery.trim() || DEFAULT_UNSPLASH_QUERY;
+    const params = new URLSearchParams({
+      query,
+      page: String(pexelsPage),
+      per_page: String(UNSPLASH_PAGE_SIZE),
+    });
+
+    setPexelsIsLoading(true);
+
+    void (async () => {
+      try {
+        const response = await fetch(`https://api.pexels.com/v1/search?${params.toString()}`, {
+          headers: {
+            Authorization: pexelsAccessKey,
+          },
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as PexelsSearchResponse;
+        if (!response.ok) {
+          throw new Error("Unable to load Pexels images.");
+        }
+
+        const results = Array.isArray(payload?.photos)
+          ? dedupePexelsPhotos(payload.photos)
+          : [];
+
+        setPexelsImages((current) =>
+          pexelsPage === 1
+            ? results
+            : dedupePexelsPhotos([...current, ...results]),
+        );
+        setPexelsHasMore(results.length === UNSPLASH_PAGE_SIZE);
+        setPexelsError(null);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        setPexelsError(
+          error instanceof Error ? error.message : "Unable to load Pexels images.",
+        );
+        setPexelsHasMore(false);
+      } finally {
+        setPexelsIsLoading(false);
+        if (pexelsInFlightRef.current === inFlightKey) {
+          pexelsInFlightRef.current = "";
+        }
+      }
+    })();
+
+    return () => controller.abort();
+  }, [isPexelsModalOpen, pexelsAccessKey, pexelsCommittedQuery, pexelsPage]);
+
+  useEffect(() => {
+    if (!isPexelsModalOpen || !pexelsHasMore || pexelsIsLoading) {
+      return;
+    }
+    const root = pexelsScrollRef.current;
+    const target = pexelsSentinelRef.current;
+    if (!root || !target) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const isIntersecting = entries.some((entry) => entry.isIntersecting);
+        if (!isIntersecting || pexelsInFlightRef.current) {
+          return;
+        }
+        setPexelsPage((current) => current + 1);
+      },
+      {
+        root,
+        threshold: 0.2,
+        rootMargin: "180px 0px",
+      },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [isPexelsModalOpen, pexelsHasMore, pexelsIsLoading]);
 
   useEffect(() => {
     isUnmountedRef.current = false;
@@ -995,7 +1156,7 @@ export default function NewPostModal({
     setImageSource("device");
     setImageMimeType(file.type || undefined);
     setResolvedLinkedinPreviewUrl(null);
-    setHasUserSelectedUnsplashImage(false);
+    setHasUserSelectedStockImage(false);
   };
 
   const openUnsplashModal = () => {
@@ -1005,7 +1166,19 @@ export default function NewPostModal({
     setUnsplashPage(1);
     setUnsplashHasMore(true);
     setUnsplashError(null);
+    setIsPexelsModalOpen(false);
     setIsUnsplashModalOpen(true);
+  };
+
+  const openPexelsModal = () => {
+    setPexelsQuery(DEFAULT_UNSPLASH_QUERY);
+    setPexelsCommittedQuery(DEFAULT_UNSPLASH_QUERY);
+    setPexelsImages([]);
+    setPexelsPage(1);
+    setPexelsHasMore(true);
+    setPexelsError(null);
+    setIsUnsplashModalOpen(false);
+    setIsPexelsModalOpen(true);
   };
 
   const openSelectedMediaSource = () => {
@@ -1013,7 +1186,11 @@ export default function NewPostModal({
       fileInputRef.current?.click();
       return;
     }
-    openUnsplashModal();
+    if (selectedMediaSource === "unsplash") {
+      openUnsplashModal();
+      return;
+    }
+    openPexelsModal();
   };
 
   const runUnsplashSearch = () => {
@@ -1038,7 +1215,35 @@ export default function NewPostModal({
     setResolvedLinkedinPreviewUrl(null);
     setIsUnsplashModalOpen(false);
     setSelectedMediaSource("unsplash");
-    setHasUserSelectedUnsplashImage(true);
+    setHasUserSelectedStockImage(true);
+    window.requestAnimationFrame(() => {
+      editorRef.current?.focus();
+    });
+  };
+
+  const runPexelsSearch = () => {
+    const query = pexelsQuery.trim() || DEFAULT_UNSPLASH_QUERY;
+    setPexelsCommittedQuery(query);
+    setPexelsImages([]);
+    setPexelsPage(1);
+    setPexelsHasMore(true);
+    setPexelsError(null);
+    pexelsInFlightRef.current = "";
+  };
+
+  const handleSelectPexelsPhoto = (photo: PexelsPhoto) => {
+    const selectedUrl = photo.src?.large2x ?? photo.src?.large ?? photo.src?.medium ?? photo.src?.original;
+    if (!selectedUrl) {
+      return;
+    }
+    setImageFile(undefined);
+    setImagePreviewUrl(selectedUrl);
+    setImageSource("pexels");
+    setImageMimeType(undefined);
+    setResolvedLinkedinPreviewUrl(null);
+    setIsPexelsModalOpen(false);
+    setSelectedMediaSource("pexels");
+    setHasUserSelectedStockImage(true);
     window.requestAnimationFrame(() => {
       editorRef.current?.focus();
     });
@@ -1265,7 +1470,7 @@ export default function NewPostModal({
       }
       return;
     }
-    if (imageFile || hasUserSelectedUnsplashImage || isResolvingPreviewMedia) {
+    if (imageFile || hasUserSelectedStockImage || isResolvingPreviewMedia) {
       return;
     }
 
@@ -1284,7 +1489,7 @@ export default function NewPostModal({
           activePreviewPostIdRef.current === targetPostId &&
           resolvedUrl &&
           !imageFile &&
-          !hasUserSelectedUnsplashImage
+          !hasUserSelectedStockImage
         ) {
           setResolvedLinkedinPreviewUrl(resolvedUrl);
         }
@@ -1305,7 +1510,7 @@ export default function NewPostModal({
       cancelled = true;
     };
   }, [
-    hasUserSelectedUnsplashImage,
+    hasUserSelectedStockImage,
     imageFile,
     imagePreviewUrl,
     isOpen,
@@ -1662,6 +1867,22 @@ export default function NewPostModal({
                               >
                                 <img src="/unsplash.svg" alt="" aria-hidden="true" className="h-4 w-4" />
                                 <span>Browse Unsplash</span>
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                  setSelectedMediaSource("pexels");
+                                  setIsMediaMenuOpen(false);
+                                  openPexelsModal();
+                                }}
+                                className={`mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition hover:bg-[#f2f4f9] ${selectedMediaSource === "pexels"
+                                  ? "bg-[#eef3ff] text-[#1e40af]"
+                                  : "text-[var(--color-text-primary)]"
+                                  }`}
+                              >
+                                <img src="/pexels.svg" alt="" aria-hidden="true" className="h-4 w-4" />
+                                <span>Browse Pexels</span>
                               </button>
                             </div>
                           ) : null}
@@ -2091,6 +2312,121 @@ export default function NewPostModal({
                 </div>
                 <div ref={unsplashSentinelRef} className="h-8 w-full" />
                 {unsplashIsLoading ? (
+                  <p className="py-2 text-center text-sm text-[var(--color-text-secondary)]">Loading images...</p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {isPexelsModalOpen ? (
+          <div
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-[#12111A]/40 px-3 py-4 backdrop-blur-[1px] sm:px-6"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                setIsPexelsModalOpen(false);
+              }
+            }}
+          >
+            <div
+              ref={pexelsModalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="pexels-modal-title"
+              className="flex h-[min(90vh,860px)] w-full max-w-[1280px] flex-col rounded-2xl border border-[#d6dae3] bg-white shadow-[0_28px_90px_-45px_rgba(15,23,42,0.55)]"
+            >
+              <header className="flex items-center justify-between border-b border-[#dbe0ea] px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <img src="/pexels.svg" alt="" aria-hidden="true" className="h-5 w-5" />
+                  <h3 id="pexels-modal-title" className="text-[32px] font-semibold text-[var(--color-text-primary)]">
+                    Pexels
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPexelsModalOpen(false)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[var(--color-text-secondary)] transition hover:bg-[#f2f4f9] hover:text-[var(--color-text-primary)]"
+                  aria-label="Close Pexels search"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </header>
+
+              <div className="flex items-center gap-3 border-b border-[#dbe0ea] px-5 py-4">
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-secondary)]" />
+                  <input
+                    type="text"
+                    value={pexelsQuery}
+                    onChange={(event) => setPexelsQuery(event.target.value)}
+                    placeholder="Search free high resolution photos"
+                    className="h-12 w-full rounded-lg border border-[#cfd5e1] bg-white pl-10 pr-3 text-base text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/15"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={runPexelsSearch}
+                  className="inline-flex h-12 items-center justify-center rounded-lg bg-[#2f54eb] px-6 text-base font-semibold text-white transition hover:brightness-95"
+                >
+                  Search
+                </button>
+              </div>
+
+              <div ref={pexelsScrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                {pexelsError ? (
+                  <p className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                    {pexelsError}
+                  </p>
+                ) : null}
+                {!pexelsIsLoading && !pexelsError && pexelsImages.length === 0 ? (
+                  <p className="text-sm text-[var(--color-text-secondary)]">No images found. Try another search.</p>
+                ) : null}
+                <div className="columns-1 gap-5 md:columns-2 lg:columns-3">
+                  {pexelsImages.map((photo) => {
+                    const previewUrl = photo.src?.medium ?? photo.src?.large ?? photo.src?.large2x ?? photo.src?.original;
+                    const creatorName = photo.photographer || "Unknown creator";
+                    const creatorUrl = photo.photographer_url || photo.url || "https://www.pexels.com";
+                    const altText = photo.alt?.trim() || `Pexels image by ${creatorName}`;
+
+                    return (
+                      <article key={photo.id} className="mb-5 break-inside-avoid">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectPexelsPhoto(photo)}
+                          className="w-full overflow-hidden rounded-md border border-[#d6dae3] bg-white text-left transition hover:shadow-[0_14px_32px_-24px_rgba(15,23,42,0.45)]"
+                        >
+                          {previewUrl ? (
+                            <img src={previewUrl} alt={altText} className="h-auto w-full object-cover" />
+                          ) : (
+                            <div className="grid h-48 w-full place-items-center bg-[#f4f6fb] text-sm text-[var(--color-text-secondary)]">
+                              Image unavailable
+                            </div>
+                          )}
+                        </button>
+                        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+                          <a
+                            href={creatorUrl}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="underline underline-offset-2 hover:text-[var(--color-text-primary)]"
+                          >
+                            {creatorName}
+                          </a>{" "}
+                          for{" "}
+                          <a
+                            href="https://www.pexels.com"
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="underline underline-offset-2 hover:text-[var(--color-text-primary)]"
+                          >
+                            Pexels
+                          </a>
+                        </p>
+                      </article>
+                    );
+                  })}
+                </div>
+                <div ref={pexelsSentinelRef} className="h-8 w-full" />
+                {pexelsIsLoading ? (
                   <p className="py-2 text-center text-sm text-[var(--color-text-secondary)]">Loading images...</p>
                 ) : null}
               </div>
