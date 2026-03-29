@@ -4,6 +4,7 @@ jest.mock(
   'src/database/schemas',
   () => ({
     AccountProvider: { LINKEDIN: 'LINKEDIN' },
+    LinkedinAccountType: { PERSON: 'PERSON', ORGANIZATION: 'ORGANIZATION' },
     ConnectedAccount: { name: 'ConnectedAccount' },
     PostDraft: { name: 'PostDraft' },
     PostDraftStatus: {
@@ -20,11 +21,9 @@ jest.mock(
   () => ({ apiFetch: jest.fn() }),
   { virtual: true },
 );
-jest.mock(
-  'src/common/HelperFn',
-  () => ({ formatLinkedinContent: jest.fn() }),
-  { virtual: true },
-);
+jest.mock('src/common/HelperFn', () => ({ formatLinkedinContent: jest.fn() }), {
+  virtual: true,
+});
 jest.mock(
   'src/encryption/encryption.service',
   () => ({ EncryptionService: class EncryptionService {} }),
@@ -76,7 +75,10 @@ describe('PostService.getPosts', () => {
 
     const posts = [{ _id: new Types.ObjectId(), content: 'post 1' }] as any[];
     mocks.exec.mockResolvedValue(posts);
-    mocks.aggregate.mockResolvedValue([{ month: '2026-02' }, { month: '2026-01' }]);
+    mocks.aggregate.mockResolvedValue([
+      { month: '2026-02' },
+      { month: '2026-01' },
+    ]);
     mocks.distinct.mockResolvedValue([connectedAccountId]);
 
     const result = await service.getPosts(
@@ -91,8 +93,8 @@ describe('PostService.getPosts', () => {
     expect(filter.user).toEqual(userId);
     expect(filter.status).toBe('DRAFT');
     expect(filter.connectedAccount).toEqual(connectedAccountId);
-    expect(filter.createdAt.$gte).toEqual(new Date(2026, 0, 1));
-    expect(filter.createdAt.$lt).toEqual(new Date(2026, 1, 1));
+    expect(filter.updatedAt.$gte).toEqual(new Date(2026, 0, 1));
+    expect(filter.updatedAt.$lt).toEqual(new Date(2026, 1, 1));
 
     expect(mocks.aggregate).toHaveBeenCalledWith([
       { $match: { user: userId } },
@@ -145,6 +147,7 @@ describe('PostService.getPosts', () => {
 describe('PostService.createDraft', () => {
   it('checks AI draft quota and increments usage after successful creation', async () => {
     const service = Object.create(PostService.prototype) as PostService;
+    const userId = new Types.ObjectId();
     const save = jest.fn().mockResolvedValue(undefined);
     const draftId = new Types.ObjectId();
     const postDraftModel = jest.fn().mockImplementation(() => ({
@@ -154,17 +157,27 @@ describe('PostService.createDraft', () => {
     const addWorkflowJob = jest.fn().mockResolvedValue(undefined);
     const assertAiDraftQuota = jest.fn().mockResolvedValue(undefined);
     const incrementAiDraftUsage = jest.fn().mockResolvedValue(undefined);
+    const connectedAccountFindById = jest.fn().mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+    });
 
     (service as any).postDraftModel = postDraftModel;
+    (service as any).connectedAccountModel = {
+      findById: connectedAccountFindById,
+    };
     (service as any).workflowQueue = { addWorkflowJob };
     (service as any).featureGatingService = {
       assertAiDraftQuota,
       incrementAiDraftUsage,
     };
 
-    const user = { _id: new Types.ObjectId() } as any;
+    const user = { _id: userId } as any;
     const accountId = new Types.ObjectId().toString();
-    const dto = { input: 'test prompt', contentType: 'quickPostLinkedin' } as any;
+    const dto = {
+      input: 'test prompt',
+      contentType: 'quickPostLinkedin',
+    } as any;
 
     const workflowId = await service.createDraft(user, accountId, dto);
 
@@ -190,17 +203,28 @@ describe('PostService.createDraft', () => {
       .mockRejectedValue(new Error('queue unavailable'));
     const assertAiDraftQuota = jest.fn().mockResolvedValue(undefined);
     const incrementAiDraftUsage = jest.fn().mockResolvedValue(undefined);
+    const userId = new Types.ObjectId();
+    const connectedAccountFindById = jest.fn().mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+    });
 
     (service as any).postDraftModel = postDraftModel;
+    (service as any).connectedAccountModel = {
+      findById: connectedAccountFindById,
+    };
     (service as any).workflowQueue = { addWorkflowJob };
     (service as any).featureGatingService = {
       assertAiDraftQuota,
       incrementAiDraftUsage,
     };
 
-    const user = { _id: new Types.ObjectId() } as any;
+    const user = { _id: userId } as any;
     const accountId = new Types.ObjectId().toString();
-    const dto = { input: 'test prompt', contentType: 'quickPostLinkedin' } as any;
+    const dto = {
+      input: 'test prompt',
+      contentType: 'quickPostLinkedin',
+    } as any;
 
     await expect(service.createDraft(user, accountId, dto)).rejects.toThrow(
       'queue unavailable',
@@ -286,11 +310,9 @@ describe('PostService.schedulePost', () => {
     mocks.findById.mockResolvedValue(post);
     mocks.getJob.mockResolvedValue({ remove });
 
-    await service.schedulePost(
-      { _id: userId } as any,
-      postId.toString(),
-      { scheduledTime } as any,
-    );
+    await service.schedulePost({ _id: userId } as any, postId.toString(), {
+      scheduledTime,
+    } as any);
 
     expect(mocks.getJob).toHaveBeenCalledWith(postId.toString());
     expect(remove).toHaveBeenCalledTimes(1);
@@ -317,11 +339,9 @@ describe('PostService.schedulePost', () => {
     mocks.findById.mockResolvedValue(post);
     mocks.getJob.mockResolvedValue(null);
 
-    await service.schedulePost(
-      { _id: userId } as any,
-      postId.toString(),
-      { scheduledTime } as any,
-    );
+    await service.schedulePost({ _id: userId } as any, postId.toString(), {
+      scheduledTime,
+    } as any);
 
     expect(mocks.getJob).toHaveBeenCalledWith(postId.toString());
     expect(mocks.addScheduleJob).toHaveBeenCalledTimes(1);
@@ -402,7 +422,7 @@ describe('PostService.deletePost', () => {
     const findById = jest.fn();
     const deleteExec = jest.fn().mockResolvedValue({ deletedCount: 1 });
     const deleteOne = jest.fn().mockReturnValue({ exec: deleteExec });
-    const findOne = jest.fn();
+    const findConnectedAccountById = jest.fn();
     const decrypt = jest.fn().mockResolvedValue('token');
     const getJob = jest.fn();
 
@@ -411,7 +431,7 @@ describe('PostService.deletePost', () => {
       deleteOne,
     };
     (service as any).connectedAccountModel = {
-      findOne,
+      findById: findConnectedAccountById,
     };
     (service as any).encryptionService = {
       decrypt,
@@ -429,7 +449,7 @@ describe('PostService.deletePost', () => {
         findById,
         deleteOne,
         deleteExec,
-        findOne,
+        findConnectedAccountById,
         decrypt,
         getJob,
       },
@@ -448,11 +468,14 @@ describe('PostService.deletePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'SCHEDULED',
     } as any;
 
     mocks.findById.mockResolvedValue(post);
-    mocks.findOne.mockResolvedValue({
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
       accessToken: 'encrypted-token',
     });
     mocks.getJob.mockResolvedValue({ remove });
@@ -473,11 +496,14 @@ describe('PostService.deletePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'SCHEDULED',
     } as any;
 
     mocks.findById.mockResolvedValue(post);
-    mocks.findOne.mockResolvedValue({
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
       accessToken: 'encrypted-token',
     });
     mocks.getJob.mockResolvedValue(null);
@@ -496,11 +522,14 @@ describe('PostService.deletePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'SCHEDULED',
     } as any;
 
     mocks.findById.mockResolvedValue(post);
-    mocks.findOne.mockResolvedValue({
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
       accessToken: 'encrypted-token',
     });
     mocks.getJob.mockResolvedValue({ remove });
@@ -518,11 +547,14 @@ describe('PostService.deletePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'DRAFT',
     } as any;
 
     mocks.findById.mockResolvedValue(post);
-    mocks.findOne.mockResolvedValue({
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
       accessToken: 'encrypted-token',
     });
 
@@ -539,6 +571,7 @@ describe('PostService.deletePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'PUBLISHED',
       channelPostId: 'urn:li:share:123',
     } as any;
@@ -546,7 +579,9 @@ describe('PostService.deletePost', () => {
     mockedApiFetch.mockResolvedValue({ data: {}, response: {} });
 
     mocks.findById.mockResolvedValue(post);
-    mocks.findOne.mockResolvedValue({
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
       accessToken: 'encrypted-token',
     });
 

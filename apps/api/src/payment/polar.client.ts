@@ -50,4 +50,19 @@ export class PolarClient {
       limit: 100,
     });
   }
+
+  async cancelSubscriptionAtPeriodEnd(subscriptionId: string) {
+    if (!this.accessToken) {
+      throw new InternalServerErrorException(
+        'POLAR_ACCESS_TOKEN is not configured',
+      );
+    }
+
+    return this.client.subscriptions.update({
+      id: subscriptionId,
+      subscriptionUpdate: {
+        cancelAtPeriodEnd: true,
+      },
+    });
+  }
 }

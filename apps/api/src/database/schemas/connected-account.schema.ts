@@ -7,6 +7,11 @@ export enum AccountProvider {
   MEDIUM = 'MEDIUM',
 }
 
+export enum LinkedinAccountType {
+  PERSON = 'PERSON',
+  ORGANIZATION = 'ORGANIZATION',
+}
+
 @Schema({ timestamps: true })
 export class ConnectedAccount extends Document {
   @Prop({ type: Types.ObjectId, ref: User.name, required: true })
@@ -14,6 +19,28 @@ export class ConnectedAccount extends Document {
 
   @Prop({ required: true, enum: AccountProvider })
   provider: AccountProvider;
+
+  @Prop({
+    required: true,
+    enum: LinkedinAccountType,
+    default: LinkedinAccountType.PERSON,
+  })
+  accountType: LinkedinAccountType;
+
+  @Prop()
+  externalId?: string;
+
+  @Prop()
+  displayName?: string;
+
+  @Prop()
+  avatarUrl?: string;
+
+  @Prop()
+  avatarUrlExpiresAt?: Date;
+
+  @Prop()
+  impersonatorUrn?: string;
 
   @Prop({ required: true })
   accessToken: string;
@@ -30,3 +57,13 @@ export class ConnectedAccount extends Document {
 
 export const ConnectedAccountSchema =
   SchemaFactory.createForClass(ConnectedAccount);
+
+ConnectedAccountSchema.index(
+  { user: 1, provider: 1, accountType: 1, externalId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      externalId: { $exists: true, $type: 'string' },
+    },
+  },
+);

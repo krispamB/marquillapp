@@ -1,7 +1,9 @@
 import {
+  BadRequestException,
   Injectable,
-  Logger,
   InternalServerErrorException,
+  Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
@@ -9,21 +11,47 @@ import { Model, Types } from 'mongoose';
 import {
   AccountProvider,
   ConnectedAccount,
+  LinkedinAccountType,
 } from '../database/schemas/connected-account.schema';
 import { User } from '../database/schemas/user.schema';
 import { Tier } from '../database/schemas/tier.schema';
 import { ConfigService } from '@nestjs/config';
 import { apiFetch } from 'src/common/HelperFn';
 import { EncryptionService } from '../encryption/encryption.service';
-import { FeatureGatingService } from '../feature-gating/feature-gating.service';
+import { FeatureGatingService } from '../feature-gating';
+
+interface LinkedinUserInfo {
+  memberId: string;
+  displayName: string;
+  localizedFirstName?: string;
+  localizedLastName?: string;
+  localizedHeadline?: string;
+  vanityName?: string;
+  displayImageUrn?: string;
+  avatarUrl?: string;
+  avatarUrlExpiresAt?: Date;
+  profileMetadata: Record<string, any>;
+}
+
+interface LinkedinOrganizationAclElement {
+  organization: string;
+  role: string;
+  state: string;
+}
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  private readonly LINKEDIN_API_BASE = 'https://api.linkedin.com/rest';
+  private readonly LINKEDIN_ALLOWED_ORG_ROLES = new Set([
+    'ADMINISTRATOR',
+    'DIRECT_SPONSORED_CONTENT_POSTER',
+    'CONTENT_ADMINISTRATOR',
+  ]);
+
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     private jwtService: JwtService,
-    @InjectModel(ConnectedAccount.name)
     @InjectModel(ConnectedAccount.name)
     private connectedAccountModel: Model<ConnectedAccount>,
     @InjectModel(Tier.name) private tierModel: Model<Tier>,
@@ -62,15 +90,15 @@ export class AuthService {
     return user;
   }
 
-  async login(user: User) {
+  login(user: User) {
     const payload = { email: user.email, sub: user._id.toString() };
     return {
       access_token: this.jwtService.sign(payload),
     };
   }
 
-  async createLinkedinOath(user: User): Promise<string> {
-    return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${this.configService.getOrThrow<string>('LINKEDIN_CLIENT_ID')}&redirect_uri=${this.configService.getOrThrow<string>('LINKEDIN_REDIRECT_URI')}&state=${user._id.toString()}&scope=${encodeURIComponent('openid profile email w_member_social')}&enable_extended_login=true`;
+  createLinkedinOath(user: User): string {
+    return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${this.configService.getOrThrow<string>('LINKEDIN_CLIENT_ID')}&redirect_uri=${this.configService.getOrThrow<string>('LINKEDIN_REDIRECT_URI')}&state=${user._id.toString()}&scope=${encodeURIComponent('openid profile email w_member_social r_basicprofile r_organization_admin rw_organization_admin')}&enable_extended_login=true`;
   }
 
   async linkedinCallback(code: string, state: string) {
@@ -80,14 +108,12 @@ export class AuthService {
     const encryptedAccessToken =
       await this.encryptionService.encrypt(access_token);
 
-    const connectedAccount = await this.connectedAccountModel.findOne({
-      user: new Types.ObjectId(state),
-      provider: AccountProvider.LINKEDIN,
-    });
+    const connectedAccount = await this.getLinkedinPersonalAccount(state);
+    const existingMemberId = this.getStoredLinkedinMemberId(connectedAccount);
     if (
       connectedAccount &&
-      connectedAccount.profileMetadata &&
-      connectedAccount.profileMetadata['sub'] != profileMetadata.sub
+      existingMemberId &&
+      existingMemberId !== profileMetadata.memberId
     ) {
       return false;
     }
@@ -101,16 +127,169 @@ export class AuthService {
       {
         user: new Types.ObjectId(state),
         provider: AccountProvider.LINKEDIN,
+        $or: [
+          { accountType: LinkedinAccountType.PERSON },
+          { accountType: { $exists: false } },
+        ],
       },
       {
+        accountType: LinkedinAccountType.PERSON,
+        externalId: profileMetadata.memberId,
+        displayName: profileMetadata.displayName,
+        avatarUrl: profileMetadata.avatarUrl,
+        avatarUrlExpiresAt: profileMetadata.avatarUrlExpiresAt,
+        impersonatorUrn: `urn:li:person:${profileMetadata.memberId}`,
         accessToken: encryptedAccessToken,
         accessTokenExpiresAt: new Date(Date.now() + expires_in * 1000),
-        profileMetadata,
+        profileMetadata: profileMetadata.profileMetadata,
       },
       { upsert: true },
     );
+    await this.connectedAccountModel.updateMany(
+      {
+        user: new Types.ObjectId(state),
+        provider: AccountProvider.LINKEDIN,
+        accountType: LinkedinAccountType.ORGANIZATION,
+      },
+      {
+        $set: {
+          accessToken: encryptedAccessToken,
+          accessTokenExpiresAt: new Date(Date.now() + expires_in * 1000),
+          impersonatorUrn: `urn:li:person:${profileMetadata.memberId}`,
+        },
+      },
+    );
 
-    return profileMetadata.email_verified;
+    return true;
+  }
+
+  async getLinkedinOrganizations(userId: string) {
+    const connectedAccount = await this.getLinkedinPersonalAccount(userId);
+    if (!connectedAccount) {
+      throw new NotFoundException('LinkedIn account not connected');
+    }
+
+    const accessToken = await this.encryptionService.decrypt(
+      connectedAccount.accessToken,
+    );
+    const memberUrn = this.resolveMemberUrn(connectedAccount);
+    if (!memberUrn) {
+      throw new BadRequestException(
+        'Unable to resolve LinkedIn member identity from connected account',
+      );
+    }
+
+    interface OrganizationAclResponse {
+      elements: LinkedinOrganizationAclElement[];
+    }
+
+    const url = `${this.LINKEDIN_API_BASE}/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED`;
+    const { data } = await apiFetch<OrganizationAclResponse>(url, {
+      method: 'GET',
+      headers: {
+        'X-Restli-Protocol-Version': '2.0.0',
+        'LinkedIn-Version': '202601',
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    return (data.elements ?? [])
+      .filter((element) => this.LINKEDIN_ALLOWED_ORG_ROLES.has(element.role))
+      .map((element) => {
+        const organizationId = this.extractOrganizationId(element.organization);
+
+        return {
+          id: organizationId,
+          urn: `urn:li:organization:${organizationId}`,
+          role: element.role,
+          state: element.state,
+        };
+      });
+  }
+
+  async connectLinkedinOrganizations(
+    userId: string,
+    organizationIds: string[],
+  ): Promise<ConnectedAccount[]> {
+    if (!organizationIds.length) {
+      throw new BadRequestException('organizationIds cannot be empty');
+    }
+
+    const uniqueOrganizationIds = [...new Set(organizationIds)].map((id) =>
+      this.extractOrganizationId(id),
+    );
+    const availableOrganizations = await this.getLinkedinOrganizations(userId);
+    const availableOrganizationIdSet = new Set(
+      availableOrganizations.map((organization) => organization.id),
+    );
+    const disallowedOrganizationIds = uniqueOrganizationIds.filter(
+      (organizationId) => !availableOrganizationIdSet.has(organizationId),
+    );
+
+    if (disallowedOrganizationIds.length) {
+      throw new BadRequestException(
+        `Unauthorized organizations: ${disallowedOrganizationIds.join(', ')}`,
+      );
+    }
+
+    const personalConnectedAccount =
+      await this.getLinkedinPersonalAccount(userId);
+    if (!personalConnectedAccount) {
+      throw new NotFoundException('LinkedIn account not connected');
+    }
+
+    const accessToken = await this.encryptionService.decrypt(
+      personalConnectedAccount.accessToken,
+    );
+    const encryptedAccessToken =
+      await this.encryptionService.encrypt(accessToken);
+    const accessTokenExpiresAt = personalConnectedAccount.accessTokenExpiresAt;
+    const impersonatorUrn = this.resolveMemberUrn(personalConnectedAccount);
+
+    for (const organizationId of uniqueOrganizationIds) {
+      const existingAccount = await this.connectedAccountModel.findOne({
+        user: new Types.ObjectId(userId),
+        provider: AccountProvider.LINKEDIN,
+        accountType: LinkedinAccountType.ORGANIZATION,
+        externalId: organizationId,
+      });
+
+      await this.featureGatingService.assertConnectedAccountCapacity({
+        userId,
+        isReconnect: !!existingAccount,
+      });
+
+      await this.connectedAccountModel.findOneAndUpdate(
+        {
+          user: new Types.ObjectId(userId),
+          provider: AccountProvider.LINKEDIN,
+          accountType: LinkedinAccountType.ORGANIZATION,
+          externalId: organizationId,
+        },
+        {
+          accountType: LinkedinAccountType.ORGANIZATION,
+          externalId: organizationId,
+          displayName: `Organization ${organizationId}`,
+          impersonatorUrn,
+          accessToken: encryptedAccessToken,
+          accessTokenExpiresAt,
+          profileMetadata: {
+            organizationUrn: `urn:li:organization:${organizationId}`,
+            connectedBy: impersonatorUrn,
+          },
+        },
+        { upsert: true },
+      );
+    }
+
+    return this.connectedAccountModel
+      .find({
+        user: new Types.ObjectId(userId),
+        provider: AccountProvider.LINKEDIN,
+        accountType: LinkedinAccountType.ORGANIZATION,
+        externalId: { $in: uniqueOrganizationIds },
+      })
+      .select('-accessToken');
   }
 
   private async getLinkedinAccessToken(code: string) {
@@ -142,26 +321,94 @@ export class AuthService {
     return result;
   }
 
-  private async getLinkedinUser(access_token: string) {
-    const url = 'https://api.linkedin.com/v2/userinfo';
-    interface IResponse {
-      sub: string;
-      name: string;
-      given_name: string;
-      family_name: string;
-      picture: string;
-      locale: string;
-      email: string;
-      email_verified: boolean;
+  private async getLinkedinUser(
+    access_token: string,
+  ): Promise<LinkedinUserInfo> {
+    interface LinkedinLocalizedField {
+      localized?: Record<string, string>;
+      preferredLocale?: {
+        country?: string;
+        language?: string;
+      };
     }
-    const { data: response } = await apiFetch<IResponse>(url, {
+
+    interface LinkedinPictureIdentifier {
+      identifier: string;
+      identifierExpiresInSeconds?: string | number;
+    }
+
+    interface LinkedinPictureElement {
+      data?: {
+        'com.linkedin.digitalmedia.mediaartifact.StillImage'?: {
+          storageSize?: { width?: number; height?: number };
+          displaySize?: { width?: number; height?: number };
+        };
+      };
+      identifiers?: LinkedinPictureIdentifier[];
+    }
+
+    interface LinkedinMeResponse {
+      id: string;
+      firstName?: LinkedinLocalizedField;
+      lastName?: LinkedinLocalizedField;
+      localizedFirstName?: string;
+      localizedLastName?: string;
+      headline?: LinkedinLocalizedField;
+      localizedHeadline?: string;
+      vanityName?: string;
+      profilePicture?: {
+        displayImage?: string;
+        'displayImage~'?: {
+          elements?: LinkedinPictureElement[];
+        };
+      };
+    }
+
+    const url =
+      'https://api.linkedin.com/v2/me?projection=(id,firstName,lastName,localizedFirstName,localizedLastName,headline,localizedHeadline,vanityName,profilePicture(displayImage~digitalmediaAsset:playableStreams))';
+    const { data: response } = await apiFetch<LinkedinMeResponse>(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         Authorization: `Bearer ${access_token}`,
       },
     });
-    return response;
+
+    const firstName = this.resolveLocalizedValue(
+      response.localizedFirstName,
+      response.firstName,
+    );
+    const lastName = this.resolveLocalizedValue(
+      response.localizedLastName,
+      response.lastName,
+    );
+    const displayName = [firstName, lastName].filter(Boolean).join(' ').trim();
+
+    const selectedImage = this.extractSmallestLinkedinImage(
+      response.profilePicture?.['displayImage~']?.elements ?? [],
+    );
+
+    return {
+      memberId: response.id,
+      displayName: displayName || response.vanityName || response.id,
+      localizedFirstName: response.localizedFirstName,
+      localizedLastName: response.localizedLastName,
+      localizedHeadline: response.localizedHeadline,
+      vanityName: response.vanityName,
+      displayImageUrn: response.profilePicture?.displayImage,
+      avatarUrl: selectedImage?.url,
+      avatarUrlExpiresAt: selectedImage?.expiresAt,
+      profileMetadata: {
+        // Legacy compatibility: existing logic and data may still use these keys.
+        sub: response.id,
+        memberId: response.id,
+        localizedFirstName: response.localizedFirstName,
+        localizedLastName: response.localizedLastName,
+        localizedHeadline: response.localizedHeadline,
+        displayImageUrn: response.profilePicture?.displayImage,
+        vanityName: response.vanityName,
+      },
+    };
   }
 
   async getConnectedAccounts(userId: string) {
@@ -178,5 +425,168 @@ export class AuthService {
         'An error occurred while fetching connected accounts',
       );
     }
+  }
+
+  private async getLinkedinPersonalAccount(
+    userId: string,
+  ): Promise<ConnectedAccount | null> {
+    return this.connectedAccountModel.findOne({
+      user: new Types.ObjectId(userId),
+      provider: AccountProvider.LINKEDIN,
+      $or: [
+        { accountType: LinkedinAccountType.PERSON },
+        { accountType: { $exists: false } },
+      ],
+    });
+  }
+
+  private resolveMemberUrn(connectedAccount: ConnectedAccount): string | null {
+    const profileMetadataSub = connectedAccount.profileMetadata?.sub;
+    if (profileMetadataSub) {
+      return `urn:li:person:${profileMetadataSub}`;
+    }
+
+    if (connectedAccount.externalId) {
+      return `urn:li:person:${connectedAccount.externalId}`;
+    }
+
+    if (connectedAccount.impersonatorUrn) {
+      return connectedAccount.impersonatorUrn;
+    }
+
+    return null;
+  }
+
+  private getStoredLinkedinMemberId(
+    connectedAccount: ConnectedAccount | null,
+  ): string | null {
+    if (!connectedAccount) {
+      return null;
+    }
+
+    return (
+      connectedAccount.externalId ||
+      connectedAccount.profileMetadata?.memberId ||
+      connectedAccount.profileMetadata?.sub ||
+      null
+    );
+  }
+
+  private resolveLocalizedValue(
+    localizedValue: string | undefined,
+    localizedField?: {
+      localized?: Record<string, string>;
+      preferredLocale?: {
+        country?: string;
+        language?: string;
+      };
+    },
+  ): string | undefined {
+    if (localizedValue) {
+      return localizedValue;
+    }
+
+    const preferredLocale = localizedField?.preferredLocale;
+    if (preferredLocale?.language && preferredLocale?.country) {
+      const localeKey = `${preferredLocale.language}_${preferredLocale.country}`;
+      const preferred = localizedField?.localized?.[localeKey];
+      if (preferred) {
+        return preferred;
+      }
+    }
+
+    return Object.values(localizedField?.localized ?? {})[0];
+  }
+
+  private extractSmallestLinkedinImage(
+    elements: Array<{
+      data?: {
+        'com.linkedin.digitalmedia.mediaartifact.StillImage'?: {
+          storageSize?: { width?: number; height?: number };
+          displaySize?: { width?: number; height?: number };
+        };
+      };
+      identifiers?: Array<{
+        identifier: string;
+        identifierExpiresInSeconds?: string | number;
+      }>;
+    }>,
+  ): { url: string; expiresAt?: Date } | null {
+    let smallest:
+      | { url: string; area: number; index: number; expiresAt?: Date }
+      | null = null;
+
+    for (const [index, element] of elements.entries()) {
+      const stillImage =
+        element.data?.['com.linkedin.digitalmedia.mediaartifact.StillImage'];
+      const width =
+        stillImage?.storageSize?.width ?? stillImage?.displaySize?.width ?? 0;
+      const height =
+        stillImage?.storageSize?.height ?? stillImage?.displaySize?.height ?? 0;
+      const area = width * height;
+
+      const primaryIdentifier = element.identifiers?.[0];
+      if (!primaryIdentifier?.identifier) {
+        continue;
+      }
+
+      const expiresAt = this.parseLinkedinImageExpiry(
+        primaryIdentifier.identifierExpiresInSeconds,
+      );
+
+      if (
+        !smallest ||
+        area < smallest.area ||
+        (area === smallest.area && index < smallest.index)
+      ) {
+        smallest = {
+          url: primaryIdentifier.identifier,
+          area,
+          index,
+          expiresAt,
+        };
+      }
+    }
+
+    if (!smallest) {
+      return null;
+    }
+
+    return {
+      url: smallest.url,
+      expiresAt: smallest.expiresAt,
+    };
+  }
+
+  private parseLinkedinImageExpiry(
+    value?: string | number,
+  ): Date | undefined {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+
+    const numericValue =
+      typeof value === 'number' ? value : Number.parseInt(value, 10);
+    if (!Number.isFinite(numericValue) || numericValue <= 0) {
+      return undefined;
+    }
+
+    return new Date(numericValue * 1000);
+  }
+
+  private extractOrganizationId(organizationIdentifier: string): string {
+    if (!organizationIdentifier) {
+      throw new BadRequestException('organizationId is required');
+    }
+
+    const organizationId =
+      organizationIdentifier.split(':').pop()?.trim() ?? '';
+    if (!organizationId) {
+      throw new BadRequestException(
+        `Invalid organization identifier: ${organizationIdentifier}`,
+      );
+    }
+
+    return organizationId;
   }
 }

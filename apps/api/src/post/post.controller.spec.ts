@@ -20,11 +20,9 @@ jest.mock(
   () => ({ IAppResponse: class IAppResponse {} }),
   { virtual: true },
 );
-jest.mock(
-  'src/database/schemas',
-  () => ({ User: class User {} }),
-  { virtual: true },
-);
+jest.mock('src/database/schemas', () => ({ User: class User {} }), {
+  virtual: true,
+});
 
 import { PostController } from './post.controller';
 
