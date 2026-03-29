@@ -39,6 +39,7 @@ import type { NewPostMode } from "./useNewPostModal";
 export type NewPostModalAccount = {
   name?: string;
   avatarUrl?: string;
+  headline?: string;
   provider?: string;
 };
 
@@ -270,7 +271,7 @@ export default function NewPostModal({
   const initialImageFingerprintRef = useRef(
     buildImageFingerprint(initialImageUrl ? "existing" : undefined, initialImageUrl),
   );
-  const POLL_INTERVAL_MS = 3000;
+  const POLL_INTERVAL_MS = 6000;
   const POLL_TIMEOUT_MS = 240000;
   const unsplashAccessKey = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY?.trim() ?? "";
   const userTimezone = useMemo(
@@ -752,6 +753,9 @@ export default function NewPostModal({
   });
 
   const accountName = account.name?.trim() || "Connected account";
+  const accountHeadline =
+    account.headline?.trim() ||
+    (account.provider === "LINKEDIN" ? "LinkedIn account" : "Connected account");
   const accountInitials = useMemo(() => {
     const parts = accountName.split(/\s+/).filter(Boolean);
     if (parts.length === 0) {
@@ -1760,18 +1764,21 @@ export default function NewPostModal({
                   </div>
                 </div>
                 <div className="rounded-2xl border border-[var(--color-border)] bg-white p-4 shadow-[0_20px_48px_-40px_rgba(15,23,42,0.45)]">
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-2.5">
                     <UserAvatar
                       initials={accountInitials}
                       avatarUrl={account.avatarUrl}
-                      sizeClass="h-14 w-14"
-                      textClass="text-base"
+                      sizeClass="h-12 w-12"
+                      textClass="text-sm"
                     />
-                    <div>
-                      <p className="text-base font-semibold leading-tight text-[var(--color-text-primary)]">
+                    <div className="min-w-0 flex-1 pt-0">
+                      <p className="truncate text-[20px] font-semibold leading-6 text-[#1f1f1f]">
                         {accountName}
                       </p>
-                      <div className="mt-1 flex items-center gap-1 text-sm text-[var(--color-text-secondary)]">
+                      <p className="mt-0 truncate text-[13px] font-medium leading-5 text-[#666666]">
+                        {accountHeadline}
+                      </p>
+                      <div className="mt-0.5 flex items-center gap-1 text-[13px] leading-5 text-[#666666]">
                         <span>1h</span>
                         <span>•</span>
                         <InlineGlobeIcon />
@@ -2156,7 +2163,14 @@ function PreviewActionBar() {
 
 function InlineGlobeIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="none"
+      className="h-4 w-4 shrink-0"
+    >
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
       <path d="M3 12h18M12 3c2.5 2.5 4 5.7 4 9s-1.5 6.5-4 9c-2.5-2.5-4-5.7-4-9s1.5-6.5 4-9z" stroke="currentColor" strokeWidth="2" />
     </svg>

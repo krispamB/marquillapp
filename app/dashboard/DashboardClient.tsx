@@ -1107,10 +1107,12 @@ export default function DashboardPage({
             <div className="min-w-0">
               <div>
                 <p className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
-                  {selectedConnectedAccount?.profile?.name ?? user.name}
+                  {selectedConnectedAccount?.displayName ?? user.name}
                 </p>
                 <p className="truncate text-xs text-[var(--color-text-secondary)]">
-                  {selectedConnectedAccount?.profile?.email ?? user.email}
+                  {selectedConnectedAccount?.vanityName
+                    ? `@${selectedConnectedAccount.vanityName}`
+                    : user.email}
                 </p>
               </div>
             </div>
@@ -1568,8 +1570,9 @@ export default function DashboardPage({
         initialContent={newPostModalState.initialContent}
         initialImageUrl={newPostModalState.initialImageUrl}
         account={{
-          name: selectedConnectedAccount?.profile?.name,
-          avatarUrl: selectedConnectedAccount?.profile?.picture,
+          name: selectedConnectedAccount?.displayName,
+          avatarUrl: selectedConnectedAccount?.avatarUrl,
+          headline: selectedConnectedAccount?.headline,
           provider: selectedConnectedAccount?.provider,
         }}
         onClose={closeNewPostModal}

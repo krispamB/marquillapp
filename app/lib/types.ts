@@ -43,13 +43,24 @@ export type ConnectedAccountProfile = {
   name?: string;
   email?: string;
   picture?: string;
+  sub?: string;
+  memberId?: string;
+  localizedFirstName?: string;
+  localizedLastName?: string;
+  localizedHeadline?: string;
+  displayImageUrn?: string;
+  vanityName?: string;
 };
 
 export type ConnectedAccount = {
   id: string;
   provider: ConnectedAccountProvider;
   accessTokenExpiresAt?: string;
-  profile: ConnectedAccountProfile;
+  displayName?: string;
+  avatarUrl?: string;
+  vanityName?: string;
+  headline?: string;
+  profile?: ConnectedAccountProfile;
   isActive?: boolean;
 };
 
@@ -60,6 +71,9 @@ export type ConnectedAccountsResponse = {
     _id: string;
     provider: ConnectedAccountProvider;
     accessTokenExpiresAt?: string;
+    displayName?: string;
+    avatarUrl?: string;
+    vanityName?: string;
     profileMetadata?: ConnectedAccountProfile;
     isActive?: boolean;
   }>;

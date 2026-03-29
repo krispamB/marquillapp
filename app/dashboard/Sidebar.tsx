@@ -11,7 +11,11 @@ import {
   PillButton,
   UserAvatar,
 } from "./components";
-import type { ConnectedAccountProvider, UserProfile } from "../lib/types";
+import type {
+  ConnectedAccount,
+  ConnectedAccountProvider,
+  UserProfile,
+} from "../lib/types";
 
 type SidebarUser = {
   initials: string;
@@ -23,17 +27,6 @@ type SidebarItem = {
   active?: boolean;
   href?: string;
   disabled?: boolean;
-};
-
-type SidebarAccount = {
-  id: string;
-  provider: ConnectedAccountProvider;
-  accessTokenExpiresAt?: string;
-  profile: {
-    name?: string;
-    email?: string;
-    picture?: string;
-  };
 };
 
 export default function Sidebar({
@@ -55,7 +48,7 @@ export default function Sidebar({
 }: {
   user: SidebarUser;
   items: SidebarItem[];
-  accounts: SidebarAccount[];
+  accounts: ConnectedAccount[];
   primaryAccountIndex?: number;
   selectedAccountId?: string;
   showAccounts?: boolean;
@@ -127,9 +120,7 @@ export default function Sidebar({
     ? accounts.find((account) => account.id === selectedAccountId)
     : null;
   const primaryAccount = selectedAccount ?? accounts[primaryAccountIndex] ?? accounts[0];
-  const connectedAccounts = accounts.filter(
-    (account) => account.profile?.name || account.profile?.email,
-  );
+  const connectedAccounts = accounts;
 
   const providerLabel = (provider: ConnectedAccountProvider) => {
     switch (provider) {
@@ -140,7 +131,7 @@ export default function Sidebar({
     }
   };
 
-  const initialsFromName = (name?: string, email?: string) => {
+  const initialsFromName = (name?: string, vanityName?: string) => {
     const cleaned = name?.trim() ?? "";
     if (cleaned.length > 0) {
       const parts = cleaned.split(/\s+/).filter(Boolean);
@@ -149,7 +140,7 @@ export default function Sidebar({
       }
       return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
     }
-    return (email ?? "").slice(0, 2).toUpperCase();
+    return (vanityName ?? "").slice(0, 2).toUpperCase();
   };
 
   const accessExpiryLabel = (iso?: string) => {
@@ -268,23 +259,23 @@ export default function Sidebar({
                 {accountAvatarWithProviderBadge({
                   provider: primaryAccount.provider,
                   initials: initialsFromName(
-                    primaryAccount.profile?.name,
-                    primaryAccount.profile?.email,
+                    primaryAccount.displayName,
+                    primaryAccount.vanityName,
                   ),
-                  avatarUrl: primaryAccount.profile?.picture,
+                  avatarUrl: primaryAccount.avatarUrl,
                   sizeClass: "h-10 w-10",
                   textClass: "text-sm",
                 })}
                 <div>
                   <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                    {primaryAccount.profile?.name ?? "Connected account"}
+                    {primaryAccount.displayName ?? providerLabel(primaryAccount.provider)}
                   </p>
                   <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                     <span>{providerLabel(primaryAccount.provider)}</span>
                   </div>
-                  {primaryAccount.profile?.email ? (
+                  {primaryAccount.vanityName ? (
                     <p className="mt-1 text-[11px] text-[var(--color-text-secondary)]">
-                      {primaryAccount.profile.email}
+                      @{primaryAccount.vanityName}
                     </p>
                   ) : null}
                   {(() => {
@@ -340,20 +331,20 @@ export default function Sidebar({
                         {accountAvatarWithProviderBadge({
                           provider: account.provider,
                           initials: initialsFromName(
-                            account.profile?.name,
-                            account.profile?.email,
+                            account.displayName,
+                            account.vanityName,
                           ),
-                          avatarUrl: account.profile?.picture,
+                          avatarUrl: account.avatarUrl,
                           sizeClass: "h-9 w-9",
                           textClass: "text-xs",
                         })}
                         <div>
                           <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                            {account.profile?.name ?? "Connected account"}
+                            {account.displayName ?? providerLabel(account.provider)}
                           </p>
-                          {account.profile?.email ? (
+                          {account.vanityName ? (
                             <p className="text-[11px] text-[var(--color-text-secondary)]">
-                              {account.profile.email}
+                              @{account.vanityName}
                             </p>
                           ) : null}
                           {(() => {
