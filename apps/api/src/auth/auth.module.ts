@@ -8,12 +8,14 @@ import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { EncryptionModule } from '../encryption/encryption.module';
 import { FeatureGatingModule } from '../feature-gating';
+import { WorkflowModule } from '../workflow/workflow.module';
 
 @Module({
   imports: [
     PassportModule,
     EncryptionModule,
     FeatureGatingModule,
+    WorkflowModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

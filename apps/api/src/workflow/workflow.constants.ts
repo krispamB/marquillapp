@@ -13,3 +13,5 @@ export enum ContentType {
 
 export const QUEUE_NAME = 'workflow';
 export const SCHEDULE_QUEUE_NAME = 'post-schedule';
+export const LINKEDIN_AVATAR_REFRESH_QUEUE_NAME = 'linkedin-avatar-refresh';
+export const LINKEDIN_AVATAR_REFRESH_JOB_NAME = 'refresh-linkedin-avatar';

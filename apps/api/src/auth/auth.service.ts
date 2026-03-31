@@ -16,9 +16,10 @@ import {
 import { User } from '../database/schemas/user.schema';
 import { Tier } from '../database/schemas/tier.schema';
 import { ConfigService } from '@nestjs/config';
-import { apiFetch } from 'src/common/HelperFn';
+import { ApiError, apiFetch } from 'src/common/HelperFn';
 import { EncryptionService } from '../encryption/encryption.service';
 import { FeatureGatingService } from '../feature-gating';
+import { LinkedinAvatarRefreshQueue } from '../workflow/linkedin-avatar-refresh.queue';
 
 interface LinkedinUserInfo {
   memberId: string;
@@ -43,6 +44,7 @@ interface LinkedinOrganizationAclElement {
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly LINKEDIN_API_BASE = 'https://api.linkedin.com/rest';
+  private readonly AVATAR_REFRESH_LEAD_TIME_MS = 24 * 60 * 60 * 1000;
   private readonly LINKEDIN_ALLOWED_ORG_ROLES = new Set([
     'ADMINISTRATOR',
     'DIRECT_SPONSORED_CONTENT_POSTER',
@@ -58,6 +60,7 @@ export class AuthService {
     private configService: ConfigService,
     private encryptionService: EncryptionService,
     private readonly featureGatingService: FeatureGatingService,
+    private readonly linkedinAvatarRefreshQueue: LinkedinAvatarRefreshQueue,
   ) {}
 
   async validateGoogleUser(details: {
@@ -418,12 +421,108 @@ export class AuthService {
           user: new Types.ObjectId(userId),
         })
         .select('-accessToken');
-      return accounts;
+
+      this.enqueueLinkedinAvatarRefreshJobs(accounts);
+
+      return accounts.map((account) =>
+        this.sanitizeConnectedAccountAvatar(account),
+      );
     } catch (error) {
       this.logger.error(error);
       throw new InternalServerErrorException(
         'An error occurred while fetching connected accounts',
       );
+    }
+  }
+
+  async refreshLinkedinAvatarForAccount(connectedAccountId: string) {
+    const connectedAccount =
+      await this.connectedAccountModel.findById(connectedAccountId);
+    if (!connectedAccount) {
+      this.logger.debug(
+        `Skipping avatar refresh; account not found (${connectedAccountId})`,
+      );
+      return;
+    }
+
+    if (
+      !connectedAccount.isActive ||
+      !this.isLinkedinPersonalAccount(connectedAccount)
+    ) {
+      this.logger.debug(
+        `Skipping avatar refresh; account not eligible (${connectedAccountId})`,
+      );
+      return;
+    }
+
+    const displayImageUrn = connectedAccount.profileMetadata?.displayImageUrn;
+    if (!displayImageUrn) {
+      this.logger.debug(
+        `Skipping avatar refresh; displayImageUrn missing (${connectedAccountId})`,
+      );
+      return;
+    }
+
+    let accessToken: string;
+    try {
+      accessToken = await this.encryptionService.decrypt(
+        connectedAccount.accessToken,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Avatar refresh decrypt failed for account ${connectedAccountId}`,
+      );
+      await this.markAvatarRefreshAuthFailure(connectedAccountId, 'DECRYPT_FAILED');
+      return;
+    }
+
+    try {
+      const linkedinUser = await this.getLinkedinUser(accessToken);
+      const metadata: Record<string, any> = {
+        ...(connectedAccount.profileMetadata ?? {}),
+        displayImageUrn: linkedinUser.displayImageUrn ?? displayImageUrn,
+      };
+
+      delete metadata.avatarRefreshNeeded;
+      delete metadata.avatarRefreshFailedAt;
+      delete metadata.avatarRefreshFailureReason;
+
+      await this.connectedAccountModel.findByIdAndUpdate(connectedAccountId, {
+        $set: {
+          avatarUrl: linkedinUser.avatarUrl ?? null,
+          avatarUrlExpiresAt: linkedinUser.avatarUrlExpiresAt ?? null,
+          profileMetadata: metadata,
+        },
+      });
+
+      this.logger.log(
+        `Avatar refresh succeeded for account ${connectedAccountId}`,
+      );
+    } catch (error) {
+      if (error instanceof ApiError) {
+        if (error.statusCode === 401 || error.statusCode === 403) {
+          this.logger.warn(
+            `Avatar refresh auth expired for account ${connectedAccountId}`,
+          );
+          await this.markAvatarRefreshAuthFailure(
+            connectedAccountId,
+            'AUTH_EXPIRED',
+          );
+          return;
+        }
+
+        if (error.statusCode === 429 || error.statusCode >= 500) {
+          this.logger.warn(
+            `Avatar refresh transient failure for account ${connectedAccountId}: ${error.statusCode}`,
+          );
+          throw error;
+        }
+      }
+
+      this.logger.warn(
+        `Avatar refresh transient failure for account ${connectedAccountId}`,
+      );
+      throw error;
     }
   }
 
@@ -470,6 +569,123 @@ export class AuthService {
       connectedAccount.profileMetadata?.sub ||
       null
     );
+  }
+
+  private enqueueLinkedinAvatarRefreshJobs(accounts: ConnectedAccount[]) {
+    const now = Date.now();
+    const refreshDeadline = now + this.AVATAR_REFRESH_LEAD_TIME_MS;
+
+    for (const account of accounts) {
+      if (!this.shouldEnqueueLinkedinAvatarRefresh(account, refreshDeadline)) {
+        continue;
+      }
+
+      this.linkedinAvatarRefreshQueue
+        .addAvatarRefreshJob(account._id.toString())
+        .then(() =>
+          this.logger.debug(
+            `Queued LinkedIn avatar refresh for account ${account._id.toString()}`,
+          ),
+        )
+        .catch((error) =>
+          this.logger.warn(
+            `Failed to enqueue LinkedIn avatar refresh for account ${account._id.toString()}: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+    }
+  }
+
+  private sanitizeConnectedAccountAvatar(account: ConnectedAccount) {
+    const serializedAccount =
+      typeof (account as any).toObject === 'function'
+        ? (account as any).toObject()
+        : { ...account };
+
+    if (!this.isLinkedinPersonalAccount(account)) {
+      return serializedAccount;
+    }
+
+    if (this.isAvatarExpired(account.avatarUrlExpiresAt)) {
+      serializedAccount.avatarUrl = null;
+    }
+
+    return serializedAccount;
+  }
+
+  private shouldEnqueueLinkedinAvatarRefresh(
+    account: ConnectedAccount,
+    refreshDeadline: number,
+  ): boolean {
+    if (!this.isLinkedinPersonalAccount(account)) {
+      return false;
+    }
+
+    const displayImageUrn = account.profileMetadata?.displayImageUrn;
+    if (!displayImageUrn) {
+      return false;
+    }
+
+    if (!account.avatarUrl) {
+      return true;
+    }
+
+    const expiresAtMs = this.parseExpiryToMs(account.avatarUrlExpiresAt);
+    if (expiresAtMs === null) {
+      return true;
+    }
+
+    return expiresAtMs <= refreshDeadline;
+  }
+
+  private isLinkedinPersonalAccount(account: ConnectedAccount): boolean {
+    return (
+      account.provider === AccountProvider.LINKEDIN &&
+      (!account.accountType || account.accountType === LinkedinAccountType.PERSON)
+    );
+  }
+
+  private isAvatarExpired(value?: Date): boolean {
+    const expiresAtMs = this.parseExpiryToMs(value);
+    if (expiresAtMs === null) {
+      return false;
+    }
+
+    return expiresAtMs <= Date.now();
+  }
+
+  private parseExpiryToMs(value?: Date): number | null {
+    if (!value) {
+      return null;
+    }
+
+    const date = value instanceof Date ? value : new Date(value);
+    const time = date.getTime();
+    return Number.isFinite(time) ? time : null;
+  }
+
+  private async markAvatarRefreshAuthFailure(
+    connectedAccountId: string,
+    reason: 'AUTH_EXPIRED' | 'DECRYPT_FAILED',
+  ) {
+    const account = await this.connectedAccountModel.findById(connectedAccountId);
+    if (!account) {
+      return;
+    }
+
+    const profileMetadata = {
+      ...(account.profileMetadata ?? {}),
+      avatarRefreshNeeded: true,
+      avatarRefreshFailedAt: new Date(),
+      avatarRefreshFailureReason: reason,
+    };
+
+    await this.connectedAccountModel.findByIdAndUpdate(connectedAccountId, {
+      $set: {
+        avatarUrl: null,
+        avatarUrlExpiresAt: null,
+        profileMetadata,
+      },
+    });
   }
 
   private resolveLocalizedValue(
