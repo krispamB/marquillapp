@@ -3,11 +3,26 @@ import {
   AccountProvider,
   LinkedinAccountType,
 } from '../database/schemas/connected-account.schema';
-import { apiFetch } from 'src/common/HelperFn';
+import { ApiError, apiFetch } from 'src/common/HelperFn';
 
-jest.mock('src/common/HelperFn', () => ({ apiFetch: jest.fn() }), {
-  virtual: true,
-});
+jest.mock(
+  'src/common/HelperFn',
+  () => ({
+    apiFetch: jest.fn(),
+    ApiError: class ApiError extends Error {
+      constructor(
+        public statusCode: number,
+        public statusText: string,
+        public data: any,
+      ) {
+        super(`HTTP error! status: ${statusCode} ${statusText}`);
+      }
+    },
+  }),
+  {
+    virtual: true,
+  },
+);
 jest.mock(
   '../feature-gating/feature-gating.service',
   () => ({ FeatureGatingService: class FeatureGatingService {} }),
@@ -33,6 +48,9 @@ describe('AuthService.linkedinCallback', () => {
     const featureGatingService = {
       assertConnectedAccountCapacity: jest.fn().mockResolvedValue(undefined),
     };
+    const linkedinAvatarRefreshQueue = {
+      addAvatarRefreshJob: jest.fn().mockResolvedValue(undefined),
+    };
 
     const service = new AuthService(
       userModel as any,
@@ -42,6 +60,7 @@ describe('AuthService.linkedinCallback', () => {
       configService as any,
       encryptionService as any,
       featureGatingService as any,
+      linkedinAvatarRefreshQueue as any,
     );
 
     return {
@@ -50,6 +69,7 @@ describe('AuthService.linkedinCallback', () => {
         connectedAccountModel,
         encryptionService,
         featureGatingService,
+        linkedinAvatarRefreshQueue,
       },
     };
   };
@@ -174,6 +194,7 @@ describe('AuthService.linkedinCallback', () => {
 describe('AuthService.getLinkedinUser', () => {
   const createService = () =>
     new AuthService(
+      {} as any,
       {} as any,
       {} as any,
       {} as any,
@@ -346,5 +367,246 @@ describe('AuthService.getLinkedinUser', () => {
     });
     expect(result.profileMetadata.headline).toBeUndefined();
     expect(result.profileMetadata.profilePicture).toBeUndefined();
+  });
+});
+
+describe('AuthService.getConnectedAccounts', () => {
+  const makeService = (accounts: any[]) => {
+    const connectedAccountModel = {
+      find: jest.fn().mockReturnValue({
+        select: jest.fn().mockResolvedValue(accounts),
+      }),
+    };
+    const linkedinAvatarRefreshQueue = {
+      addAvatarRefreshJob: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const service = new AuthService(
+      {} as any,
+      {} as any,
+      connectedAccountModel as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      linkedinAvatarRefreshQueue as any,
+    );
+
+    return { service, connectedAccountModel, linkedinAvatarRefreshQueue };
+  };
+
+  it('queues refresh for expiring LinkedIn person avatars and nulls expired urls', async () => {
+    const userId = new Types.ObjectId().toString();
+    const expiringSoon = new Date(Date.now() + 60 * 60 * 1000);
+    const alreadyExpired = new Date(Date.now() - 60 * 1000);
+
+    const linkedInAccount = {
+      _id: new Types.ObjectId(),
+      provider: AccountProvider.LINKEDIN,
+      accountType: LinkedinAccountType.PERSON,
+      avatarUrl: 'https://cdn.example.com/avatar.jpg',
+      avatarUrlExpiresAt: expiringSoon,
+      profileMetadata: {
+        displayImageUrn: 'urn:li:digitalmediaAsset:test',
+      },
+      toObject() {
+        return { ...this };
+      },
+    };
+    const expiredLinkedInAccount = {
+      _id: new Types.ObjectId(),
+      provider: AccountProvider.LINKEDIN,
+      accountType: LinkedinAccountType.PERSON,
+      avatarUrl: 'https://cdn.example.com/expired.jpg',
+      avatarUrlExpiresAt: alreadyExpired,
+      profileMetadata: {
+        displayImageUrn: 'urn:li:digitalmediaAsset:test2',
+      },
+      toObject() {
+        return { ...this };
+      },
+    };
+
+    const { service, linkedinAvatarRefreshQueue, connectedAccountModel } =
+      makeService([linkedInAccount, expiredLinkedInAccount]);
+
+    const result = await service.getConnectedAccounts(userId);
+
+    expect(connectedAccountModel.find).toHaveBeenCalledWith({
+      user: new Types.ObjectId(userId),
+    });
+    expect(linkedinAvatarRefreshQueue.addAvatarRefreshJob).toHaveBeenCalledTimes(
+      2,
+    );
+    expect(result[1].avatarUrl).toBeNull();
+  });
+
+  it('does not queue refresh for org accounts or accounts without displayImageUrn', async () => {
+    const userId = new Types.ObjectId().toString();
+    const organizationAccount = {
+      _id: new Types.ObjectId(),
+      provider: AccountProvider.LINKEDIN,
+      accountType: LinkedinAccountType.ORGANIZATION,
+      avatarUrl: 'https://cdn.example.com/org.jpg',
+      avatarUrlExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      profileMetadata: {
+        displayImageUrn: 'urn:li:digitalmediaAsset:test',
+      },
+      toObject() {
+        return { ...this };
+      },
+    };
+    const missingUrnAccount = {
+      _id: new Types.ObjectId(),
+      provider: AccountProvider.LINKEDIN,
+      accountType: LinkedinAccountType.PERSON,
+      avatarUrl: 'https://cdn.example.com/missing-urn.jpg',
+      avatarUrlExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      profileMetadata: {},
+      toObject() {
+        return { ...this };
+      },
+    };
+
+    const { service, linkedinAvatarRefreshQueue } = makeService([
+      organizationAccount,
+      missingUrnAccount,
+    ]);
+
+    await service.getConnectedAccounts(userId);
+
+    expect(
+      linkedinAvatarRefreshQueue.addAvatarRefreshJob,
+    ).not.toHaveBeenCalled();
+  });
+});
+
+describe('AuthService.refreshLinkedinAvatarForAccount', () => {
+  const makeService = () => {
+    const accountId = new Types.ObjectId().toString();
+    const connectedAccount = {
+      _id: accountId,
+      provider: AccountProvider.LINKEDIN,
+      accountType: LinkedinAccountType.PERSON,
+      isActive: true,
+      accessToken: 'encrypted',
+      profileMetadata: {
+        displayImageUrn: 'urn:li:digitalmediaAsset:123',
+      },
+    };
+
+    const connectedAccountModel = {
+      findById: jest.fn().mockResolvedValue(connectedAccount),
+      findByIdAndUpdate: jest.fn().mockResolvedValue({}),
+    };
+    const encryptionService = {
+      decrypt: jest.fn().mockResolvedValue('token'),
+    };
+
+    const service = new AuthService(
+      {} as any,
+      {} as any,
+      connectedAccountModel as any,
+      {} as any,
+      {} as any,
+      encryptionService as any,
+      {} as any,
+      { addAvatarRefreshJob: jest.fn() } as any,
+    );
+
+    return { service, connectedAccountModel, encryptionService, accountId };
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('updates avatar fields on successful refresh', async () => {
+    const { service, connectedAccountModel, accountId } = makeService();
+    jest.spyOn(service as any, 'getLinkedinUser').mockResolvedValue({
+      avatarUrl: 'https://cdn.example.com/new.jpg',
+      avatarUrlExpiresAt: new Date(1711111111 * 1000),
+      displayImageUrn: 'urn:li:digitalmediaAsset:new',
+    });
+
+    await service.refreshLinkedinAvatarForAccount(accountId);
+
+    expect(connectedAccountModel.findByIdAndUpdate).toHaveBeenCalledWith(
+      accountId,
+      expect.objectContaining({
+        $set: expect.objectContaining({
+          avatarUrl: 'https://cdn.example.com/new.jpg',
+        }),
+      }),
+    );
+  });
+
+  it('clears avatar and marks auth failure when decrypt fails', async () => {
+    const { service, connectedAccountModel, encryptionService, accountId } =
+      makeService();
+    encryptionService.decrypt.mockRejectedValue(new Error('decrypt failed'));
+    connectedAccountModel.findById.mockResolvedValueOnce({
+      _id: accountId,
+      provider: AccountProvider.LINKEDIN,
+      accountType: LinkedinAccountType.PERSON,
+      isActive: true,
+      profileMetadata: { displayImageUrn: 'urn:li:digitalmediaAsset:123' },
+    });
+
+    await service.refreshLinkedinAvatarForAccount(accountId);
+
+    expect(connectedAccountModel.findByIdAndUpdate).toHaveBeenCalledWith(
+      accountId,
+      expect.objectContaining({
+        $set: expect.objectContaining({
+          avatarUrl: null,
+          avatarUrlExpiresAt: null,
+          profileMetadata: expect.objectContaining({
+            avatarRefreshNeeded: true,
+            avatarRefreshFailureReason: 'DECRYPT_FAILED',
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('marks auth expired on 401 response without throwing', async () => {
+    const { service, connectedAccountModel, accountId } = makeService();
+    jest
+      .spyOn(service as any, 'getLinkedinUser')
+      .mockRejectedValue(new ApiError(401, 'Unauthorized', {}));
+    connectedAccountModel.findById.mockResolvedValueOnce({
+      _id: accountId,
+      provider: AccountProvider.LINKEDIN,
+      accountType: LinkedinAccountType.PERSON,
+      isActive: true,
+      profileMetadata: { displayImageUrn: 'urn:li:digitalmediaAsset:123' },
+    });
+
+    await expect(
+      service.refreshLinkedinAvatarForAccount(accountId),
+    ).resolves.toBeUndefined();
+
+    expect(connectedAccountModel.findByIdAndUpdate).toHaveBeenCalledWith(
+      accountId,
+      expect.objectContaining({
+        $set: expect.objectContaining({
+          profileMetadata: expect.objectContaining({
+            avatarRefreshFailureReason: 'AUTH_EXPIRED',
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('throws transient failures for retries', async () => {
+    const { service, accountId } = makeService();
+    jest
+      .spyOn(service as any, 'getLinkedinUser')
+      .mockRejectedValue(new ApiError(503, 'Unavailable', {}));
+
+    await expect(
+      service.refreshLinkedinAvatarForAccount(accountId),
+    ).rejects.toBeInstanceOf(ApiError);
   });
 });

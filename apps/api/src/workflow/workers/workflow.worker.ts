@@ -1,8 +1,8 @@
 import { Job, Worker } from 'bullmq';
 import {
+  LINKEDIN_AVATAR_REFRESH_QUEUE_NAME,
   QUEUE_NAME,
   SCHEDULE_QUEUE_NAME,
-  WorkflowStep,
 } from '../workflow.constants';
 import 'dotenv/config';
 import { Logger } from '@nestjs/common';
@@ -15,6 +15,7 @@ import { runWorkflow } from '../engine/workflow.engine';
 import { getModelToken } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from '../../database/schemas';
+import { AuthService } from '../../auth/auth.service';
 
 async function bootstrapWorker() {
   const logger = new Logger(
@@ -26,6 +27,7 @@ async function bootstrapWorker() {
 
   const agentService = app.get(AgentService);
   const postService = app.get(PostService);
+  const authService = app.get(AuthService);
   const userModel = app.get<Model<User>>(getModelToken(User.name));
 
   logger.log('NestJs context ready');
@@ -74,6 +76,27 @@ async function bootstrapWorker() {
         logger.error(error);
         throw error;
       }
+    },
+    {
+      connection: {
+        url: process.env.REDIS_URL!,
+        maxRetriesPerRequest: null,
+        enableReadyCheck: false,
+      },
+    },
+  );
+
+  new Worker(
+    LINKEDIN_AVATAR_REFRESH_QUEUE_NAME,
+    async (job: Job) => {
+      const connectedAccountId = job.data?.connectedAccountId;
+      if (!connectedAccountId) {
+        logger.warn(`Skipping avatar refresh job ${job.id}; missing account id`);
+        return;
+      }
+
+      logger.log(`Processing LinkedIn avatar refresh for ${connectedAccountId}`);
+      await authService.refreshLinkedinAvatarForAccount(connectedAccountId);
     },
     {
       connection: {
