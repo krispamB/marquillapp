@@ -55,9 +55,7 @@ export default function Footer() {
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wide text-white/80 mb-4">Contact</h3>
             <ul className="space-y-3 text-sm text-white/70">
-              <li>Email: hello@marquill.ai</li>
-              <li>Partnerships: partners@marquill.ai</li>
-              <li>Press: press@marquill.ai</li>
+              <li>Email: hello@marquill.com</li>
             </ul>
           </div>
         </div>
