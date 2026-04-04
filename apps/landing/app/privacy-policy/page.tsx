@@ -157,7 +157,7 @@ export default function PrivacyPolicyPage() {
               <li>Contact us for clarification</li>
             </ul>
             <p className="text-text-secondary leading-relaxed mt-4">
-              <strong>Contact:</strong> incontentai@gmail.com
+              <strong>Contact:</strong> hello@marquill.com
             </p>
           </section>
 
@@ -188,7 +188,7 @@ export default function PrivacyPolicyPage() {
             </p>
             <div className="bg-surface p-6 rounded-lg mt-4">
               <p className="text-text-secondary mb-2">
-                <strong>Email:</strong> incontentai@gmail.com
+                <strong>Email:</strong> hello@marquill.com
               </p>
             </div>
           </section>
