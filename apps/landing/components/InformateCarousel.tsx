@@ -6,32 +6,32 @@ const posts = [
   {
     name: 'Sade Adebayo',
     title: 'Head of Content · Lumen Studio',
-    excerpt: 'We turned one research prompt into 4 LinkedIn posts in under an hour.',
-    image: 'from-[#E7ECFF] via-[#EDEBFF] to-[#F7E8FF]',
+    excerpt: 'Content strategy isn\'t just about volume. It\'s about delivering the right message consistently.',
+    image: '/images/carousel-posts/1.png',
   },
   {
     name: 'Micah Lee',
     title: 'Founder · SignalCraft',
-    excerpt: 'Insight posts backed by YouTube research now drive our highest saves.',
-    image: 'from-[#DFF5FF] via-[#E6F1FF] to-[#F1E7FF]',
+    excerpt: 'Building a startup from scratch taught me one crucial lesson: resilience is everything.',
+    image: '/images/carousel-posts/2.png',
   },
   {
     name: 'Priya Nair',
     title: 'Growth Lead · Orbital',
-    excerpt: 'Drafts stay within the 3,000 character limit without extra editing.',
-    image: 'from-[#E7FFF4] via-[#E6F6FF] to-[#F1E7FF]',
+    excerpt: 'Sustainable growth comes from small, compounding wins, not just massive overnight successes.',
+    image: '/images/carousel-posts/3.png',
   },
   {
     name: 'Alex Chen',
     title: 'Creator · Product Notes',
-    excerpt: 'Scheduling from my phone keeps my LinkedIn cadence consistent.',
-    image: 'from-[#FFF1E6] via-[#FBE8FF] to-[#E9F0FF]',
+    excerpt: 'Finding your voice as a creator takes time. Focus on authenticity over algorithms.',
+    image: '/images/carousel-posts/4.png',
   },
   {
     name: 'Dara Okoye',
     title: 'Marketing Ops · Northwind',
-    excerpt: 'Multiple LinkedIn pages, one dashboard. We finally stopped tab hopping.',
-    image: 'from-[#E9F0FF] via-[#F3ECFF] to-[#FFF0F7]',
+    excerpt: 'Efficiency in marketing operations is the difference between a good campaign and a great one.',
+    image: '/images/carousel-posts/5.png',
   },
 ];
 
@@ -152,7 +152,10 @@ export default function InformateCarousel() {
                     LinkedIn
                   </div>
                 </div>
-                <div className={`informate-media mt-4 rounded-2xl bg-gradient-to-br ${post.image}`} />
+                <div 
+                  className="informate-media mt-4 rounded-2xl bg-cover bg-center bg-no-repeat" 
+                  style={{ backgroundImage: `url(${post.image})` }} 
+                />
                 <p className="mt-4 text-sm text-slate-600">{post.excerpt}</p>
                 <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
                   <span className="h-2 w-2 rounded-full bg-[#0A66C2]" />
