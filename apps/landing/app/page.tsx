@@ -108,14 +108,13 @@ export default function Home() {
                 Built for LinkedIn creators and teams
               </div>
               <h1 className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-semibold text-text-primary leading-tight">
-                Your LinkedIn
+                Your AI writing team,
                 <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#4F5BFF] via-[#7A5BFF] to-[#A56BFF]">
-                  content engine
+                  built for LinkedIn.
                 </span>
               </h1>
               <p className="mt-6 text-lg text-[#3F3E4F] max-w-2xl mx-auto">
-                Generate LinkedIn posts from YouTube research, edit in a focused draft editor, and schedule or publish
-                across personal and company pages in minutes.
+                Marquill combines intelligent post generation, multi-account management, and precision scheduling into one clean workflow — so every post you publish is sharp, on-brand, and built to perform.
               </p>
               <div className="mt-8 flex flex-wrap justify-center gap-4">
                 <a
@@ -163,22 +162,27 @@ export default function Home() {
               Three focused steps to go from research to published LinkedIn posts.
             </p>
           </div>
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               {
-                title: 'Connect your accounts',
-                copy: 'Link personal profiles and company pages with secure OAuth access.',
-                gif: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770688525/marquill/account-linking_cfzuku.gif',
-              },
-              {
-                title: 'Generate your draft',
-                copy: 'Pick Quick or Insight posts and create a 150–300 word LinkedIn draft.',
+                title: 'AI post generation',
+                copy: 'A trained workflow that researches, drafts, and refines posts for your voice and audience.',
                 gif: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770688525/marquill/ai-draft_iwqson.gif',
               },
               {
-                title: 'Schedule or publish',
-                copy: 'Set local publish times or xpost instantly with LinkedIn-ready validation.',
+                title: 'Multi-account control',
+                copy: 'Manage and publish across multiple LinkedIn profiles from a single dashboard.',
+                gif: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770688525/marquill/account-linking_cfzuku.gif',
+              },
+              {
+                title: 'Post scheduling',
+                copy: 'Queue and auto-publish at selected times. Your pipeline keeps moving even when you\'re not.',
                 gif: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770688525/marquill/publishing_arxvh0.gif',
+              },
+              {
+                title: 'Post analytics',
+                copy: 'Track what lands. Real performance data that feeds back into your next post.',
+                gif: '/images/doodle-outline-317-decrease-hover-pinch.gif',
               },
             ].map((card, index) => (
               <div key={card.title} className="rounded-3xl bg-white/80 p-6 shadow-lg border border-white/70">
@@ -253,10 +257,10 @@ export default function Home() {
             <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 items-center">
               <div>
                 <h3 className="text-2xl sm:text-3xl font-semibold text-text-primary">
-                  Teams and agencies scale faster
+                  Built for founders, creators, and teams who publish at scale.
                 </h3>
                 <p className="mt-4 text-text-secondary">
-                  Manage multiple LinkedIn accounts, keep drafts organized, and monitor usage limits per tier. Marquill
+                  Manage multiple LinkedIn accounts, Create posts with a top tier workflow, schedule and publish posts and see post analytics. Marquill
                   keeps your publishing pipeline steady as output grows.
                 </p>
                 <button className="mt-6 rounded-full bg-[#1B1C2A] px-6 py-3 text-sm font-semibold text-white">
@@ -266,7 +270,7 @@ export default function Home() {
               <div className="rounded-3xl bg-[#0F111A] p-6 text-white shadow-xl">
                 <p className="text-sm text-white/70">Customer spotlight</p>
                 <p className="mt-4 text-lg font-semibold">
-                  “We went from scattered drafts to a reliable LinkedIn cadence in one week.”
+                  "Not just a scheduler — an AI workflow that actually understands what makes a LinkedIn post worth reading."
                 </p>
                 <div className="mt-6 flex items-center gap-3">
                   <span className="h-10 w-10 rounded-full bg-white/20" />
