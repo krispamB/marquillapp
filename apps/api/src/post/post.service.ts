@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -193,10 +194,12 @@ export class PostService {
       user._id.toString(),
       post.connectedAccount.toString(),
     );
-
-    const accessToken = await this.encryptionService.decrypt(
-      connectedAccount.accessToken,
-    );
+    const canUseLinkedinAccount = this.isLinkedinAccountUsable(connectedAccount);
+    if (post.status === PostDraftStatus.PUBLISHED && !canUseLinkedinAccount) {
+      throw new ConflictException(
+        'Reconnect account to delete published posts from LinkedIn safely.',
+      );
+    }
 
     if (post.status === PostDraftStatus.SCHEDULED) {
       const scheduledJob = await this.scheduleQueue.queue.getJob(
@@ -208,6 +211,9 @@ export class PostService {
     }
 
     if (post.status === PostDraftStatus.PUBLISHED && post.channelPostId) {
+      const accessToken = await this.encryptionService.decrypt(
+        connectedAccount.accessToken!,
+      );
       const externalUrl = `${this.LINKEDIN_API_BASE}/posts/${encodeURIComponent(post.channelPostId)}`;
       await apiFetch(externalUrl, {
         method: 'DELETE',
@@ -253,13 +259,14 @@ export class PostService {
       throw new BadRequestException('Post is already published');
     }
 
-    const connectedAccount = await this.getOwnedLinkedinConnectedAccount(
+    const connectedAccount = await this.getOwnedUsableLinkedinConnectedAccount(
       user._id.toString(),
       post.connectedAccount.toString(),
+      'publish posts',
     );
 
     const accessToken = await this.encryptionService.decrypt(
-      connectedAccount.accessToken,
+      connectedAccount.accessToken!,
     );
 
     const url = `${this.LINKEDIN_API_BASE}/posts`;
@@ -326,6 +333,12 @@ export class PostService {
       throw new BadRequestException('Post is already published');
     }
 
+    await this.getOwnedUsableLinkedinConnectedAccount(
+      user._id.toString(),
+      post.connectedAccount.toString(),
+      'schedule posts',
+    );
+
     const scheduledDate = new Date(dto.scheduledTime);
     const now = new Date();
     const delay = scheduledDate.getTime() - now.getTime();
@@ -374,13 +387,14 @@ export class PostService {
       throw new BadRequestException('Post is already published');
     }
 
-    const connectedAccount = await this.getOwnedLinkedinConnectedAccount(
+    const connectedAccount = await this.getOwnedUsableLinkedinConnectedAccount(
       user._id.toString(),
       post.connectedAccount.toString(),
+      'upload media',
     );
 
     const accessToken = await this.encryptionService.decrypt(
-      connectedAccount.accessToken,
+      connectedAccount.accessToken!,
     );
 
     const urn = await this.uploadLinkedinImage(
@@ -462,9 +476,14 @@ export class PostService {
     if (!connectedAccount) {
       throw new NotFoundException('Connected account not found');
     }
+    if (!this.isLinkedinAccountUsable(connectedAccount)) {
+      throw new ConflictException(
+        'Reconnect connected account to fetch LinkedIn images.',
+      );
+    }
 
     const accessToken = await this.encryptionService.decrypt(
-      connectedAccount.accessToken,
+      connectedAccount.accessToken!,
     );
 
     const url = `${this.LINKEDIN_API_BASE}/images/${encodeURIComponent(urn)}`;
@@ -565,6 +584,27 @@ export class PostService {
     }
 
     return connectedAccount;
+  }
+
+  private async getOwnedUsableLinkedinConnectedAccount(
+    userId: string,
+    connectedAccountId: string,
+    action: string,
+  ): Promise<ConnectedAccount> {
+    const connectedAccount = await this.getOwnedLinkedinConnectedAccount(
+      userId,
+      connectedAccountId,
+    );
+
+    if (!this.isLinkedinAccountUsable(connectedAccount)) {
+      throw new ConflictException(`Reconnect connected account to ${action}.`);
+    }
+
+    return connectedAccount;
+  }
+
+  private isLinkedinAccountUsable(connectedAccount: ConnectedAccount): boolean {
+    return Boolean(connectedAccount.isActive && connectedAccount.accessToken);
   }
 
   private resolveLinkedinAuthorUrn(connectedAccount: ConnectedAccount): string {

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -20,6 +21,7 @@ import { ApiError, apiFetch } from 'src/common/HelperFn';
 import { EncryptionService } from '../encryption/encryption.service';
 import { FeatureGatingService } from '../feature-gating';
 import { LinkedinAvatarRefreshQueue } from '../workflow/linkedin-avatar-refresh.queue';
+import { ScheduleQueue } from '../workflow/schedule.queue';
 
 interface LinkedinUserInfo {
   memberId: string;
@@ -56,11 +58,14 @@ export class AuthService {
     private jwtService: JwtService,
     @InjectModel(ConnectedAccount.name)
     private connectedAccountModel: Model<ConnectedAccount>,
+    @InjectModel('PostDraft')
+    private readonly postDraftModel: Model<any>,
     @InjectModel(Tier.name) private tierModel: Model<Tier>,
     private configService: ConfigService,
     private encryptionService: EncryptionService,
     private readonly featureGatingService: FeatureGatingService,
     private readonly linkedinAvatarRefreshQueue: LinkedinAvatarRefreshQueue,
+    private readonly scheduleQueue: ScheduleQueue,
   ) {}
 
   async validateGoogleUser(details: {
@@ -111,6 +116,19 @@ export class AuthService {
     const encryptedAccessToken =
       await this.encryptionService.encrypt(access_token);
 
+    const memberOwnerAccount = await this.getLinkedinPersonalAccountByMemberId(
+      profileMetadata.memberId,
+    );
+    if (
+      memberOwnerAccount &&
+      !this.isAccountOwnedByUser(memberOwnerAccount, state)
+    ) {
+      throw new ConflictException({
+        message: 'This LinkedIn account is already connected to another user.',
+        code: 'LINKEDIN_ACCOUNT_ALREADY_CONNECTED',
+      });
+    }
+
     const connectedAccount = await this.getLinkedinPersonalAccount(state);
     const existingMemberId = this.getStoredLinkedinMemberId(connectedAccount);
     if (
@@ -118,7 +136,11 @@ export class AuthService {
       existingMemberId &&
       existingMemberId !== profileMetadata.memberId
     ) {
-      return false;
+      throw new ConflictException({
+        message:
+          'A different LinkedIn account is already connected to this user.',
+        code: 'LINKEDIN_ACCOUNT_MISMATCH',
+      });
     }
 
     await this.featureGatingService.assertConnectedAccountCapacity({
@@ -170,6 +192,11 @@ export class AuthService {
     const connectedAccount = await this.getLinkedinPersonalAccount(userId);
     if (!connectedAccount) {
       throw new NotFoundException('LinkedIn account not connected');
+    }
+    if (!connectedAccount.isActive || !connectedAccount.accessToken) {
+      throw new BadRequestException(
+        'Reconnect your LinkedIn account to fetch organizations',
+      );
     }
 
     const accessToken = await this.encryptionService.decrypt(
@@ -239,6 +266,11 @@ export class AuthService {
       await this.getLinkedinPersonalAccount(userId);
     if (!personalConnectedAccount) {
       throw new NotFoundException('LinkedIn account not connected');
+    }
+    if (!personalConnectedAccount.isActive || !personalConnectedAccount.accessToken) {
+      throw new BadRequestException(
+        'Reconnect your LinkedIn account before connecting organizations',
+      );
     }
 
     const accessToken = await this.encryptionService.decrypt(
@@ -435,6 +467,100 @@ export class AuthService {
     }
   }
 
+  async disconnectConnectedAccount(userId: string, connectedAccountId: string) {
+    const userObjectId = new Types.ObjectId(userId);
+    const targetAccount =
+      await this.connectedAccountModel.findById(connectedAccountId);
+    if (!targetAccount) {
+      throw new NotFoundException('Connected account not found');
+    }
+    if (!this.isAccountOwnedByUser(targetAccount, userId)) {
+      throw new ConflictException('Connected account is not owned by user');
+    }
+    if (targetAccount.provider !== AccountProvider.LINKEDIN) {
+      throw new BadRequestException('Connected account must be LinkedIn');
+    }
+
+    const additionalFilter =
+      targetAccount.accountType === LinkedinAccountType.PERSON
+        ? {
+            $or: [
+              { _id: targetAccount._id },
+              { accountType: LinkedinAccountType.ORGANIZATION },
+            ],
+          }
+        : {
+            _id: targetAccount._id,
+          };
+
+    const accountsToDeactivate = await this.connectedAccountModel
+      .find({
+        user: userObjectId,
+        provider: AccountProvider.LINKEDIN,
+        ...additionalFilter,
+      })
+      .select('_id');
+    const accountIds = accountsToDeactivate.map((account) => account._id);
+    const deactivatedCount = await this.connectedAccountModel.countDocuments({
+      _id: { $in: accountIds },
+      isActive: true,
+    });
+    const now = new Date();
+
+    await this.connectedAccountModel.updateMany(
+      { _id: { $in: accountIds } },
+      {
+        $set: {
+          isActive: false,
+          accessToken: null,
+          accessTokenExpiresAt: null,
+          avatarUrlExpiresAt: null,
+          'profileMetadata.disconnectedAt': now,
+          'profileMetadata.disconnectReason': 'USER_REQUESTED',
+        },
+      },
+    );
+
+    const scheduledPosts = await this.postDraftModel
+      .find({
+        user: userObjectId,
+        connectedAccount: { $in: accountIds },
+        status: 'SCHEDULED',
+      })
+      .select('_id');
+
+    for (const post of scheduledPosts) {
+      const scheduledJob = await this.scheduleQueue.queue.getJob(
+        post._id.toString(),
+      );
+      if (scheduledJob) {
+        await scheduledJob.remove();
+      }
+    }
+
+    if (scheduledPosts.length > 0) {
+      await this.postDraftModel.updateMany(
+        {
+          _id: {
+            $in: scheduledPosts.map((post) => new Types.ObjectId(post._id)),
+          },
+        },
+        {
+          $set: {
+            status: 'DRAFT',
+            scheduledAt: null,
+          },
+        },
+      );
+    }
+
+    return {
+      accountId: targetAccount._id.toString(),
+      deactivatedCount,
+      scheduledPostsCanceled: scheduledPosts.length,
+    };
+  }
+
   async refreshLinkedinAvatarForAccount(connectedAccountId: string) {
     const connectedAccount =
       await this.connectedAccountModel.findById(connectedAccountId);
@@ -459,6 +585,12 @@ export class AuthService {
     if (!displayImageUrn) {
       this.logger.debug(
         `Skipping avatar refresh; displayImageUrn missing (${connectedAccountId})`,
+      );
+      return;
+    }
+    if (!connectedAccount.accessToken) {
+      this.logger.debug(
+        `Skipping avatar refresh; access token missing (${connectedAccountId})`,
       );
       return;
     }
@@ -537,6 +669,45 @@ export class AuthService {
         { accountType: { $exists: false } },
       ],
     });
+  }
+
+  private async getLinkedinPersonalAccountByMemberId(
+    memberId: string,
+  ): Promise<ConnectedAccount | null> {
+    return this.connectedAccountModel.findOne({
+      provider: AccountProvider.LINKEDIN,
+      $and: [
+        {
+          $or: [
+            { accountType: LinkedinAccountType.PERSON },
+            { accountType: { $exists: false } },
+          ],
+        },
+        {
+          $or: [
+            { externalId: memberId },
+            { 'profileMetadata.memberId': memberId },
+            { 'profileMetadata.sub': memberId },
+          ],
+        },
+      ],
+    });
+  }
+
+  private isAccountOwnedByUser(
+    connectedAccount: ConnectedAccount,
+    userId: string,
+  ): boolean {
+    const connectedUser = connectedAccount.user as
+      | Types.ObjectId
+      | { _id?: Types.ObjectId | string }
+      | undefined;
+    const ownerId =
+      connectedUser && typeof connectedUser === 'object' && '_id' in connectedUser
+        ? connectedUser._id?.toString()
+        : connectedUser?.toString();
+
+    return ownerId === userId;
   }
 
   private resolveMemberUrn(connectedAccount: ConnectedAccount): string | null {

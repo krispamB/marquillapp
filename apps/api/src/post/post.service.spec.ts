@@ -237,6 +237,7 @@ describe('PostService.schedulePost', () => {
   const createService = () => {
     const service = Object.create(PostService.prototype) as PostService;
     const findById = jest.fn();
+    const findConnectedAccountById = jest.fn();
     const save = jest.fn().mockResolvedValue(undefined);
     const addScheduleJob = jest.fn().mockResolvedValue(undefined);
     const getJob = jest.fn();
@@ -250,11 +251,15 @@ describe('PostService.schedulePost', () => {
         getJob,
       },
     };
+    (service as any).connectedAccountModel = {
+      findById: findConnectedAccountById,
+    };
 
     return {
       service,
       mocks: {
         findById,
+        findConnectedAccountById,
         save,
         addScheduleJob,
         getJob,
@@ -270,11 +275,18 @@ describe('PostService.schedulePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'DRAFT',
       save: mocks.save,
     } as any;
 
     mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+    });
 
     const result = await service.schedulePost(
       { _id: userId } as any,
@@ -303,11 +315,18 @@ describe('PostService.schedulePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'SCHEDULED',
       save: mocks.save,
     } as any;
 
     mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+    });
     mocks.getJob.mockResolvedValue({ remove });
 
     await service.schedulePost({ _id: userId } as any, postId.toString(), {
@@ -332,11 +351,18 @@ describe('PostService.schedulePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'SCHEDULED',
       save: mocks.save,
     } as any;
 
     mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+    });
     mocks.getJob.mockResolvedValue(null);
 
     await service.schedulePost({ _id: userId } as any, postId.toString(), {
@@ -356,11 +382,18 @@ describe('PostService.schedulePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'SCHEDULED',
       save: mocks.save,
     } as any;
 
     mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+    });
     mocks.getJob.mockResolvedValue({ remove });
 
     await expect(
@@ -379,6 +412,7 @@ describe('PostService.schedulePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'PUBLISHED',
       save: mocks.save,
     } as any;
@@ -401,11 +435,18 @@ describe('PostService.schedulePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'DRAFT',
       save: mocks.save,
     } as any;
 
     mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+    });
 
     await expect(
       service.schedulePost({ _id: userId } as any, postId.toString(), {
@@ -476,6 +517,7 @@ describe('PostService.deletePost', () => {
     mocks.findConnectedAccountById.mockResolvedValue({
       user: userId,
       provider: 'LINKEDIN',
+      isActive: true,
       accessToken: 'encrypted-token',
     });
     mocks.getJob.mockResolvedValue({ remove });
@@ -504,6 +546,7 @@ describe('PostService.deletePost', () => {
     mocks.findConnectedAccountById.mockResolvedValue({
       user: userId,
       provider: 'LINKEDIN',
+      isActive: true,
       accessToken: 'encrypted-token',
     });
     mocks.getJob.mockResolvedValue(null);
@@ -530,6 +573,7 @@ describe('PostService.deletePost', () => {
     mocks.findConnectedAccountById.mockResolvedValue({
       user: userId,
       provider: 'LINKEDIN',
+      isActive: true,
       accessToken: 'encrypted-token',
     });
     mocks.getJob.mockResolvedValue({ remove });
@@ -555,6 +599,7 @@ describe('PostService.deletePost', () => {
     mocks.findConnectedAccountById.mockResolvedValue({
       user: userId,
       provider: 'LINKEDIN',
+      isActive: true,
       accessToken: 'encrypted-token',
     });
 
@@ -582,6 +627,7 @@ describe('PostService.deletePost', () => {
     mocks.findConnectedAccountById.mockResolvedValue({
       user: userId,
       provider: 'LINKEDIN',
+      isActive: true,
       accessToken: 'encrypted-token',
     });
 
@@ -590,5 +636,33 @@ describe('PostService.deletePost', () => {
     expect(mocks.getJob).not.toHaveBeenCalled();
     expect(mockedApiFetch).toHaveBeenCalledTimes(1);
     expect(mocks.deleteOne).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks deleting published posts when account is disconnected', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const post = {
+      _id: postId,
+      user: userId,
+      connectedAccount: new Types.ObjectId(),
+      status: 'PUBLISHED',
+      channelPostId: 'urn:li:share:123',
+    } as any;
+
+    mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: false,
+      accessToken: null,
+    });
+
+    await expect(
+      service.deletePost({ _id: userId } as any, postId.toString()),
+    ).rejects.toThrow(
+      'Reconnect account to delete published posts from LinkedIn safely.',
+    );
+    expect(mocks.deleteOne).not.toHaveBeenCalled();
   });
 });

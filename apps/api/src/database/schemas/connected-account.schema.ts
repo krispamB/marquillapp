@@ -42,8 +42,8 @@ export class ConnectedAccount extends Document {
   @Prop()
   impersonatorUrn?: string;
 
-  @Prop({ required: true })
-  accessToken: string;
+  @Prop({ type: String })
+  accessToken?: string | null;
 
   @Prop()
   accessTokenExpiresAt?: Date;
@@ -64,6 +64,18 @@ ConnectedAccountSchema.index(
     unique: true,
     partialFilterExpression: {
       externalId: { $exists: true, $type: 'string' },
+    },
+  },
+);
+
+ConnectedAccountSchema.index(
+  { provider: 1, accountType: 1, externalId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      provider: AccountProvider.LINKEDIN,
+      accountType: LinkedinAccountType.PERSON,
+      externalId: { $exists: true, $type: 'string', $ne: '' },
     },
   },
 );
