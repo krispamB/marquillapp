@@ -20,11 +20,11 @@ export const metadata = {
 };
 
 const stats = [
-  { value: '150–300', label: 'Word range per post type' },
-  { value: '3K', label: 'LinkedIn character guardrails' },
-  // { value: '30s', label: 'Auto-save cadence in editor' },
-  // { value: 'Multi', label: 'Personal + company pages' },
-  // { value: 'TZ Smart', label: 'Timezone-aware scheduling' },
+  { value: '1.2M+', label: 'Post impressions generated' },
+  { value: '850+', label: 'Active creators & founders' },
+  { value: '4,500', label: 'Posts published weekly' },
+  { value: '6 hrs', label: 'Saved on formatting per week' },
+  { value: '40%', label: 'Avg. engagement increase' },
 ];
 
 const pricing = [
