@@ -23,6 +23,7 @@ import { ConnectLinkedinOrganizationsDto } from './dto/connect-linkedin-organiza
 @Controller('auth')
 export class AuthController {
   private readonly LINKEDIN_CALLBACK_CLOSE_DELAY_SECONDS = 4;
+  private readonly COOKIE_EXP = 30 * 24 * 60 * 60 * 1000;
 
   constructor(private readonly authService: AuthService) {}
 
@@ -38,14 +39,16 @@ export class AuthController {
       httpOnly: true,
       secure: true,
       sameSite: 'none',
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      domain: '.marquill.com',
+      maxAge: this.COOKIE_EXP,
     });
     //attach entire user to cookie
     res.cookie('user', JSON.stringify(user), {
       httpOnly: false,
       secure: true,
       sameSite: 'none',
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      domain: '.marquill.com',
+      maxAge: this.COOKIE_EXP,
     });
     return res.redirect(`${process.env.FRONTEND_URL}/auth/callback`);
   }
