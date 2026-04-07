@@ -43,13 +43,24 @@ export type ConnectedAccountProfile = {
   name?: string;
   email?: string;
   picture?: string;
+  sub?: string;
+  memberId?: string;
+  localizedFirstName?: string;
+  localizedLastName?: string;
+  localizedHeadline?: string;
+  displayImageUrn?: string;
+  vanityName?: string;
 };
 
 export type ConnectedAccount = {
   id: string;
   provider: ConnectedAccountProvider;
   accessTokenExpiresAt?: string;
-  profile: ConnectedAccountProfile;
+  displayName?: string;
+  avatarUrl?: string;
+  vanityName?: string;
+  headline?: string;
+  profile?: ConnectedAccountProfile;
   isActive?: boolean;
 };
 
@@ -60,6 +71,9 @@ export type ConnectedAccountsResponse = {
     _id: string;
     provider: ConnectedAccountProvider;
     accessTokenExpiresAt?: string;
+    displayName?: string;
+    avatarUrl?: string;
+    vanityName?: string;
     profileMetadata?: ConnectedAccountProfile;
     isActive?: boolean;
   }>;
@@ -69,6 +83,31 @@ export type LinkedinAuthUrlResponse = {
   statusCode?: number;
   message?: string;
   data?: string;
+};
+
+export type PaymentUsageMetric = {
+  used: number;
+  limit: number;
+  remaining: number;
+};
+
+export type PaymentUsageData = {
+  tier: {
+    id: string;
+    name: string;
+  };
+  billingCycle: {
+    start: string;
+    end: string;
+    source: string;
+  };
+  usage: Record<string, PaymentUsageMetric>;
+};
+
+export type PaymentUsageResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: PaymentUsageData;
 };
 
 export type PostMetricsMonthlyItem = {

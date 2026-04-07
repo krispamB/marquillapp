@@ -71,7 +71,10 @@ export default async function BillingPage() {
                     id: account._id,
                     provider: account.provider,
                     accessTokenExpiresAt: account.accessTokenExpiresAt,
-                    profile: account.profileMetadata ?? {},
+                    displayName: account.displayName,
+                    avatarUrl: account.avatarUrl,
+                    vanityName: account.vanityName ?? account.profileMetadata?.vanityName,
+                    headline: account.profileMetadata?.localizedHeadline,
                     isActive: account.isActive,
                 })) ?? [];
         }

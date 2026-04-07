@@ -664,7 +664,7 @@ export default function PostsClient({
   ): Promise<File> => {
     const response = await fetch(imageUrl);
     if (!response.ok) {
-      throw new Error("Unable to fetch selected Unsplash image.");
+      throw new Error("Unable to fetch selected stock image.");
     }
 
     const blob = await response.blob();
@@ -781,21 +781,25 @@ export default function PostsClient({
         setConnectFeedback(error instanceof Error ? error.message : "Image upload failed.");
         return;
       }
-    } else if (payload.imageSource === "unsplash" && payload.imageUrl) {
+    } else if (
+      (payload.imageSource === "unsplash" || payload.imageSource === "pexels") &&
+      payload.imageUrl
+    ) {
+      const sourceLabel = payload.imageSource === "pexels" ? "Pexels" : "Unsplash";
       if (!payload.postId) {
-        setConnectFeedback("Please save or generate this draft first before uploading an Unsplash image.");
+        setConnectFeedback(`Please save or generate this draft first before uploading a ${sourceLabel} image.`);
         return;
       }
       try {
         const remoteFile = await buildFileFromRemoteImage(
           payload.imageUrl,
-          "unsplash-image",
+          payload.imageSource === "pexels" ? "pexels-image" : "unsplash-image",
           payload.imageMimeType,
         );
         await uploadImageForPost(payload.postId, remoteFile);
       } catch (error) {
         setConnectFeedback(
-          error instanceof Error ? error.message : "Unsplash image upload failed.",
+          error instanceof Error ? error.message : `${sourceLabel} image upload failed.`,
         );
         return;
       }
@@ -1212,7 +1216,8 @@ export default function PostsClient({
                     )
                     .map((account) => (
                       <option key={account.id} value={account.id}>
-                        {account.profile.name ?? account.profile.email ?? account.provider}
+                        {account.displayName ??
+                          (account.vanityName ? `@${account.vanityName}` : account.provider)}
                       </option>
                     ))}
                 </select>
@@ -1386,16 +1391,18 @@ export default function PostsClient({
                                     <div className="flex items-center gap-3">
                                       <UserAvatar
                                         initials={initials}
-                                        avatarUrl={selectedConnectedAccount?.profile?.picture ?? user.avatar}
+                                        avatarUrl={selectedConnectedAccount?.avatarUrl ?? user.avatar}
                                         sizeClass="h-10 w-10"
                                         textClass="text-sm"
                                       />
                                       <div>
                                         <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                                          {selectedConnectedAccount?.profile?.name ?? user.name}
+                                          {selectedConnectedAccount?.displayName ?? user.name}
                                         </p>
                                         <p className="text-xs text-[var(--color-text-secondary)]">
-                                          {selectedConnectedAccount?.profile?.email ?? "LinkedIn account"}
+                                          {selectedConnectedAccount?.vanityName
+                                            ? `@${selectedConnectedAccount.vanityName}`
+                                            : "LinkedIn account"}
                                         </p>
                                       </div>
                                     </div>
@@ -1586,8 +1593,9 @@ export default function PostsClient({
         initialContent={newPostModalState.initialContent}
         initialImageUrl={newPostModalState.initialImageUrl}
         account={{
-          name: selectedConnectedAccount?.profile?.name,
-          avatarUrl: selectedConnectedAccount?.profile?.picture,
+          name: selectedConnectedAccount?.displayName,
+          avatarUrl: selectedConnectedAccount?.avatarUrl,
+          headline: selectedConnectedAccount?.headline,
           provider: selectedConnectedAccount?.provider,
         }}
         onClose={closeNewPostModal}

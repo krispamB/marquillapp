@@ -387,7 +387,10 @@ function getProviderInitials(provider: ConnectedAccountProvider) {
 }
 
 function getAccountLabel(account?: ConnectedAccount) {
-  return account?.profile?.name || account?.profile?.email || "No connected account";
+  if (!account) {
+    return "No connected account";
+  }
+  return account.displayName || getProviderLabel(account.provider);
 }
 
 export function MobileAccountChip({
@@ -417,7 +420,7 @@ export function MobileAccountChip({
         <span className="min-w-0 truncate">{getAccountLabel(account)}</span>
       </span>
       <span className="shrink-0 text-xs text-[var(--color-text-secondary)]">
-        {providerLabel}
+        {account?.vanityName ? `@${account.vanityName}` : providerLabel}
       </span>
     </button>
   );
@@ -479,7 +482,9 @@ export function MobileAccountSwitcherSheet({
                   <span className="block truncate text-sm font-semibold text-[var(--color-text-primary)]">
                     {getAccountLabel(account)}
                   </span>
-                  <span className="block text-xs">{getProviderLabel(account.provider)}</span>
+                  <span className="block text-xs">
+                    {account.vanityName ? `@${account.vanityName}` : getProviderLabel(account.provider)}
+                  </span>
                 </span>
                 {isSelected ? (
                   <span className="rounded-full bg-[var(--color-primary)] px-2 py-0.5 text-[10px] font-semibold text-white">
