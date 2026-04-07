@@ -143,6 +143,61 @@ export class FeatureGatingService {
     }
   }
 
+  async assertScheduledPostQuota(userId: string): Promise<void> {
+    const tier = await this.resolveEntitlementTier(userId);
+    const limit = this.getLimitFromTier(tier, FEATURE_KEYS.SCHEDULED_POSTS);
+    const periodStart = await this.resolveUsagePeriodStart(userId);
+    const currentUsage = await this.getUsageCount(
+      userId,
+      FEATURE_KEYS.SCHEDULED_POSTS,
+      periodStart,
+    );
+
+    if (currentUsage >= limit) {
+      throw new FeatureGateForbiddenException({
+        code: FEATURE_GATE_ERROR_CODE,
+        feature: FEATURE_KEYS.SCHEDULED_POSTS,
+        limit,
+        currentUsage,
+        tier: {
+          id: tier._id.toString(),
+          name: tier.name,
+        },
+        upgradeHint: 'Upgrade your plan to schedule more posts this month.',
+      });
+    }
+  }
+
+  async incrementScheduledPostUsage(userId: string): Promise<void> {
+    const periodStart = await this.resolveUsagePeriodStart(userId);
+    const userObjectId = new Types.ObjectId(userId);
+
+    const query = {
+      user_id: userObjectId,
+      feature: FEATURE_KEYS.SCHEDULED_POSTS,
+      periodStart,
+    };
+
+    const update = {
+      $inc: { count: 1 },
+      $setOnInsert: {
+        user_id: userObjectId,
+        feature: FEATURE_KEYS.SCHEDULED_POSTS,
+        periodStart,
+      },
+    };
+
+    try {
+      await this.usageModel.updateOne(query, update, { upsert: true });
+    } catch (error: any) {
+      if (error?.code === 11000) {
+        await this.usageModel.updateOne(query, { $inc: { count: 1 } });
+        return;
+      }
+      throw error;
+    }
+  }
+
   async assertConnectedAccountCapacity(params: {
     userId: string;
     isReconnect: boolean;

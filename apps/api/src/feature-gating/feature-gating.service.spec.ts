@@ -1,6 +1,23 @@
 import { InternalServerErrorException } from '@nestjs/common';
 import { Types } from 'mongoose';
-import { SubscriptionStatus } from '../database/schemas/subscription.schema';
+
+jest.mock(
+  '../database/schemas',
+  () => ({
+    SubscriptionStatus: {
+      ACTIVE: 'ACTIVE',
+      CANCELED: 'CANCELED',
+      EXPIRED: 'EXPIRED',
+      PAST_DUE: 'PAST_DUE',
+    },
+    Subscription: class Subscription {},
+    Tier: class Tier {},
+    Usage: class Usage {},
+  }),
+  { virtual: true },
+);
+
+import { SubscriptionStatus } from '../database/schemas';
 import { FeatureGatingService } from './feature-gating.service';
 
 describe('FeatureGatingService', () => {
@@ -139,6 +156,58 @@ describe('FeatureGatingService', () => {
     });
   });
 
+  it('blocks post scheduling when usage reaches the plan limit', async () => {
+    const { service, mocks } = makeService();
+    const userId = new Types.ObjectId().toString();
+    const periodStart = new Date('2026-03-01T00:00:00.000Z');
+    const tier = {
+      _id: new Types.ObjectId(),
+      name: 'Starter',
+      limits: { ai_drafts: 10, connected_accounts: 1, scheduled_posts: 5 },
+    } as any;
+
+    jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
+    jest
+      .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
+      .mockResolvedValue(periodStart);
+    mocks.usageModel.findOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({ count: 5 }),
+    });
+
+    await expect(service.assertScheduledPostQuota(userId)).rejects.toMatchObject(
+      {
+        response: {
+          code: 'FEATURE_LIMIT_EXCEEDED',
+          feature: 'scheduled_posts',
+          limit: 5,
+          currentUsage: 5,
+        },
+        status: 403,
+      },
+    );
+  });
+
+  it('allows post scheduling when usage is below the plan limit', async () => {
+    const { service, mocks } = makeService();
+    const userId = new Types.ObjectId().toString();
+    const periodStart = new Date('2026-03-01T00:00:00.000Z');
+    const tier = {
+      _id: new Types.ObjectId(),
+      name: 'Starter',
+      limits: { ai_drafts: 10, connected_accounts: 1, scheduled_posts: 5 },
+    } as any;
+
+    jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
+    jest
+      .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
+      .mockResolvedValue(periodStart);
+    mocks.usageModel.findOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({ count: 4 }),
+    });
+
+    await expect(service.assertScheduledPostQuota(userId)).resolves.toBeUndefined();
+  });
+
   it('uses active subscription period start for metered usage', async () => {
     const { service, mocks } = makeService();
     const userId = new Types.ObjectId().toString();
@@ -198,6 +267,36 @@ describe('FeatureGatingService', () => {
         $setOnInsert: {
           user_id: new Types.ObjectId(userId),
           feature: 'ai_drafts',
+          periodStart,
+        },
+      },
+      { upsert: true },
+    );
+  });
+
+  it('increments scheduled_posts usage with upsert', async () => {
+    const { service, mocks } = makeService();
+    const userId = new Types.ObjectId().toString();
+    const periodStart = new Date('2026-03-01T00:00:00.000Z');
+
+    jest
+      .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
+      .mockResolvedValue(periodStart);
+    mocks.usageModel.updateOne.mockResolvedValue({ acknowledged: true });
+
+    await service.incrementScheduledPostUsage(userId);
+
+    expect(mocks.usageModel.updateOne).toHaveBeenCalledWith(
+      {
+        user_id: new Types.ObjectId(userId),
+        feature: 'scheduled_posts',
+        periodStart,
+      },
+      {
+        $inc: { count: 1 },
+        $setOnInsert: {
+          user_id: new Types.ObjectId(userId),
+          feature: 'scheduled_posts',
           periodStart,
         },
       },

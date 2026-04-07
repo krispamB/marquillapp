@@ -340,6 +340,13 @@ export class PostService {
       'schedule posts',
     );
 
+    const isFirstTimeSchedule = post.status !== PostDraftStatus.SCHEDULED;
+    if (isFirstTimeSchedule) {
+      await this.featureGatingService.assertScheduledPostQuota(
+        user._id.toString(),
+      );
+    }
+
     const scheduledDate = new Date(dto.scheduledTime);
     const now = new Date();
     const delay = scheduledDate.getTime() - now.getTime();
@@ -366,6 +373,12 @@ export class PostService {
       user._id.toString(),
       delay,
     );
+
+    if (isFirstTimeSchedule) {
+      await this.featureGatingService.incrementScheduledPostUsage(
+        user._id.toString(),
+      );
+    }
 
     return post;
   }
