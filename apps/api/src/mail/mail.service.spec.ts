@@ -42,12 +42,15 @@ describe('MailService', () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: 'noreply@example.com',
+        from: expect.stringContaining('noreply@example.com'),
         to: 'user@example.com',
         subject: 'Welcome to LinkGen',
       }),
     );
     expect(send.mock.calls[0][0].html).toContain('Jane Doe');
+    expect(send.mock.calls[0][0].html).toContain(
+      'https://res.cloudinary.com/dnpvndlmy/image/upload/q_auto/f_auto/v1775561659/marquill/logo_nwvdon.svg',
+    );
     expect(send.mock.calls[0][0].text).toContain('Open dashboard');
     expect(result.error).toBeNull();
   });

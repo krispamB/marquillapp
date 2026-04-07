@@ -32,14 +32,16 @@ describe('mailTemplates', () => {
 
       expect(subject).toBeTruthy();
       expect(template.htmlFile.endsWith('.hbs')).toBe(true);
-      expect(existsSync(join(__dirname, 'templates', template.htmlFile))).toBe(
-        true,
-      );
+      expect(
+        existsSync(join(process.cwd(), 'assets/mail/templates', template.htmlFile)),
+      ).toBe(true);
 
       if (template.textFile) {
         expect(template.textFile.endsWith('.hbs')).toBe(true);
         expect(
-          existsSync(join(__dirname, 'templates', template.textFile)),
+          existsSync(
+            join(process.cwd(), 'assets/mail/templates', template.textFile),
+          ),
         ).toBe(true);
       }
     }

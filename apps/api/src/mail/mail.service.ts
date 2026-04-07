@@ -26,7 +26,7 @@ export type SendResult = CreateEmailResponse;
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private readonly templatesDir = join(__dirname, 'templates');
+  private readonly templatesDir = join(process.cwd(), 'assets/mail/templates');
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -47,7 +47,7 @@ export class MailService {
 
     const client = this.createResendClient(apiKey);
     const result = await client.emails.send({
-      from,
+      from: `"Marquill" <${from}>`,
       to: input.to,
       subject: template.subject(input.data),
       html,

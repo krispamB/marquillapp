@@ -24,7 +24,7 @@ type MailTemplateRegistry = {
 
 export const mailTemplates: MailTemplateRegistry = {
   welcome: {
-    subject: ({ appName = 'LinkGen' }) => `Welcome to ${appName}`,
+    subject: ({ appName = 'Marquill' }) => `Welcome to ${appName}`,
     htmlFile: 'welcome.hbs',
     textFile: 'welcome.text.hbs',
   },
