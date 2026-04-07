@@ -85,6 +85,31 @@ export type LinkedinAuthUrlResponse = {
   data?: string;
 };
 
+export type PaymentUsageMetric = {
+  used: number;
+  limit: number;
+  remaining: number;
+};
+
+export type PaymentUsageData = {
+  tier: {
+    id: string;
+    name: string;
+  };
+  billingCycle: {
+    start: string;
+    end: string;
+    source: string;
+  };
+  usage: Record<string, PaymentUsageMetric>;
+};
+
+export type PaymentUsageResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: PaymentUsageData;
+};
+
 export type PostMetricsMonthlyItem = {
   count: number;
   month: string;

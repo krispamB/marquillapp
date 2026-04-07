@@ -488,13 +488,24 @@ export default function NewPostModal({
     const isContentDirty = content !== initialContentRef.current;
     const isImageDirty =
       buildImageFingerprint(imageSource, imagePreviewUrl) !== initialImageFingerprintRef.current;
-    const shouldConfirmDiscard = mode === "edit" && phase === "editor" && (isContentDirty || isImageDirty);
+    const resolvedPostId = postId ?? activeDraftId ?? undefined;
+    const shouldConfirmDiscard =
+      phase === "editor" && Boolean(resolvedPostId) && (isContentDirty || isImageDirty);
     if (shouldConfirmDiscard) {
       setIsDiscardConfirmOpen(true);
       return;
     }
     onClose();
-  }, [content, imagePreviewUrl, imageSource, isSchedulePopoverOpen, mode, onClose, phase]);
+  }, [
+    activeDraftId,
+    content,
+    imagePreviewUrl,
+    imageSource,
+    isSchedulePopoverOpen,
+    onClose,
+    phase,
+    postId,
+  ]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -899,9 +910,10 @@ export default function NewPostModal({
   const isImageDirty =
     buildImageFingerprint(imageSource, imagePreviewUrl) !== initialImageFingerprintRef.current;
   const isDirty = isContentDirty || isImageDirty;
+  const resolvedPostId = postId ?? activeDraftId ?? undefined;
   const canSaveDraft =
-    mode === "edit" &&
-    Boolean(postId) &&
+    phase === "editor" &&
+    Boolean(resolvedPostId) &&
     isDirty &&
     !isOverLimit &&
     pendingAction === null;
@@ -1561,7 +1573,7 @@ export default function NewPostModal({
     overrides?: Partial<Pick<NewPostSubmitPayload, "scheduledTime" | "timezone">>,
   ): NewPostSubmitPayload => ({
     mode,
-    postId,
+    postId: resolvedPostId,
     content,
     imageFile,
     imageUrl: imagePreviewUrl,

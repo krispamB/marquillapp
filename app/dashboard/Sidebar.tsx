@@ -205,8 +205,8 @@ export default function Sidebar({
             <img
               src={
                 collapsed
-                  ? "https://res.cloudinary.com/dnpvndlmy/image/upload/v1770759168/marquill/icon_at6fek.svg"
-                  : "https://res.cloudinary.com/dnpvndlmy/image/upload/v1770689074/marquill/logo_bpw55v.svg"
+                  ? "https://res.cloudinary.com/dnpvndlmy/image/upload/q_auto/f_auto/v1775562587/marquill/icon_ngg31p.svg"
+                  : "https://res.cloudinary.com/dnpvndlmy/image/upload/q_auto/f_auto/v1775561659/marquill/logo_nwvdon.svg"
               }
               alt="Marquill"
               className={`${collapsed ? "mx-auto h-10 w-10" : "h-8 w-auto"}`}

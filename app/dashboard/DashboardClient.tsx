@@ -41,6 +41,8 @@ import type {
   UpdatePostResponse,
   UserProfile,
   FeatureLimitErrorResponse,
+  PaymentUsageData,
+  PaymentUsageResponse,
 } from "../lib/types";
 import { FeatureLimitExceededError } from "../lib/types";
 
@@ -213,6 +215,13 @@ function formatScheduledLocalDateTime(isoDate?: string) {
   }).format(scheduled);
 }
 
+function formatUsageKey(key: string) {
+  return key
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export default function DashboardPage({
   user,
   connectedAccounts,
@@ -241,6 +250,9 @@ export default function DashboardPage({
   const [isViewingAllDrafts, setIsViewingAllDrafts] = useState(false);
   const [draftVisibleLimit, setDraftVisibleLimit] = useState(4);
   const [isMobileAccountSheetOpen, setIsMobileAccountSheetOpen] = useState(false);
+  const [usageData, setUsageData] = useState<PaymentUsageData | null>(null);
+  const [isUsageLoading, setIsUsageLoading] = useState(false);
+  const [usageError, setUsageError] = useState<string | null>(null);
   const [scheduledFilter, setScheduledFilter] = useState<ScheduledFilter>("TODAY");
   const [generatedDraftId, setGeneratedDraftId] = useState<string | null>(null);
   const { state: newPostModalState, openCreate, openEdit, close: closeNewPostModal } =
@@ -441,6 +453,52 @@ export default function DashboardPage({
     window.addEventListener("resize", updateLimit);
     return () => window.removeEventListener("resize", updateLimit);
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadUsage = async () => {
+      setIsUsageLoading(true);
+      setUsageError(null);
+
+      try {
+        const response = await fetch(`${apiBase}/payment/usage`, {
+          credentials: "include",
+          signal: controller.signal,
+        });
+
+        let payload: PaymentUsageResponse | null = null;
+        try {
+          payload = (await response.json()) as PaymentUsageResponse;
+        } catch {
+          payload = null;
+        }
+
+        if (!response.ok) {
+          throw new Error(payload?.message || "Unable to load usage data.");
+        }
+
+        if (payload?.data) {
+          setUsageData(payload.data);
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        setUsageError(error instanceof Error ? error.message : "Unable to load usage data.");
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsUsageLoading(false);
+        }
+      }
+    };
+
+    void loadUsage();
+
+    return () => {
+      controller.abort();
+    };
+  }, [apiBase]);
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -1197,39 +1255,59 @@ export default function DashboardPage({
               aria-disabled={!hasConnectedAccounts}
             >
               <section className="grid gap-4 lg:grid-cols-2">
-                <Card className="group relative overflow-hidden p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_36px_80px_-58px_rgba(15,23,42,0.45)]">
+                <Card className="group relative overflow-hidden p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_36px_80px_-58px_rgba(15,23,42,0.45)] flex flex-col min-h-[280px]">
                   <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-[var(--color-accent)]/20 blur-3xl" />
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[var(--color-primary)]/8 via-white/70 to-[var(--color-accent)]/10" />
-                  <div className="relative flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                        Posts this billing cycle
-                      </p>
-                      <div className="mt-4 flex items-end gap-3">
-                        <span className="text-4xl font-semibold leading-none text-[var(--color-text-primary)]">
-                          {stats.postsThisMonth}
+                  <div className="relative mb-8">
+                    <h2 className="font-[var(--font-sora)] text-[18px] font-semibold text-[var(--color-text-primary)] tracking-tight">
+                      Current cycle usage
+                    </h2>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs font-semibold text-[var(--color-text-secondary)]">
+                      {usageData?.tier?.name ? (
+                        <span className="inline-flex items-center rounded-md bg-[var(--color-primary)]/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary)] mr-1">
+                          {usageData.tier.name}
                         </span>
-                        <span className="pb-1 text-lg font-semibold text-[var(--color-text-secondary)]">
-                          / {stats.postLimit}
+                      ) : null}
+                      {usageData?.billingCycle?.start && usageData?.billingCycle?.end ? (
+                        <span className="tracking-wide">
+                          {new Date(usageData.billingCycle.start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} &ndash; {new Date(usageData.billingCycle.end).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                         </span>
-                      </div>
+                      ) : (
+                        <span>Loading cycle...</span>
+                      )}
                     </div>
                   </div>
-                  <div className="relative mt-5">
-                    <div className="h-2.5 w-full rounded-full bg-[var(--color-border)]">
-                      <div
-                        className={`h-2.5 rounded-full bg-gradient-to-r ${billingMeta.meter} transition-all duration-500 ease-out`}
-                        style={{ width: `${usagePercent}%` }}
-                      />
-                    </div>
-                    <div className="mt-3 flex items-center justify-between text-xs font-medium text-[var(--color-text-secondary)]">
-                      <span>Used: {stats.postsThisMonth}</span>
-                      <span>Remaining: {postsRemaining}</span>
-                    </div>
+                  <div className="relative flex flex-col gap-6 flex-1 justify-center">
+                    {isUsageLoading ? (
+                      <p className="text-sm text-[var(--color-text-secondary)]">Loading usage...</p>
+                    ) : usageError ? (
+                      <p className="text-sm text-rose-500">{usageError}</p>
+                    ) : usageData?.usage ? (
+                      Object.entries(usageData.usage).map(([key, metric]) => {
+                        const usagePercent = metric.limit > 0 ? Math.min(100, (metric.used / metric.limit) * 100) : 0;
+                        const meterClass = usagePercent >= 90 ? "from-rose-400 to-rose-600" : usagePercent >= 70 ? "from-amber-400 to-orange-400" : "from-[var(--color-primary)] to-[var(--color-accent)]";
+                        return (
+                          <div key={key} className="flex flex-col">
+                            <div className="flex items-end justify-between mb-2">
+                              <span className="text-[13px] font-semibold text-[var(--color-text-primary)] tracking-wide">{formatUsageKey(key)}</span>
+                              <div className="flex items-baseline gap-1.5">
+                                <span className="text-[22px] font-bold leading-none tracking-tight text-[var(--color-text-primary)]">{metric.used}</span>
+                                <span className="text-sm font-semibold text-[var(--color-text-secondary)]">/ {metric.limit}</span>
+                              </div>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-[var(--color-border)] overflow-hidden">
+                              <div
+                                className={`h-full rounded-full bg-gradient-to-r ${meterClass} transition-all duration-700 ease-out`}
+                                style={{ width: `${usagePercent}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-sm text-[var(--color-text-secondary)]">No usage data found.</p>
+                    )}
                   </div>
-                  <p className="relative mt-4 text-sm text-[var(--color-text-secondary)]">
-                    {postsRemaining} posts left in this cycle. {billingMeta.note}
-                  </p>
                 </Card>
 
                 <Card className="group relative overflow-hidden p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_36px_80px_-58px_rgba(15,23,42,0.45)]">
