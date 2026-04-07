@@ -24,6 +24,7 @@ import {
 } from '../database/schemas';
 import { PolarClient } from './polar.client';
 import { RedisService } from '../redis/redis.service';
+import { FeatureGatingService } from '../feature-gating/feature-gating.service';
 
 const WEBHOOK_DEDUPE_TTL_SECONDS = 172800; // 48h
 const WEBHOOK_REDIS_KEY_PREFIX = 'billing:webhook:polar:id:';
@@ -48,6 +49,7 @@ export class PaymentService {
     private readonly polarClient: PolarClient,
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
+    private readonly featureGatingService: FeatureGatingService,
   ) {}
 
   async createCheckoutSession(
@@ -237,6 +239,10 @@ export class PaymentService {
     }
 
     return { items };
+  }
+
+  async getUsageSummary(userId: string) {
+    return this.featureGatingService.getDashboardUsage(userId);
   }
 
   async cancelSubscription(userId: string) {

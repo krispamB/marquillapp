@@ -31,6 +31,7 @@ describe('FeatureGatingService', () => {
     };
     const usageModel = {
       findOne: jest.fn(),
+      find: jest.fn(),
       updateOne: jest.fn(),
     };
     const connectedAccountModel = {
@@ -225,6 +226,106 @@ describe('FeatureGatingService', () => {
 
     const periodStart = await (service as any).resolveUsagePeriodStart(userId);
     expect(periodStart).toEqual(currentPeriodStart);
+  });
+
+  it('returns dashboard usage summary for active subscription cycle', async () => {
+    const { service, mocks } = makeService();
+    const userId = new Types.ObjectId().toString();
+    const tierId = new Types.ObjectId();
+    const currentPeriodStart = new Date('2026-03-14T00:00:00.000Z');
+    const currentPeriodEnd = new Date('2026-04-14T00:00:00.000Z');
+    const tier = {
+      _id: tierId,
+      name: 'Starter',
+      limits: { ai_drafts: 5, connected_accounts: 1, scheduled_posts: 3 },
+    };
+
+    mocks.subscriptionModel.findOne.mockReturnValue({
+      sort: jest.fn().mockReturnValue({
+        lean: jest
+          .fn()
+          .mockResolvedValueOnce({
+            status: SubscriptionStatus.ACTIVE,
+            currentPeriodStart,
+            currentPeriodEnd,
+            tierId,
+          })
+          .mockResolvedValueOnce({
+            status: SubscriptionStatus.ACTIVE,
+            currentPeriodStart,
+            currentPeriodEnd,
+          }),
+      }),
+    });
+    mocks.tierModel.findById.mockReturnValue({
+      lean: jest.fn().mockResolvedValue(tier),
+    });
+    mocks.connectedAccountModel.countDocuments.mockResolvedValue(1);
+    mocks.usageModel.find.mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue([
+          { feature: 'ai_drafts', count: 2 },
+          { feature: 'scheduled_posts', count: 1 },
+        ]),
+      }),
+    });
+
+    const result = await service.getDashboardUsage(userId);
+
+    expect(result).toEqual({
+      tier: { id: tierId.toString(), name: 'Starter' },
+      billingCycle: {
+        start: currentPeriodStart,
+        end: currentPeriodEnd,
+        source: 'subscription',
+      },
+      usage: {
+        connected_accounts: { used: 1, limit: 1, remaining: 0 },
+        ai_drafts: { used: 2, limit: 5, remaining: 3 },
+        scheduled_posts: { used: 1, limit: 3, remaining: 2 },
+      },
+    });
+  });
+
+  it('returns default cycle usage summary and floors remaining at zero', async () => {
+    const { service, mocks } = makeService();
+    const userId = new Types.ObjectId().toString();
+    const defaultTierId = new Types.ObjectId();
+    const now = new Date('2026-03-20T12:00:00.000Z');
+
+    jest.useFakeTimers().setSystemTime(now);
+    mocks.subscriptionModel.findOne.mockReturnValue({
+      sort: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue(null),
+      }),
+    });
+    mocks.tierModel.findOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({
+        _id: defaultTierId,
+        name: 'Free',
+        limits: { ai_drafts: 2, connected_accounts: 1, scheduled_posts: 0 },
+      }),
+    });
+    mocks.connectedAccountModel.countDocuments.mockResolvedValue(3);
+    mocks.usageModel.find.mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue([{ feature: 'ai_drafts', count: 7 }]),
+      }),
+    });
+
+    const result = await service.getDashboardUsage(userId);
+
+    expect(result.billingCycle).toEqual({
+      start: new Date('2026-03-01T00:00:00.000Z'),
+      end: new Date('2026-04-01T00:00:00.000Z'),
+      source: 'default',
+    });
+    expect(result.usage).toEqual({
+      connected_accounts: { used: 3, limit: 1, remaining: 0 },
+      ai_drafts: { used: 7, limit: 2, remaining: 0 },
+      scheduled_posts: { used: 0, limit: 0, remaining: 0 },
+    });
+    jest.useRealTimers();
   });
 
   it('falls back to UTC month start for free/default users', async () => {

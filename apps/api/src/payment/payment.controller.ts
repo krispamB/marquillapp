@@ -12,6 +12,7 @@ import { JwtAuthGuard } from '../common/guards';
 import { GetUser } from '../common/decorators';
 import { User } from '../database/schemas';
 import { CreateCheckoutDto } from './payment.dto';
+import { IAppResponse } from '../common/interfaces';
 
 @UseGuards(JwtAuthGuard)
 @Controller('payment')
@@ -36,6 +37,15 @@ export class PaymentController {
   @Get('invoices')
   async getInvoices(@GetUser() user: User) {
     return this.paymentService.getInvoiceHistory(user._id.toString());
+  }
+
+  @Get('usage')
+  async getUsage(@GetUser() user: User): Promise<IAppResponse> {
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Usage summary fetched successfully',
+      data: await this.paymentService.getUsageSummary(user._id.toString()),
+    };
   }
 
   @Post('cancel')
