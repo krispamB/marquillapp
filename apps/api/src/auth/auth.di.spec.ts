@@ -9,6 +9,8 @@ import { JwtService } from '@nestjs/jwt';
 import { EncryptionService } from '../encryption/encryption.service';
 import { FeatureGatingService } from '../feature-gating';
 import { LinkedinAvatarRefreshQueue } from '../workflow/linkedin-avatar-refresh.queue';
+import { ScheduleQueue } from '../workflow/schedule.queue';
+import { EmailQueue } from '../workflow/email.queue';
 
 jest.mock(
   'src/common/HelperFn',
@@ -39,6 +41,10 @@ describe('AuthService DI', () => {
           useValue: {},
         },
         {
+          provide: getModelToken('PostDraft'),
+          useValue: {},
+        },
+        {
           provide: getModelToken(Tier.name),
           useValue: {},
         },
@@ -59,6 +65,18 @@ describe('AuthService DI', () => {
         },
         {
           provide: FeatureGatingService,
+          useValue: {},
+        },
+        {
+          provide: ScheduleQueue,
+          useValue: {
+            queue: {
+              getJob: jest.fn(),
+            },
+          },
+        },
+        {
+          provide: EmailQueue,
           useValue: {},
         },
       ],

@@ -16,11 +16,13 @@ import {
 } from '../database/schemas';
 import { PaymentController } from './payment.controller';
 import { PaymentWebhookController } from './payment.webhook.controller';
+import { FeatureGatingModule } from '../feature-gating';
 
 @Module({
   imports: [
     DatabaseModule,
     RedisModule,
+    FeatureGatingModule,
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: Tier.name, schema: TierSchema },

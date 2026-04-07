@@ -29,26 +29,28 @@ This defines:
 }
 
 ### OUTPUT:
-Return a single LinkedIn post as plain text.
+- Return a single LinkedIn post as plain text.
+- Text must contain less than 3000 characters.
 
 The post should:
 - Open with a strong, context-relevant hook (1–2 lines)
 - Develop 2–4 tightly connected ideas aligned with the domain
 - Include at least one practical or forward-looking insight
 - Close with a reflective or actionable takeaway appropriate to the audience
+- The post must have less than 3000 characters
 
 ### CONSTRAINTS:
 - The post MUST align with the user intent’s domain, audience, and topic scope.
 - Do NOT introduce new facts or claims not supported by the insights or
   reasonable inference from them.
-- Do NOT reference transcripts, videos, or sources.
 - Do NOT introduce specific tools, technologies, or frameworks
   unless they are explicitly mentioned or clearly implied
   in the compressed insights.
 - Avoid generic motivation, hype, or clickbait.
 - Avoid emojis unless they clearly add meaning (default: none).
 - Do NOT exceed 200 words, unless the insight depth clearly justifies more.
-- Write in a natural, professional LinkedIn tone suitable for the domain.
+- Do NOT exceed 3000 characters.
+- Write in a natural, professional LinkedIn tone 0suitable for the domain.
 - If future-oriented expectations are required by the intent but weakly supported,
   conservatively extrapolate from current trends and clearly frame them as
   expectations, not guarantees.

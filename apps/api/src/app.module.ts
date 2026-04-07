@@ -23,6 +23,7 @@ import { SubscriptionModule } from './subscription/subscription.module';
 import { PaymentModule } from './payment/payment.module';
 import { YoutubeTranscriptModule } from './youtube-transcript';
 import { TierModule } from './tier/tier.module';
+import { MailModule } from './mail';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { TierModule } from './tier/tier.module';
     SubscriptionModule,
     TierModule,
     PaymentModule,
+    MailModule,
     AgentModule,
     LlmModule,
     ApifyModule.register({

@@ -37,6 +37,7 @@ jest.mock(
 
 import { PostService } from './post.service';
 import { apiFetch } from 'src/common/HelperFn/apiFetch.helper';
+import { formatLinkedinContent } from 'src/common/HelperFn';
 
 describe('PostService.getPosts', () => {
   const createService = () => {
@@ -237,9 +238,12 @@ describe('PostService.schedulePost', () => {
   const createService = () => {
     const service = Object.create(PostService.prototype) as PostService;
     const findById = jest.fn();
+    const findConnectedAccountById = jest.fn();
     const save = jest.fn().mockResolvedValue(undefined);
     const addScheduleJob = jest.fn().mockResolvedValue(undefined);
     const getJob = jest.fn();
+    const assertScheduledPostQuota = jest.fn().mockResolvedValue(undefined);
+    const incrementScheduledPostUsage = jest.fn().mockResolvedValue(undefined);
 
     (service as any).postDraftModel = {
       findById,
@@ -250,14 +254,24 @@ describe('PostService.schedulePost', () => {
         getJob,
       },
     };
+    (service as any).connectedAccountModel = {
+      findById: findConnectedAccountById,
+    };
+    (service as any).featureGatingService = {
+      assertScheduledPostQuota,
+      incrementScheduledPostUsage,
+    };
 
     return {
       service,
       mocks: {
         findById,
+        findConnectedAccountById,
         save,
         addScheduleJob,
         getJob,
+        assertScheduledPostQuota,
+        incrementScheduledPostUsage,
       },
     };
   };
@@ -270,11 +284,18 @@ describe('PostService.schedulePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'DRAFT',
       save: mocks.save,
     } as any;
 
     mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+    });
 
     const result = await service.schedulePost(
       { _id: userId } as any,
@@ -283,10 +304,16 @@ describe('PostService.schedulePost', () => {
     );
 
     expect(mocks.getJob).not.toHaveBeenCalled();
+    expect(mocks.assertScheduledPostQuota).toHaveBeenCalledWith(
+      userId.toString(),
+    );
     expect(mocks.addScheduleJob).toHaveBeenCalledWith(
       postId.toString(),
       userId.toString(),
       expect.any(Number),
+    );
+    expect(mocks.incrementScheduledPostUsage).toHaveBeenCalledWith(
+      userId.toString(),
     );
     expect(post.status).toBe('SCHEDULED');
     expect(post.scheduledAt).toEqual(new Date(scheduledTime));
@@ -303,17 +330,25 @@ describe('PostService.schedulePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'SCHEDULED',
       save: mocks.save,
     } as any;
 
     mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+    });
     mocks.getJob.mockResolvedValue({ remove });
 
     await service.schedulePost({ _id: userId } as any, postId.toString(), {
       scheduledTime,
     } as any);
 
+    expect(mocks.assertScheduledPostQuota).not.toHaveBeenCalled();
     expect(mocks.getJob).toHaveBeenCalledWith(postId.toString());
     expect(remove).toHaveBeenCalledTimes(1);
     expect(mocks.addScheduleJob).toHaveBeenCalledWith(
@@ -321,6 +356,7 @@ describe('PostService.schedulePost', () => {
       userId.toString(),
       expect.any(Number),
     );
+    expect(mocks.incrementScheduledPostUsage).not.toHaveBeenCalled();
     expect(post.scheduledAt).toEqual(new Date(scheduledTime));
   });
 
@@ -332,19 +368,28 @@ describe('PostService.schedulePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'SCHEDULED',
       save: mocks.save,
     } as any;
 
     mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+    });
     mocks.getJob.mockResolvedValue(null);
 
     await service.schedulePost({ _id: userId } as any, postId.toString(), {
       scheduledTime,
     } as any);
 
+    expect(mocks.assertScheduledPostQuota).not.toHaveBeenCalled();
     expect(mocks.getJob).toHaveBeenCalledWith(postId.toString());
     expect(mocks.addScheduleJob).toHaveBeenCalledTimes(1);
+    expect(mocks.incrementScheduledPostUsage).not.toHaveBeenCalled();
   });
 
   it('fails rescheduling if removing previous scheduled job throws', async () => {
@@ -356,11 +401,18 @@ describe('PostService.schedulePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'SCHEDULED',
       save: mocks.save,
     } as any;
 
     mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+    });
     mocks.getJob.mockResolvedValue({ remove });
 
     await expect(
@@ -368,7 +420,9 @@ describe('PostService.schedulePost', () => {
         scheduledTime,
       } as any),
     ).rejects.toThrow('remove failed');
+    expect(mocks.assertScheduledPostQuota).not.toHaveBeenCalled();
     expect(mocks.addScheduleJob).not.toHaveBeenCalled();
+    expect(mocks.incrementScheduledPostUsage).not.toHaveBeenCalled();
   });
 
   it('still rejects scheduling for published posts', async () => {
@@ -379,6 +433,7 @@ describe('PostService.schedulePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'PUBLISHED',
       save: mocks.save,
     } as any;
@@ -390,7 +445,9 @@ describe('PostService.schedulePost', () => {
         scheduledTime,
       } as any),
     ).rejects.toThrow('Post is already published');
+    expect(mocks.assertScheduledPostQuota).not.toHaveBeenCalled();
     expect(mocks.addScheduleJob).not.toHaveBeenCalled();
+    expect(mocks.incrementScheduledPostUsage).not.toHaveBeenCalled();
   });
 
   it('still rejects scheduling in the past', async () => {
@@ -401,18 +458,222 @@ describe('PostService.schedulePost', () => {
     const post = {
       _id: postId,
       user: userId,
+      connectedAccount: new Types.ObjectId(),
       status: 'DRAFT',
       save: mocks.save,
     } as any;
 
     mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+    });
 
     await expect(
       service.schedulePost({ _id: userId } as any, postId.toString(), {
         scheduledTime,
       } as any),
     ).rejects.toThrow('Scheduled time must be in the future');
+    expect(mocks.assertScheduledPostQuota).toHaveBeenCalledWith(
+      userId.toString(),
+    );
     expect(mocks.addScheduleJob).not.toHaveBeenCalled();
+    expect(mocks.incrementScheduledPostUsage).not.toHaveBeenCalled();
+  });
+
+  it('does not increment scheduling usage when queue enqueue fails', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const scheduledTime = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const post = {
+      _id: postId,
+      user: userId,
+      connectedAccount: new Types.ObjectId(),
+      status: 'DRAFT',
+      save: mocks.save,
+    } as any;
+
+    mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+    });
+    mocks.addScheduleJob.mockRejectedValue(new Error('queue unavailable'));
+
+    await expect(
+      service.schedulePost({ _id: userId } as any, postId.toString(), {
+        scheduledTime,
+      } as any),
+    ).rejects.toThrow('queue unavailable');
+    expect(mocks.assertScheduledPostQuota).toHaveBeenCalledWith(
+      userId.toString(),
+    );
+    expect(mocks.incrementScheduledPostUsage).not.toHaveBeenCalled();
+  });
+});
+
+describe('PostService.publishOnLinkedIn', () => {
+  const createService = () => {
+    const service = Object.create(PostService.prototype) as PostService;
+    const findById = jest.fn();
+    const save = jest.fn().mockResolvedValue(undefined);
+    const findConnectedAccountById = jest.fn().mockResolvedValue({
+      user: new Types.ObjectId(),
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+      accountType: 'PERSON',
+      impersonatorUrn: 'urn:li:person:abc',
+      profileMetadata: {},
+    });
+    const decrypt = jest.fn().mockResolvedValue('token');
+    const mockedApiFetch = apiFetch as jest.Mock;
+
+    mockedApiFetch.mockResolvedValue({
+      response: {
+        headers: {
+          get: jest.fn().mockReturnValue('urn:li:share:123'),
+        },
+      },
+    });
+    (formatLinkedinContent as jest.Mock).mockImplementation((text: string) => text);
+
+    (service as any).postDraftModel = {
+      findById,
+    };
+    (service as any).connectedAccountModel = {
+      findById: findConnectedAccountById,
+    };
+    (service as any).encryptionService = {
+      decrypt,
+    };
+    (service as any).LINKEDIN_API_BASE = 'https://api.linkedin.com/rest';
+
+    return {
+      service,
+      mocks: {
+        findById,
+        save,
+        findConnectedAccountById,
+        decrypt,
+        mockedApiFetch,
+      },
+    };
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('publishes successfully when media is an empty array', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const post = {
+      _id: postId,
+      user: userId,
+      connectedAccount: new Types.ObjectId(),
+      status: 'SCHEDULED',
+      content: 'text only',
+      media: [],
+      save: mocks.save,
+    } as any;
+    mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+      accountType: 'PERSON',
+      impersonatorUrn: 'urn:li:person:abc',
+      profileMetadata: {},
+    });
+
+    await expect(
+      service.publishOnLinkedIn({ _id: userId } as any, postId.toString()),
+    ).resolves.toBeUndefined();
+
+    expect(mocks.mockedApiFetch).toHaveBeenCalledTimes(1);
+    const request = mocks.mockedApiFetch.mock.calls[0][1];
+    const body = JSON.parse(request.body);
+    expect(body.content).toBeUndefined();
+    expect(body.commentary).toBe('text only');
+    expect(post.status).toBe('PUBLISHED');
+  });
+
+  it('publishes successfully when media is undefined', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const post = {
+      _id: postId,
+      user: userId,
+      connectedAccount: new Types.ObjectId(),
+      status: 'SCHEDULED',
+      content: 'text only',
+      save: mocks.save,
+    } as any;
+    mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+      accountType: 'PERSON',
+      impersonatorUrn: 'urn:li:person:abc',
+      profileMetadata: {},
+    });
+
+    await expect(
+      service.publishOnLinkedIn({ _id: userId } as any, postId.toString()),
+    ).resolves.toBeUndefined();
+
+    expect(mocks.mockedApiFetch).toHaveBeenCalledTimes(1);
+    const request = mocks.mockedApiFetch.mock.calls[0][1];
+    const body = JSON.parse(request.body);
+    expect(body.content).toBeUndefined();
+    expect(body.commentary).toBe('text only');
+  });
+
+  it('includes media payload when media exists', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const post = {
+      _id: postId,
+      user: userId,
+      connectedAccount: new Types.ObjectId(),
+      status: 'SCHEDULED',
+      content: 'with media',
+      media: [{ id: 'urn:li:image:1', title: 'image-1' }],
+      save: mocks.save,
+    } as any;
+    mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+      accountType: 'PERSON',
+      impersonatorUrn: 'urn:li:person:abc',
+      profileMetadata: {},
+    });
+
+    await service.publishOnLinkedIn({ _id: userId } as any, postId.toString());
+
+    const request = mocks.mockedApiFetch.mock.calls[0][1];
+    const body = JSON.parse(request.body);
+    expect(body.content).toEqual({
+      media: {
+        id: 'urn:li:image:1',
+        title: 'image-1',
+      },
+    });
   });
 });
 
@@ -476,6 +737,7 @@ describe('PostService.deletePost', () => {
     mocks.findConnectedAccountById.mockResolvedValue({
       user: userId,
       provider: 'LINKEDIN',
+      isActive: true,
       accessToken: 'encrypted-token',
     });
     mocks.getJob.mockResolvedValue({ remove });
@@ -504,6 +766,7 @@ describe('PostService.deletePost', () => {
     mocks.findConnectedAccountById.mockResolvedValue({
       user: userId,
       provider: 'LINKEDIN',
+      isActive: true,
       accessToken: 'encrypted-token',
     });
     mocks.getJob.mockResolvedValue(null);
@@ -530,6 +793,7 @@ describe('PostService.deletePost', () => {
     mocks.findConnectedAccountById.mockResolvedValue({
       user: userId,
       provider: 'LINKEDIN',
+      isActive: true,
       accessToken: 'encrypted-token',
     });
     mocks.getJob.mockResolvedValue({ remove });
@@ -555,6 +819,7 @@ describe('PostService.deletePost', () => {
     mocks.findConnectedAccountById.mockResolvedValue({
       user: userId,
       provider: 'LINKEDIN',
+      isActive: true,
       accessToken: 'encrypted-token',
     });
 
@@ -582,6 +847,7 @@ describe('PostService.deletePost', () => {
     mocks.findConnectedAccountById.mockResolvedValue({
       user: userId,
       provider: 'LINKEDIN',
+      isActive: true,
       accessToken: 'encrypted-token',
     });
 
@@ -590,5 +856,33 @@ describe('PostService.deletePost', () => {
     expect(mocks.getJob).not.toHaveBeenCalled();
     expect(mockedApiFetch).toHaveBeenCalledTimes(1);
     expect(mocks.deleteOne).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks deleting published posts when account is disconnected', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const post = {
+      _id: postId,
+      user: userId,
+      connectedAccount: new Types.ObjectId(),
+      status: 'PUBLISHED',
+      channelPostId: 'urn:li:share:123',
+    } as any;
+
+    mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: false,
+      accessToken: null,
+    });
+
+    await expect(
+      service.deletePost({ _id: userId } as any, postId.toString()),
+    ).rejects.toThrow(
+      'Reconnect account to delete published posts from LinkedIn safely.',
+    );
+    expect(mocks.deleteOne).not.toHaveBeenCalled();
   });
 });

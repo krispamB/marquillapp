@@ -1,5 +1,6 @@
 import { Job, Worker } from 'bullmq';
 import {
+  EMAIL_QUEUE_NAME,
   LINKEDIN_AVATAR_REFRESH_QUEUE_NAME,
   QUEUE_NAME,
   SCHEDULE_QUEUE_NAME,
@@ -16,6 +17,9 @@ import { getModelToken } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from '../../database/schemas';
 import { AuthService } from '../../auth/auth.service';
+import { MailService } from '../../mail';
+import { EmailQueue } from '../email.queue';
+import { processEmailJob } from './email.worker.handler';
 
 async function bootstrapWorker() {
   const logger = new Logger(
@@ -28,6 +32,8 @@ async function bootstrapWorker() {
   const agentService = app.get(AgentService);
   const postService = app.get(PostService);
   const authService = app.get(AuthService);
+  const mailService = app.get(MailService);
+  const emailQueue = app.get(EmailQueue);
   const userModel = app.get<Model<User>>(getModelToken(User.name));
 
   logger.log('NestJs context ready');
@@ -72,6 +78,17 @@ async function bootstrapWorker() {
         }
 
         await postService.publishOnLinkedIn(user, postId);
+        try {
+          await emailQueue.addScheduledPostPublishedEmailJob(
+            user.email,
+            user.name,
+            postId,
+          );
+        } catch (error) {
+          logger.warn(
+            `Failed to enqueue scheduled post published email for post ${postId}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
       } catch (error) {
         logger.error(error);
         throw error;
@@ -97,6 +114,20 @@ async function bootstrapWorker() {
 
       logger.log(`Processing LinkedIn avatar refresh for ${connectedAccountId}`);
       await authService.refreshLinkedinAvatarForAccount(connectedAccountId);
+    },
+    {
+      connection: {
+        url: process.env.REDIS_URL!,
+        maxRetriesPerRequest: null,
+        enableReadyCheck: false,
+      },
+    },
+  );
+
+  new Worker(
+    EMAIL_QUEUE_NAME,
+    async (job: Job) => {
+      await processEmailJob(job, logger, mailService);
     },
     {
       connection: {
