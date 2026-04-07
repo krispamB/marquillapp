@@ -37,6 +37,7 @@ jest.mock(
 
 import { PostService } from './post.service';
 import { apiFetch } from 'src/common/HelperFn/apiFetch.helper';
+import { formatLinkedinContent } from 'src/common/HelperFn';
 
 describe('PostService.getPosts', () => {
   const createService = () => {
@@ -454,6 +455,166 @@ describe('PostService.schedulePost', () => {
       } as any),
     ).rejects.toThrow('Scheduled time must be in the future');
     expect(mocks.addScheduleJob).not.toHaveBeenCalled();
+  });
+});
+
+describe('PostService.publishOnLinkedIn', () => {
+  const createService = () => {
+    const service = Object.create(PostService.prototype) as PostService;
+    const findById = jest.fn();
+    const save = jest.fn().mockResolvedValue(undefined);
+    const findConnectedAccountById = jest.fn().mockResolvedValue({
+      user: new Types.ObjectId(),
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+      accountType: 'PERSON',
+      impersonatorUrn: 'urn:li:person:abc',
+      profileMetadata: {},
+    });
+    const decrypt = jest.fn().mockResolvedValue('token');
+    const mockedApiFetch = apiFetch as jest.Mock;
+
+    mockedApiFetch.mockResolvedValue({
+      response: {
+        headers: {
+          get: jest.fn().mockReturnValue('urn:li:share:123'),
+        },
+      },
+    });
+    (formatLinkedinContent as jest.Mock).mockImplementation((text: string) => text);
+
+    (service as any).postDraftModel = {
+      findById,
+    };
+    (service as any).connectedAccountModel = {
+      findById: findConnectedAccountById,
+    };
+    (service as any).encryptionService = {
+      decrypt,
+    };
+    (service as any).LINKEDIN_API_BASE = 'https://api.linkedin.com/rest';
+
+    return {
+      service,
+      mocks: {
+        findById,
+        save,
+        findConnectedAccountById,
+        decrypt,
+        mockedApiFetch,
+      },
+    };
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('publishes successfully when media is an empty array', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const post = {
+      _id: postId,
+      user: userId,
+      connectedAccount: new Types.ObjectId(),
+      status: 'SCHEDULED',
+      content: 'text only',
+      media: [],
+      save: mocks.save,
+    } as any;
+    mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+      accountType: 'PERSON',
+      impersonatorUrn: 'urn:li:person:abc',
+      profileMetadata: {},
+    });
+
+    await expect(
+      service.publishOnLinkedIn({ _id: userId } as any, postId.toString()),
+    ).resolves.toBeUndefined();
+
+    expect(mocks.mockedApiFetch).toHaveBeenCalledTimes(1);
+    const request = mocks.mockedApiFetch.mock.calls[0][1];
+    const body = JSON.parse(request.body);
+    expect(body.content).toBeUndefined();
+    expect(body.commentary).toBe('text only');
+    expect(post.status).toBe('PUBLISHED');
+  });
+
+  it('publishes successfully when media is undefined', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const post = {
+      _id: postId,
+      user: userId,
+      connectedAccount: new Types.ObjectId(),
+      status: 'SCHEDULED',
+      content: 'text only',
+      save: mocks.save,
+    } as any;
+    mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+      accountType: 'PERSON',
+      impersonatorUrn: 'urn:li:person:abc',
+      profileMetadata: {},
+    });
+
+    await expect(
+      service.publishOnLinkedIn({ _id: userId } as any, postId.toString()),
+    ).resolves.toBeUndefined();
+
+    expect(mocks.mockedApiFetch).toHaveBeenCalledTimes(1);
+    const request = mocks.mockedApiFetch.mock.calls[0][1];
+    const body = JSON.parse(request.body);
+    expect(body.content).toBeUndefined();
+    expect(body.commentary).toBe('text only');
+  });
+
+  it('includes media payload when media exists', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const post = {
+      _id: postId,
+      user: userId,
+      connectedAccount: new Types.ObjectId(),
+      status: 'SCHEDULED',
+      content: 'with media',
+      media: [{ id: 'urn:li:image:1', title: 'image-1' }],
+      save: mocks.save,
+    } as any;
+    mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+      accountType: 'PERSON',
+      impersonatorUrn: 'urn:li:person:abc',
+      profileMetadata: {},
+    });
+
+    await service.publishOnLinkedIn({ _id: userId } as any, postId.toString());
+
+    const request = mocks.mockedApiFetch.mock.calls[0][1];
+    const body = JSON.parse(request.body);
+    expect(body.content).toEqual({
+      media: {
+        id: 'urn:li:image:1',
+        title: 'image-1',
+      },
+    });
   });
 });
 

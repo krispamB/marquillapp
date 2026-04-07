@@ -5,6 +5,7 @@ import {
   LinkedinAccountType,
 } from '../database/schemas/connected-account.schema';
 import { ApiError, apiFetch } from 'src/common/HelperFn';
+import { EmailQueue } from '../workflow/email.queue';
 
 jest.mock(
   'src/common/HelperFn',
@@ -31,6 +32,137 @@ jest.mock(
 );
 
 import { AuthService } from './auth.service';
+
+describe('AuthService.validateGoogleUser', () => {
+  const makeService = () => {
+    const existingByGoogleId = {
+      _id: new Types.ObjectId(),
+      email: 'existing-google@example.com',
+    };
+    const existingByEmail = {
+      _id: new Types.ObjectId(),
+      email: 'existing-email@example.com',
+      googleId: null,
+      avatar: 'old-avatar',
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    const createdUser = {
+      _id: new Types.ObjectId(),
+      email: 'new-user@example.com',
+      name: 'New User',
+      googleId: 'google-new',
+    };
+
+    const userModel = {
+      findOne: jest.fn(),
+      create: jest.fn(),
+    };
+    const tierModel = {
+      findOne: jest.fn().mockResolvedValue({ _id: new Types.ObjectId() }),
+    };
+    const emailQueue = {
+      addWelcomeEmailJob: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const service = new AuthService(
+      userModel as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      tierModel as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      emailQueue as EmailQueue,
+    );
+
+    return {
+      service,
+      mocks: { userModel, tierModel, emailQueue },
+      fixtures: { existingByGoogleId, existingByEmail, createdUser },
+    };
+  };
+
+  it('enqueues welcome email once when a new user is created', async () => {
+    const { service, mocks, fixtures } = makeService();
+    mocks.userModel.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    mocks.userModel.create.mockResolvedValue(fixtures.createdUser);
+
+    const result = await service.validateGoogleUser({
+      email: fixtures.createdUser.email,
+      name: fixtures.createdUser.name,
+      avatar: 'avatar-url',
+      googleId: fixtures.createdUser.googleId,
+    });
+
+    expect(result).toEqual(fixtures.createdUser);
+    expect(mocks.userModel.create).toHaveBeenCalledTimes(1);
+    expect(mocks.emailQueue.addWelcomeEmailJob).toHaveBeenCalledTimes(1);
+    expect(mocks.emailQueue.addWelcomeEmailJob).toHaveBeenCalledWith(
+      fixtures.createdUser.email,
+      fixtures.createdUser.name,
+    );
+  });
+
+  it('does not enqueue welcome email for existing googleId user', async () => {
+    const { service, mocks, fixtures } = makeService();
+    mocks.userModel.findOne.mockResolvedValueOnce(fixtures.existingByGoogleId);
+
+    await service.validateGoogleUser({
+      email: fixtures.existingByGoogleId.email,
+      name: 'Existing User',
+      avatar: 'avatar-url',
+      googleId: 'google-existing',
+    });
+
+    expect(mocks.userModel.create).not.toHaveBeenCalled();
+    expect(mocks.emailQueue.addWelcomeEmailJob).not.toHaveBeenCalled();
+  });
+
+  it('does not enqueue welcome email when linking googleId to existing email user', async () => {
+    const { service, mocks, fixtures } = makeService();
+    mocks.userModel.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(fixtures.existingByEmail);
+
+    await service.validateGoogleUser({
+      email: fixtures.existingByEmail.email,
+      name: 'Existing User',
+      avatar: 'new-avatar-url',
+      googleId: 'google-linked',
+    });
+
+    expect(fixtures.existingByEmail.save).toHaveBeenCalledTimes(1);
+    expect(mocks.userModel.create).not.toHaveBeenCalled();
+    expect(mocks.emailQueue.addWelcomeEmailJob).not.toHaveBeenCalled();
+  });
+
+  it('does not throw when welcome email enqueue fails for a new user', async () => {
+    const { service, mocks, fixtures } = makeService();
+    mocks.userModel.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    mocks.userModel.create.mockResolvedValue(fixtures.createdUser);
+    mocks.emailQueue.addWelcomeEmailJob.mockRejectedValueOnce(
+      new Error('queue unavailable'),
+    );
+
+    await expect(
+      service.validateGoogleUser({
+        email: fixtures.createdUser.email,
+        name: fixtures.createdUser.name,
+        avatar: 'avatar-url',
+        googleId: fixtures.createdUser.googleId,
+      }),
+    ).resolves.toEqual(fixtures.createdUser);
+
+    expect(mocks.emailQueue.addWelcomeEmailJob).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('AuthService.linkedinCallback', () => {
   const makeService = () => {
@@ -61,6 +193,9 @@ describe('AuthService.linkedinCallback', () => {
         getJob: jest.fn(),
       },
     };
+    const emailQueue = {
+      addWelcomeEmailJob: jest.fn(),
+    };
 
     const service = new AuthService(
       userModel as any,
@@ -73,6 +208,7 @@ describe('AuthService.linkedinCallback', () => {
       featureGatingService as any,
       linkedinAvatarRefreshQueue as any,
       scheduleQueue as any,
+      emailQueue as any,
     );
 
     return {
@@ -296,6 +432,7 @@ describe('AuthService.disconnectConnectedAccount', () => {
       {} as any,
       {} as any,
       scheduleQueue as any,
+      {} as any,
     );
 
     return { service, connectedAccountModel, postDraftModel, scheduleQueue };
@@ -365,6 +502,7 @@ describe('AuthService.disconnectConnectedAccount', () => {
 describe('AuthService.getLinkedinUser', () => {
   const createService = () =>
     new AuthService(
+      {} as any,
       {} as any,
       {} as any,
       {} as any,
@@ -565,6 +703,7 @@ describe('AuthService.getConnectedAccounts', () => {
       {} as any,
       linkedinAvatarRefreshQueue as any,
       {} as any,
+      {} as any,
     );
 
     return { service, connectedAccountModel, linkedinAvatarRefreshQueue };
@@ -688,6 +827,7 @@ describe('AuthService.refreshLinkedinAvatarForAccount', () => {
       encryptionService as any,
       {} as any,
       { addAvatarRefreshJob: jest.fn() } as any,
+      {} as any,
       {} as any,
     );
 

@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Welcome</title>
+  </head>
+  <body style="font-family: Arial, sans-serif; color: #111; margin: 0; padding: 24px;">
+    <h1 style="margin: 0 0 12px;">Welcome, {{name}}!</h1>
+    <p style="margin: 0 0 12px;">Thanks for joining Marquill.</p>
+    {{#if dashboardUrl}}
+    <p style="margin: 0;">
+      Continue here: <a href="{{dashboardUrl}}">Open dashboard</a>
+    </p>
+    {{/if}}
+  </body>
+</html>

@@ -270,16 +270,17 @@ export class PostService {
     );
 
     const url = `${this.LINKEDIN_API_BASE}/posts`;
+    const firstMedia = post.media?.[0];
     const data: ILinkedInPost = {
       author: this.resolveLinkedinAuthorUrn(connectedAccount),
       commentary: post.content
         ? formatLinkedinContent(post.content)
         : undefined,
-      content: post.media
+      content: firstMedia
         ? {
             media: {
-              id: post.media[0].id,
-              title: post.media[0].title,
+              id: firstMedia.id,
+              title: firstMedia.title,
             },
           }
         : undefined,

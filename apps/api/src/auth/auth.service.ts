@@ -22,6 +22,7 @@ import { EncryptionService } from '../encryption/encryption.service';
 import { FeatureGatingService } from '../feature-gating';
 import { LinkedinAvatarRefreshQueue } from '../workflow/linkedin-avatar-refresh.queue';
 import { ScheduleQueue } from '../workflow/schedule.queue';
+import { EmailQueue } from '../workflow/email.queue';
 
 interface LinkedinUserInfo {
   memberId: string;
@@ -66,6 +67,7 @@ export class AuthService {
     private readonly featureGatingService: FeatureGatingService,
     private readonly linkedinAvatarRefreshQueue: LinkedinAvatarRefreshQueue,
     private readonly scheduleQueue: ScheduleQueue,
+    private readonly emailQueue: EmailQueue,
   ) {}
 
   async validateGoogleUser(details: {
@@ -92,6 +94,16 @@ export class AuthService {
           googleId,
           tier: defaultTier ? defaultTier._id : undefined,
         });
+
+        try {
+          await this.emailQueue.addWelcomeEmailJob(email, name);
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'Unknown queue error';
+          this.logger.warn(
+            `Welcome email enqueue failed for new signup (${email}): ${message}`,
+          );
+        }
       }
     }
 

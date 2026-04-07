@@ -10,6 +10,7 @@ import { EncryptionService } from '../encryption/encryption.service';
 import { FeatureGatingService } from '../feature-gating';
 import { LinkedinAvatarRefreshQueue } from '../workflow/linkedin-avatar-refresh.queue';
 import { ScheduleQueue } from '../workflow/schedule.queue';
+import { EmailQueue } from '../workflow/email.queue';
 
 jest.mock(
   'src/common/HelperFn',
@@ -73,6 +74,10 @@ describe('AuthService DI', () => {
               getJob: jest.fn(),
             },
           },
+        },
+        {
+          provide: EmailQueue,
+          useValue: {},
         },
       ],
     }).compile();
