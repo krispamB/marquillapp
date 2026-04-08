@@ -4,7 +4,7 @@ import { Lock, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 
 const BRAND_WORDMARK =
-  "https://res.cloudinary.com/dnpvndlmy/image/upload/v1770689074/marquill/logo_bpw55v.svg";
+  "https://res.cloudinary.com/dnpvndlmy/image/upload/q_auto/f_auto/v1775561659/marquill/logo_nwvdon.svg";
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);

@@ -3,7 +3,8 @@
 import type { ReactNode } from "react";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronLeft, Settings, LogOut, Zap, Sparkles, CreditCard } from "lucide-react";
+import { ChevronDown, ChevronLeft, Settings, LogOut, Zap, Sparkles, CreditCard, Bug } from "lucide-react";
+import BugReportModal from "./BugReportModal";
 import {
   Card,
   ConnectProviderMenu,
@@ -64,6 +65,7 @@ export default function Sidebar({
 }) {
   const [accountsExpanded, setAccountsExpanded] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isBugModalOpen, setIsBugModalOpen] = useState(false);
   const [isDefaultTier, setIsDefaultTier] = useState(false);
   const [tierName, setTierName] = useState("Free plan");
   const settingsRef = useRef<HTMLDivElement>(null);
@@ -467,6 +469,10 @@ export default function Sidebar({
               <Settings className="h-[18px] w-[18px] text-[var(--color-text-secondary)] shrink-0" />
               Settings
             </button>
+            <button className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-colors hover:bg-gray-50 text-[var(--color-text-primary)]" onClick={() => { setIsSettingsOpen(false); setIsBugModalOpen(true); }}>
+              <Bug className="h-[18px] w-[18px] text-[var(--color-text-secondary)] shrink-0" />
+              Help & feedback
+            </button>
           </div>
           <div className="mx-2 h-[1px] bg-gray-100 my-1.5"></div>
           <div className="mb-0.5 mt-0.5">
@@ -481,6 +487,7 @@ export default function Sidebar({
         </div>
       )
       }
+      <BugReportModal isOpen={isBugModalOpen} onClose={() => setIsBugModalOpen(false)} />
     </aside >
   );
 }
