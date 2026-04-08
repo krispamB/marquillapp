@@ -8,6 +8,7 @@ import type {
   UserIntent,
   YoutubeSearchResult,
 } from '../../agent/agent.interface';
+import { StylePreset } from '../../agent/style-presets.config';
 
 export enum PostDraftStatus {
   DRAFT = 'DRAFT',
@@ -39,6 +40,9 @@ export class PostDraft extends Document {
 
   @Prop()
   content?: string;
+
+  @Prop({ enum: StylePreset })
+  stylePreset?: StylePreset;
 
   @Prop(
     raw([

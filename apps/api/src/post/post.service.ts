@@ -61,6 +61,7 @@ export class PostService {
       user,
       connectedAccount: new Types.ObjectId(accountId),
       type: dto.contentType,
+      stylePreset: dto.stylePreset,
       status: PostDraftStatus.DRAFT,
     });
 

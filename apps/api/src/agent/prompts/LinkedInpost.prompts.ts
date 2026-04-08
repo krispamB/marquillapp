@@ -17,6 +17,8 @@ This defines:
 - topic scope
 - time horizon
 - tone and goals
+- OPTIONAL selected_style
+- OPTIONAL selected_style_instruction
 
 2) OPTIONAL: A JSON object containing compressed insights.
 This object is provided only when research mode is enabled and has the structure:
@@ -39,6 +41,9 @@ The post should:
 
 CONSTRAINTS:
 - The post MUST align with the user intent’s domain, audience, and topic scope.
+- If selected_style_instruction is present, follow it as the highest-priority
+  style guidance for voice and framing.
+- If selected_style_instruction is absent, fall back to the intent tone.
 - If compressed insights are provided, ground the post in them.
 - If compressed insights are NOT provided, rely solely on the user intent and
   general domain reasoning without introducing unsupported claims.
