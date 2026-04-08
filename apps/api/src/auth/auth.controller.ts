@@ -34,20 +34,21 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@GetUser() user: User, @Res() res: Response) {
+    const isProd = process.env.NODE_ENV === 'production';
     const jwt = await this.authService.login(user);
     res.cookie('access_token', jwt.access_token, {
       httpOnly: true,
       secure: true,
-      sameSite: 'none',
-      domain: '.marquill.com',
+      sameSite: isProd ? 'none' : 'lax',
+      domain: isProd ? '.marquill.com' : undefined,
       maxAge: this.COOKIE_EXP,
     });
     //attach entire user to cookie
     res.cookie('user', JSON.stringify(user), {
       httpOnly: false,
       secure: true,
-      sameSite: 'none',
-      domain: '.marquill.com',
+      sameSite: isProd ? 'none' : 'lax',
+      domain: isProd ? '.marquill.com' : undefined,
       maxAge: this.COOKIE_EXP,
     });
     return res.redirect(`${process.env.FRONTEND_URL}/auth/callback`);

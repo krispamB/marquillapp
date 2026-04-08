@@ -33,7 +33,7 @@ describe('processEmailJob', () => {
       template: 'welcome',
       data: {
         name: 'Jane Doe',
-        appName: 'LinkGen',
+        appName: 'Marquill',
       },
     });
     expect((logger.warn as jest.Mock)).not.toHaveBeenCalled();

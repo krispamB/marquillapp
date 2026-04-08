@@ -33,7 +33,7 @@ async function processWelcomeEmailJob(
     template: 'welcome',
     data: {
       name,
-      appName: 'LinkGen',
+      appName: 'Marquill',
     },
   });
 }
