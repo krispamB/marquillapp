@@ -9,7 +9,7 @@ import {
 const sampleData: MailTemplateDataMap = {
   welcome: {
     name: 'Ada Lovelace',
-    appName: 'LinkGen',
+    appName: 'Marquill',
     dashboardUrl: 'https://example.com/dashboard',
   },
   scheduledPostPublished: {

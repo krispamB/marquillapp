@@ -24,12 +24,14 @@ import { PaymentModule } from './payment/payment.module';
 import { YoutubeTranscriptModule } from './youtube-transcript';
 import { TierModule } from './tier/tier.module';
 import { MailModule } from './mail';
+import { FeedbackModule } from './feedback/feedback.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     SubscriptionModule,
     TierModule,
+    FeedbackModule,
     PaymentModule,
     MailModule,
     AgentModule,

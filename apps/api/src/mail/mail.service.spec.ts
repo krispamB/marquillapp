@@ -34,7 +34,7 @@ describe('MailService', () => {
       template: 'welcome',
       data: {
         name: 'Jane Doe',
-        appName: 'LinkGen',
+        appName: 'Marquill',
         dashboardUrl: 'https://example.com/dashboard',
       },
     });
@@ -44,7 +44,7 @@ describe('MailService', () => {
       expect.objectContaining({
         from: expect.stringContaining('noreply@example.com'),
         to: 'user@example.com',
-        subject: 'Welcome to LinkGen',
+        subject: 'Welcome to Marquill',
       }),
     );
     expect(send.mock.calls[0][0].html).toContain('Jane Doe');
