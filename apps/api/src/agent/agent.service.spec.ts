@@ -28,6 +28,52 @@ jest.mock(
 
 import { AgentService } from './agent.service';
 
+describe('AgentService.generateSearchKeywords', () => {
+  const createService = () => {
+    const service = Object.create(AgentService.prototype) as AgentService;
+    const generateCompletions = jest.fn();
+
+    (service as any).llmService = {
+      generateCompletions,
+    };
+
+    return { service, generateCompletions };
+  };
+
+  const userIntent = {
+    primary_goal: 'Understand product-led growth',
+    secondary_goal: [],
+    audience: 'Founders',
+    domain: 'SaaS',
+    topic_Scope: ['growth'],
+    time_horizon: 'evergreen',
+    content_depth: 'overview',
+    tone: 'professional',
+    format_preferences: ['post'],
+    success_criteria: ['clarity'],
+    ambiguity_flags: [],
+  } as any;
+
+  it('normalizes a malformed multi-query response into one simple query', async () => {
+    const { service, generateCompletions } = createService();
+    generateCompletions.mockResolvedValue(` "product led growth"  |  "overview" `);
+
+    const query = await service.generateSearchKeywords(userIntent);
+
+    expect(query).toBe('product led growth');
+    expect(generateCompletions).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns an already simple query unchanged except whitespace normalization', async () => {
+    const { service, generateCompletions } = createService();
+    generateCompletions.mockResolvedValue('  product   led   growth explained  ');
+
+    const query = await service.generateSearchKeywords(userIntent);
+
+    expect(query).toBe('product led growth explained');
+  });
+});
+
 describe('AgentService.searchYoutube', () => {
   const createService = () => {
     const service = Object.create(AgentService.prototype) as AgentService;
@@ -81,42 +127,34 @@ describe('AgentService.searchYoutube', () => {
     );
   });
 
-  it('retries with first | segment when first search is empty', async () => {
+  it('uses one normalized query when input contains pipe-separated variants', async () => {
     const { service, list } = createService();
-    list
-      .mockResolvedValueOnce({ data: { items: [] } })
-      .mockResolvedValueOnce({ data: { items: [makeItem()] } });
+    list.mockResolvedValueOnce({ data: { items: [makeItem()] } });
 
     const result = await service.searchYoutube('nestjs tutorial | overview', 3);
 
     expect(result).toHaveLength(1);
     expect(result[0].videoId).toBe('video-1');
-    expect(list).toHaveBeenCalledTimes(2);
+    expect(list).toHaveBeenCalledTimes(1);
     expect(list).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        q: 'nestjs tutorial | overview',
+        q: 'nestjs tutorial',
         maxResults: 3,
       }),
     );
-    expect(list).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({ q: 'nestjs tutorial', maxResults: 3 }),
-    );
   });
 
-  it('returns empty array when first search is empty and fallback search is empty', async () => {
+  it('returns empty array when normalized query has no results', async () => {
     const { service, list } = createService();
-    list
-      .mockResolvedValueOnce({ data: { items: [] } })
-      .mockResolvedValueOnce({ data: { items: [] } });
+    list.mockResolvedValueOnce({ data: { items: [] } });
 
     const result = await service.searchYoutube('nestjs tutorial | overview', 3);
 
     expect(result).toEqual([]);
-    expect(list).toHaveBeenCalledTimes(2);
+    expect(list).toHaveBeenCalledTimes(1);
     expect(list).toHaveBeenNthCalledWith(
-      2,
+      1,
       expect.objectContaining({ q: 'nestjs tutorial', maxResults: 3 }),
     );
   });
@@ -131,14 +169,26 @@ describe('AgentService.searchYoutube', () => {
     expect(list).toHaveBeenCalledTimes(1);
   });
 
-  it('returns empty array with no retry when query starts with | and first search is empty', async () => {
+  it('uses the first non-empty segment when query starts with |', async () => {
     const { service, list } = createService();
-    list.mockResolvedValueOnce({ data: { items: [] } });
+    list.mockResolvedValueOnce({ data: { items: [makeItem()] } });
 
     const result = await service.searchYoutube(' | overview', 2);
 
-    expect(result).toEqual([]);
+    expect(result).toHaveLength(1);
     expect(list).toHaveBeenCalledTimes(1);
+    expect(list).toHaveBeenCalledWith(
+      expect.objectContaining({ q: 'overview', maxResults: 2 }),
+    );
+  });
+
+  it('returns empty array when normalized query becomes empty', async () => {
+    const { service, list } = createService();
+
+    const result = await service.searchYoutube('   "   "   ', 2);
+
+    expect(result).toEqual([]);
+    expect(list).not.toHaveBeenCalled();
   });
 
   it('throws Failed to search YouTube videos when API call throws', async () => {

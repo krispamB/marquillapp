@@ -72,15 +72,21 @@ export class AgentService {
       { model: 'google/gemini-3-flash-preview' },
     );
 
-    return response;
+    return this.normalizeYoutubeQuery(response);
   }
 
   async searchYoutube(
     query: string,
     maxResults = 2,
   ): Promise<YoutubeSearchResult[]> {
-    this.logger.log(query);
+    const normalizedQuery = this.normalizeYoutubeQuery(query);
+    this.logger.log(normalizedQuery);
     try {
+      if (!normalizedQuery) {
+        this.logger.warn('Skipping YouTube search because query is empty');
+        return [];
+      }
+
       const mapResults = (items: youtube_v3.Schema$SearchResult[]) =>
         items.slice(0, maxResults).map((item) => ({
           videoId: item.id?.videoId || '',
@@ -101,29 +107,14 @@ export class AgentService {
           // videoCaption: 'closedCaption',
         });
 
-      const response = await runSearch(query);
+      const response = await runSearch(normalizedQuery);
       const items = response.data.items || [];
       if (items.length > 0) {
         return mapResults(items);
       }
 
-      this.logger.warn(`No results found for query: ${query}`);
-
-      const fallbackQuery = query.split('|')[0]?.trim() || '';
-      if (!fallbackQuery || fallbackQuery === query.trim()) {
-        return [];
-      }
-
-      const fallbackResponse = await runSearch(fallbackQuery);
-      const fallbackItems = fallbackResponse.data.items || [];
-      if (fallbackItems.length === 0) {
-        this.logger.warn(
-          `No results found for fallback query: ${fallbackQuery}`,
-        );
-        return [];
-      }
-
-      return mapResults(fallbackItems);
+      this.logger.warn(`No results found for query: ${normalizedQuery}`);
+      return [];
     } catch (error) {
       this.logger.error(
         `YouTube search failed: ${error?.message}`,
@@ -131,6 +122,20 @@ export class AgentService {
       );
       throw new Error('Failed to search YouTube videos');
     }
+  }
+
+  private normalizeYoutubeQuery(query: string): string {
+    const firstSegment =
+      query
+        .split('|')
+        .map((segment) => segment.trim())
+        .find((segment) => segment.length > 0) ?? '';
+    const withoutWrappingQuotes = firstSegment
+      .replace(/^["']+/, '')
+      .replace(/["']+$/, '')
+      .trim();
+
+    return withoutWrappingQuotes.replace(/\s+/g, ' ');
   }
   async searchWithFallbacks(
     query: string,
