@@ -1,5 +1,6 @@
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
-import { ContentType } from 'src/workflow/workflow.constants';
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { ContentType } from '../../workflow/workflow.constants';
+import { StylePreset } from '../style-presets.config';
 
 export class InputDto {
   @IsNotEmpty()
@@ -9,4 +10,8 @@ export class InputDto {
   @IsNotEmpty()
   @IsEnum(ContentType)
   contentType: ContentType;
+
+  @IsOptional()
+  @IsEnum(StylePreset)
+  stylePreset?: StylePreset;
 }

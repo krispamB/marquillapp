@@ -232,6 +232,50 @@ describe('PostService.createDraft', () => {
     );
     expect(incrementAiDraftUsage).not.toHaveBeenCalled();
   });
+
+  it('persists provided style preset on draft creation', async () => {
+    const service = Object.create(PostService.prototype) as PostService;
+    const userId = new Types.ObjectId();
+    const draftId = new Types.ObjectId();
+    const save = jest.fn().mockResolvedValue(undefined);
+    const postDraftModel = jest.fn().mockImplementation(() => ({
+      _id: draftId,
+      save,
+    }));
+    const addWorkflowJob = jest.fn().mockResolvedValue(undefined);
+    const assertAiDraftQuota = jest.fn().mockResolvedValue(undefined);
+    const incrementAiDraftUsage = jest.fn().mockResolvedValue(undefined);
+    const connectedAccountFindById = jest.fn().mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+    });
+
+    (service as any).postDraftModel = postDraftModel;
+    (service as any).connectedAccountModel = {
+      findById: connectedAccountFindById,
+    };
+    (service as any).workflowQueue = { addWorkflowJob };
+    (service as any).featureGatingService = {
+      assertAiDraftQuota,
+      incrementAiDraftUsage,
+    };
+
+    const user = { _id: userId } as any;
+    const accountId = new Types.ObjectId().toString();
+    const dto = {
+      input: 'test prompt',
+      contentType: 'quickPostLinkedin',
+      stylePreset: 'storytelling',
+    } as any;
+
+    await service.createDraft(user, accountId, dto);
+
+    expect(postDraftModel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stylePreset: 'storytelling',
+      }),
+    );
+  });
 });
 
 describe('PostService.schedulePost', () => {

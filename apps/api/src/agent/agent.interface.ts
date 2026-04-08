@@ -32,4 +32,6 @@ export interface UserIntent {
   format_preferences: string[];
   success_criteria: string[];
   ambiguity_flags: string[];
+  selected_style?: string;
+  selected_style_instruction?: string;
 }
