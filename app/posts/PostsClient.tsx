@@ -25,6 +25,8 @@ import {
   PillButton,
   StatusTag,
   UserAvatar,
+  CustomSelect,
+  type SelectOption,
 } from "../dashboard/components";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import { ReschedulePopover } from "./ReschedulePopover";
@@ -870,6 +872,7 @@ export default function PostsClient({
     const requestBody: CreateDraftRequest = {
       input,
       contentType: payload.contentType,
+      stylePreset: payload.stylePreset,
     };
 
     const response = await fetch(`${apiBase}/posts/${selectedAccountId}/draft`, {
@@ -1181,46 +1184,36 @@ export default function PostsClient({
                   Tags
                 </PillButton>
 
-                <div className="relative flex items-center">
-                  <CalendarDays className="pointer-events-none absolute left-3 h-4 w-4 text-[var(--color-text-secondary)]" />
-                  <select
-                    value={selectedMonth}
-                    onChange={(event) => setSelectedMonth(event.target.value)}
-                    className="appearance-none rounded-full border border-[var(--color-border)] bg-white/85 py-2 pl-9 pr-4 text-sm font-medium text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
-                    aria-label="Select month"
-                  >
-                    {availableMonths.length > 0 ? (
-                      availableMonths.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))
-                    ) : (
-                      <option value={selectedMonth}>{selectedMonth}</option>
-                    )}
-                  </select>
-                </div>
+                <CustomSelect
+                  value={selectedMonth}
+                  onChange={(val) => setSelectedMonth(val)}
+                  options={
+                    availableMonths.length > 0
+                      ? availableMonths.map((m) => ({ value: m, label: m }))
+                      : [{ value: selectedMonth, label: selectedMonth }]
+                  }
+                  icon={<CalendarDays className="h-4 w-4" />}
+                  ariaLabel="Select month"
+                  className="min-w-[140px]"
+                />
 
-                <select
+                <CustomSelect
                   value={selectedAccountId ?? ""}
-                  onChange={(event) => setSelectedAccountId(event.target.value || undefined)}
-                  className="rounded-full border border-[var(--color-border)] bg-white/85 px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
-                  aria-label="Select connected account"
-                >
-                  {connectedAccounts
+                  onChange={(val) => setSelectedAccountId(val || undefined)}
+                  options={connectedAccounts
                     .filter(
                       (account) =>
                         availableAccountIds.length === 0 ||
                         availableAccountIds.includes(account.id) ||
                         account.id === selectedAccountId
                     )
-                    .map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.displayName ??
-                          (account.vanityName ? `@${account.vanityName}` : account.provider)}
-                      </option>
-                    ))}
-                </select>
+                    .map((account) => ({
+                      value: account.id,
+                      label: account.displayName ?? (account.vanityName ? `@${account.vanityName}` : account.provider)
+                    }))}
+                  ariaLabel="Select connected account"
+                  className="min-w-[170px]"
+                />
 
                 <label className="relative ml-auto min-w-[220px] flex-1 sm:max-w-[320px]">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-secondary)]" />

@@ -154,9 +154,19 @@ export type DashboardPostsResponse = {
 
 export type PostStatus = "DRAFT" | "SCHEDULED" | "PUBLISHED";
 
+export enum StylePreset {
+  PROFESSIONAL = 'professional',
+  STORYTELLING = 'storytelling',
+  EDUCATIONAL = 'educational',
+  BOLD = 'bold',
+  CONTRARIAN = 'contrarian',
+  FOUNDER = 'founder',
+}
+
 export type CreateDraftRequest = {
   input: string;
   contentType: "quickPostLinkedin" | "insightPostLinkedin";
+  stylePreset: StylePreset;
 };
 
 export type CreateDraftResponse = {
