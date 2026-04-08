@@ -1029,6 +1029,7 @@ export default function DashboardPage({
     const requestBody: CreateDraftRequest = {
       input,
       contentType: payload.contentType,
+      stylePreset: payload.stylePreset,
     };
 
     const response = await fetch(`${apiBase}/posts/${selectedAccountId}/draft`, {

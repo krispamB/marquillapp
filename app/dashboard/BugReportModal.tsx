@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import { X, Check, XCircle } from "lucide-react";
-import { PillButton } from "./components";
+import { PillButton, CustomSelect, type SelectOption } from "./components";
+
+const BUG_REPORT_OPTIONS: SelectOption[] = [
+  { value: "Report a bug", label: "Report a bug" },
+  { value: "Request a feature", label: "Request a feature" },
+];
 
 interface DeviceReport {
   browser: string;
@@ -117,21 +122,12 @@ export default function BugReportModal({ isOpen, onClose }: BugReportModalProps)
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
         <div>
           <label className="block text-xs font-semibold text-slate-500 mb-2">I would like to</label>
-          <div className="relative">
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="w-full sm:w-[220px] appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-            >
-              <option value="Report a bug">Report a bug</option>
-              <option value="Request a feature">Request a feature</option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
-          </div>
+          <CustomSelect
+            value={type}
+            onChange={(val) => setType(val)}
+            options={BUG_REPORT_OPTIONS}
+            className="w-full sm:w-[220px]"
+          />
         </div>
 
         <div>

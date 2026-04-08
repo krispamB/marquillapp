@@ -11,6 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import {
+  ArrowUp,
   CalendarClock,
   ChevronDown,
   Clock3,
@@ -27,13 +28,14 @@ import {
   ThumbsUp,
   X,
 } from "lucide-react";
-import { UserAvatar } from "./components";
+import { UserAvatar, CustomSelect, type SelectOption } from "./components";
 import type {
   DraftStatusResponse,
   LinkedinImageDetailsResponse,
   PostDetailResponse,
   PostMediaItem,
 } from "../lib/types";
+import { StylePreset } from "../lib/types";
 import type { NewPostMode } from "./useNewPostModal";
 
 export type NewPostModalAccount = {
@@ -60,6 +62,7 @@ export type NewPostSubmitPayload = {
 export type NewDraftGeneratePayload = {
   input: string;
   contentType: "quickPostLinkedin" | "insightPostLinkedin";
+  stylePreset: StylePreset;
 };
 
 export type NewDraftGenerateResult = {
@@ -71,6 +74,16 @@ type ComposerPhase = "ai_prompt" | "ai_progress" | "editor";
 const EMOJI_OPTIONS = ["😀", "🎉", "🚀", "🔥", "💡", "👏", "✅", "📈", "🤝", "🙌"];
 const DEFAULT_UNSPLASH_QUERY = "nature";
 const UNSPLASH_PAGE_SIZE = 10;
+
+const POST_TYPE_OPTIONS: SelectOption[] = [
+  { value: "quickPostLinkedin", label: "Quick Post (LinkedIn)" },
+  { value: "insightPostLinkedin", label: "Insight Post (LinkedIn)" },
+];
+
+const STYLE_PRESET_OPTIONS: SelectOption[] = Object.values(StylePreset).map((preset) => ({
+  value: preset,
+  label: preset.charAt(0).toUpperCase() + preset.slice(1).toLowerCase(),
+}));
 
 type UnsplashPhoto = {
   id: string;
@@ -227,6 +240,7 @@ export default function NewPostModal({
   const [postType, setPostType] = useState<"quickPostLinkedin" | "insightPostLinkedin">(
     "quickPostLinkedin",
   );
+  const [stylePreset, setStylePreset] = useState<StylePreset>(StylePreset.PROFESSIONAL);
   const [content, setContent] = useState(initialContent ?? "");
   const [imageFile, setImageFile] = useState<File | undefined>(undefined);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | undefined>(
@@ -340,6 +354,7 @@ export default function NewPostModal({
     setIsPreviewVisible(false);
     setAiPrompt("");
     setPostType("quickPostLinkedin");
+    setStylePreset(StylePreset.PROFESSIONAL);
     setContent(initialContent ?? "");
     setImageFile(undefined);
     setImagePreviewUrl(initialImageUrl);
@@ -1107,6 +1122,7 @@ export default function NewPostModal({
       const createdDraft = await onGenerateDraft({
         input,
         contentType: postType,
+        stylePreset,
       });
       if (!createdDraft?.draftId) {
         throw new Error("Draft ID missing from response.");
@@ -1675,56 +1691,60 @@ export default function NewPostModal({
                 }`}
             >
               {phase === "ai_prompt" ? (
-                <div className="flex h-full min-h-[400px] flex-col rounded-3xl border border-[var(--color-border)] bg-[linear-gradient(160deg,rgba(123,140,255,0.08),rgba(255,255,255,0.95))] p-4 sm:p-6">
-                  <div className="mb-4 flex items-center gap-2">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-primary)]/15 text-[var(--color-primary)]">
-                      <Sparkles className="h-4 w-4" />
-                    </span>
-                    <p className="text-sm font-semibold text-[var(--color-text-primary)]">What would you like to share?</p>
+                <div className="mx-auto flex h-full max-w-4xl flex-col">
+                  <div className="mb-6 mt-4">
+                    <h3 className="text-xl font-semibold text-[var(--color-text-primary)]">What would you like to post about?</h3>
+                    <p className="mt-1 text-sm text-[var(--color-text-secondary)]">For the best results, use a descriptive prompt about the subject, tone, and goals of your post.</p>
                   </div>
-                  <textarea
-                    ref={aiPromptRef}
-                    value={aiPrompt}
-                    onChange={(event) => {
-                      setAiPrompt(event.target.value);
-                      if (promptError) {
-                        setPromptError(null);
-                      }
-                    }}
-                    placeholder="Ask AI to draft your post..."
-                    className="min-h-[220px] w-full resize-none rounded-2xl border border-[var(--color-border)] bg-white/90 px-4 py-3 text-sm text-[var(--color-text-primary)] outline-none transition placeholder:text-[var(--color-text-secondary)]/80 focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/15"
-                  />
-                  {promptError ? (
-                    <p className="mt-3 text-sm font-medium text-rose-600">{promptError}</p>
-                  ) : null}
-                  <div className="mt-auto flex items-center justify-between gap-3 pt-4">
-                    <div className="relative">
-                      <select
-                        value={postType}
-                        onChange={(event) =>
-                          setPostType(
-                            event.target.value as "quickPostLinkedin" | "insightPostLinkedin",
-                          )
+                  <div className="flex flex-col rounded-[2rem] border border-[var(--color-border)] bg-white p-3 shadow-sm transition-shadow focus-within:border-[var(--color-primary)]/40 focus-within:ring-4 focus-within:ring-[var(--color-primary)]/5 sm:p-4">
+                    <textarea
+                      ref={aiPromptRef}
+                      value={aiPrompt}
+                      onChange={(event) => {
+                        setAiPrompt(event.target.value);
+                        // Auto-resize
+                        event.target.style.height = "auto";
+                        event.target.style.height = `${event.target.scrollHeight}px`;
+                        if (promptError) {
+                          setPromptError(null);
                         }
-                        className="h-10 min-w-[220px] appearance-none rounded-full border border-[var(--color-border)] bg-white/90 pl-4 pr-10 text-sm font-semibold text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/15"
-                        aria-label="Post type"
-                      >
-                        <option value="quickPostLinkedin">quickPostLinkedin</option>
-                        <option value="insightPostLinkedin">insightPostLinkedin</option>
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-secondary)]" />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void handleGenerate();
                       }}
-                      disabled={pendingAction !== null}
-                      className="inline-flex items-center gap-2 rounded-full bg-[var(--color-secondary)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_40px_-26px_rgba(28,27,39,0.55)] transition hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50"
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      {pendingAction === "generate" ? "Generating..." : "Generate draft"}
-                    </button>
+                      rows={2}
+                      placeholder="Describe the post you want to create..."
+                      className="max-h-[50vh] min-h-[56px] w-full resize-none border-none bg-transparent px-2 py-2 text-base text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
+                    />
+                    {promptError ? (
+                      <p className="my-2 px-2 text-sm font-medium text-rose-600">{promptError}</p>
+                    ) : null}
+                    <div className="mt-3 flex items-end justify-between gap-3 px-1 pt-2 border-t border-[var(--color-border)]/50">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <CustomSelect
+                          value={postType}
+                          onChange={(value) => setPostType(value as "quickPostLinkedin" | "insightPostLinkedin")}
+                          options={POST_TYPE_OPTIONS}
+                          className="min-w-[190px]"
+                          dropdownHeader="Content Type"
+                        />
+                        <CustomSelect
+                          value={stylePreset}
+                          onChange={(value) => setStylePreset(value as StylePreset)}
+                          options={STYLE_PRESET_OPTIONS}
+                          className="min-w-[150px]"
+                          dropdownHeader="Style / Tone"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleGenerate();
+                        }}
+                        disabled={pendingAction !== null || !aiPrompt.trim()}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:pointer-events-none disabled:opacity-50"
+                        aria-label="Generate draft"
+                      >
+                        <ArrowUp className="h-5 w-5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : phase === "ai_progress" ? (

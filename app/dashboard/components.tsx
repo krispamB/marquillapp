@@ -1,6 +1,7 @@
+import { useState, useRef, useEffect } from "react";
 import type { MouseEventHandler, ReactNode } from "react";
 import Link from "next/link";
-import { CalendarClock, CheckCheck, PenLine, Plug } from "lucide-react";
+import { CalendarClock, CheckCheck, PenLine, Plug, ChevronDown } from "lucide-react";
 import type {
   ConnectedAccount,
   ConnectedAccountProvider,
@@ -553,5 +554,111 @@ export function MobileBottomNav({
         })}
       </ul>
     </nav>
+  );
+}
+
+export type SelectOption = {
+  value: string;
+  label: string;
+  disabled?: boolean;
+};
+
+export function CustomSelect({
+  value,
+  onChange,
+  options,
+  placeholder = "Select...",
+  icon,
+  className = "",
+  disabled = false,
+  ariaLabel,
+  dropdownPosition = "bottom",
+  dropdownHeader,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: SelectOption[];
+  placeholder?: string;
+  icon?: ReactNode;
+  className?: string;
+  disabled?: boolean;
+  ariaLabel?: string;
+  dropdownPosition?: "top" | "bottom";
+  dropdownHeader?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target || !containerRef.current?.contains(target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [isOpen]);
+
+  const selectedOption = options.find((opt) => opt.value === value);
+  const positionClass = dropdownPosition === "top" ? "bottom-[calc(100%+8px)]" : "top-[calc(100%+8px)]";
+
+  return (
+    <div className={`relative ${className}`} ref={containerRef}>
+      {icon ? (
+        <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]">
+          {icon}
+        </div>
+      ) : null}
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label={ariaLabel}
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex h-10 w-full items-center justify-between rounded-full border border-[var(--color-border)] bg-white/90 px-4 text-sm font-semibold text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/15 disabled:cursor-not-allowed disabled:opacity-60 ${
+          icon ? "pl-9" : ""
+        }`}
+      >
+        <span className="truncate pr-2">
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-[var(--color-text-secondary)] transition-transform ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {isOpen && (
+        <div className={`absolute left-0 z-50 min-w-full rounded-2xl border border-[var(--color-border)] bg-white p-2 shadow-[0_12px_40px_-15px_rgba(15,23,42,0.3)] ${positionClass}`}>
+          <div className="flex max-h-60 flex-col overflow-y-auto">
+            {dropdownHeader ? (
+              <div className="mb-1 px-3 pb-1 pt-1 text-xs font-semibold text-[var(--color-text-secondary)]">
+                {dropdownHeader}
+              </div>
+            ) : null}
+            {options.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                disabled={opt.disabled}
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                className={`w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                  value === opt.value
+                    ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
+                    : "text-[var(--color-text-secondary)] hover:bg-slate-50"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
