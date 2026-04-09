@@ -116,7 +116,7 @@ export default function Sidebar({
         .replace(/^ +/, "")
         .replace(/=.*/, `=;expires=${new Date(0).toUTCString()};path=/`);
     });
-    window.location.href = process.env.NEXT_PUPLIC_LANDING || process.env.NEXT_PUBLIC_LANDING || "http://localhost:3001";
+    window.location.href = process.env.NEXT_PUBLIC_LANDING || "http://localhost:3001";
   };
   const selectedAccount = selectedAccountId
     ? accounts.find((account) => account.id === selectedAccountId)
