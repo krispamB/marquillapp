@@ -113,7 +113,9 @@ export class AuthService {
   login(user: User) {
     const payload = { email: user.email, sub: user._id.toString() };
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: this.jwtService.sign(payload, {
+        expiresIn: 30 * 24 * 60 * 60 * 1000,
+      }),
     };
   }
 
