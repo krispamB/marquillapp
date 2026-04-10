@@ -77,7 +77,7 @@ const UNSPLASH_PAGE_SIZE = 10;
 
 const POST_TYPE_OPTIONS: SelectOption[] = [
   { value: "quickPostLinkedin", label: "Quick Post (LinkedIn)" },
-  { value: "insightPostLinkedin", label: "Insight Post (LinkedIn)" },
+  // { value: "insightPostLinkedin", label: "Insight Post (LinkedIn)" }, // temporarily disabled
 ];
 
 const STYLE_PRESET_OPTIONS: SelectOption[] = Object.values(StylePreset).map((preset) => ({
@@ -1718,13 +1718,12 @@ export default function NewPostModal({
                     ) : null}
                     <div className="mt-3 flex items-end justify-between gap-3 px-1 pt-2 border-t border-[var(--color-border)]/50">
                       <div className="flex flex-wrap items-center gap-2">
-                        <CustomSelect
-                          value={postType}
-                          onChange={(value) => setPostType(value as "quickPostLinkedin" | "insightPostLinkedin")}
-                          options={POST_TYPE_OPTIONS}
-                          className="min-w-[190px]"
-                          dropdownHeader="Content Type"
-                        />
+                        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                          <span className="mt-0.5 shrink-0">⚠️</span>
+                          <span>
+                            <strong>Insight Post is temporarily unavailable.</strong>{" "}We&apos;re working on it — Quick Post is available in the meantime.
+                          </span>
+                        </div>
                         <CustomSelect
                           value={stylePreset}
                           onChange={(value) => setStylePreset(value as StylePreset)}
