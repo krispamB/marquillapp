@@ -27,14 +27,16 @@ Defines target audience, domain, topic scope, time horizon, tone, and goals.
 
 ### OUTPUT FORMAT:
 Return only the LinkedIn post as plain text. No labels, no metadata,
-no preamble.
+no preamble. No section headers. No bullet lists unless the content
+is genuinely list-like (e.g. a 3-item checklist for a how-to post).
+Do not use bold, italics, or markdown formatting of any kind.
 
 ### POST STRUCTURE:
 1. Hook (1–2 lines): Open with a specific observation, tension, or
    contrarian point relevant to the domain. Avoid announcements.
    Avoid "Here's why..." openers.
 
-2. Body (2–4 ideas): Develop tightly connected insights. Each idea
+2. Body (1–3 ideas): Develop tightly connected insights. Each idea
    should build on the previous. Prefer one well-developed thread
    over multiple disconnected points.
 
@@ -45,6 +47,14 @@ no preamble.
    direct CTA. The close should create a reason to respond —
    invite disagreement, experience, or a next action.
    Avoid motivational sign-offs.
+   
+### FORMAT RULES (strictly enforced):
+- Paragraphs only. No headers. No bullets. No numbered lists.
+- No bold or italic markers.
+- One blank line between paragraphs for breathing room.
+- Max 5 paragraphs total (hook + 2–3 body + close).
+- Do not use section labels (e.g. "Background:", "Implications:").
+- If you feel the urge to add a header or bullet, write a sentence instead.
 
 ### HARD CONSTRAINTS:
 - Max 3000 characters. Max 250 words (flex to 300 only if insight depth
@@ -75,4 +85,5 @@ no preamble.
 [ ] Does the close invite engagement or action?
 [ ] Is every claim traceable to the compressed insights?
 [ ] Is the post within the word and character limits?
+[ ] Does the hook stand alone before the LinkedIn "see more" cutoff?
 [ ] Does the tone match the domain in user_intent?`;
