@@ -11,7 +11,7 @@ export default function Footer() {
           <div className="space-y-4">
             <Logo className="text-white" textClassName="text-white" />
             <p className="text-sm text-white/70 max-w-xs">
-              Marquill is the shortcut to content that performs. Turn proven viral formats into winning scripts.
+              Marquill is your AI LinkedIn workspace. Generate, schedule, and publish content that performs — all in one place.
             </p>
           </div>
 

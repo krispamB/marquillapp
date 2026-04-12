@@ -1,8 +1,12 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy | inContentai',
-  description: 'Privacy Policy for inContentai - Learn how we collect, use, and protect your data when using our AI-powered LinkedIn content creation tool.',
+  title: 'Privacy Policy',
+  description:
+    'Privacy Policy for Marquill — learn how we collect, use, and protect your data when using our AI LinkedIn workspace.',
+  alternates: {
+    canonical: 'https://marquill.com/privacy-policy',
+  },
 };
 
 export default function PrivacyPolicyPage() {
@@ -17,7 +21,7 @@ export default function PrivacyPolicyPage() {
           <section className="mb-12" aria-labelledby="introduction-heading">
             <h2 id="introduction-heading" className="text-2xl font-semibold text-text-primary mb-4">1. Introduction</h2>
             <p className="text-text-secondary leading-relaxed mb-4">
-              This Privacy Policy explains how inContentAi (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) collects, uses, and protects information when users access or use our website, services, or integrations, including those powered by the LinkedIn API.
+              This Privacy Policy explains how Marquill (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) collects, uses, and protects information when users access or use our website, services, or integrations, including those powered by the LinkedIn API.
             </p>
             <p className="text-text-secondary leading-relaxed">
               We are currently in the development stage and may update this policy as our product evolves.

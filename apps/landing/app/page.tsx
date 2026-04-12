@@ -2,20 +2,29 @@ import InformateCarousel from '@/components/InformateCarousel';
 import { normalizeAppUrl } from '@/config/urls';
 
 export const metadata = {
-  title: 'Marquill - AI-Powered LinkedIn Content Platform',
+  title: 'Marquill — AI LinkedIn Workspace | Post Generation & Scheduling',
   description:
-    'Marquill helps LinkedIn creators generate posts from YouTube research, schedule content, and publish faster.',
-  keywords: 'LinkedIn content, AI post generator, YouTube research, scheduling, publishing',
+    'Marquill is the AI LinkedIn workspace built for creators and teams. Generate posts with AI, manage multiple accounts, schedule publishing, and track analytics — all in one place.',
+  keywords:
+    'AI LinkedIn workspace, LinkedIn AI workspace, AI LinkedIn content workspace, LinkedIn workspace AI tool, LinkedIn post generator, LinkedIn scheduling tool',
+  alternates: {
+    canonical: 'https://marquill.com',
+  },
   openGraph: {
-    title: 'Marquill - AI-Powered LinkedIn Content Platform',
-    description: 'Generate LinkedIn posts from YouTube research, schedule, and publish in one place.',
+    title: 'Marquill — AI LinkedIn Workspace',
+    description:
+      'Generate LinkedIn posts with AI, manage accounts, and schedule publishing from one workspace.',
     type: 'website',
     locale: 'en_US',
+    url: 'https://marquill.com',
+    images: [{ url: '/og-image.png', width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Marquill - AI-Powered LinkedIn Content Platform',
-    description: 'Generate LinkedIn posts from YouTube research, schedule, and publish in one place.',
+    title: 'Marquill — AI LinkedIn Workspace',
+    description:
+      'Generate LinkedIn posts with AI, manage accounts, and schedule publishing from one workspace.',
+    images: ['/og-image.png'],
   },
 };
 
@@ -89,12 +98,107 @@ const faqs = [
     answer:
       'Search stock images or upload your own. We handle LinkedIn-ready sizing and attach assets to your post.',
   },
+  {
+    question: 'Is Marquill an AI LinkedIn workspace?',
+    answer:
+      'Yes — Marquill is purpose-built as an AI LinkedIn workspace. Everything you need to research, draft, schedule, and publish LinkedIn content lives in one place. No tab-switching, no copy-pasting between tools.',
+  },
 ];
 
 export default function Home() {
   const appUrl = normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL);
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'SoftwareApplication',
+        name: 'Marquill',
+        applicationCategory: 'BusinessApplication',
+        operatingSystem: 'Web',
+        description:
+          'Marquill is an AI LinkedIn workspace for post generation, multi-account management, scheduling, and analytics.',
+        url: 'https://marquill.com',
+        offers: [
+          { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Free Plan' },
+          { '@type': 'Offer', price: '9', priceCurrency: 'USD', name: 'Starter Plan' },
+          { '@type': 'Offer', price: '29', priceCurrency: 'USD', name: 'Creator Plan' },
+          { '@type': 'Offer', price: '79', priceCurrency: 'USD', name: 'Pro Writers Plan' },
+        ],
+      },
+      {
+        '@type': 'Organization',
+        name: 'Marquill',
+        url: 'https://marquill.com',
+        logo: 'https://marquill.com/logo.svg',
+        contactPoint: {
+          '@type': 'ContactPoint',
+          email: 'hello@marquill.com',
+          contactType: 'customer support',
+        },
+      },
+      {
+        '@type': 'FAQPage',
+        mainEntity: [
+          {
+            '@type': 'Question',
+            name: 'Is Marquill an AI LinkedIn workspace?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Yes — Marquill is purpose-built as an AI LinkedIn workspace. Everything you need to research, draft, schedule, and publish LinkedIn content lives in one place. No tab-switching, no copy-pasting between tools.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'What makes Marquill different from generic AI writers?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Marquill turns YouTube research into LinkedIn-ready posts. You can generate, edit, schedule, and publish without leaving the platform.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Can I connect multiple LinkedIn accounts?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Yes. Connect personal profiles and company pages, then filter drafts and schedules by account.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'How does YouTube research work?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Select a post type, add your topic, and Marquill pulls context from YouTube to build a concise, LinkedIn-length draft.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Can I schedule posts in my local timezone?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Yes. Scheduling is timezone-aware so you can set local publish times while we store and process in UTC.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'What about images?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Search stock images or upload your own. We handle LinkedIn-ready sizing and attach assets to your post.',
+            },
+          },
+        ],
+      },
+    ],
+  };
+
   return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
     <div className="bg-gradient-to-b from-white via-[#F6F2FF] to-[#EAF1FF]">
       <section className="relative overflow-hidden">
         <div className="mobile-decor absolute -top-40 right-10 h-80 w-80 rounded-full bg-gradient-to-br from-[#C9D4FF] via-[#D8C8FF] to-[#F2C8FF] opacity-60 blur-3xl" />
@@ -108,13 +212,13 @@ export default function Home() {
                 Built for LinkedIn creators and teams
               </div>
               <h1 className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-semibold text-text-primary leading-tight">
-                Your AI writing team,
+                Your AI LinkedIn workspace,
                 <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#4F5BFF] via-[#7A5BFF] to-[#A56BFF]">
-                  built for LinkedIn.
+                  built to publish and perform.
                 </span>
               </h1>
               <p className="mt-6 text-lg text-[#3F3E4F] max-w-2xl mx-auto">
-                Marquill combines intelligent post generation, multi-account management, and precision scheduling into one clean workflow — so every post you publish is sharp, on-brand, and built to perform.
+                Marquill is your AI LinkedIn workspace — combining intelligent post generation, multi-account management, and precision scheduling into one clean workflow. Every post you publish is sharp, on-brand, and built to perform.
               </p>
               <div className="mt-8 flex flex-wrap justify-center gap-4">
                 <a
@@ -159,7 +263,7 @@ export default function Home() {
           <div className="text-center">
             <h2 className="text-3xl sm:text-4xl font-semibold text-text-primary">How Marquill Works</h2>
             <p className="mt-4 text-text-secondary max-w-2xl mx-auto">
-              Three focused steps to go from research to published LinkedIn posts.
+              Three focused steps to go from idea to published LinkedIn post — inside your AI workspace.
             </p>
           </div>
           <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -213,7 +317,7 @@ export default function Home() {
             <div>
               <h2 className="text-3xl sm:text-4xl font-semibold text-text-primary">Everything you need to ship</h2>
               <p className="mt-4 text-text-secondary">
-                Manage drafts, scheduling, images, and publishing without hopping between tools.
+                Manage drafts, scheduling, images, and publishing inside one AI LinkedIn workspace — without hopping between tools.
               </p>
             </div>
             <div className="orbit-wrap">
@@ -383,5 +487,6 @@ export default function Home() {
         </div>
       </section>
     </div>
+    </>
   );
 }
