@@ -1,8 +1,17 @@
 import { Check } from 'lucide-react';
 
 export const metadata = {
-    title: 'Pricing - inContentai for LinkedIn',
-    description: 'Choose the perfect plan for your LinkedIn content creation needs. Flexible pricing for professionals and teams.',
+    title: 'Pricing — Plans for Every LinkedIn Creator',
+    description:
+        'Choose a Marquill plan. From free to Pro — get AI post generation, multi-account LinkedIn management, and scheduling that fits your publishing volume.',
+    alternates: {
+        canonical: 'https://marquill.com/pricing',
+    },
+    openGraph: {
+        title: 'Marquill Pricing — AI LinkedIn Workspace Plans',
+        description: 'Free, Starter, Creator, and Pro plans. Start your AI LinkedIn workspace today.',
+        url: 'https://marquill.com/pricing',
+    },
 };
 
 interface PricingTier {
@@ -192,7 +201,7 @@ export default function PricingPage() {
                                 Do you offer refunds?
                             </h3>
                             <p className="text-text-secondary">
-                                Yes, we offer a 30-day money-back guarantee. If you&apos;re not satisfied with inContentai, contact us for a full refund.
+                                Yes, we offer a 30-day money-back guarantee. If you&apos;re not satisfied with Marquill, contact us for a full refund.
                             </p>
                         </div>
                         <div>

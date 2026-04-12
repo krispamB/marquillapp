@@ -19,18 +19,37 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  title: 'Marquill',
-  description: 'Marquill helps teams transform viral formats into winning scripts and scalable content.',
+  metadataBase: new URL('https://marquill.com'),
+  title: {
+    default: 'Marquill — AI LinkedIn Workspace for Creators & Teams',
+    template: '%s | Marquill',
+  },
+  description:
+    'Marquill is your AI LinkedIn workspace. Generate posts, manage multiple accounts, schedule and publish — all in one focused workflow built for creators and teams.',
   openGraph: {
-    title: 'Marquill',
-    description: 'Transform viral formats into winning scripts with Marquill.',
+    title: 'Marquill — AI LinkedIn Workspace',
+    description: 'Your AI LinkedIn workspace. Generate, schedule, and publish posts that perform.',
     type: 'website',
     locale: 'en_US',
+    url: 'https://marquill.com',
+    siteName: 'Marquill',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Marquill — AI LinkedIn Workspace',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Marquill',
-    description: 'Transform viral formats into winning scripts with Marquill.',
+    title: 'Marquill — AI LinkedIn Workspace',
+    description: 'Your AI LinkedIn workspace. Generate, schedule, and publish posts that perform.',
+    images: ['/og-image.png'],
+  },
+  alternates: {
+    canonical: 'https://marquill.com',
   },
 };
 
