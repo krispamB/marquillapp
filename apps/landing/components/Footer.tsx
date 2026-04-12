@@ -45,6 +45,16 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/tsc" className="hover:text-white transition-colors">
+                  Terms of Service
+                </Link>
+              </li>
+              <li>
+                <Link href="/refund" className="hover:text-white transition-colors">
+                  Refund Policy
+                </Link>
+              </li>
+              <li>
                 <Link href="/pricing" className="hover:text-white transition-colors">
                   Pricing Details
                 </Link>
