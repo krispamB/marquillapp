@@ -45,20 +45,20 @@ const pricing = [
   },
   {
     name: 'Starter',
-    price: '$9',
+    price: '$9.99',
     description: 'For consistent weekly posting.',
     features: ['1 LinkedIn account', '30 AI posts / month', '10 scheduled posts queued', '90 days post history'],
   },
   {
     name: 'Creator',
-    price: '$29',
+    price: '$19.99',
     description: 'Best for creators scaling output.',
     features: ['2 LinkedIn accounts', '100 AI posts / month', '50 scheduled posts queued', '1 year post history'],
     featured: true,
   },
   {
-    name: 'Pro Writers',
-    price: '$79',
+    name: 'Pro Writer',
+    price: '$29.99',
     description: 'High-volume teams and agencies.',
     features: ['10 LinkedIn accounts', 'Unlimited AI posts', 'Unlimited scheduled posts', 'Unlimited post history'],
   },
@@ -121,9 +121,9 @@ export default function Home() {
         url: 'https://marquill.com',
         offers: [
           { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Free Plan' },
-          { '@type': 'Offer', price: '9', priceCurrency: 'USD', name: 'Starter Plan' },
-          { '@type': 'Offer', price: '29', priceCurrency: 'USD', name: 'Creator Plan' },
-          { '@type': 'Offer', price: '79', priceCurrency: 'USD', name: 'Pro Writers Plan' },
+          { '@type': 'Offer', price: '9.99', priceCurrency: 'USD', name: 'Starter Plan' },
+          { '@type': 'Offer', price: '19.99', priceCurrency: 'USD', name: 'Creator Plan' },
+          { '@type': 'Offer', price: '29.99', priceCurrency: 'USD', name: 'Pro Writer Plan' },
         ],
       },
       {

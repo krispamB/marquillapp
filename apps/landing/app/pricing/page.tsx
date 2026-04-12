@@ -26,52 +26,57 @@ interface PricingTier {
 
 const pricingTiers: PricingTier[] = [
     {
-        name: 'Starter',
-        price: '$29',
-        period: '/month',
-        description: 'Perfect for professionals getting started with LinkedIn content',
+        name: 'Free',
+        price: '$0',
+        period: '',
+        description: 'Get started with core creation and publishing.',
         features: [
-            '10 AI-generated posts per month',
-            'Basic research automation',
-            'Post editing tools',
-            'Email support',
-            'Content calendar',
+            '1 LinkedIn account',
+            '5 AI posts / month',
+            '3 scheduled posts queued',
+            '30 days post history',
+        ],
+        cta: 'Get started',
+    },
+    {
+        name: 'Starter',
+        price: '$9.99',
+        period: '/month',
+        description: 'For consistent weekly posting.',
+        features: [
+            '1 LinkedIn account',
+            '30 AI posts / month',
+            '10 scheduled posts queued',
+            '90 days post history',
         ],
         cta: 'Start Free Trial',
     },
     {
-        name: 'Professional',
-        price: '$79',
+        name: 'Creator',
+        price: '$19.99',
         period: '/month',
-        description: 'For active LinkedIn creators who post regularly',
+        description: 'Best for creators scaling output.',
         features: [
-            '50 AI-generated posts per month',
-            'Advanced research automation',
-            'Priority post editing',
-            'Topic suggestions',
-            'Scheduling tools',
-            'Priority email support',
-            'Analytics dashboard',
+            '2 LinkedIn accounts',
+            '100 AI posts / month',
+            '50 scheduled posts queued',
+            '1 year post history',
         ],
         highlighted: true,
         cta: 'Start Free Trial',
     },
     {
-        name: 'Business',
-        price: '$199',
+        name: 'Pro Writer',
+        price: '$29.99',
         period: '/month',
-        description: 'For teams and businesses managing multiple LinkedIn accounts',
+        description: 'High-volume teams and agencies.',
         features: [
-            'Unlimited AI-generated posts',
-            'Multi-account management',
-            'Team collaboration tools',
-            'Custom brand voice',
-            'Advanced analytics',
-            'API access',
-            'Dedicated account manager',
-            '24/7 priority support',
+            '10 LinkedIn accounts',
+            'Unlimited AI posts',
+            'Unlimited scheduled posts',
+            'Unlimited post history',
         ],
-        cta: 'Contact Sales',
+        cta: 'Start Free Trial',
     },
 ];
 
@@ -95,7 +100,7 @@ export default function PricingPage() {
             {/* Pricing Cards */}
             <section className="py-16 sm:py-20">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                         {pricingTiers.map((tier, index) => (
                             <div
                                 key={index}
