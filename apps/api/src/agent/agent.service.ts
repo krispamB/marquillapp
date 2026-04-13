@@ -233,6 +233,7 @@ export class AgentService {
           content: JSON.stringify(compressionResult || {}),
         },
       ],
+      { model: 'openai/gpt-5.4' },
     );
 
     return response;
