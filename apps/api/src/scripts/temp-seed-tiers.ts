@@ -1,6 +1,9 @@
 /**
  * TEMPORARY SCRIPT:
- * Seed/update billing tiers in MongoDB for initial Polar setup.
+ * Seed/update billing tiers in MongoDB for Paddle setup.
+ *
+ * Fill in the paddleMonthlyPriceId / paddleYearlyPriceId values from your
+ * Paddle dashboard (format: pri_xxxx) before running.
  *
  * Run:
  *   npx ts-node src/scripts/temp-seed-tiers.ts
@@ -13,13 +16,14 @@ type TierSeed = {
   name: string;
   monthlyPrice: number;
   yearlyPrice: number;
-  polarMonthlyPriceId?: string;
-  polarYearlyPriceId?: string;
+  paddleMonthlyPriceId?: string;
+  paddleYearlyPriceId?: string;
   isDefault: boolean;
   isActive: boolean;
   limits: {
     ai_drafts: number;
     connected_accounts: number;
+    scheduled_posts: number;
   };
   metadata: {
     features: string[];
@@ -31,38 +35,42 @@ const tierSeeds: TierSeed[] = [
     name: 'Free',
     monthlyPrice: 0,
     yearlyPrice: 0,
-    polarMonthlyPriceId: undefined,
-    polarYearlyPriceId: undefined,
+    paddleMonthlyPriceId: undefined,
+    paddleYearlyPriceId: undefined,
     isDefault: true,
     isActive: true,
     limits: {
       ai_drafts: 2,
       connected_accounts: 1,
+      scheduled_posts: 1,
     },
     metadata: {
       features: [
         '1 connected account',
         '2 AI posts per month',
+        '1 scheduled post',
         '30 day history',
       ],
     },
   },
   {
-    name: 'starter',
+    name: 'Starter',
     monthlyPrice: 9.99,
     yearlyPrice: 0,
-    polarMonthlyPriceId: 'b8f76a29-80a2-4e88-a706-873e5cbad88d',
-    polarYearlyPriceId: undefined,
+    paddleMonthlyPriceId: 'pri_01kp1mjq33h66h0sgwjy1sshzb',
+    paddleYearlyPriceId: undefined,
     isDefault: false,
     isActive: true,
     limits: {
       ai_drafts: 10,
       connected_accounts: 1,
+      scheduled_posts: 5,
     },
     metadata: {
       features: [
         '1 connected account',
         '10 AI posts per month',
+        '5 scheduled posts',
         '90 day history',
       ],
     },
@@ -71,18 +79,20 @@ const tierSeeds: TierSeed[] = [
     name: 'Creator',
     monthlyPrice: 19.99,
     yearlyPrice: 0,
-    polarMonthlyPriceId: '08b899c6-798e-45e4-9ef3-e86a54df515e',
-    polarYearlyPriceId: undefined,
+    paddleMonthlyPriceId: 'pri_01kp1mgt8gmsnzb4cb9jndz34k',
+    paddleYearlyPriceId: undefined,
     isDefault: false,
     isActive: true,
     limits: {
       ai_drafts: 30,
       connected_accounts: 1,
+      scheduled_posts: 15,
     },
     metadata: {
       features: [
         '1 connected account',
         '30 AI posts per month',
+        '15 scheduled posts',
         '1 year post history',
       ],
     },
@@ -91,18 +101,20 @@ const tierSeeds: TierSeed[] = [
     name: 'Pro Writer',
     monthlyPrice: 29.99,
     yearlyPrice: 0,
-    polarMonthlyPriceId: '23b1cf94-c1cc-49b6-8143-f1092c2eb997',
-    polarYearlyPriceId: undefined,
+    paddleMonthlyPriceId: 'pri_01kp1mmw9b31vxjvhs69y1q4g3',
+    paddleYearlyPriceId: undefined,
     isDefault: false,
     isActive: true,
     limits: {
-      ai_drafts: 350,
-      connected_accounts: 10,
+      ai_drafts: 300,
+      connected_accounts: 5,
+      scheduled_posts: -1,
     },
     metadata: {
       features: [
         '10 connected accounts',
         '350 AI posts per month',
+        'unlimited scheduled posts',
         'unlimited post history',
       ],
     },

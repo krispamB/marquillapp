@@ -17,6 +17,7 @@ export enum BillingInterval {
 
 export enum PaymentProvider {
   POLAR = 'POLAR',
+  PADDLE = 'PADDLE',
   STRIPE = 'STRIPE',
   LEMON_SQUEEZY = 'LEMON_SQUEEZY',
   PAYPAL = 'PAYPAL',
@@ -47,6 +48,9 @@ export class Subscription extends Document {
 
   @Prop({ unique: true, sparse: true })
   polarSubscriptionId?: string;
+
+  @Prop({ unique: true, sparse: true })
+  paddleSubscriptionId?: string;
 }
 
 export const SubscriptionSchema = SchemaFactory.createForClass(Subscription);

@@ -29,7 +29,8 @@ export class SubscriptionService {
 
     if (
       subscription &&
-      subscription.status === SubscriptionStatus.ACTIVE &&
+      (subscription.status === SubscriptionStatus.ACTIVE ||
+        subscription.status === SubscriptionStatus.PAST_DUE) &&
       subscription.currentPeriodEnd > new Date()
     ) {
       const paidTier = await this.tierModel.findById(subscription.tierId);
@@ -55,7 +56,7 @@ export class SubscriptionService {
     currentPeriodStart: Date;
     currentPeriodEnd: Date;
     cancelAtPeriodEnd: boolean;
-    polarSubscriptionId?: string;
+    paddleSubscriptionId?: string;
   }): Promise<Subscription> {
     return this.subscriptionModel.findOneAndUpdate(
       { userId: new Types.ObjectId(data.userId) },
@@ -67,7 +68,7 @@ export class SubscriptionService {
         currentPeriodStart: data.currentPeriodStart,
         currentPeriodEnd: data.currentPeriodEnd,
         cancelAtPeriodEnd: data.cancelAtPeriodEnd,
-        polarSubscriptionId: data.polarSubscriptionId,
+        paddleSubscriptionId: data.paddleSubscriptionId,
       },
       { upsert: true, new: true },
     );
