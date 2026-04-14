@@ -69,19 +69,6 @@ export default function Header() {
         </div>
 
         <div className={`hidden md:flex items-center transition-all duration-300 ${isCompact ? 'gap-2' : 'gap-3'}`}>
-          <label className="sr-only" htmlFor="desktop-language-selector">
-            Language
-          </label>
-          <select
-            id="desktop-language-selector"
-            aria-label="Language selector"
-            defaultValue="en"
-            className={`rounded-full border border-slate-200 bg-white px-3 text-sm font-semibold text-text-secondary outline-none transition-colors hover:text-text-primary ${
-              isCompact ? 'py-1.5' : 'py-2'
-            }`}
-          >
-            <option value="en">English (EN)</option>
-          </select>
           <a
             href={appUrl}
             className={`text-sm font-semibold text-white rounded-full bg-gradient-to-r from-[#5B5CF6] via-[#6C62FF] to-[#7C72FF] shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all ${
@@ -129,17 +116,6 @@ export default function Header() {
                 {item.label}
               </a>
             ))}
-            <label className="sr-only" htmlFor="mobile-language-selector">
-              Language
-            </label>
-            <select
-              id="mobile-language-selector"
-              aria-label="Language selector"
-              defaultValue="en"
-              className="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-text-secondary outline-none"
-            >
-              <option value="en">English (EN)</option>
-            </select>
             <a
               href={appUrl}
               className="w-full rounded-full bg-gradient-to-r from-[#5B5CF6] via-[#6C62FF] to-[#7C72FF] px-4 py-2 text-sm font-semibold text-white shadow-lg"
