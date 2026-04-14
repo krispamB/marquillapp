@@ -20,6 +20,12 @@ export class Tier extends Document {
   @Prop()
   polarYearlyPriceId?: string;
 
+  @Prop()
+  paddleMonthlyPriceId?: string;
+
+  @Prop()
+  paddleYearlyPriceId?: string;
+
   @Prop({ default: false })
   isDefault: boolean;
 

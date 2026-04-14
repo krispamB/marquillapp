@@ -50,7 +50,8 @@ export class FeatureGatingService {
 
     if (
       subscription &&
-      subscription.status === SubscriptionStatus.ACTIVE &&
+      (subscription.status === SubscriptionStatus.ACTIVE ||
+        subscription.status === SubscriptionStatus.PAST_DUE) &&
       subscription.currentPeriodEnd > new Date()
     ) {
       const paidTier = await this.tierModel
@@ -389,7 +390,8 @@ export class FeatureGatingService {
 
     if (
       subscription &&
-      subscription.status === SubscriptionStatus.ACTIVE &&
+      (subscription.status === SubscriptionStatus.ACTIVE ||
+        subscription.status === SubscriptionStatus.PAST_DUE) &&
       subscription.currentPeriodEnd > new Date()
     ) {
       return {

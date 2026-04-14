@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Controller,
   HttpCode,
   HttpStatus,
@@ -9,7 +8,6 @@ import {
   Req,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { WebhookVerificationError } from '@polar-sh/sdk/webhooks';
 import { PaymentService } from './payment.service';
 
 type RawBodyRequest = Request & { rawBody?: Buffer };
@@ -20,28 +18,26 @@ export class PaymentWebhookController {
 
   constructor(private readonly paymentService: PaymentService) {}
 
-  @Post('polar')
+  @Post('paddle')
   @HttpCode(HttpStatus.OK)
-  async handlePolarWebhook(@Req() request: RawBodyRequest) {
+  async handlePaddleWebhook(@Req() request: RawBodyRequest) {
     const rawBody = request.rawBody;
     if (!rawBody) {
       this.logger.error(
-        'Polar webhook missing raw body. Ensure rawBody is enabled.',
+        'Paddle webhook missing raw body. Ensure rawBody is enabled.',
       );
       throw new BadRequestException('Webhook raw body not available');
     }
 
-    try {
-      const result = await this.paymentService.handlePolarWebhook(
-        rawBody,
-        request.headers,
-      );
-      return { ok: true, ...result };
-    } catch (error) {
-      if (error instanceof WebhookVerificationError) {
-        throw new ForbiddenException('Invalid webhook signature');
-      }
-      throw error;
+    const paddleSignature = request.headers['paddle-signature'];
+    if (!paddleSignature || Array.isArray(paddleSignature)) {
+      throw new BadRequestException('Missing or invalid paddle-signature header');
     }
+
+    const result = await this.paymentService.handlePaddleWebhook(
+      rawBody,
+      paddleSignature,
+    );
+    return { ok: true, ...result };
   }
 }

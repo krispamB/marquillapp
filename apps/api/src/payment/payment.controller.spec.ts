@@ -8,7 +8,7 @@ jest.mock(
       YEARLY: 'yearly',
     },
     PaymentProvider: {
-      POLAR: 'POLAR',
+      PADDLE: 'PADDLE',
     },
     SubscriptionStatus: {
       ACTIVE: 'ACTIVE',

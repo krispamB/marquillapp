@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { PaymentService } from './payment.service';
-import { PolarClient } from './polar.client';
+import { PaddleClient } from './paddle.client';
 import { DatabaseModule } from '../database/database.module';
 import { RedisModule } from '../redis/redis.module';
 import {
@@ -31,7 +31,7 @@ import { FeatureGatingModule } from '../feature-gating';
     ]),
   ],
   controllers: [PaymentController, PaymentWebhookController],
-  providers: [PaymentService, PolarClient],
+  providers: [PaymentService, PaddleClient],
   exports: [PaymentService],
 })
 export class PaymentModule {}

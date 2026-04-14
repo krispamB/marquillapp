@@ -4,30 +4,29 @@ import {
 } from '@nestjs/common';
 import { Types } from 'mongoose';
 
-jest.mock(
-  '../database/schemas',
-  () => ({
-    BillingInterval: {
-      MONTHLY: 'monthly',
-      YEARLY: 'yearly',
-    },
-    PaymentProvider: {
-      POLAR: 'POLAR',
-    },
-    SubscriptionStatus: {
-      ACTIVE: 'ACTIVE',
-      CANCELED: 'CANCELED',
-      EXPIRED: 'EXPIRED',
-      PAST_DUE: 'PAST_DUE',
-    },
-    User: class User {},
-    Tier: class Tier {},
-    Subscription: class Subscription {},
-    BillingCustomer: class BillingCustomer {},
-    Usage: class Usage {},
-  }),
-  { virtual: true },
-);
+// Bun does not hoist jest.mock — use manual module resolution instead
+const mockSchemas = {
+  BillingInterval: {
+    MONTHLY: 'monthly',
+    YEARLY: 'yearly',
+  },
+  PaymentProvider: {
+    PADDLE: 'PADDLE',
+  },
+  SubscriptionStatus: {
+    ACTIVE: 'ACTIVE',
+    CANCELED: 'CANCELED',
+    EXPIRED: 'EXPIRED',
+    PAST_DUE: 'PAST_DUE',
+  },
+  User: class User {},
+  Tier: class Tier {},
+  Subscription: class Subscription {},
+  BillingCustomer: class BillingCustomer {},
+  Usage: class Usage {},
+};
+
+jest.mock('../database/schemas', () => mockSchemas, { virtual: true });
 
 import { PaymentService } from './payment.service';
 import { SubscriptionStatus } from '../database/schemas';
@@ -41,7 +40,7 @@ describe('PaymentService.cancelSubscription', () => {
       findOneAndUpdate: jest.fn(),
     };
     const billingCustomerModel = {};
-    const polarClient = {
+    const paddleClient = {
       cancelSubscriptionAtPeriodEnd: jest.fn(),
     };
     const configService = {};
@@ -57,7 +56,7 @@ describe('PaymentService.cancelSubscription', () => {
       tierModel as any,
       subscriptionModel as any,
       billingCustomerModel as any,
-      polarClient as any,
+      paddleClient as any,
       configService as any,
       redisService as any,
       featureGatingService as any,
@@ -67,7 +66,7 @@ describe('PaymentService.cancelSubscription', () => {
       service,
       mocks: {
         subscriptionModel,
-        polarClient,
+        paddleClient,
         featureGatingService,
       },
     };
@@ -79,7 +78,7 @@ describe('PaymentService.cancelSubscription', () => {
     const subscription = {
       status: SubscriptionStatus.ACTIVE,
       cancelAtPeriodEnd: false,
-      polarSubscriptionId: 'sub_123',
+      paddleSubscriptionId: 'sub_123',
     };
 
     mocks.subscriptionModel.findOne.mockReturnValue({
@@ -94,7 +93,7 @@ describe('PaymentService.cancelSubscription', () => {
     const result = await service.cancelSubscription(userId);
 
     expect(
-      mocks.polarClient.cancelSubscriptionAtPeriodEnd,
+      mocks.paddleClient.cancelSubscriptionAtPeriodEnd,
     ).toHaveBeenCalledWith('sub_123');
     expect(mocks.subscriptionModel.findOneAndUpdate).toHaveBeenCalledWith(
       { userId: expect.any(Types.ObjectId) },
@@ -110,7 +109,7 @@ describe('PaymentService.cancelSubscription', () => {
     const subscription = {
       status: SubscriptionStatus.ACTIVE,
       cancelAtPeriodEnd: true,
-      polarSubscriptionId: 'sub_123',
+      paddleSubscriptionId: 'sub_123',
     };
 
     mocks.subscriptionModel.findOne.mockReturnValue({
@@ -125,7 +124,7 @@ describe('PaymentService.cancelSubscription', () => {
     const result = await service.cancelSubscription(userId);
 
     expect(
-      mocks.polarClient.cancelSubscriptionAtPeriodEnd,
+      mocks.paddleClient.cancelSubscriptionAtPeriodEnd,
     ).not.toHaveBeenCalled();
     expect(mocks.subscriptionModel.findOneAndUpdate).not.toHaveBeenCalled();
     expect(result).toBe(billingSummary);
@@ -144,13 +143,13 @@ describe('PaymentService.cancelSubscription', () => {
     );
   });
 
-  it('throws when subscription is missing Polar reference', async () => {
+  it('throws when subscription is missing Paddle reference', async () => {
     const { service, mocks } = makeService();
     const userId = new Types.ObjectId().toString();
     const subscription = {
       status: SubscriptionStatus.ACTIVE,
       cancelAtPeriodEnd: false,
-      polarSubscriptionId: undefined,
+      paddleSubscriptionId: undefined,
     };
 
     mocks.subscriptionModel.findOne.mockReturnValue({
@@ -169,7 +168,7 @@ describe('PaymentService.getUsageSummary', () => {
     const tierModel = {};
     const subscriptionModel = {};
     const billingCustomerModel = {};
-    const polarClient = {};
+    const paddleClient = {};
     const configService = {};
     const redisService = {
       getClient: jest.fn(),
@@ -196,7 +195,7 @@ describe('PaymentService.getUsageSummary', () => {
       tierModel as any,
       subscriptionModel as any,
       billingCustomerModel as any,
-      polarClient as any,
+      paddleClient as any,
       configService as any,
       redisService as any,
       featureGatingService as any,
