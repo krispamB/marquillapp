@@ -21,7 +21,7 @@ import {
 } from 'src/database/schemas';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { apiFetch } from 'src/common/HelperFn/apiFetch.helper';
+import { ApiError, apiFetch } from 'src/common/HelperFn/apiFetch.helper';
 import { EncryptionService } from 'src/encryption/encryption.service';
 import { ILinkedInPost } from './post.interface';
 import { formatLinkedinContent } from 'src/common/HelperFn';
@@ -315,6 +315,16 @@ export class PostService {
       await post.save();
     } catch (error) {
       this.logger.error(error);
+      if (
+        error instanceof ApiError &&
+        error.statusCode === 400 &&
+        typeof error.data?.message === 'string' &&
+        error.data.message.includes('Organization permissions must be used')
+      ) {
+        throw new BadRequestException(
+          'Your LinkedIn account needs to be reconnected to enable company page posting. Please disconnect and reconnect your LinkedIn account.',
+        );
+      }
       throw new InternalServerErrorException('Failed to publish post');
     }
   }
@@ -447,27 +457,26 @@ export class PostService {
         image: string;
       };
     }
-    const initializeUploadRequest = await apiFetch<IResponse>(
-      `${this.LINKEDIN_API_BASE}/images?action=initializeUpload`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Restli-Protocol-Version': '2.0.0',
-          'LinkedIn-Version': '202601',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          initializeUploadRequest: {
-            owner: urn,
+    try {
+      const initializeUploadRequest = await apiFetch<IResponse>(
+        `${this.LINKEDIN_API_BASE}/images?action=initializeUpload`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Restli-Protocol-Version': '2.0.0',
+            'LinkedIn-Version': '202601',
+            Authorization: `Bearer ${accessToken}`,
           },
-        }),
-      },
-    );
+          body: JSON.stringify({
+            initializeUploadRequest: {
+              owner: urn,
+            },
+          }),
+        },
+      );
 
-    const uploadResponse = await apiFetch(
-      initializeUploadRequest.data.value.uploadUrl,
-      {
+      await apiFetch(initializeUploadRequest.data.value.uploadUrl, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/octet-stream',
@@ -476,10 +485,22 @@ export class PostService {
         },
         body: file.buffer as any,
         ...({ duplex: 'half' } as any),
-      },
-    );
+      });
 
-    return initializeUploadRequest.data.value.image;
+      return initializeUploadRequest.data.value.image;
+    } catch (error) {
+      if (
+        error instanceof ApiError &&
+        error.statusCode === 400 &&
+        typeof error.data?.message === 'string' &&
+        error.data.message.includes('Organization permissions must be used')
+      ) {
+        throw new BadRequestException(
+          'Your LinkedIn account needs to be reconnected to enable company page posting. Please disconnect and reconnect your LinkedIn account.',
+        );
+      }
+      throw error;
+    }
   }
 
   async getLinkedinImage(user: User, urn: string) {
