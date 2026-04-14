@@ -18,6 +18,7 @@ type Tier = {
     };
     monthlyPrice: number;
     polarMonthlyPriceId?: string;
+    paddleMonthlyPriceId?: string;
 };
 
 
@@ -59,7 +60,6 @@ export default function PricingClient({
     const [tiers, setTiers] = useState<Tier[]>([]);
     const [activeSubscriptionTierId, setActiveSubscriptionTierId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [isLoadingCheckout, setIsLoadingCheckout] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const initials = getInitials(user.name, user.email);
@@ -113,39 +113,18 @@ export default function PricingClient({
         void fetchSubscription();
     }, []);
 
-    const handleCheckout = async (tier: Tier) => {
-        setIsLoadingCheckout(tier._id);
-        setError(null);
-
-        try {
-            const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
-            const res = await fetch(`${apiBase}/payment/checkout`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                credentials: "include",
-                body: JSON.stringify({
-                    tierId: tier._id,
-                    billingInterval: "monthly",
-                }),
-            });
-
-            if (!res.ok) {
-                const errorData = await res.json().catch(() => null);
-                throw new Error(errorData?.message || "Failed to initialize checkout");
-            }
-
-            const data = await res.json();
-            if (data?.url) {
-                window.location.href = data.url;
-            } else {
-                throw new Error("No checkout URL returned");
-            }
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Unable to initiate checkout.");
-            setIsLoadingCheckout(null);
+    const handleCheckout = (tier: Tier) => {
+        if (!tier.paddleMonthlyPriceId) {
+            setError("This plan is not available for purchase right now.");
+            return;
         }
+        const params = new URLSearchParams({
+            priceId: tier.paddleMonthlyPriceId,
+            tierName: tier.name,
+            monthlyPrice: String(tier.monthlyPrice),
+        });
+        const landingUrl = process.env.NEXT_PUBLIC_LANDING ?? "http://localhost:3001";
+        window.location.href = `${landingUrl}/checkout?${params.toString()}`;
     };
 
     return (
@@ -243,7 +222,7 @@ export default function PricingClient({
 
                                                 <button
                                                     onClick={() => handleCheckout(tier)}
-                                                    disabled={isCurrentPlan || isLoadingCheckout === tier._id}
+                                                    disabled={isCurrentPlan}
                                                     className={`mt-2 mb-8 w-full rounded-full py-3 text-sm font-semibold transition-all ${isCurrentPlan
                                                         ? "bg-slate-100 text-[var(--color-text-secondary)] cursor-not-allowed"
                                                         : isCreator
@@ -251,7 +230,7 @@ export default function PricingClient({
                                                             : "border border-[var(--color-border)] bg-transparent text-[var(--color-text-primary)] hover:border-slate-300 hover:bg-slate-50 disabled:opacity-70 disabled:cursor-not-allowed"
                                                         }`}
                                                 >
-                                                    {isCurrentPlan ? "Current Plan" : isLoadingCheckout === tier._id ? "Loading..." : "Upgrade"}
+                                                    {isCurrentPlan ? "Current Plan" : "Upgrade"}
                                                 </button>
 
                                                 <ul className="flex flex-1 flex-col gap-4 text-sm font-medium text-[var(--color-text-secondary)]">
