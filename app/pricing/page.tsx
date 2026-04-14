@@ -49,6 +49,7 @@ export default async function PricingPage() {
     }
 
     const user: UserProfile = {
+        id: apiUser?._id,
         name,
         email,
         avatar: apiUser?.avatar ?? undefined,

@@ -122,6 +122,7 @@ export default function PricingClient({
             priceId: tier.paddleMonthlyPriceId,
             tierName: tier.name,
             monthlyPrice: String(tier.monthlyPrice),
+            ...(user.id ? { userId: user.id } : {}),
         });
         const landingUrl = process.env.NEXT_PUBLIC_LANDING ?? "http://localhost:3001";
         window.location.href = `${landingUrl}/checkout?${params.toString()}`;
