@@ -3,18 +3,17 @@
 import type { ReactNode } from "react";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronLeft, Settings, LogOut, Zap, Sparkles, CreditCard, Bug } from "lucide-react";
+import { ChevronLeft, Info, Plus, RefreshCw, Settings, LogOut, Sparkles, CreditCard, Bug } from "lucide-react";
 import BugReportModal from "./BugReportModal";
 import {
   Card,
-  ConnectProviderMenu,
   NavItem,
-  PillButton,
+  OrgAvatar,
+  Trash2,
   UserAvatar,
 } from "./components";
 import type {
   ConnectedAccount,
-  ConnectedAccountProvider,
   UserProfile,
 } from "../lib/types";
 
@@ -34,7 +33,6 @@ export default function Sidebar({
   user,
   items,
   accounts,
-  primaryAccountIndex = 0,
   selectedAccountId,
   showAccounts = true,
   collapsed = false,
@@ -42,15 +40,18 @@ export default function Sidebar({
   showChrome = true,
   isConnectMenuOpen = false,
   isConnectingLinkedIn = false,
+  isConnectingOrg = false,
+  hasPersonalAccount = false,
   onToggleConnectMenu,
   onConnectLinkedIn,
+  onConnectLinkedInOrg,
   onSelectAccount,
+  onRemoveAccount,
   onSubscriptionLoaded,
 }: {
   user: SidebarUser;
   items: SidebarItem[];
   accounts: ConnectedAccount[];
-  primaryAccountIndex?: number;
   selectedAccountId?: string;
   showAccounts?: boolean;
   collapsed?: boolean;
@@ -58,12 +59,15 @@ export default function Sidebar({
   showChrome?: boolean;
   isConnectMenuOpen?: boolean;
   isConnectingLinkedIn?: boolean;
+  isConnectingOrg?: boolean;
+  hasPersonalAccount?: boolean;
   onToggleConnectMenu?: () => void;
   onConnectLinkedIn?: () => void;
+  onConnectLinkedInOrg?: () => void;
   onSelectAccount?: (accountId: string) => void;
+  onRemoveAccount?: (accountId: string) => void;
   onSubscriptionLoaded?: (data: { tier?: { id: string; name: string; isDefault?: boolean } | null }) => void;
 }) {
-  const [accountsExpanded, setAccountsExpanded] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isBugModalOpen, setIsBugModalOpen] = useState(false);
   const [isDefaultTier, setIsDefaultTier] = useState(false);
@@ -118,14 +122,10 @@ export default function Sidebar({
     });
     window.location.href = process.env.NEXT_PUBLIC_LANDING || "http://localhost:3001";
   };
-  const selectedAccount = selectedAccountId
-    ? accounts.find((account) => account.id === selectedAccountId)
-    : null;
-  const primaryAccount = selectedAccount ?? accounts[primaryAccountIndex] ?? accounts[0];
-  const connectedAccounts = accounts;
 
-  const providerLabel = (provider: ConnectedAccountProvider) => {
-    switch (provider) {
+  const providerLabel = (account: ConnectedAccount) => {
+    if (account.accountType === "ORGANIZATION") return "LinkedIn Page";
+    switch (account.provider) {
       case "LINKEDIN":
         return "LinkedIn account";
       default:
@@ -162,36 +162,46 @@ export default function Sidebar({
   };
 
   const accountAvatarWithProviderBadge = ({
-    provider,
+    account,
     initials,
-    avatarUrl,
     sizeClass,
     textClass,
   }: {
-    provider: ConnectedAccountProvider;
+    account: ConnectedAccount;
     initials: string;
-    avatarUrl?: string;
     sizeClass: string;
     textClass: string;
-  }) => (
-    <div className="relative w-fit">
-      <UserAvatar
-        initials={initials}
-        avatarUrl={avatarUrl}
-        sizeClass={sizeClass}
-        textClass={textClass}
-      />
-      {provider === "LINKEDIN" ? (
-        <span className="absolute -bottom-1 -right-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white bg-white shadow-[0_6px_16px_-8px_rgba(15,23,42,0.45)]">
-          <img
-            src="/LinkedIn_Icon_1.webp"
-            alt="LinkedIn"
-            className="h-3.5 w-3.5 object-contain"
-          />
-        </span>
-      ) : null}
-    </div>
-  );
+  }) => {
+    if (account.accountType === "ORGANIZATION") {
+      return (
+        <OrgAvatar
+          name={account.displayName ?? initials}
+          logoUrl={account.avatarUrl}
+          sizeClass={sizeClass}
+          textClass={textClass}
+        />
+      );
+    }
+    return (
+      <div className="relative w-fit">
+        <UserAvatar
+          initials={initials}
+          avatarUrl={account.avatarUrl}
+          sizeClass={sizeClass}
+          textClass={textClass}
+        />
+        {account.provider === "LINKEDIN" ? (
+          <span className="absolute -bottom-1 -right-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white bg-white shadow-[0_6px_16px_-8px_rgba(15,23,42,0.45)]">
+            <img
+              src="/LinkedIn_Icon_1.webp"
+              alt="LinkedIn"
+              className="h-3.5 w-3.5 object-contain"
+            />
+          </span>
+        ) : null}
+      </div>
+    );
+  };
 
   return (
     <aside
@@ -250,152 +260,120 @@ export default function Sidebar({
           </div>
         </div>
 
-        {showAccounts && !collapsed && primaryAccount ? (
-          <div className="w-full">
-            <button
-              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--color-border)] bg-white/80 px-3 py-3 text-left transition hover:-translate-y-0.5"
-              onClick={() => setAccountsExpanded((value) => !value)}
-              type="button"
-            >
-              <div className="flex items-center gap-3">
-                {accountAvatarWithProviderBadge({
-                  provider: primaryAccount.provider,
-                  initials: initialsFromName(
-                    primaryAccount.displayName,
-                    primaryAccount.vanityName,
-                  ),
-                  avatarUrl: primaryAccount.avatarUrl,
-                  sizeClass: "h-10 w-10",
-                  textClass: "text-sm",
-                })}
-                <div>
-                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                    {primaryAccount.displayName ?? providerLabel(primaryAccount.provider)}
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                    <span>{providerLabel(primaryAccount.provider)}</span>
-                  </div>
-                  {primaryAccount.vanityName ? (
-                    <p className="mt-1 text-[11px] text-[var(--color-text-secondary)]">
-                      @{primaryAccount.vanityName}
-                    </p>
-                  ) : null}
-                  {(() => {
-                    const expiry = accessExpiryLabel(
-                      primaryAccount.accessTokenExpiresAt,
-                    );
-                    if (!expiry) {
-                      return null;
-                    }
-                    return (
-                      <p
-                        className={`mt-1 text-[11px] font-semibold ${expiry.isDanger
-                          ? "text-rose-500"
-                          : "text-[var(--color-text-secondary)]"
-                          }`}
-                      >
-                        {expiry.label}
-                      </p>
-                    );
-                  })()}
-                </div>
+        {showAccounts && !collapsed ? (
+          <div className="w-full flex flex-col gap-3">
+            {/* ── Section header ── */}
+            <div className="flex items-center justify-between px-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-text-secondary)]">
+                Connected accounts
+              </p>
+              <div className="flex items-center gap-0.5">
+                {/* Info */}
+                <button
+                  type="button"
+                  title="Connect your LinkedIn account to start publishing. Use + to add organization pages."
+                  className="grid h-7 w-7 place-items-center rounded-full text-[var(--color-text-secondary)] hover:bg-white/70 transition"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+                {/* Reconnect — personal accounts only, always runs OAuth */}
+                <button
+                  type="button"
+                  disabled={!hasPersonalAccount || isConnectingLinkedIn}
+                  onClick={onConnectLinkedIn}
+                  title="Re-authenticate your LinkedIn account"
+                  className="grid h-7 w-7 place-items-center rounded-full text-[var(--color-text-secondary)] hover:bg-white/70 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </button>
+                {/* Plus — connect org page, disabled when no accounts at all */}
+                <button
+                  type="button"
+                  disabled={accounts.length === 0}
+                  onClick={onConnectLinkedInOrg}
+                  title="Connect an organization page"
+                  className="grid h-7 w-7 place-items-center rounded-full text-[var(--color-text-secondary)] hover:bg-white/70 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
               </div>
-              <ChevronDown
-                className={`h-4 w-4 text-[var(--color-text-secondary)] transition ${accountsExpanded ? "rotate-180" : ""
-                  }`}
-              />
-            </button>
+            </div>
 
-            {accountsExpanded ? (
-              <div className="mt-3 rounded-2xl border border-[var(--color-border)] bg-white/70 p-3 shadow-[0_24px_60px_-50px_rgba(15,23,42,0.35)]">
-                <p className="px-2 pb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-text-secondary)]">
-                  Connected accounts
-                </p>
-                <div className="flex flex-col gap-2">
-                  {connectedAccounts.map((account) => (
+            {/* ── Account list OR empty state ── */}
+            {accounts.length > 0 ? (
+              <div className="flex flex-col gap-1.5">
+                {accounts.map((account) => {
+                  const isActive = account.id === (selectedAccountId ?? accounts[0]?.id);
+                  const expiry = accessExpiryLabel(account.accessTokenExpiresAt);
+                  const subtitle = expiry
+                    ? expiry.label
+                    : account.vanityName
+                    ? `@${account.vanityName}`
+                    : providerLabel(account);
+                  return (
                     <div
                       key={account.id}
                       role="button"
                       tabIndex={0}
                       onClick={() => onSelectAccount?.(account.id)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
                           onSelectAccount?.(account.id);
                         }
                       }}
-                      className={`flex items-center justify-between rounded-2xl border px-3 py-2 transition ${primaryAccount.id === account.id
-                        ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10"
-                        : "border-[var(--color-border)] bg-white/80 hover:border-[var(--color-primary)]/45"
-                        }`}
+                      className={`group flex items-center gap-3 rounded-2xl border px-3 py-2.5 cursor-pointer transition ${
+                        isActive
+                          ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10"
+                          : "border-transparent hover:border-[var(--color-border)] hover:bg-white/70"
+                      }`}
                     >
-                      <div className="flex items-center gap-3">
-                        {accountAvatarWithProviderBadge({
-                          provider: account.provider,
-                          initials: initialsFromName(
-                            account.displayName,
-                            account.vanityName,
-                          ),
-                          avatarUrl: account.avatarUrl,
-                          sizeClass: "h-9 w-9",
-                          textClass: "text-xs",
-                        })}
-                        <div>
-                          <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                            {account.displayName ?? providerLabel(account.provider)}
-                          </p>
-                          {account.vanityName ? (
-                            <p className="text-[11px] text-[var(--color-text-secondary)]">
-                              @{account.vanityName}
-                            </p>
-                          ) : null}
-                          {(() => {
-                            const expiry = accessExpiryLabel(
-                              account.accessTokenExpiresAt,
-                            );
-                            if (!expiry) {
-                              return null;
-                            }
-                            return (
-                              <p
-                                className={`text-[11px] font-semibold ${expiry.isDanger
-                                  ? "text-rose-500"
-                                  : "text-[var(--color-text-secondary)]"
-                                  }`}
-                              >
-                                {expiry.label}
-                              </p>
-                            );
-                          })()}
-                        </div>
+                      {/* Avatar */}
+                      {accountAvatarWithProviderBadge({
+                        account,
+                        initials: initialsFromName(account.displayName, account.vanityName),
+                        sizeClass: "h-11 w-11",
+                        textClass: "text-sm",
+                      })}
+
+                      {/* Name + subtitle */}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-[var(--color-text-primary)] truncate">
+                          {account.displayName ?? providerLabel(account)}
+                        </p>
+                        <p className={`text-[11px] truncate ${expiry?.isDanger ? "font-semibold text-rose-500" : "text-[var(--color-text-secondary)]"}`}>
+                          {subtitle}
+                        </p>
                       </div>
+
+                      {/* Trash — hover only */}
+                      {onRemoveAccount ? (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onRemoveAccount(account.id); }}
+                          className="ml-auto shrink-0 grid h-7 w-7 place-items-center rounded-full text-[var(--color-text-secondary)] opacity-0 transition group-hover:opacity-100 hover:bg-rose-50 hover:text-rose-500"
+                          aria-label={`Remove ${account.displayName ?? providerLabel(account)}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      ) : null}
                     </div>
-                  ))}
-                </div>
-                <div className="relative mt-3 flex justify-end">
-                  <PillButton
-                    variant="primary"
-                    ariaLabel="Open connect account options"
-                    ariaExpanded={isConnectMenuOpen}
-                    ariaControls="connect-account-menu-sidebar"
-                    onClick={onToggleConnectMenu}
-                  >
-                    + Add acount
-                  </PillButton>
-                  <ConnectProviderMenu
-                    menuId="connect-account-menu-sidebar"
-                    isOpen={isConnectMenuOpen}
-                    isConnectingLinkedIn={isConnectingLinkedIn}
-                    onConnectLinkedIn={() => {
-                      if (onConnectLinkedIn) {
-                        onConnectLinkedIn();
-                      }
-                    }}
-                    align="right"
-                  />
-                </div>
+                  );
+                })}
               </div>
-            ) : null}
+            ) : (
+              /* Empty state — matches image's "More channels" style */
+              <button
+                type="button"
+                onClick={onConnectLinkedIn}
+                className="flex items-center gap-3 rounded-2xl border border-dashed border-[var(--color-border)] px-3 py-2.5 text-left transition hover:border-[var(--color-primary)]/45 hover:bg-white/70"
+              >
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white/80">
+                  <Plus className="h-5 w-5 text-[var(--color-text-secondary)]" />
+                </span>
+                <span className="text-sm font-semibold text-[var(--color-text-secondary)]">Add account</span>
+              </button>
+            )}
           </div>
         ) : null}
 

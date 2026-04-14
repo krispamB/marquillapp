@@ -39,6 +39,8 @@ export type UserApiResponse = UserProfile & {
 
 export type ConnectedAccountProvider = "LINKEDIN" | (string & {});
 
+export type ConnectedAccountType = "PERSONAL" | "ORGANIZATION";
+
 export type ConnectedAccountProfile = {
   name?: string;
   email?: string;
@@ -55,6 +57,7 @@ export type ConnectedAccountProfile = {
 export type ConnectedAccount = {
   id: string;
   provider: ConnectedAccountProvider;
+  accountType?: ConnectedAccountType;
   accessTokenExpiresAt?: string;
   displayName?: string;
   avatarUrl?: string;
@@ -276,4 +279,37 @@ export type LinkedinImageDetailsResponse = {
   statusCode?: number;
   message?: string;
   data?: LinkedinImageDetailsData;
+};
+
+// ─── LinkedIn Organization / Company Page ────────────────────────────────────
+
+export type LinkedInOrg = {
+  id: string;
+  urn: string;
+  name: string;
+  logoUrl: string | null;
+  role: string;
+  state: string;
+};
+
+export type ListOrgsResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: LinkedInOrg[];
+};
+
+export type ConnectOrgsResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: ConnectedAccount[];
+};
+
+export type DisconnectAccountResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: {
+    accountId: string;
+    deactivatedCount: number;
+    scheduledPostsCanceled: number;
+  };
 };

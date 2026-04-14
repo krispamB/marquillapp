@@ -167,7 +167,6 @@ export default function PricingClient({
                             user={{ ...user, initials }}
                             items={navItems}
                             accounts={connectedAccounts}
-                            primaryAccountIndex={0}
                             selectedAccountId={selectedAccountId}
                             collapsed={sidebarCollapsed}
                             onToggle={() => setSidebarCollapsed((value) => !value)}
