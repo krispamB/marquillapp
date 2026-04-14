@@ -17,6 +17,8 @@ import NewPostModal, {
 import {
   Card,
   ConnectAccountCta,
+  ConnectOrgModal,
+  DisconnectAccountModal,
   ListItem,
   MobileAccountChip,
   MobileAccountSwitcherSheet,
@@ -30,6 +32,7 @@ import type {
   CreateDraftResponse,
   DashboardPost,
   DashboardPostsResponse,
+  DisconnectAccountResponse,
   DraftStatusResponse,
   ImageUploadResponse,
   LinkedinImageDetailsResponse,
@@ -235,9 +238,13 @@ export default function DashboardPage({
   const [connectFeedback, setConnectFeedback] = useState<string | null>(null);
   const [isConnectingLinkedIn, setIsConnectingLinkedIn] = useState(false);
   const [isConnectMenuOpen, setIsConnectMenuOpen] = useState(false);
-  const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(
-    primaryAccountId ?? connectedAccounts[0]?.id,
-  );
+  const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("selectedAccountId");
+      if (stored && connectedAccounts.some((a) => a.id === stored)) return stored;
+    }
+    return primaryAccountId ?? connectedAccounts[0]?.id;
+  });
   const [postMetrics, setPostMetrics] = useState<{
     total: number;
     monthly: Array<{ month: string; count: number }>;
@@ -255,6 +262,8 @@ export default function DashboardPage({
   const [usageError, setUsageError] = useState<string | null>(null);
   const [scheduledFilter, setScheduledFilter] = useState<ScheduledFilter>("TODAY");
   const [generatedDraftId, setGeneratedDraftId] = useState<string | null>(null);
+  const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
+  const [disconnectTarget, setDisconnectTarget] = useState<{ accountId: string; accountName: string } | null>(null);
   const { state: newPostModalState, openCreate, openEdit, close: closeNewPostModal } =
     useNewPostModal();
   const connectMenuBoundaryRef = useRef<HTMLDivElement | null>(null);
@@ -275,6 +284,14 @@ export default function DashboardPage({
       connectedAccounts.find((account) => account.id === selectedAccountId) ??
       connectedAccounts[0],
     [connectedAccounts, selectedAccountId],
+  );
+  const connectedOrgIds = useMemo(
+    () => connectedAccounts.filter((a) => a.accountType === "ORGANIZATION").map((a) => a.id),
+    [connectedAccounts],
+  );
+  const hasPersonalAccount = useMemo(
+    () => connectedAccounts.some((a) => a.accountType !== "ORGANIZATION"),
+    [connectedAccounts],
   );
   const usagePercent = Math.max(
     0,
@@ -440,9 +457,19 @@ export default function DashboardPage({
       if (current && connectedAccounts.some((account) => account.id === current)) {
         return current;
       }
+      const stored = typeof window !== "undefined" ? localStorage.getItem("selectedAccountId") : null;
+      if (stored && connectedAccounts.some((account) => account.id === stored)) {
+        return stored;
+      }
       return primaryAccountId ?? connectedAccounts[0]?.id;
     });
   }, [connectedAccounts, primaryAccountId]);
+
+  useEffect(() => {
+    if (selectedAccountId) {
+      localStorage.setItem("selectedAccountId", selectedAccountId);
+    }
+  }, [selectedAccountId]);
 
   useEffect(() => {
     const updateLimit = () => {
@@ -779,6 +806,44 @@ export default function DashboardPage({
       );
     } finally {
       setIsConnectingLinkedIn(false);
+    }
+  };
+
+  const handleOpenOrgModal = () => {
+    setIsConnectMenuOpen(false);
+    setIsOrgModalOpen(true);
+  };
+
+  const handleOrgConnectSuccess = () => {
+    setIsOrgModalOpen(false);
+    setConnectFeedback("Organization page connected.");
+    window.location.reload();
+  };
+
+  const handleDisconnect = async () => {
+    if (!disconnectTarget) return;
+    try {
+      const res = await fetch(
+        `${apiBase}/auth/connected-accounts/${disconnectTarget.accountId}`,
+        { method: "DELETE", credentials: "include" },
+      );
+      let json: DisconnectAccountResponse = {};
+      try { json = await res.json(); } catch { /* ignore */ }
+      if (!res.ok) {
+        setConnectFeedback(json.message ?? "Failed to disconnect account.");
+      } else {
+        const canceled = json.data?.scheduledPostsCanceled ?? 0;
+        setConnectFeedback(
+          canceled > 0
+            ? `Account removed. ${canceled} scheduled post${canceled > 1 ? "s" : ""} cancelled.`
+            : "Account disconnected successfully.",
+        );
+        window.location.reload();
+      }
+    } catch (err) {
+      setConnectFeedback(err instanceof Error ? err.message : "Failed to disconnect account.");
+    } finally {
+      setDisconnectTarget(null);
     }
   };
 
@@ -1199,7 +1264,6 @@ export default function DashboardPage({
             user={{ ...user, initials }}
             items={navItems}
             accounts={connectedAccounts}
-            primaryAccountIndex={0}
             selectedAccountId={selectedAccountId}
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed((value) => !value)}
@@ -1207,10 +1271,20 @@ export default function DashboardPage({
             onSelectAccount={setSelectedAccountId}
             isConnectMenuOpen={isConnectMenuOpen}
             isConnectingLinkedIn={isConnectingLinkedIn}
+            isConnectingOrg={false}
+            hasPersonalAccount={hasPersonalAccount}
             onToggleConnectMenu={() =>
               setIsConnectMenuOpen((previousState) => !previousState)
             }
             onConnectLinkedIn={handleConnectLinkedIn}
+            onConnectLinkedInOrg={handleOpenOrgModal}
+            onRemoveAccount={(accountId) => {
+              const account = connectedAccounts.find((a) => a.id === accountId);
+              setDisconnectTarget({
+                accountId,
+                accountName: account?.displayName ?? "this account",
+              });
+            }}
           />
 
           <main className="flex flex-col gap-8">
@@ -1242,11 +1316,14 @@ export default function DashboardPage({
               <ConnectAccountCta
                 isConnectMenuOpen={isConnectMenuOpen}
                 isConnectingLinkedIn={isConnectingLinkedIn}
+                isConnectingOrg={false}
+                hasPersonalAccount={hasPersonalAccount}
                 menuId="connect-account-menu-cta"
                 onToggleConnectMenu={() =>
                   setIsConnectMenuOpen((previousState) => !previousState)
                 }
                 onConnectLinkedIn={handleConnectLinkedIn}
+                onConnectLinkedInOrg={handleOpenOrgModal}
               />
             ) : null}
 
@@ -1285,15 +1362,16 @@ export default function DashboardPage({
                       <p className="text-sm text-rose-500">{usageError}</p>
                     ) : usageData?.usage ? (
                       Object.entries(usageData.usage).map(([key, metric]) => {
-                        const usagePercent = metric.limit > 0 ? Math.min(100, (metric.used / metric.limit) * 100) : 0;
-                        const meterClass = usagePercent >= 90 ? "from-rose-400 to-rose-600" : usagePercent >= 70 ? "from-amber-400 to-orange-400" : "from-[var(--color-primary)] to-[var(--color-accent)]";
+                        const isUnlimited = metric.limit === -1;
+                        const usagePercent = isUnlimited ? 0 : metric.limit > 0 ? Math.min(100, (metric.used / metric.limit) * 100) : 0;
+                        const meterClass = isUnlimited ? "from-[var(--color-primary)] to-[var(--color-accent)]" : usagePercent >= 90 ? "from-rose-400 to-rose-600" : usagePercent >= 70 ? "from-amber-400 to-orange-400" : "from-[var(--color-primary)] to-[var(--color-accent)]";
                         return (
                           <div key={key} className="flex flex-col">
                             <div className="flex items-end justify-between mb-2">
                               <span className="text-[13px] font-semibold text-[var(--color-text-primary)] tracking-wide">{formatUsageKey(key)}</span>
                               <div className="flex items-baseline gap-1.5">
                                 <span className="text-[22px] font-bold leading-none tracking-tight text-[var(--color-text-primary)]">{metric.used}</span>
-                                <span className="text-sm font-semibold text-[var(--color-text-secondary)]">/ {metric.limit}</span>
+                                <span className="text-sm font-semibold text-[var(--color-text-secondary)]">/ {isUnlimited ? "Unlimited" : metric.limit}</span>
                               </div>
                             </div>
                             <div className="h-2 w-full rounded-full bg-[var(--color-border)] overflow-hidden">
@@ -1666,6 +1744,19 @@ export default function DashboardPage({
         onGetDraftStatus={handleGetDraftStatus}
         onGetDraftById={handleGetDraftById}
         onGetLinkedinImageByUrn={handleGetLinkedinImageByUrn}
+      />
+      <ConnectOrgModal
+        isOpen={isOrgModalOpen}
+        onClose={() => setIsOrgModalOpen(false)}
+        onSuccess={handleOrgConnectSuccess}
+        alreadyConnectedOrgIds={connectedOrgIds}
+        apiBase={apiBase}
+      />
+      <DisconnectAccountModal
+        isOpen={!!disconnectTarget}
+        accountName={disconnectTarget?.accountName ?? ""}
+        onClose={() => setDisconnectTarget(null)}
+        onConfirm={handleDisconnect}
       />
     </div>
   );
