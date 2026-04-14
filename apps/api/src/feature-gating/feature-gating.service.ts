@@ -79,7 +79,7 @@ export class FeatureGatingService {
   getLimitFromTier(tier: Tier, feature: FeatureKey): number {
     const limit = tier?.limits?.[feature];
 
-    if (!Number.isInteger(limit) || limit < 0) {
+    if (!Number.isInteger(limit)) {
       throw new InternalServerErrorException(
         `Tier "${tier?.name ?? 'unknown'}" has invalid limit for "${feature}"`,
       );
@@ -224,6 +224,26 @@ export class FeatureGatingService {
           name: tier.name,
         },
         upgradeHint: 'Upgrade your plan to connect more accounts.',
+      });
+    }
+  }
+
+  async assertCompanyPagesAccess(userId: string): Promise<void> {
+    const tier = await this.resolveEntitlementTier(userId);
+    const limit = this.getLimitFromTier(tier, FEATURE_KEYS.CONNECTED_ACCOUNTS);
+
+    if (limit <= 1) {
+      throw new FeatureGateForbiddenException({
+        code: FEATURE_GATE_ERROR_CODE,
+        feature: FEATURE_KEYS.CONNECTED_ACCOUNTS,
+        limit,
+        currentUsage: 0,
+        tier: {
+          id: tier._id.toString(),
+          name: tier.name,
+        },
+        upgradeHint:
+          'Upgrade to Pro Writer to connect LinkedIn company pages.',
       });
     }
   }

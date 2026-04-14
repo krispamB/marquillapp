@@ -43,6 +43,20 @@ interface LinkedinOrganizationAclElement {
   state: string;
 }
 
+interface LinkedinOrganizationDetails {
+  id: number;
+  localizedName?: string;
+  logoV2?: {
+    'original~'?: {
+      elements?: Array<{
+        identifiers?: Array<{
+          identifier?: string;
+        }>;
+      }>;
+    };
+  };
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -120,7 +134,7 @@ export class AuthService {
   }
 
   createLinkedinOath(user: User): string {
-    return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${this.configService.getOrThrow<string>('LINKEDIN_CLIENT_ID')}&redirect_uri=${this.configService.getOrThrow<string>('LINKEDIN_REDIRECT_URI')}&state=${user._id.toString()}&scope=${encodeURIComponent('openid profile email w_member_social r_basicprofile r_organization_admin rw_organization_admin')}&enable_extended_login=true`;
+    return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${this.configService.getOrThrow<string>('LINKEDIN_CLIENT_ID')}&redirect_uri=${this.configService.getOrThrow<string>('LINKEDIN_REDIRECT_URI')}&state=${user._id.toString()}&scope=${encodeURIComponent('openid profile email w_member_social r_basicprofile r_organization_admin rw_organization_admin w_organization_social r_organization_social')}&enable_extended_login=true`;
   }
 
   async linkedinCallback(code: string, state: string) {
@@ -147,6 +161,7 @@ export class AuthService {
     const existingMemberId = this.getStoredLinkedinMemberId(connectedAccount);
     if (
       connectedAccount &&
+      connectedAccount.isActive &&
       existingMemberId &&
       existingMemberId !== profileMetadata.memberId
     ) {
@@ -156,11 +171,6 @@ export class AuthService {
         code: 'LINKEDIN_ACCOUNT_MISMATCH',
       });
     }
-
-    await this.featureGatingService.assertConnectedAccountCapacity({
-      userId: state,
-      isReconnect: !!connectedAccount,
-    });
 
     await this.connectedAccountModel.findOneAndUpdate(
       {
@@ -181,6 +191,7 @@ export class AuthService {
         accessToken: encryptedAccessToken,
         accessTokenExpiresAt: new Date(Date.now() + expires_in * 1000),
         profileMetadata: profileMetadata.profileMetadata,
+        isActive: true,
       },
       { upsert: true },
     );
@@ -203,6 +214,8 @@ export class AuthService {
   }
 
   async getLinkedinOrganizations(userId: string) {
+    await this.featureGatingService.assertCompanyPagesAccess(userId);
+
     const connectedAccount = await this.getLinkedinPersonalAccount(userId);
     if (!connectedAccount) {
       throw new NotFoundException('LinkedIn account not connected');
@@ -227,8 +240,8 @@ export class AuthService {
       elements: LinkedinOrganizationAclElement[];
     }
 
-    const url = `${this.LINKEDIN_API_BASE}/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED`;
-    const { data } = await apiFetch<OrganizationAclResponse>(url, {
+    const aclUrl = `${this.LINKEDIN_API_BASE}/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED`;
+    const { data } = await apiFetch<OrganizationAclResponse>(aclUrl, {
       method: 'GET',
       headers: {
         'X-Restli-Protocol-Version': '2.0.0',
@@ -237,18 +250,62 @@ export class AuthService {
       },
     });
 
-    return (data.elements ?? [])
-      .filter((element) => this.LINKEDIN_ALLOWED_ORG_ROLES.has(element.role))
-      .map((element) => {
+    const filtered = (data.elements ?? []).filter((element) =>
+      this.LINKEDIN_ALLOWED_ORG_ROLES.has(element.role),
+    );
+
+    const enriched = await Promise.all(
+      filtered.map(async (element) => {
         const organizationId = this.extractOrganizationId(element.organization);
+        const orgDetails = await this.fetchLinkedinOrganizationDetails(
+          organizationId,
+          accessToken,
+        );
 
         return {
           id: organizationId,
           urn: `urn:li:organization:${organizationId}`,
           role: element.role,
           state: element.state,
+          name: orgDetails?.localizedName ?? `Organization ${organizationId}`,
+          logoUrl: this.extractOrgLogoUrl(orgDetails),
         };
+      }),
+    );
+
+    return enriched;
+  }
+
+  private async fetchLinkedinOrganizationDetails(
+    organizationId: string,
+    accessToken: string,
+  ): Promise<LinkedinOrganizationDetails | null> {
+    try {
+      const url = `${this.LINKEDIN_API_BASE}/organizations/${organizationId}`;
+      const { data } = await apiFetch<LinkedinOrganizationDetails>(url, {
+        method: 'GET',
+        headers: {
+          'X-Restli-Protocol-Version': '2.0.0',
+          'LinkedIn-Version': '202601',
+          Authorization: `Bearer ${accessToken}`,
+        },
       });
+      return data;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to fetch details for organization ${organizationId}: ${error?.message}`,
+      );
+      return null;
+    }
+  }
+
+  private extractOrgLogoUrl(
+    orgDetails: LinkedinOrganizationDetails | null,
+  ): string | null {
+    return (
+      orgDetails?.logoV2?.['original~']?.elements?.[0]?.identifiers?.[0]
+        ?.identifier ?? null
+    );
   }
 
   async connectLinkedinOrganizations(
@@ -263,11 +320,11 @@ export class AuthService {
       this.extractOrganizationId(id),
     );
     const availableOrganizations = await this.getLinkedinOrganizations(userId);
-    const availableOrganizationIdSet = new Set(
-      availableOrganizations.map((organization) => organization.id),
+    const availableOrganizationMap = new Map(
+      availableOrganizations.map((org) => [org.id, org]),
     );
     const disallowedOrganizationIds = uniqueOrganizationIds.filter(
-      (organizationId) => !availableOrganizationIdSet.has(organizationId),
+      (organizationId) => !availableOrganizationMap.has(organizationId),
     );
 
     if (disallowedOrganizationIds.length) {
@@ -308,6 +365,8 @@ export class AuthService {
         isReconnect: !!existingAccount,
       });
 
+      const orgDetails = availableOrganizationMap.get(organizationId);
+
       await this.connectedAccountModel.findOneAndUpdate(
         {
           user: new Types.ObjectId(userId),
@@ -318,10 +377,12 @@ export class AuthService {
         {
           accountType: LinkedinAccountType.ORGANIZATION,
           externalId: organizationId,
-          displayName: `Organization ${organizationId}`,
+          displayName: orgDetails?.name ?? `Organization ${organizationId}`,
+          avatarUrl: orgDetails?.logoUrl ?? undefined,
           impersonatorUrn,
           accessToken: encryptedAccessToken,
           accessTokenExpiresAt,
+          isActive: true,
           profileMetadata: {
             organizationUrn: `urn:li:organization:${organizationId}`,
             connectedBy: impersonatorUrn,
@@ -465,6 +526,7 @@ export class AuthService {
       const accounts = await this.connectedAccountModel
         .find({
           user: new Types.ObjectId(userId),
+          isActive: true,
         })
         .select('-accessToken');
 
