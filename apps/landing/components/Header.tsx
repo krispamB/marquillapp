@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { normalizeAppUrl } from '@/config/urls';
 
@@ -11,9 +12,12 @@ const navItems = [
 ];
 
 export default function Header() {
+  const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
   const appUrl = normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL);
+
+  if (pathname === '/checkout') return null;
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
