@@ -1,8 +1,14 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import Logo from './Logo';
 
 export default function Footer() {
+  const pathname = usePathname();
   const currentYear = new Date().getFullYear();
+
+  if (pathname === '/checkout') return null;
 
   return (
     <footer className="bg-[#0F111A] text-white" role="contentinfo">
