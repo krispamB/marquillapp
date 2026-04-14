@@ -57,7 +57,7 @@ export default function CheckoutContent() {
       token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN!,
       eventCallback(event) {
         if (event.name === 'checkout.completed') {
-          window.location.href = 'https://beta.marquill.com';
+          window.location.href = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`;
         }
       },
     })
