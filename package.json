@@ -9,7 +9,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@paddle/paddle-js": "^1.6.2",
     "@vercel/analytics": "^1",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",

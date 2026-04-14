@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { ChevronLeft, LayoutDashboard, PenSquare, CalendarClock, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import Sidebar from "../dashboard/Sidebar";
@@ -52,7 +51,6 @@ export default function PricingClient({
     connectedAccounts: ConnectedAccount[];
     primaryAccountId?: string;
 }) {
-    const router = useRouter();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(
         primaryAccountId ?? connectedAccounts[0]?.id,
@@ -125,7 +123,8 @@ export default function PricingClient({
             tierName: tier.name,
             monthlyPrice: String(tier.monthlyPrice),
         });
-        router.push(`/checkout?${params.toString()}`);
+        const landingUrl = process.env.NEXT_PUBLIC_LANDING ?? "http://localhost:3001";
+        window.location.href = `${landingUrl}/checkout?${params.toString()}`;
     };
 
     return (
