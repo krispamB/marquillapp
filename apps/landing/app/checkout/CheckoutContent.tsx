@@ -36,6 +36,7 @@ export default function CheckoutContent() {
   const priceId = params.get('priceId') ?? '';
   const tierName = params.get('tierName') ?? 'Your plan';
   const monthlyPrice = params.get('monthlyPrice') ?? '';
+  const userId = params.get('userId') ?? '';
 
   const [paddle, setPaddle] = useState<Paddle | undefined>();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -76,7 +77,10 @@ export default function CheckoutContent() {
     paddle.Checkout.open({
       items: [{ priceId, quantity: 1 }],
       customer: email ? { email } : undefined,
-      customData: name ? { name } : undefined,
+      customData: {
+        ...(name ? { name } : {}),
+        ...(userId ? { userId } : {}),
+      },
       settings: {
         displayMode: 'inline',
         frameTarget: 'paddle-checkout',  // matches className on container div below
