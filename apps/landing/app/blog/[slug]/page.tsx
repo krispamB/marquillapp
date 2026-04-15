@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { posts, getPostBySlug, formatDate } from '@/lib/posts';
 
 interface Props {
@@ -71,9 +73,14 @@ export default async function BlogPost({ params }: Props) {
             prose-li:text-text-secondary
             prose-a:text-[#5B5CF6] prose-a:no-underline hover:prose-a:underline
             prose-strong:text-text-primary
-            prose-ul:my-4"
-          dangerouslySetInnerHTML={{ __html: post.content }}
-        />
+            prose-ul:my-4
+            prose-table:border-collapse prose-th:border prose-th:border-gray-200 prose-th:bg-gray-50 prose-th:px-4 prose-th:py-2
+            prose-td:border prose-td:border-gray-200 prose-td:px-4 prose-td:py-2"
+        >
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {post.content}
+          </ReactMarkdown>
+        </div>
 
         {/* CTA */}
         <div className="mt-16 rounded-3xl border border-[#CBD2FF] bg-gradient-to-br from-[#F0F0FF] to-[#EAF1FF] p-8 text-center">
