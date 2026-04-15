@@ -4,7 +4,7 @@ export interface Post {
   description: string;
   date: string;
   readTime: string;
-  content: string;
+  content: string; // markdown
 }
 
 export const posts: Post[] = [
@@ -16,48 +16,42 @@ export const posts: Post[] = [
     date: '2026-04-10',
     readTime: '6 min read',
     content: `
-<p>If you publish on LinkedIn regularly, you've probably stitched together your own workflow: ChatGPT for drafting, Notion for storing ideas, Buffer or Hootsuite for scheduling, maybe a separate analytics tool to check what's working. It gets the job done — until it doesn't.</p>
+You've got ChatGPT for drafting, Notion for storing ideas, Buffer for scheduling, and a spreadsheet for tracking what's working. It kind of works — until it doesn't.
 
-<p>The problem isn't any single tool. It's the friction between them. Every handoff between tools costs time, breaks momentum, and introduces inconsistency. You paste text into the wrong window, lose a draft, or forget to cross-reference your analytics before writing the next post.</p>
+**The problem isn't your tools. It's the gap between them.**
 
-<p>In 2026, the better answer is a dedicated <strong>AI LinkedIn workspace</strong> — a single environment where every step from idea to published post happens without leaving the platform.</p>
+Every time you copy-paste between apps, you lose momentum. You forget to check analytics before writing the next post. You leave a draft half-finished in the wrong tab. Multiply that by five posts a week and it becomes a real drag.
 
-<h2>The Patchwork Approach vs. an Integrated Workspace</h2>
+## The two types of LinkedIn creators
 
-<p>Most LinkedIn creators fall into one of two camps:</p>
+**The patchwork crew** stitches together general-purpose tools. ChatGPT drafts it, Notion stores it, Buffer publishes it, and a separate dashboard tracks it. Works fine at low volume. Falls apart when you're posting consistently.
 
-<p><strong>The patchwork camp</strong> uses a combination of general-purpose AI tools alongside social media schedulers. ChatGPT or Claude generates a draft, which gets copied into Notion or Google Docs for editing, then manually pasted into a scheduler like Buffer, then posted — and tracked separately in a spreadsheet or native LinkedIn analytics.</p>
+**The integrated crew** uses a purpose-built **AI LinkedIn workspace** — one place where research, drafting, editing, scheduling, and analytics all live. Less friction. More posts. Better results.
 
-<p>This works at low volume. Once you're posting 3–5 times a week, managing multiple accounts, or working with a content team, the overhead compounds fast.</p>
+## What actually matters in an AI LinkedIn workspace
 
-<p><strong>The integrated camp</strong> uses a purpose-built AI LinkedIn workspace. Research, drafting, editing, scheduling, and analytics live in one place. The AI is trained on LinkedIn-specific formats — not generic blog posts or email copy — so the output is more immediately usable.</p>
+Not every tool that calls itself a "workspace" earns the label. Here's what to look for:
 
-<h2>What to Look for in an AI LinkedIn Workspace</h2>
+- **LinkedIn-native AI** — General AI writes generic content. A workspace trained on LinkedIn formats produces drafts that actually sound like LinkedIn posts, not blog excerpts.
+- **Real multi-account support** — If you manage more than one profile, you need a single dashboard. Not a dropdown with three separate login flows.
+- **Scheduling built in** — Any tool that makes you export to a separate scheduler is not a workspace. It's two tools with extra steps.
+- **Analytics that inform your next post** — Not just a scorecard. The data should be visible *while* you're writing.
+- **A free tier that's actually usable** — You should be able to validate the workflow before paying anything.
 
-<p>Not all tools that call themselves AI LinkedIn workspaces are created equal. Here's what to evaluate:</p>
+## How Marquill handles this
 
-<ul>
-  <li><strong>LinkedIn-native AI:</strong> General AI models produce generic content. A workspace trained on what actually performs on LinkedIn — hooks, formatting, post length, cadence — produces drafts that need less editing before they're ready to publish.</li>
-  <li><strong>Multi-account support:</strong> Agencies and teams managing more than one LinkedIn profile need a single dashboard. Logging in and out of accounts, or juggling multiple tool subscriptions, is a solved problem.</li>
-  <li><strong>Built-in scheduling:</strong> A workspace that requires you to export to a separate scheduler is not really a workspace. Scheduling should be native, timezone-aware, and tied directly to the post you just drafted.</li>
-  <li><strong>Analytics that feed back into creation:</strong> The most underrated feature of a good AI LinkedIn workspace is performance data that informs your next post — not just a scorecard for the last one.</li>
-  <li><strong>Reasonable pricing:</strong> The best tools for creators don't require a business-tier budget. Look for a free tier to validate the workflow, with paid plans that scale with your volume.</li>
-</ul>
+[Marquill's AI LinkedIn workspace](https://marquill.com) starts with research. You pick a post type, enter a topic, and it pulls context from YouTube to generate a LinkedIn-ready draft. From there, editing, account selection, and scheduling happen in the same tab.
 
-<h2>How Marquill Approaches the Workspace Problem</h2>
+No copy-pasting. No context-switching. **The gap between idea and published post gets as small as possible.**
 
-<p><a href="https://marquill.com">Marquill's AI LinkedIn workspace</a> is built around a single premise: the gap between having an idea and having a published post should be as small as possible.</p>
+## The bottom line
 
-<p>The workflow starts with research. You select a post type, enter your topic, and Marquill pulls context from YouTube to build a LinkedIn-length draft calibrated to your voice. From there, editing, image attachment, account selection, and scheduling all happen inside the same interface. Analytics from previous posts are visible when you're writing the next one.</p>
+There's no prize for using the most tools. If your current setup is working, stick with it. But if you're spending more time managing software than writing, a dedicated **AI LinkedIn workspace** is worth two weeks of your time.
 
-<p>The result is a faster publishing cycle — less time on tooling, more time on the ideas that actually matter.</p>
+Start on the free plan. Run it alongside your current setup. Let the publishing speed tell you if it's better.
 
-<h2>The Verdict</h2>
-
-<p>There's no award for using the most tools. If your current patchwork workflow is working, that's fine. But if you're spending more time managing software than actually writing, it's worth trying a proper <strong>AI LinkedIn workspace</strong> designed for the job.</p>
-
-<p>The best workspace in 2026 is the one you'll actually use consistently. Start with a free plan, run it alongside your existing setup for two weeks, and let the publishing speed speak for itself.</p>
-    `,
+[Try Marquill free →](https://marquill.com)
+    `.trim(),
   },
   {
     slug: 'linkedin-content-workflow-ai-workspace',
@@ -67,74 +61,78 @@ export const posts: Post[] = [
     date: '2026-04-08',
     readTime: '7 min read',
     content: `
-<p>The creators who publish consistently on LinkedIn aren't necessarily the ones with the most ideas. They're the ones with the best system. A repeatable workflow removes the decision fatigue from publishing — you always know what step comes next, and the tools handle the rest.</p>
+The people posting consistently on LinkedIn aren't the ones with the most ideas. They're the ones with the best system.
 
-<p>This guide walks through how to build that workflow using an <strong>AI LinkedIn workspace</strong>, from the first spark of an idea to a post that's scheduled and going out at the right time.</p>
+**A good workflow removes the decisions.** You always know what comes next — and the tools handle the execution.
 
-<h2>Step 1 — Set Your Publishing Cadence First</h2>
+Here's how to build that system using an **AI LinkedIn workspace**, from blank page to published post.
 
-<p>Before touching any tool, decide how often you want to publish. Three times a week is a common target for creators who want consistent growth. Once a week is sustainable for most founders with full-time responsibilities. Daily posting is achievable with the right workspace, but rarely necessary to build an audience.</p>
+## Step 1 — Pick your cadence before anything else
 
-<p>The number matters less than the consistency. Pick a cadence you can hold for 90 days without burning out, then design your workflow around it.</p>
+Decide how often you're actually going to post. Not how often you want to. How often you'll *still* be doing in 90 days.
 
-<h2>Step 2 — Build a Topic Bank</h2>
+- **3x per week** — solid for consistent growth
+- **1x per week** — sustainable for most founders with full schedules
+- **Daily** — achievable with the right workspace, rarely necessary
 
-<p>A topic bank is a running list of ideas separated from the drafting process. It prevents the blank-page problem and decouples ideation (which is creative work) from writing (which is execution work).</p>
+Consistency beats volume. A realistic cadence you can hold beats an ambitious one you'll drop.
 
-<p>Good sources for LinkedIn topics:</p>
+## Step 2 — Keep a topic bank (separate from drafting)
 
-<ul>
-  <li>Questions your audience asks you repeatedly</li>
-  <li>Hard lessons from recent projects or client engagements</li>
-  <li>Contrarian takes on common advice in your industry</li>
-  <li>Data or observations from your own work that others would find surprising</li>
-  <li>YouTube videos or podcasts in your niche that sparked a reaction</li>
-</ul>
+A topic bank is just a running list of ideas you collect *before* you need to write. It solves the blank-page problem and keeps ideation and execution separate.
 
-<p>The last point is worth expanding on. An <a href="https://marquill.com">AI LinkedIn workspace like Marquill</a> connects directly to YouTube research, so you can start a post from a video you watched rather than a blank document. You select the post type, add your topic or a video reference, and the AI generates a LinkedIn-ready draft from that source material.</p>
+Good sources for topics:
 
-<h2>Step 3 — Draft in the Workspace, Not in a Separate Doc</h2>
+- Questions you get asked repeatedly
+- Hard lessons from recent projects
+- Contrarian takes on advice in your field
+- Data from your own work that others would find surprising
+- YouTube videos in your niche that sparked a reaction
 
-<p>The most common workflow inefficiency is drafting in Google Docs or Notion, then copying the finished post into a scheduler. This sounds minor, but it creates a separate "finishing" step that becomes a bottleneck, especially when you're in a rhythm and don't want to context-switch.</p>
+That last one is worth noting — [Marquill](https://marquill.com) connects directly to YouTube research, so you can start a post from a video instead of a blank document.
 
-<p>A proper AI LinkedIn workspace lets you draft, edit, and schedule in the same environment. The AI generates a starting point, you refine it, attach an image, select which LinkedIn account it posts from, pick a time, and queue it — all without leaving the tab.</p>
+## Step 3 — Draft and schedule in the same place
 
-<h2>Step 4 — Edit for Voice, Not from Scratch</h2>
+The most common workflow bottleneck: drafting in Notion or Google Docs, then copy-pasting into a scheduler. It sounds small. It becomes a real friction point when you're in a rhythm.
 
-<p>AI-generated drafts should be a starting point, not a finished product. The most important editing pass is for voice — making the post sound like you, not like a language model that has read every LinkedIn post ever written.</p>
+**A proper AI LinkedIn workspace lets you draft, edit, and schedule without leaving the tab.** Pick your post type, generate a draft, refine it, attach an image, select your account, set a time. Done.
 
-<p>Practical voice edits:</p>
+## Step 4 — Edit for your voice, not from scratch
 
-<ul>
-  <li>Replace the opening line. AI hooks tend to be generic. Write your own.</li>
-  <li>Cut filler phrases ("In today's fast-paced world…", "It's important to note…").</li>
-  <li>Add a specific detail, number, or anecdote that only you would know.</li>
-  <li>Shorten. LinkedIn posts rarely benefit from being longer than they are.</li>
-</ul>
+AI drafts are a starting point, not a final product. The most important edit is voice — making it sound like *you*, not like every other AI-generated LinkedIn post.
 
-<h2>Step 5 — Schedule at Peak Times for Your Audience</h2>
+Quick voice edits that actually matter:
 
-<p>Once the post is edited, scheduling is the easy part — but it's worth doing intentionally. Tuesday through Thursday mornings (7–9am in your audience's primary timezone) tend to perform well for most B2B LinkedIn audiences. Your own analytics will tell you if your audience skews differently.</p>
+- **Rewrite the first line.** AI hooks tend to be generic. Yours shouldn't be.
+- **Cut filler phrases** — "In today's competitive landscape…", "It's important to note…"
+- **Add one specific detail** — a number, a name, an outcome — that only you would know.
+- **Shorten it.** LinkedIn posts almost never get better by being longer.
 
-<p>A timezone-aware scheduler inside your AI LinkedIn workspace handles the UTC conversion automatically, so you set local times and don't have to calculate the offset yourself.</p>
+## Step 5 — Schedule with intention
 
-<h2>Step 6 — Review Analytics Weekly, Not Daily</h2>
+Tuesday–Thursday mornings (7–9am in your audience's timezone) tend to work well for B2B LinkedIn. Your analytics will tell you if your audience skews differently.
 
-<p>Checking post performance daily is a distraction. The signal-to-noise ratio is too low — a post that looks weak at 6 hours can outperform another at 48 hours once the algorithm catches up.</p>
+A timezone-aware scheduler handles the offset math automatically. You set the local time, it handles the rest.
 
-<p>Instead, review the previous week's posts every Monday. Note what formats got the highest engagement, which hooks generated the most comments, and which topics drove profile views. Feed those observations back into your topic bank and into the briefs you give the AI.</p>
+## Step 6 — Review analytics weekly, not daily
 
-<h2>The Workflow in Summary</h2>
+Checking your post performance every few hours is a distraction. The signal-to-noise is too low — a post that looks weak at 6 hours can outperform everything else at 48.
 
-<ul>
-  <li><strong>Sunday:</strong> Review analytics from the past week. Refresh the topic bank.</li>
-  <li><strong>Monday:</strong> Draft the week's posts in the AI workspace. Edit for voice.</li>
-  <li><strong>Monday afternoon:</strong> Schedule all posts for the week. Attach images.</li>
-  <li><strong>Throughout the week:</strong> Engage with comments. Note observations for next week.</li>
-</ul>
+Instead: review the past week every Monday. Note what formats got the most engagement, which hooks drove comments, which topics drove profile visits. Feed that back into your topic bank.
 
-<p>The whole system, once set up inside an <a href="https://marquill.com">AI LinkedIn workspace</a>, takes 2–3 hours per week. The consistency it creates compounds over time in ways that ad hoc posting never does.</p>
-    `,
+## The weekly system at a glance
+
+| Day | Task |
+|---|---|
+| Sunday | Review analytics. Refresh topic bank. |
+| Monday | Draft the week's posts. Edit for voice. |
+| Monday PM | Schedule all posts. Attach images. |
+| Throughout week | Engage with comments. Collect new topic ideas. |
+
+Once you've set this up inside an [AI LinkedIn workspace](https://marquill.com), the whole thing takes about 2–3 hours a week. The consistency compounds over time in a way that ad hoc posting never does.
+
+[Start building your system →](https://marquill.com)
+    `.trim(),
   },
   {
     slug: 'why-linkedin-posts-not-getting-traction',
@@ -144,54 +142,66 @@ export const posts: Post[] = [
     date: '2026-04-06',
     readTime: '6 min read',
     content: `
-<p>You've written the post, checked it three times, hit publish — and then watched it get twelve impressions and two likes, one of which is your own. It's a familiar feeling for anyone building a presence on LinkedIn, and it's frustrating enough that most people quietly stop posting.</p>
+You hit publish. Twelve impressions. Two likes — one of which is yours. You refresh once more, close the tab, and quietly wonder if it's worth it.
 
-<p>The good news: flat posts are rarely a problem with your ideas. They're almost always a structural problem — something in the way the post is formatted, hooked, or distributed that's working against you.</p>
+Here's the thing: **flat posts are almost never a problem with your ideas.** They're a structural problem — something in your hook, format, or consistency that's working against you.
 
-<p>Here's what's usually going wrong, and how a proper <strong>AI LinkedIn workspace</strong> addresses each issue.</p>
+Here's what's actually going wrong, and how a proper **AI LinkedIn workspace** fixes it.
 
-<h2>Problem 1 — The First Line Doesn't Stop the Scroll</h2>
+## Your first line doesn't earn the scroll
 
-<p>LinkedIn's feed shows roughly the first line or two of a post before the "see more" cutoff. If that opening doesn't give someone a reason to expand it, they keep scrolling. Most posts open with context-setting ("I've been thinking about…") or vague promises ("Here's what I learned after 10 years…") that don't earn the click.</p>
+LinkedIn shows roughly the first 1–2 lines before the "see more" cut. If that opening doesn't give someone a reason to keep reading, they're gone.
 
-<p>A strong opening makes a specific claim, asks a sharp question, or states a counterintuitive fact. It gives the reader something to react to before they even decide whether to read further.</p>
+Most posts open with:
 
-<p>An AI LinkedIn workspace trained on high-performing posts generates hooks calibrated to LinkedIn's format — short, punchy, and front-loaded with the payoff. You still need to edit for your voice, but the starting point is structurally sound.</p>
+- "I've been thinking about this a lot lately…"
+- "Here's what I learned after 10 years in [industry]…"
+- "Something interesting happened this week…"
 
-<h2>Problem 2 — Inconsistent Posting Frequency</h2>
+None of that earns the click. **A strong opener makes a specific claim, states a counterintuitive fact, or asks a sharp question.** It gives the reader something to react to before they even decide to keep going.
 
-<p>LinkedIn's algorithm rewards accounts that post consistently. A burst of five posts in one week followed by three weeks of silence is worse than posting once a week, every week. The algorithm loses confidence in your account's reliability, and so does your audience.</p>
+An AI workspace trained on high-performing LinkedIn posts generates hooks built for this format — short, punchy, front-loaded. You still edit for your voice, but the structure is already right.
 
-<p>Consistency is a scheduling problem, not a creativity problem. When research, drafting, and scheduling live in the same <a href="https://marquill.com">AI LinkedIn workspace</a>, you can batch an entire week of posts in one session and have them publish automatically. The calendar stays full even when your schedule doesn't.</p>
+## You're posting in bursts, not consistently
 
-<h2>Problem 3 — Generic Content That Could Have Been Written by Anyone</h2>
+Five posts in one week, then silence for three. LinkedIn's algorithm treats that worse than one post a week, every week — it loses confidence in your account, and so does your audience.
 
-<p>The most scrolled-past posts on LinkedIn are the ones that say something broadly true in the most forgettable way possible. "Consistency is key." "Mindset matters." "Always be learning." These posts exist in everyone's feed and stand out in none of them.</p>
+**Consistency is a scheduling problem, not a creativity problem.** When drafting and scheduling live inside the same [AI LinkedIn workspace](https://marquill.com), you can batch an entire week of posts in one session. The calendar stays full even on the weeks your schedule doesn't.
 
-<p>What performs is specificity. A post about a decision you made that didn't work out. A process you built that solved a specific problem. A number from your own data that challenges a common assumption. These posts can only come from you — and that's exactly why they work.</p>
+## Your content could have been written by anyone
 
-<p>A good AI workspace doesn't replace that specificity; it surfaces it. When you start a post from a YouTube video, a topic prompt, or a previous observation, the AI gives you a structure to fill with your own details. The scaffold is generic; the content you layer onto it is not.</p>
+"Consistency is key." "Always be learning." "Mindset matters." These posts exist everywhere on LinkedIn and stand out nowhere.
 
-<h2>Problem 4 — No Clear Format</h2>
+What actually performs is *specificity*. A decision you made that didn't work. A process you built that solved a real problem. A number from your own work that challenges a common assumption. **Those posts can only come from you — and that's exactly why they work.**
 
-<p>The posts that consistently earn the highest engagement on LinkedIn follow recognizable formats: the list post, the story arc, the contrarian take, the how-to, the personal lesson. Readers know what they're getting, which lowers the cognitive load of deciding whether to read it.</p>
+A good AI workspace gives you structure to fill with your specific details. The scaffold is generic. What you layer onto it isn't.
 
-<p>Wandering posts — ones that start with one idea and drift into three others — lose readers midway because there's no payoff to wait for.</p>
+## Your post has no recognizable format
 
-<p>An <a href="https://marquill.com">AI LinkedIn workspace</a> lets you select a post type before generating the draft. That format selection does a lot of the structural work upfront, so you're editing a coherent piece rather than restructuring a rambling one.</p>
+The posts that consistently get the most engagement follow a format readers can recognize: the list, the story arc, the contrarian take, the how-to, the personal lesson.
 
-<h2>Problem 5 — You're Not Looking at What's Actually Working</h2>
+When a post starts somewhere and drifts into three different ideas, people drop off halfway because there's no payoff to wait for.
 
-<p>Most creators who post without momentum aren't reviewing their analytics with any intention. They check total impressions, feel vaguely good or bad, and move on. What they're missing is the specific data that tells them which formats are performing, which topics generate comments versus just views, and what time of day their audience is most active.</p>
+[Marquill](https://marquill.com) lets you select a post type before generating the draft. That one decision handles most of the structure — you're editing a coherent piece, not rebuilding a rambling one.
 
-<p>That data should be feeding back into every post you write. A workspace that shows you analytics alongside your drafts closes the loop between what you've published and what you write next.</p>
+## You're not actually using your analytics
 
-<h2>The Fix Is Structural</h2>
+Most people check their total impressions, feel vaguely good or bad, and move on. What they're missing:
 
-<p>Low LinkedIn traction is almost never a problem with the quality of your thinking. It's a problem with the system around the thinking — how you hook readers, how consistently you publish, whether your format is working, and whether you're learning from what you've already put out.</p>
+- Which formats are getting the most engagement
+- Which hooks generate comments vs. just views
+- Which topics are driving profile visits
 
-<p>An AI LinkedIn workspace addresses all of this in one environment. The research-to-draft pipeline removes the blank page problem. The scheduling tools handle consistency. The analytics close the feedback loop. What's left is the part only you can do: adding the specific details, the personal experience, and the point of view that no AI can generate for you.</p>
-    `,
+That data should feed directly into what you write next. A workspace that shows analytics alongside your drafts closes the loop — instead of guessing what's working, you know.
+
+## The fix is structural, not creative
+
+Low traction isn't a sign your thinking is weak. It's a sign the system around your thinking needs work — your hooks, your consistency, your format, your feedback loop.
+
+A proper **AI LinkedIn workspace** handles all of that in one place. What's left is the part only you can do: the specific experience, the real opinion, the point of view no AI can write for you.
+
+[Fix the structure — try Marquill free →](https://marquill.com)
+    `.trim(),
   },
   {
     slug: 'managing-multiple-linkedin-accounts-ai',
@@ -201,131 +211,140 @@ export const posts: Post[] = [
     date: '2026-04-04',
     readTime: '7 min read',
     content: `
-<p>Managing one LinkedIn account with a consistent publishing schedule is already a full-time job. Managing five — each with its own audience, voice, and posting goals — is a different challenge entirely.</p>
+Managing one LinkedIn account with a consistent posting schedule is already a lot. Managing five — each with its own audience, voice, and goals — is a different problem entirely.
 
-<p>For agencies handling LinkedIn content on behalf of clients, or for companies managing profiles across multiple team members, the operational complexity compounds fast. Who approves which post? How do you maintain different brand voices in the same workflow? Which account gets the next slot in the scheduler?</p>
+**The chaos isn't the content. It's the coordination.**
 
-<p>An <strong>AI LinkedIn workspace</strong> built for multi-account management changes the operational picture entirely. Here's how to use one effectively.</p>
+Who approves which post? How do you keep five different voices distinct? Which account gets the next scheduler slot? Without the right system, you end up drowning in tabs and spreadsheets.
 
-<h2>The Core Problem with Multi-Account LinkedIn Management</h2>
+Here's how to use an **AI LinkedIn workspace** to handle it without losing your mind.
 
-<p>Most LinkedIn tools are designed for a single user. Even platforms that nominally support multiple accounts bolt the feature on rather than building around it — you get a dropdown to switch between accounts, but drafts, analytics, and scheduling queues are still siloed per account.</p>
+## Why most tools aren't built for this
 
-<p>What agencies and teams actually need is a unified view: all accounts visible in one dashboard, drafts filterable by account, schedules visible across every profile, and analytics comparable across the accounts you manage. Without that unified view, the operational overhead of managing multiple accounts doesn't decrease with better tooling — it just shifts from one spreadsheet to another.</p>
+Most LinkedIn tools are designed for a single creator. Multi-account support is usually tacked on — a dropdown to switch between profiles, with drafts, queues, and analytics still siloed per account.
 
-<h2>Setting Up a Multi-Account Workspace</h2>
+What agencies and teams actually need:
 
-<p>The setup process in a proper <a href="https://marquill.com">AI LinkedIn workspace</a> starts with connecting LinkedIn profiles via OAuth. Each profile — whether a personal page, a company page, or a client account — is added to the workspace and becomes selectable at every stage of the drafting and scheduling process.</p>
+- All accounts visible in one dashboard
+- Drafts filterable by account
+- Scheduling visible across every profile at once
+- Analytics comparable across accounts
 
-<p>The key workflow change: you draft first, then assign. Rather than opening a specific account's queue before writing, you write inside the workspace and select the account (or accounts) the post is intended for before scheduling. This means you can batch-produce content for multiple accounts in a single session without logging in and out of anything.</p>
+Without that unified view, better tooling doesn't reduce your workload — it just moves the spreadsheet.
 
-<h2>Maintaining Different Brand Voices</h2>
+## Setting up a multi-account workspace
 
-<p>The biggest editorial challenge in multi-account management is keeping voices distinct. A SaaS founder's LinkedIn presence sounds different from a law firm's company page, which sounds different from a freelance consultant's personal profile — even if all three are being managed from the same desk.</p>
+In [Marquill](https://marquill.com), you connect LinkedIn profiles via OAuth — personal pages, company pages, client accounts. Each one becomes selectable at every stage of the drafting and scheduling process.
 
-<p>Practical approaches to maintaining voice differentiation in an AI workspace:</p>
+**The key shift: draft first, assign second.** You don't open a specific account's queue before writing. You write inside the workspace, then choose which account (or accounts) the post goes to. That means you can batch-produce content for five accounts in one session, without logging in and out of anything.
 
-<ul>
-  <li><strong>Keep a voice brief per account.</strong> A short document (3–5 bullet points) describing the account's tone, the topics it covers, and phrases or formats it avoids. Reference this brief when reviewing AI drafts for that account.</li>
-  <li><strong>Use different post types by account.</strong> A company page might default to case studies and industry analysis. A founder's personal page might lead with personal stories and contrarian takes. Selecting the right post type when generating a draft does a lot of voice work upfront.</li>
-  <li><strong>Edit the first line for every account.</strong> The AI hook will be generic. Rewriting it in the specific voice of each account is the single highest-leverage editing pass you can make.</li>
-</ul>
+## Keeping voices distinct across accounts
 
-<h2>Scheduling at Scale</h2>
+This is the real editorial challenge. A SaaS founder sounds different from a law firm's company page, which sounds different from a freelance consultant — even if all three are managed from the same workspace.
 
-<p>With five accounts each posting three times a week, you're managing fifteen scheduled posts per week. That's before accounting for last-minute additions, client feedback loops, or time-sensitive content that needs to jump the queue.</p>
+Three things that actually help:
 
-<p>A workspace with a shared scheduling queue across accounts makes this manageable. You can see the full week's schedule across all accounts in one view, identify gaps, and fill them without switching contexts. Timezone-aware scheduling handles the complexity of clients in different regions without manual offset calculations.</p>
+- **Keep a voice brief per account.** 3–5 bullet points on tone, topics, and phrases to avoid. Reference it when reviewing AI drafts.
+- **Use different post types by account.** A company page might default to case studies. A founder's personal page might lead with stories and contrarian takes. Choosing the right format upfront does most of the voice work.
+- **Rewrite the first line for every account.** The AI hook will be generic. One targeted edit makes it sound like the right person wrote it.
 
-<h2>Reviewing Performance Across Accounts</h2>
+## Scheduling at scale
 
-<p>Single-account analytics tell you what's working for one audience. Multi-account analytics tell you what's working as a principle — patterns that hold across different accounts, industries, and audiences, and patterns that don't.</p>
+Five accounts, three posts each, every week — that's 15 scheduled posts. Before accounting for last-minute additions, client feedback, or time-sensitive content.
 
-<p>If carousel posts are outperforming text posts across three of your five accounts, that's a signal worth acting on across all five. If a specific hook format is driving unusually high comment rates on a client's account, that's a template worth stealing for others.</p>
+A shared scheduling view across all accounts makes this manageable. You see the full week at a glance, spot the gaps, and fill them without switching contexts. Timezone-aware scheduling handles the offset math for clients in different regions automatically.
 
-<p>Analytics reviewed across accounts, rather than in isolation, compound the learning faster than managing each profile independently.</p>
+## Using cross-account analytics
 
-<h2>Who This Is For</h2>
+Single-account analytics tell you what's working for one audience. Cross-account analytics tell you what's working *as a principle*.
 
-<p>Multi-account LinkedIn management with an AI workspace makes the most sense for:</p>
+If carousel posts are outperforming text posts across three of your five accounts, that's worth acting on across all five. **If a hook format is driving unusually high comment rates on one client's account, that's a template worth testing on the others.**
 
-<ul>
-  <li><strong>Content agencies</strong> managing LinkedIn presence for 3+ clients.</li>
-  <li><strong>Ghostwriting operations</strong> writing under multiple personal brand names.</li>
-  <li><strong>Growth teams</strong> managing a mix of founder profiles, company pages, and employee advocacy accounts.</li>
-  <li><strong>Consultants</strong> managing their own profile alongside a company page or a second personal brand.</li>
-</ul>
+## Who this setup actually makes sense for
 
-<p>If you're managing more than two LinkedIn accounts and spending more than two hours a week on scheduling and coordination, a dedicated <a href="https://marquill.com">AI LinkedIn workspace</a> will cut that time significantly — and produce more consistent output in the process.</p>
-    `,
+- Content agencies managing LinkedIn for 3+ clients
+- Ghostwriting operations managing multiple personal brands
+- Growth teams running founder profiles, company pages, and employee advocacy at once
+- Consultants managing their own profile alongside a client or company page
+
+If you're managing more than two LinkedIn accounts and spending more than two hours a week on coordination alone, a dedicated [AI LinkedIn workspace](https://marquill.com) will cut that time and produce more consistent output.
+
+[Try Marquill free →](https://marquill.com)
+    `.trim(),
   },
   {
     slug: 'taplio-vs-marquill-ai-linkedin-workspace',
     title: 'Taplio vs. Marquill: Which AI LinkedIn Workspace Is Right for You?',
     description:
-      "A straightforward comparison of Taplio and Marquill for LinkedIn creators — pricing, AI features, scheduling, and who each tool is best suited for.",
+      'A straightforward comparison of Taplio and Marquill for LinkedIn creators — pricing, AI features, scheduling, and who each tool is best suited for.',
     date: '2026-04-02',
     readTime: '5 min read',
     content: `
-<p>If you've been researching AI tools for LinkedIn, you've probably come across Taplio. It's been one of the more visible options in the LinkedIn content space for a few years, and it does a solid job of certain things. Marquill takes a different approach — and depending on what you actually need, one of them is a significantly better fit.</p>
+If you've been looking for an AI tool for LinkedIn, you've probably come across Taplio. It's one of the more established names in the space. [Marquill](https://marquill.com) takes a different approach — and depending on what you actually need, one of them is a noticeably better fit.
 
-<p>This comparison covers the key differences honestly. Neither tool is universally better. The right choice depends on what matters most to your workflow.</p>
+This is a straight comparison. No inflated claims. Just what's different and who each tool is built for.
 
-<h2>The Core Difference in Approach</h2>
+## The core difference
 
-<p>Taplio's primary angle is inspiration and post recycling — it surfaces trending LinkedIn content, lets you save posts you like, and generates content from those inspirations. It's designed around the idea that the best LinkedIn content comes from observing what's already working and iterating on it.</p>
+**Taplio** is built around inspiration and recycling. It surfaces trending LinkedIn content, lets you save posts you like, and generates new content from that inspiration library. The core idea: remix what's already working.
 
-<p>Marquill's approach is research-first. Rather than drawing from existing LinkedIn posts as inspiration, it pulls context from YouTube — videos in your niche, relevant topics, recent conversations — and uses that as the raw material for original drafts. The output is less derivative of what's already circulating on LinkedIn and more grounded in the source material you actually care about.</p>
+**Marquill** is built around research-first content. Instead of drawing from existing LinkedIn posts, it pulls context from YouTube — videos in your niche, topics you care about — and uses that as the raw material for original drafts. The output is grounded in real sources, not trend-watching.
 
-<p>If your content style is observation and commentary on LinkedIn trends, Taplio's inspiration feed will feel natural. If you prefer building original posts from primary sources, Marquill's YouTube research workflow fits better.</p>
+**If you like remixing what's already performing on LinkedIn, Taplio fits your style. If you prefer building original content from primary sources, Marquill fits better.**
 
-<h2>AI Post Generation</h2>
+## AI post generation
 
-<p><strong>Taplio:</strong> Generates posts based on topics you enter, with the option to draw from posts you've saved to your inspiration library. The AI is capable and produces reasonable LinkedIn-format drafts. The output leans toward formats that are already popular on the platform, which is a strength if you want proven structures and a limitation if you want to differentiate.</p>
+| Feature | Taplio | Marquill |
+|---|---|---|
+| Source of inspiration | LinkedIn inspiration library | YouTube research + your topic |
+| Output style | Popular LinkedIn formats | Research-grounded drafts |
+| Customization | Topic prompts, tone settings | Post type selection + research context |
+| Voice editing needed | Yes | Yes |
 
-<p><strong>Marquill:</strong> Generates posts from a topic prompt combined with YouTube research context. The resulting drafts are more grounded in specific information rather than general advice, which tends to produce more original content. The tradeoff is that the research step adds a small amount of friction at the start of each session.</p>
+Both tools produce decent first drafts. The difference is where they pull from — and that shapes how original the output feels.
 
-<h2>Multi-Account Management</h2>
+## Multi-account support
 
-<p><strong>Taplio:</strong> Multi-account support exists but is primarily aimed at individual creators managing a single brand. Team features are available on higher-tier plans.</p>
+**Taplio** is primarily designed for individual creators. Team features exist on higher-tier plans, but multi-account management isn't a core focus.
 
-<p><strong>Marquill:</strong> Multi-account management is a core feature, not an add-on. Connecting personal profiles and company pages, filtering drafts and schedules by account, and managing publishing across multiple LinkedIn presences from a single dashboard is built into the <a href="https://marquill.com">AI LinkedIn workspace</a> from the start.</p>
+**Marquill** was built with multi-account management as a core feature from day one. Personal profiles, company pages, client accounts — all connected in one dashboard, with drafts and schedules filterable by account.
 
-<h2>Scheduling</h2>
+If you manage more than one LinkedIn presence, this is a meaningful difference.
 
-<p>Both tools offer LinkedIn post scheduling with timezone-aware publishing. This is table-stakes functionality at this point and neither has a meaningful advantage here. Marquill's scheduling is native to the drafting flow — you schedule a post immediately after editing it without switching screens. Taplio's scheduling is similarly integrated.</p>
+## Pricing
 
-<h2>Pricing</h2>
+| Plan | Taplio | Marquill |
+|---|---|---|
+| Free tier | Trial only | Free forever (1 account, 5 posts/mo) |
+| Entry paid | ~$39/mo | $9.99/mo |
+| Mid tier | ~$65/mo | $19.99/mo |
+| Agency/team | ~$199/mo | $29.99/mo (10 accounts) |
 
-<p><strong>Taplio</strong> starts at around $39/month and does not offer a permanent free tier — there's a trial period, but continued use requires a paid plan.</p>
+Marquill is significantly cheaper at every tier. Taplio's pricing reflects a more established product with a larger user base. Whether that premium is worth it depends on whether you actually need what Taplio does differently.
 
-<p><strong>Marquill</strong> offers a free plan (1 account, 5 AI posts per month) with paid plans starting at $9.99/month. The Creator plan at $19.99/month covers 2 accounts and 100 AI posts per month. For agencies, the Pro Writer plan at $29.99/month includes 10 accounts and unlimited posts.</p>
+## Who should pick which
 
-<p>For creators testing the waters or working with a limited budget, Marquill's free tier and lower entry price make it the more accessible starting point. Taplio's higher price point is harder to justify unless you're specifically drawn to its inspiration and trend-monitoring features.</p>
+**Go with Taplio if:**
 
-<h2>Who Each Tool Is Best For</h2>
+- Your strategy is built around monitoring LinkedIn trends and iterating on popular formats
+- You want a large saved inspiration library to draw from
+- You have the budget and want a tool with a bigger community
 
-<p><strong>Choose Taplio if:</strong></p>
-<ul>
-  <li>Your content strategy relies heavily on monitoring LinkedIn trends and remixing popular formats.</li>
-  <li>You want a large library of saved inspiration posts to draw from.</li>
-  <li>Budget is less of a concern and you want a more established tool with a larger user base.</li>
-</ul>
+**Go with Marquill if:**
 
-<p><strong>Choose Marquill if:</strong></p>
-<ul>
-  <li>You want an <a href="https://marquill.com">AI LinkedIn workspace</a> that generates content from primary source research rather than existing LinkedIn posts.</li>
-  <li>You manage multiple LinkedIn accounts and need genuine multi-account support in the core product.</li>
-  <li>You want to start on a free plan before committing, or you want a lower-cost paid option.</li>
-  <li>You value a focused, workflow-first tool over a feature-heavy platform.</li>
-</ul>
+- You want an [AI LinkedIn workspace](https://marquill.com) that generates content from real research, not LinkedIn recycling
+- You manage multiple accounts and need genuine multi-account support in the base product
+- You want to start free before committing, or you want lower-cost paid plans
+- You prefer a focused, workflow-first tool over a feature-heavy platform
 
-<h2>The Bottom Line</h2>
+## The short version
 
-<p>Both Taplio and Marquill are legitimate AI LinkedIn workspaces that will improve your publishing consistency and content quality compared to no tool at all. The choice comes down to your content philosophy and your budget.</p>
+Both tools will make your LinkedIn publishing more consistent. The question is your content philosophy.
 
-<p>If you produce original content grounded in research and ideas rather than LinkedIn trend-watching, Marquill's workflow fits better and costs significantly less. Start with the free plan and see whether the YouTube research-to-draft pipeline clicks for how you actually work.</p>
-    `,
+If you build content from ideas and research rather than trend-watching, Marquill's workflow fits better — and costs a lot less. Start on the free plan and see if the YouTube research-to-draft pipeline clicks for how you actually work.
+
+[Try Marquill free →](https://marquill.com)
+    `.trim(),
   },
 ];
 
