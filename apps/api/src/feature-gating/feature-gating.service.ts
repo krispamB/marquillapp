@@ -147,6 +147,9 @@ export class FeatureGatingService {
   async assertScheduledPostQuota(userId: string): Promise<void> {
     const tier = await this.resolveEntitlementTier(userId);
     const limit = this.getLimitFromTier(tier, FEATURE_KEYS.SCHEDULED_POSTS);
+
+    if (limit === -1) return; // unlimited
+
     const periodStart = await this.resolveUsagePeriodStart(userId);
     const currentUsage = await this.getUsageCount(
       userId,
