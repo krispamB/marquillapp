@@ -20,22 +20,22 @@ import {
   YoutubeSearchResult,
 } from './agent.interface';
 import { HttpService } from '@nestjs/axios';
-import { Supadata } from '@supadata/js';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PostDraft } from 'src/database/schemas';
+import { YoutubeTranscriptService } from '../youtube-transcript/youtube-transcript.service';
 
 @Injectable()
 export class AgentService {
   private logger: Logger;
   private youtube: youtube_v3.Youtube;
-  private supadata: Supadata;
   constructor(
     private llmService: LLMService,
     private actorsService: ActorsService,
     private parser: ResponseParserService,
     private config: ConfigService,
     private http: HttpService,
+    private youtubeTranscriptService: YoutubeTranscriptService,
     @InjectModel(PostDraft.name) private draftModel: Model<PostDraft>,
   ) {
     this.logger = new Logger(AgentService.name);
@@ -44,10 +44,6 @@ export class AgentService {
       throw new Error('YOUTUBE_API_KEY is not configured');
     }
     this.youtube = youtube({ version: 'v3', auth: apiKey });
-
-    this.supadata = new Supadata({
-      apiKey: this.config.get<string>('SUPADATA_KEY')!,
-    });
   }
 
   async generateUserIntent(input: string) {
@@ -172,21 +168,9 @@ export class AgentService {
   ): Promise<TranscriptResult | null> {
     const url = `https://www.youtube.com/watch?v=${video.videoId}`;
     try {
-      const transcriptResult = await this.supadata.transcript({
-        url,
-        lang: 'en',
-        text: true,
-        mode: 'native',
-      });
-      if ('jobId' in transcriptResult) {
-        this.logger.log({ jobId: transcriptResult.jobId });
-        return null;
-      } else {
-        return {
-          title: video.title,
-          transcript: transcriptResult.content as string,
-        };
-      }
+      const transcript =
+        await this.youtubeTranscriptService.getTranscript(url);
+      return { title: video.title, transcript };
     } catch (err) {
       this.logger.error(err);
       return null;

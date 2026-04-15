@@ -5,7 +5,6 @@
     "": {
       "name": "linkgenserver",
       "dependencies": {
-        "@danielxceron/youtube-transcript": "^1.2.6",
         "@googleapis/youtube": "^31.0.0",
         "@nestjs/axios": "^4.0.1",
         "@nestjs/common": "^11.0.1",
@@ -35,6 +34,7 @@
         "reflect-metadata": "^0.2.2",
         "resend": "^6.10.0",
         "rxjs": "^7.8.1",
+        "youtube-transcript-plus": "^2.0.0",
         "zod": "^4.1.12",
       },
       "devDependencies": {
@@ -158,8 +158,6 @@
     "@crawlee/types": ["@crawlee/types@3.15.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-RvgVPXrsQw4GQIUXrC1z1aNOedUPJnZ/U/8n+jZ0fu1Iw9moJVMuiuIxSI8q1P6BA84aWZdalyfDWBZ3FMjsiw=="],
 
     "@cspotcode/source-map-support": ["@cspotcode/source-map-support@0.8.1", "", { "dependencies": { "@jridgewell/trace-mapping": "0.3.9" } }, "sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw=="],
-
-    "@danielxceron/youtube-transcript": ["@danielxceron/youtube-transcript@1.2.6", "", {}, "sha512-NGqXFJE2+9ChS1xWrLM1bath6AWl2Q3im9PvD+tIpZROOnmp18MclzuUEGPCEFl1W67RNKLiLDGk2qrBxyuOLA=="],
 
     "@emnapi/core": ["@emnapi/core@1.8.1", "", { "dependencies": { "@emnapi/wasi-threads": "1.1.0", "tslib": "^2.4.0" } }, "sha512-AvT9QFpxK0Zd8J0jopedNm+w/2fIzvtPKPjqyw9jwvBaReTTqPBk9Hixaz7KbjimP+QNz605/XnjFcDAL2pqBg=="],
 
@@ -1594,6 +1592,8 @@
     "yocto-queue": ["yocto-queue@0.1.0", "", {}, "sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q=="],
 
     "yoctocolors-cjs": ["yoctocolors-cjs@2.1.3", "", {}, "sha512-U/PBtDf35ff0D8X8D0jfdzHYEPFxAI7jJlxZXwCSez5M3190m+QobIfh+sWDWSHMCWWJN2AWamkegn6vr6YBTw=="],
+
+    "youtube-transcript-plus": ["youtube-transcript-plus@2.0.0", "", {}, "sha512-n4nnGVV3ZABnvk/sSF+W51c/+P6I23kLwwhOiYeKLeHOGfpjwCUthhoKgQk9dldJEgHCkbyJpuD3vkbBxWqDHA=="],
 
     "zod": ["zod@4.3.5", "", {}, "sha512-k7Nwx6vuWx1IJ9Bjuf4Zt1PEllcwe7cls3VNzm4CQ1/hgtFUK2bRNG3rvnpPUhFjmqJKAKtjV576KnUkHocg/g=="],
 
