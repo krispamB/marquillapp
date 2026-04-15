@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { YoutubeTranscript } from '@danielxceron/youtube-transcript';
+import { fetchTranscript } from 'youtube-transcript-plus';
 
 const YOUTUBE_ID_PATTERN = /^[a-zA-Z0-9_-]{11}$/;
 
@@ -7,6 +7,41 @@ export class InvalidYouTubeVideoInputError extends Error {
   constructor(input: string) {
     super(`Invalid YouTube video URL or ID: ${input}`);
     this.name = 'InvalidYouTubeVideoInputError';
+  }
+}
+
+export class TranscriptDisabledError extends Error {
+  constructor(input: string) {
+    super(`Transcripts are disabled for this video: ${input}`);
+    this.name = 'TranscriptDisabledError';
+  }
+}
+
+export class TranscriptVideoUnavailableError extends Error {
+  constructor(input: string) {
+    super(`Video is unavailable: ${input}`);
+    this.name = 'TranscriptVideoUnavailableError';
+  }
+}
+
+export class TranscriptRateLimitError extends Error {
+  constructor(input: string) {
+    super(`YouTube rate limit exceeded while fetching transcript for: ${input}`);
+    this.name = 'TranscriptRateLimitError';
+  }
+}
+
+export class TranscriptNotAvailableError extends Error {
+  constructor(input: string) {
+    super(`No transcript available for: ${input}`);
+    this.name = 'TranscriptNotAvailableError';
+  }
+}
+
+export class TranscriptLanguageNotAvailableError extends Error {
+  constructor(input: string, lang: string) {
+    super(`Transcript not available in language "${lang}" for: ${input}`);
+    this.name = 'TranscriptLanguageNotAvailableError';
   }
 }
 
@@ -20,17 +55,28 @@ export class YouTubeTranscriptFetchError extends Error {
 
 @Injectable()
 export class YoutubeTranscriptService {
-  async getTranscript(input: string): Promise<string> {
+  async getTranscript(input: string, lang = 'en'): Promise<string> {
     const videoId = this.extractVideoId(input);
 
     try {
-      const transcriptParts = await YoutubeTranscript.fetchTranscript(videoId);
-      return transcriptParts
-        .map((part) => part.text)
+      const segments = await fetchTranscript(videoId, { lang });
+      return segments
+        .map((s) => s.text)
         .join(' ')
         .replace(/\s+/g, ' ')
         .trim();
     } catch (error) {
+      const name = error instanceof Error ? error.constructor.name : '';
+      if (name === 'YoutubeTranscriptDisabledError')
+        throw new TranscriptDisabledError(input);
+      if (name === 'YoutubeTranscriptVideoUnavailableError')
+        throw new TranscriptVideoUnavailableError(input);
+      if (name === 'YoutubeTranscriptTooManyRequestError')
+        throw new TranscriptRateLimitError(input);
+      if (name === 'YoutubeTranscriptNotAvailableError')
+        throw new TranscriptNotAvailableError(input);
+      if (name === 'YoutubeTranscriptNotAvailableLanguageError')
+        throw new TranscriptLanguageNotAvailableError(input, lang);
       throw new YouTubeTranscriptFetchError(input, error);
     }
   }
