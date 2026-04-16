@@ -1072,18 +1072,23 @@ export default function PostsClient({
       <div className="pointer-events-none absolute -left-28 top-10 h-80 w-80 rounded-full bg-[var(--color-accent)]/25 blur-[140px]" />
       <div className="pointer-events-none absolute right-6 top-24 h-64 w-64 rounded-full bg-[var(--color-primary)]/20 blur-[120px]" />
 
-      <div className="relative flex min-h-screen w-full flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8">
-        <header className="flex flex-col gap-4 md:hidden">
-          <Card className="flex items-center justify-between gap-3 px-4 py-3">
-            <div className="flex items-center gap-3">
-              <UserAvatar initials={initials} avatarUrl={user.avatar} />
-              <div>
-                <p className="text-sm font-semibold text-[var(--color-text-primary)]">{user.name}</p>
-                <p className="text-xs text-[var(--color-text-secondary)]">{user.email}</p>
-              </div>
-            </div>
-            <PillButton variant="secondary">Settings</PillButton>
-          </Card>
+      <div className="relative flex min-h-screen w-full flex-col gap-8 px-4 pt-8 pb-28 sm:px-6 md:py-10 lg:px-8">
+        <header className="flex items-end justify-between gap-3 md:hidden">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[var(--color-text-secondary)]">
+              Manage your workflow
+            </p>
+            <h1 className="mt-1 truncate font-[var(--font-sora)] text-3xl font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
+              Posts
+            </h1>
+          </div>
+          <PillButton
+            icon={<PenSquare className="h-4 w-4" />}
+            onClick={openCreate}
+            className="shrink-0"
+          >
+            New post
+          </PillButton>
         </header>
 
         <div
@@ -1117,7 +1122,7 @@ export default function PostsClient({
               </div>
             ) : null}
 
-            <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="hidden flex-wrap items-end justify-between gap-4 md:flex">
               <div>
                 <p className="text-sm font-semibold text-[var(--color-text-secondary)]">
                   Manage your publishing workflow
@@ -1161,73 +1166,74 @@ export default function PostsClient({
             ) : null}
 
             <Card className="p-4 sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  {(Object.keys(postCounts) as PostTab[]).map((tab) => (
-                    <button
-                      key={tab}
-                      type="button"
-                      onClick={() => setActiveTab(tab)}
-                      className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition ${activeTab === tab
-                        ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
-                        : "border-[var(--color-border)] bg-white/80 text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]/40"
-                        }`}
-                    >
-                      <span>{tab[0]}{tab.slice(1).toLowerCase()}</span>
-                      <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs">{postCounts[tab]}</span>
-                    </button>
-                  ))}
-                </div>
-                <PillButton icon={<PenSquare className="h-4 w-4" />} onClick={openCreate}>
-                  New Post
-                </PillButton>
+              {/* Tabs row */}
+              <div className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                {(Object.keys(postCounts) as PostTab[]).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveTab(tab)}
+                    className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition ${activeTab === tab
+                      ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
+                      : "border-[var(--color-border)] bg-white/80 text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]/40"
+                      }`}
+                  >
+                    <span>{tab[0]}{tab.slice(1).toLowerCase()}</span>
+                    <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs">{postCounts[tab]}</span>
+                  </button>
+                ))}
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <PillButton variant="secondary" icon={<Tags className="h-4 w-4" />}>
-                  Tags
-                </PillButton>
-
-                <CustomSelect
-                  value={selectedMonth}
-                  onChange={(val) => setSelectedMonth(val)}
-                  options={
-                    availableMonths.length > 0
-                      ? availableMonths.map((m) => ({ value: m, label: m }))
-                      : [{ value: selectedMonth, label: selectedMonth }]
-                  }
-                  icon={<CalendarDays className="h-4 w-4" />}
-                  ariaLabel="Select month"
-                  className="min-w-[140px]"
-                />
-
-                <CustomSelect
-                  value={selectedAccountId ?? ""}
-                  onChange={(val) => setSelectedAccountId(val || undefined)}
-                  options={connectedAccounts
-                    .filter(
-                      (account) =>
-                        availableAccountIds.length === 0 ||
-                        availableAccountIds.includes(account.id) ||
-                        account.id === selectedAccountId
-                    )
-                    .map((account) => ({
-                      value: account.id,
-                      label: account.displayName ?? (account.vanityName ? `@${account.vanityName}` : account.provider)
-                    }))}
-                  ariaLabel="Select connected account"
-                  className="min-w-[170px]"
-                />
-
-                <label className="relative ml-auto min-w-[220px] flex-1 sm:max-w-[320px]">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-secondary)]" />
-                  <input
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Search post content"
-                    className="w-full rounded-full border border-[var(--color-border)] bg-white/85 py-2 pl-9 pr-3 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
+              {/* Filter controls */}
+              <div className="mt-4 flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
+                {/* Row 1 on mobile: month + account pickers */}
+                <div className="flex gap-2">
+                  <CustomSelect
+                    value={selectedMonth}
+                    onChange={(val) => setSelectedMonth(val)}
+                    options={
+                      availableMonths.length > 0
+                        ? availableMonths.map((m) => ({ value: m, label: m }))
+                        : [{ value: selectedMonth, label: selectedMonth }]
+                    }
+                    icon={<CalendarDays className="h-4 w-4" />}
+                    ariaLabel="Select month"
+                    className="flex-1 md:min-w-[140px] md:flex-none"
                   />
-                </label>
+                  <CustomSelect
+                    value={selectedAccountId ?? ""}
+                    onChange={(val) => setSelectedAccountId(val || undefined)}
+                    options={connectedAccounts
+                      .filter(
+                        (account) =>
+                          availableAccountIds.length === 0 ||
+                          availableAccountIds.includes(account.id) ||
+                          account.id === selectedAccountId
+                      )
+                      .map((account) => ({
+                        value: account.id,
+                        label: account.displayName ?? (account.vanityName ? `@${account.vanityName}` : account.provider)
+                      }))}
+                    ariaLabel="Select connected account"
+                    className="flex-1 md:min-w-[170px] md:flex-none"
+                  />
+                </div>
+
+                {/* Row 2 on mobile: search + Tags */}
+                <div className="flex flex-1 items-center gap-2">
+                  <label className="relative flex-1 sm:max-w-[320px] md:ml-auto">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-secondary)]" />
+                    <input
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      placeholder="Search post content"
+                      className="w-full rounded-full border border-[var(--color-border)] bg-white/85 py-2 pl-9 pr-3 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]"
+                    />
+                  </label>
+                  <PillButton variant="secondary" icon={<Tags className="h-4 w-4" />}>
+                    Tags
+                  </PillButton>
+                </div>
               </div>
             </Card>
 
@@ -1376,7 +1382,7 @@ export default function PostsClient({
                                   : {})}
                                 className="grid gap-3 rounded-2xl border border-[var(--color-border)] bg-white/90 p-4 transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-28px_rgba(15,23,42,0.4)] md:grid-cols-[132px_1fr]"
                               >
-                                <div className="flex flex-col gap-2 border-b border-[var(--color-border)] pb-3 md:border-b-0 md:border-r md:pb-0 md:pr-3">
+                                <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3 md:flex-col md:items-start md:justify-start md:gap-2 md:border-b-0 md:border-r md:pb-0 md:pr-3">
                                   <p className="text-2xl font-semibold text-[var(--color-text-primary)]">
                                     {formatTimelineTime(post.scheduledAt ?? post.updatedAt ?? post.createdAt)}
                                   </p>
@@ -1439,18 +1445,21 @@ export default function PostsClient({
                                       ) : null}
                                     </div>
 
-                                    <div className="flex items-center gap-2">
+                                    <div ref={actionMenuBoundaryRef} className="relative flex items-center gap-2">
+                                      {/* Schedule + Edit — desktop only */}
                                       {!isPublished ? (
-                                        <PillButton
-                                          variant="secondary"
-                                          icon={<CalendarClock className="h-4 w-4" />}
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            onEdit();
-                                          }}
-                                        >
-                                          {scheduleLabel}
-                                        </PillButton>
+                                        <div className="hidden md:block">
+                                          <PillButton
+                                            variant="secondary"
+                                            icon={<CalendarClock className="h-4 w-4" />}
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              onEdit();
+                                            }}
+                                          >
+                                            {scheduleLabel}
+                                          </PillButton>
+                                        </div>
                                       ) : null}
                                       {canEdit ? (
                                         <button
@@ -1459,12 +1468,14 @@ export default function PostsClient({
                                             event.stopPropagation();
                                             onEdit();
                                           }}
-                                          className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--color-border)] bg-white text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                                          className="hidden h-9 w-9 place-items-center rounded-xl border border-[var(--color-border)] bg-white text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] md:grid"
                                           aria-label="Edit post"
                                         >
                                           <Edit3 className="h-4 w-4" />
                                         </button>
                                       ) : null}
+
+                                      {/* ... menu — always visible */}
                                       <button
                                         type="button"
                                         onClick={(event) => {
@@ -1481,10 +1492,38 @@ export default function PostsClient({
 
                                       {actionMenuPostId === post._id ? (
                                         <div
-                                          ref={actionMenuBoundaryRef}
-                                          className="absolute right-0 top-full z-10 mt-2 w-40 rounded-xl border border-[var(--color-border)] bg-white p-1 shadow-lg"
+                                          className="absolute right-0 top-full z-10 mt-2 w-44 rounded-xl border border-[var(--color-border)] bg-white p-1 shadow-lg"
                                           onClick={(event) => event.stopPropagation()}
                                         >
+                                          {/* Schedule/Edit in dropdown on mobile */}
+                                          {!isPublished ? (
+                                            <button
+                                              type="button"
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                setActionMenuPostId(null);
+                                                onEdit();
+                                              }}
+                                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--color-text-primary)] transition hover:bg-gray-50 md:hidden"
+                                            >
+                                              <CalendarClock className="h-4 w-4 text-[var(--color-text-secondary)]" />
+                                              {scheduleLabel}
+                                            </button>
+                                          ) : null}
+                                          {canEdit ? (
+                                            <button
+                                              type="button"
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                setActionMenuPostId(null);
+                                                onEdit();
+                                              }}
+                                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--color-text-primary)] transition hover:bg-gray-50 md:hidden"
+                                            >
+                                              <Edit3 className="h-4 w-4 text-[var(--color-text-secondary)]" />
+                                              Edit post
+                                            </button>
+                                          ) : null}
                                           <button
                                             type="button"
                                             onClick={() => {
