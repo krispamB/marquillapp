@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { MouseEventHandler, ReactNode } from "react";
 import Link from "next/link";
-import { CalendarClock, CheckCheck, PenLine, Plug, ChevronDown, Check, X, AlertTriangle, Building2, Trash2 } from "lucide-react";
+import { CalendarClock, CheckCheck, PenLine, Plug, ChevronDown, Check, X, AlertTriangle, Building2, Trash2, Info, RefreshCw, Plus, Menu, Sparkles, CreditCard, Settings, Bug, LogOut } from "lucide-react";
 import type {
   ConnectedAccount,
   ConnectedAccountProvider,
@@ -302,10 +302,10 @@ export function ListItem({
   const content = (
     <>
       <div className="min-w-0 flex-1">
-        <p className="truncate whitespace-nowrap text-sm font-semibold text-[var(--color-text-primary)]">
+        <p className="line-clamp-2 text-sm font-semibold text-[var(--color-text-primary)]">
           {title}
         </p>
-        <p className="truncate whitespace-nowrap text-xs text-[var(--color-text-secondary)]">
+        <p className="truncate text-xs text-[var(--color-text-secondary)]">
           {subtitle}
         </p>
       </div>
@@ -440,25 +440,53 @@ export function MobileAccountChip({
   onOpenSwitcher: () => void;
   disabled?: boolean;
 }) {
-  const providerLabel = account ? getProviderLabel(account.provider) : "Account";
-  const providerInitials = account ? getProviderInitials(account.provider) : "AC";
+  const initials = account?.displayName
+    ? account.displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("")
+    : "?";
 
   return (
     <button
       type="button"
       onClick={onOpenSwitcher}
       disabled={disabled}
-      className="inline-flex h-11 w-full items-center justify-between gap-3 rounded-full border border-[var(--color-border)] bg-white/90 px-4 text-sm font-semibold text-[var(--color-text-primary)] shadow-[0_16px_36px_-30px_rgba(15,23,42,0.6)] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
-      aria-label="Open connected account selector"
+      className="inline-flex h-14 w-full items-center justify-between gap-3 rounded-2xl border border-[var(--color-border)] bg-white/90 px-3 pr-4 shadow-[0_4px_16px_-8px_rgba(15,23,42,0.12)] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
+      aria-label="Switch connected account"
     >
-      <span className="flex min-w-0 items-center gap-2">
-        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)]/12 text-[11px] font-semibold text-[var(--color-primary)]">
-          {providerInitials}
+      {/* Avatar with provider badge */}
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="relative shrink-0">
+          <span className="block h-9 w-9 overflow-hidden rounded-full bg-gradient-to-br from-[#7C3AED] via-[#A855F7] to-[#EC4899] p-[2px]">
+            <span className="grid h-full w-full overflow-hidden rounded-full bg-[var(--color-secondary)]">
+              {account?.avatarUrl ? (
+                <img src={account.avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="grid h-full w-full place-items-center text-[11px] font-bold text-white">
+                  {initials}
+                </span>
+              )}
+            </span>
+          </span>
+          {/* LinkedIn badge */}
+          {account?.provider === "LINKEDIN" ? (
+            <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-[4px] bg-[#0077B5] text-[8px] font-extrabold text-white shadow-sm">
+              in
+            </span>
+          ) : null}
         </span>
-        <span className="min-w-0 truncate">{getAccountLabel(account)}</span>
+
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-semibold text-[var(--color-text-primary)] leading-tight">
+            {getAccountLabel(account)}
+          </span>
+          <span className="block truncate text-xs text-[var(--color-text-secondary)] leading-tight">
+            {account?.vanityName ? `@${account.vanityName}` : "No account connected"}
+          </span>
+        </span>
       </span>
-      <span className="shrink-0 text-xs text-[var(--color-text-secondary)]">
-        {account?.vanityName ? `@${account.vanityName}` : providerLabel}
+
+      {/* Switch affordance */}
+      <span className="shrink-0 rounded-full bg-[var(--color-primary)]/10 px-3 py-1 text-[11px] font-semibold text-[var(--color-primary)]">
+        Switch
       </span>
     </button>
   );
@@ -538,8 +566,255 @@ export function MobileAccountSwitcherSheet({
   );
 }
 
+export function MobileSidebar({
+  isOpen,
+  accounts,
+  selectedAccountId,
+  user,
+  onClose,
+  onSelectAccount,
+  onOpenBugReport,
+}: {
+  isOpen: boolean;
+  accounts: ConnectedAccount[];
+  selectedAccountId?: string;
+  user: { name: string; email: string; initials: string; avatar?: string | null };
+  onClose: () => void;
+  onSelectAccount: (accountId: string) => void;
+  onOpenBugReport?: () => void;
+}) {
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [tierName, setTierName] = useState<string | null>(null);
+  const [isDefaultTier, setIsDefaultTier] = useState(true);
+
+  useEffect(() => {
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
+    fetch(`${apiBase}/payment/subscription`, { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.tier?.name) setTierName(data.tier.name);
+        if (data?.tier?.isDefault !== undefined) setIsDefaultTier(data.tier.isDefault);
+      })
+      .catch(() => {});
+  }, []);
+
+  function getDaysUntilExpiry(expiresAt?: string | null): number | null {
+    if (!expiresAt) return null;
+    const diff = new Date(expiresAt).getTime() - Date.now();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  }
+
+  function handleLogout() {
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, `=;expires=${new Date(0).toUTCString()};path=/`);
+    });
+    window.location.href = process.env.NEXT_PUBLIC_LANDING ?? "/";
+  }
+
+  const displayTierName = tierName ?? "Free";
+  const handleLabel = user.email ? `@${user.email.split("@")[0]}` : `@${user.name.toLowerCase().replace(/\s+/g, "")}`;
+
+  return (
+    <div
+      className={`fixed inset-0 z-50 md:hidden transition-opacity duration-300 ${isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+      role="dialog"
+      aria-modal="true"
+    >
+      {/* Backdrop */}
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/50"
+        onClick={() => { setIsSettingsOpen(false); onClose(); }}
+        aria-label="Close menu"
+      />
+
+      {/* Panel */}
+      <div
+        className={`absolute inset-y-0 left-0 flex w-[85vw] max-w-[340px] flex-col bg-white transition-transform duration-300 ease-out ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-12 pb-4">
+          <h2 className="text-[11px] font-bold uppercase tracking-widest text-[var(--color-text-secondary)]">
+            Connected Accounts
+          </h2>
+          <div className="flex items-center gap-3 text-[var(--color-text-secondary)]">
+            <button type="button" aria-label="Info" className="rounded-full p-1 hover:bg-[var(--color-border)]">
+              <Info className="h-4 w-4" />
+            </button>
+            <button type="button" aria-label="Refresh" className="rounded-full p-1 hover:bg-[var(--color-border)]">
+              <RefreshCw className="h-4 w-4" />
+            </button>
+            <button type="button" aria-label="Add account" className="rounded-full p-1 hover:bg-[var(--color-border)]">
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Accounts list */}
+        <div className="flex-1 overflow-y-auto px-4 pb-4">
+          <div className="flex flex-col gap-3">
+            {accounts.length === 0 ? (
+              <p className="rounded-2xl border border-[var(--color-border)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">
+                No connected accounts yet.
+              </p>
+            ) : null}
+            {accounts.map((account) => {
+              const isSelected = account.id === selectedAccountId;
+              const daysLeft = getDaysUntilExpiry(account.accessTokenExpiresAt);
+              const expiryLabel =
+                daysLeft !== null
+                  ? daysLeft <= 0
+                    ? "Access expired"
+                    : `Access ends in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`
+                  : null;
+
+              return (
+                <button
+                  key={account.id}
+                  type="button"
+                  onClick={() => {
+                    onSelectAccount(account.id);
+                    onClose();
+                  }}
+                  className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition active:scale-[0.99] ${
+                    isSelected
+                      ? "border-[#7C3AED] bg-[#7C3AED]/6"
+                      : "border-[var(--color-border)] hover:bg-[var(--color-background)]"
+                  }`}
+                >
+                  <div className="relative shrink-0">
+                    <div className={`h-12 w-12 overflow-hidden rounded-full ${isSelected ? "ring-2 ring-[#7C3AED] ring-offset-2" : ""}`}>
+                      {account.avatarUrl ? (
+                        <img src={account.avatarUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="grid h-full w-full place-items-center rounded-full bg-[var(--color-secondary)] text-sm font-semibold text-white">
+                          {(account.displayName ?? "?").slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-md bg-[#0077B5] text-[9px] font-bold text-white shadow">
+                      in
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
+                      {account.displayName ?? account.vanityName ?? "Account"}
+                    </p>
+                    {expiryLabel ? (
+                      <p className={`text-xs ${daysLeft !== null && daysLeft <= 7 ? "text-red-500" : "text-[var(--color-text-secondary)]"}`}>
+                        {expiryLabel}
+                      </p>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Settings popover — shown above the user button */}
+        {isSettingsOpen ? (
+          <div className="mx-4 mb-2 rounded-[24px] border border-[var(--color-border)] bg-white p-2.5 shadow-[0_-16px_48px_-32px_rgba(15,23,42,0.2)]">
+            {/* User header */}
+            <div className="flex items-center gap-3 p-2 mb-1">
+              <UserAvatar
+                initials={user.initials}
+                avatarUrl={user.avatar ?? undefined}
+                sizeClass="h-10 w-10 min-w-[40px]"
+                textClass="text-sm"
+              />
+              <div className="flex flex-col min-w-0">
+                <span className="text-[15px] font-semibold text-[var(--color-text-primary)] leading-tight truncate">{user.name}</span>
+                <span className="text-[13px] text-[var(--color-text-secondary)] leading-tight truncate">{handleLabel}</span>
+              </div>
+            </div>
+            <div className="mx-2 h-px bg-gray-100 my-1" />
+            <div className="flex flex-col gap-0.5 mt-1.5">
+              <Link
+                href="/pricing"
+                className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-colors hover:bg-gray-50 text-[var(--color-text-primary)]"
+                onClick={() => { setIsSettingsOpen(false); onClose(); }}
+              >
+                <Sparkles className="h-[18px] w-[18px] text-[var(--color-text-secondary)] shrink-0" />
+                Upgrade plan
+              </Link>
+              <Link
+                href="/billing"
+                className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-colors hover:bg-gray-50 text-[var(--color-text-primary)]"
+                onClick={() => { setIsSettingsOpen(false); onClose(); }}
+              >
+                <CreditCard className="h-[18px] w-[18px] text-[var(--color-text-secondary)] shrink-0" />
+                Billing
+              </Link>
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-colors hover:bg-gray-50 text-[var(--color-text-primary)]"
+                onClick={() => setIsSettingsOpen(false)}
+              >
+                <Settings className="h-[18px] w-[18px] text-[var(--color-text-secondary)] shrink-0" />
+                Settings
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-colors hover:bg-gray-50 text-[var(--color-text-primary)]"
+                onClick={() => { setIsSettingsOpen(false); onOpenBugReport?.(); }}
+              >
+                <Bug className="h-[18px] w-[18px] text-[var(--color-text-secondary)] shrink-0" />
+                Help &amp; feedback
+              </button>
+            </div>
+            <div className="mx-2 h-px bg-gray-100 my-1.5" />
+            <div className="mb-0.5">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-colors hover:bg-rose-50 text-[var(--color-text-primary)] hover:text-rose-600"
+              >
+                <LogOut className="h-[18px] w-[18px] text-rose-500 shrink-0" />
+                Log out
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {/* User profile button at bottom */}
+        <div className="border-t border-[var(--color-border)] p-4 pb-8">
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen((prev) => !prev)}
+            className="flex w-full items-center justify-between gap-2 rounded-[32px] border border-[var(--color-border)] bg-white p-1.5 pl-2 pr-3 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] transition hover:bg-gray-50"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <UserAvatar
+                initials={user.initials}
+                avatarUrl={user.avatar ?? undefined}
+                sizeClass="h-8 w-8 shrink-0"
+                textClass="text-[12px]"
+              />
+              <div className="flex flex-col items-start text-left min-w-0 py-0.5">
+                <span className="text-[13px] font-medium leading-tight truncate w-full text-[var(--color-text-primary)]">{user.name}</span>
+                <span className="text-[11px] text-[var(--color-text-secondary)] leading-tight capitalize truncate w-full">{displayTierName}</span>
+              </div>
+            </div>
+            {isDefaultTier ? (
+              <span className="shrink-0 rounded-full border border-[var(--color-border)] bg-white px-2.5 py-1 text-[11px] font-medium text-[var(--color-text-primary)] shadow-sm">
+                Upgrade
+              </span>
+            ) : null}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MobileBottomNav({
   items,
+  onMenuClick,
 }: {
   items: Array<{
     label: string;
@@ -548,40 +823,47 @@ export function MobileBottomNav({
     active?: boolean;
     disabled?: boolean;
   }>;
+  onMenuClick?: () => void;
 }) {
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--color-border)] bg-white/90 px-2 py-2 backdrop-blur-md md:hidden"
+      className="fixed bottom-4 left-1/2 z-30 -translate-x-1/2 w-[calc(100%-2rem)] md:hidden"
       aria-label="Mobile dashboard navigation"
     >
-      <ul className="grid grid-cols-4 gap-1">
+      <ul className="flex items-center justify-between rounded-full border border-white/20 bg-white/20 px-2 py-1.5 shadow-[0_8px_32px_rgba(15,23,42,0.18)] backdrop-blur-xl">
         {items.map((item) => {
-          const itemClass = `flex h-12 flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-semibold transition ${
+          const iconWrapClass = `flex h-11 w-11 items-center justify-center rounded-full transition ${
             item.disabled
-              ? "opacity-45"
+              ? "opacity-40"
               : item.active
-              ? "bg-[var(--color-secondary)] text-white"
-              : "text-[var(--color-text-secondary)] hover:bg-[var(--color-primary)]/8"
+              ? "bg-[var(--color-secondary)]"
+              : "hover:bg-black/8"
           }`;
+          const iconColor = item.disabled
+            ? "text-[var(--color-text-secondary)]/40"
+            : item.active
+            ? "text-white"
+            : "text-[var(--color-text-secondary)]";
+
           const content = (
-            <>
-              <span className="text-sm">{item.icon}</span>
-              <span className="leading-none">{item.label}</span>
-            </>
+            <span className={`${iconWrapClass} ${iconColor}`}>
+              {item.icon}
+            </span>
           );
 
           return (
-            <li key={item.label}>
+            <li key={item.label} className="flex justify-center">
               {item.href && !item.disabled ? (
-                <Link href={item.href} className={itemClass}>
+                <Link href={item.href} aria-label={item.label}>
                   {content}
                 </Link>
               ) : (
                 <button
                   type="button"
-                  disabled
-                  aria-disabled="true"
-                  className={`${itemClass} w-full`}
+                  disabled={item.disabled}
+                  aria-disabled={item.disabled}
+                  aria-label={item.label}
+                  className="flex justify-center"
                 >
                   {content}
                 </button>
@@ -589,6 +871,16 @@ export function MobileBottomNav({
             </li>
           );
         })}
+        <li className="flex justify-center">
+          <button
+            type="button"
+            onClick={onMenuClick}
+            aria-label="Open menu"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--color-text-secondary)] transition hover:bg-black/8 hover:text-[var(--color-text-primary)]"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </li>
       </ul>
     </nav>
   );

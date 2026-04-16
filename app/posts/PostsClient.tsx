@@ -14,6 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import Sidebar from "../dashboard/Sidebar";
+import BugReportModal from "../dashboard/BugReportModal";
 import NewPostModal, {
   type NewDraftGeneratePayload,
   type NewDraftGenerateResult,
@@ -22,6 +23,8 @@ import NewPostModal, {
 import {
   Card,
   ConnectAccountCta,
+  MobileBottomNav,
+  MobileSidebar,
   PillButton,
   StatusTag,
   UserAvatar,
@@ -59,11 +62,11 @@ const navItems = [
     label: "Overview",
     active: false,
     href: "/dashboard",
-    icon: <LayoutDashboard className="h-4 w-4" />,
+    icon: <LayoutDashboard className="h-5 w-5" />,
   },
-  { label: "Posts", active: true, href: "/posts", icon: <PenSquare className="h-4 w-4" /> },
-  { label: "Calendar", active: false, disabled: true, icon: <CalendarClock className="h-4 w-4" /> },
-  { label: "Analytics", active: false, disabled: true, icon: <TrendingUp className="h-4 w-4" /> },
+  { label: "Posts", active: true, href: "/posts", icon: <PenSquare className="h-5 w-5" /> },
+  { label: "Calendar", active: false, disabled: true, icon: <CalendarClock className="h-5 w-5" /> },
+  { label: "Analytics", active: false, disabled: true, icon: <TrendingUp className="h-5 w-5" /> },
 ];
 
 function getInitials(name: string, email: string) {
@@ -242,6 +245,8 @@ export default function PostsClient({
   );
   const [refreshKey, setRefreshKey] = useState(0);
   const [generatedDraftId, setGeneratedDraftId] = useState<string | null>(null);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isMobileBugModalOpen, setIsMobileBugModalOpen] = useState(false);
   const [actionMenuPostId, setActionMenuPostId] = useState<string | null>(null);
   const [deleteModalState, setDeleteModalState] = useState<{
     isOpen: boolean;
@@ -1606,6 +1611,17 @@ export default function PostsClient({
         onClose={() => setDeleteModalState((prev) => ({ ...prev, isOpen: false }))}
         onConfirm={handleDeletePost}
       />
+      <MobileBottomNav items={navItems} onMenuClick={() => setIsMobileSidebarOpen(true)} />
+      <MobileSidebar
+        isOpen={isMobileSidebarOpen}
+        accounts={connectedAccounts}
+        selectedAccountId={selectedAccountId}
+        user={{ name: user.name, email: user.email, initials, avatar: user.avatar }}
+        onClose={() => setIsMobileSidebarOpen(false)}
+        onSelectAccount={setSelectedAccountId}
+        onOpenBugReport={() => { setIsMobileSidebarOpen(false); setIsMobileBugModalOpen(true); }}
+      />
+      <BugReportModal isOpen={isMobileBugModalOpen} onClose={() => setIsMobileBugModalOpen(false)} />
     </div>
   );
 }

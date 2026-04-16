@@ -9,6 +9,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Sidebar from "./Sidebar";
+import BugReportModal from "./BugReportModal";
 import NewPostModal, {
   type NewDraftGeneratePayload,
   type NewDraftGenerateResult,
@@ -23,6 +24,7 @@ import {
   MobileAccountChip,
   MobileAccountSwitcherSheet,
   MobileBottomNav,
+  MobileSidebar,
   PillButton,
 } from "./components";
 import { useNewPostModal } from "./useNewPostModal";
@@ -54,11 +56,11 @@ const navItems = [
     label: "Overview",
     active: true,
     href: "/dashboard",
-    icon: <LayoutDashboard className="h-4 w-4" />,
+    icon: <LayoutDashboard className="h-5 w-5" />,
   },
-  { label: "Posts", active: false, href: "/posts", icon: <PenSquare className="h-4 w-4" /> },
-  { label: "Calendar", active: false, disabled: true, icon: <CalendarClock className="h-4 w-4" /> },
-  { label: "Analytics", active: false, disabled: true, icon: <TrendingUp className="h-4 w-4" /> },
+  { label: "Posts", active: false, href: "/posts", icon: <PenSquare className="h-5 w-5" /> },
+  { label: "Calendar", active: false, disabled: true, icon: <CalendarClock className="h-5 w-5" /> },
+  { label: "Analytics", active: false, disabled: true, icon: <TrendingUp className="h-5 w-5" /> },
 ];
 
 const stats = {
@@ -257,6 +259,8 @@ export default function DashboardPage({
   const [isViewingAllDrafts, setIsViewingAllDrafts] = useState(false);
   const [draftVisibleLimit, setDraftVisibleLimit] = useState(4);
   const [isMobileAccountSheetOpen, setIsMobileAccountSheetOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isMobileBugModalOpen, setIsMobileBugModalOpen] = useState(false);
   const [usageData, setUsageData] = useState<PaymentUsageData | null>(null);
   const [isUsageLoading, setIsUsageLoading] = useState(false);
   const [usageError, setUsageError] = useState<string | null>(null);
@@ -1231,26 +1235,6 @@ export default function DashboardPage({
             disabled={connectedAccounts.length === 0}
             onOpenSwitcher={() => setIsMobileAccountSheetOpen(true)}
           />
-          <Card className="flex items-center justify-between gap-3 px-4 py-3">
-            <div className="min-w-0">
-              <div>
-                <p className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
-                  {selectedConnectedAccount?.displayName ?? user.name}
-                </p>
-                <p className="truncate text-xs text-[var(--color-text-secondary)]">
-                  {selectedConnectedAccount?.vanityName
-                    ? `@${selectedConnectedAccount.vanityName}`
-                    : user.email}
-                </p>
-              </div>
-            </div>
-            <PillButton
-              variant="secondary"
-              onClick={() => setIsMobileAccountSheetOpen(true)}
-            >
-              Accounts
-            </PillButton>
-          </Card>
         </header>
 
         <div
@@ -1512,7 +1496,7 @@ export default function DashboardPage({
                 </Card>
               </section>
 
-              <Card className="p-6">
+              <Card className="order-first p-6 md:order-none">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h2 className="font-[var(--font-sora)] text-xl font-semibold text-[var(--color-text-primary)]">
@@ -1723,7 +1707,17 @@ export default function DashboardPage({
         onClose={() => setIsMobileAccountSheetOpen(false)}
         onSelectAccount={setSelectedAccountId}
       />
-      <MobileBottomNav items={navItems} />
+      <MobileBottomNav items={navItems} onMenuClick={() => setIsMobileSidebarOpen(true)} />
+      <MobileSidebar
+        isOpen={isMobileSidebarOpen}
+        accounts={connectedAccounts}
+        selectedAccountId={selectedAccountId}
+        user={{ name: user.name, email: user.email, initials, avatar: user.avatar }}
+        onClose={() => setIsMobileSidebarOpen(false)}
+        onSelectAccount={setSelectedAccountId}
+        onOpenBugReport={() => { setIsMobileSidebarOpen(false); setIsMobileBugModalOpen(true); }}
+      />
+      <BugReportModal isOpen={isMobileBugModalOpen} onClose={() => setIsMobileBugModalOpen(false)} />
       <NewPostModal
         isOpen={newPostModalState.isOpen}
         mode={newPostModalState.mode}
