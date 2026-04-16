@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { ChevronLeft, LayoutDashboard, PenSquare, CalendarClock, TrendingUp, Sparkles, Receipt, Check, Download } from "lucide-react";
 import Link from "next/link";
 import Sidebar from "../dashboard/Sidebar";
-import { MobileAccountSwitcherSheet, MobileBottomNav } from "../dashboard/components";
+import { MobileAccountSwitcherSheet, MobileBottomNav, MobileSidebar } from "../dashboard/components";
+import BugReportModal from "../dashboard/BugReportModal";
 import type { UserProfile, ConnectedAccount, Tier } from "../lib/types";
 
 type Invoice = {
@@ -53,6 +54,8 @@ export default function BillingClient({
         primaryAccountId ?? connectedAccounts[0]?.id,
     );
     const [isMobileAccountSheetOpen, setIsMobileAccountSheetOpen] = useState(false);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [isMobileBugModalOpen, setIsMobileBugModalOpen] = useState(false);
 
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [tiers, setTiers] = useState<Tier[]>([]);
@@ -282,7 +285,17 @@ export default function BillingClient({
                 onClose={() => setIsMobileAccountSheetOpen(false)}
                 onSelectAccount={setSelectedAccountId}
             />
-            <MobileBottomNav items={navItems} />
+            <MobileBottomNav items={navItems} onMenuClick={() => setIsMobileSidebarOpen(true)} />
+            <MobileSidebar
+                isOpen={isMobileSidebarOpen}
+                accounts={connectedAccounts}
+                selectedAccountId={selectedAccountId}
+                user={{ name: user.name, email: user.email, initials, avatar: user.avatar }}
+                onClose={() => setIsMobileSidebarOpen(false)}
+                onSelectAccount={setSelectedAccountId}
+                onOpenBugReport={() => { setIsMobileSidebarOpen(false); setIsMobileBugModalOpen(true); }}
+            />
+            <BugReportModal isOpen={isMobileBugModalOpen} onClose={() => setIsMobileBugModalOpen(false)} />
         </div>
     );
 }

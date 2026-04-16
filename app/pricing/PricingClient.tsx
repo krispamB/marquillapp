@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { ChevronLeft, LayoutDashboard, PenSquare, CalendarClock, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import Sidebar from "../dashboard/Sidebar";
-import { MobileAccountSwitcherSheet, MobileBottomNav } from "../dashboard/components";
+import { MobileAccountSwitcherSheet, MobileBottomNav, MobileSidebar } from "../dashboard/components";
+import BugReportModal from "../dashboard/BugReportModal";
 import type { UserProfile, ConnectedAccount } from "../lib/types";
 
 type Tier = {
@@ -56,6 +57,8 @@ export default function PricingClient({
         primaryAccountId ?? connectedAccounts[0]?.id,
     );
     const [isMobileAccountSheetOpen, setIsMobileAccountSheetOpen] = useState(false);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [isMobileBugModalOpen, setIsMobileBugModalOpen] = useState(false);
 
     const [tiers, setTiers] = useState<Tier[]>([]);
     const [activeSubscriptionTierId, setActiveSubscriptionTierId] = useState<string | null>(null);
@@ -260,7 +263,17 @@ export default function PricingClient({
                 onClose={() => setIsMobileAccountSheetOpen(false)}
                 onSelectAccount={setSelectedAccountId}
             />
-            <MobileBottomNav items={navItems} />
+            <MobileBottomNav items={navItems} onMenuClick={() => setIsMobileSidebarOpen(true)} />
+            <MobileSidebar
+                isOpen={isMobileSidebarOpen}
+                accounts={connectedAccounts}
+                selectedAccountId={selectedAccountId}
+                user={{ name: user.name, email: user.email, initials, avatar: user.avatar }}
+                onClose={() => setIsMobileSidebarOpen(false)}
+                onSelectAccount={setSelectedAccountId}
+                onOpenBugReport={() => { setIsMobileSidebarOpen(false); setIsMobileBugModalOpen(true); }}
+            />
+            <BugReportModal isOpen={isMobileBugModalOpen} onClose={() => setIsMobileBugModalOpen(false)} />
         </div>
     );
 }
