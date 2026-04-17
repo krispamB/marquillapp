@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, LayoutDashboard, PenSquare, CalendarClock, TrendingUp, Sparkles, Receipt, Check, Download } from "lucide-react";
 import Link from "next/link";
 import Sidebar from "../dashboard/Sidebar";
-import { MobileAccountSwitcherSheet, MobileBottomNav } from "../dashboard/components";
+import { ConnectOrgModal, MobileAccountSwitcherSheet, MobileBottomNav, MobileSidebar } from "../dashboard/components";
+import BugReportModal from "../dashboard/BugReportModal";
 import type { UserProfile, ConnectedAccount, Tier } from "../lib/types";
 
 type Invoice = {
@@ -53,6 +54,26 @@ export default function BillingClient({
         primaryAccountId ?? connectedAccounts[0]?.id,
     );
     const [isMobileAccountSheetOpen, setIsMobileAccountSheetOpen] = useState(false);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [isMobileBugModalOpen, setIsMobileBugModalOpen] = useState(false);
+    const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
+
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
+
+    const connectedOrgIds = useMemo(
+        () => connectedAccounts.filter((a) => a.accountType === "ORGANIZATION").map((a) => a.id),
+        [connectedAccounts],
+    );
+    const hasPersonalAccount = useMemo(
+        () => connectedAccounts.some((a) => a.accountType !== "ORGANIZATION"),
+        [connectedAccounts],
+    );
+
+    const handleOpenOrgModal = () => setIsOrgModalOpen(true);
+    const handleOrgConnectSuccess = () => {
+        setIsOrgModalOpen(false);
+        window.location.reload();
+    };
 
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [tiers, setTiers] = useState<Tier[]>([]);
@@ -144,6 +165,9 @@ export default function BillingClient({
                             isConnectMenuOpen={false}
                             onToggleConnectMenu={() => { }}
                             onConnectLinkedIn={async () => { }}
+                            onConnectLinkedInOrg={handleOpenOrgModal}
+                            hasPersonalAccount={hasPersonalAccount}
+                            isConnectingOrg={false}
                             onSubscriptionLoaded={(data) => {
                                 if (data?.tier) {
                                     setActivePlan(data.tier);
@@ -282,7 +306,25 @@ export default function BillingClient({
                 onClose={() => setIsMobileAccountSheetOpen(false)}
                 onSelectAccount={setSelectedAccountId}
             />
-            <MobileBottomNav items={navItems} />
+            <MobileBottomNav items={navItems} onMenuClick={() => setIsMobileSidebarOpen(true)} />
+            <MobileSidebar
+                isOpen={isMobileSidebarOpen}
+                accounts={connectedAccounts}
+                selectedAccountId={selectedAccountId}
+                user={{ name: user.name, email: user.email, initials, avatar: user.avatar }}
+                onClose={() => setIsMobileSidebarOpen(false)}
+                onSelectAccount={setSelectedAccountId}
+                onOpenBugReport={() => { setIsMobileSidebarOpen(false); setIsMobileBugModalOpen(true); }}
+                onConnectLinkedInOrg={() => { setIsMobileSidebarOpen(false); handleOpenOrgModal(); }}
+            />
+            <BugReportModal isOpen={isMobileBugModalOpen} onClose={() => setIsMobileBugModalOpen(false)} />
+            <ConnectOrgModal
+                isOpen={isOrgModalOpen}
+                onClose={() => setIsOrgModalOpen(false)}
+                onSuccess={handleOrgConnectSuccess}
+                alreadyConnectedOrgIds={connectedOrgIds}
+                apiBase={apiBase}
+            />
         </div>
     );
 }

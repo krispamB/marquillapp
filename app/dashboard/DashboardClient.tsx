@@ -1716,6 +1716,10 @@ export default function DashboardPage({
         onClose={() => setIsMobileSidebarOpen(false)}
         onSelectAccount={setSelectedAccountId}
         onOpenBugReport={() => { setIsMobileSidebarOpen(false); setIsMobileBugModalOpen(true); }}
+        onConnectLinkedIn={handleConnectLinkedIn}
+        onConnectLinkedInOrg={() => { setIsMobileSidebarOpen(false); handleOpenOrgModal(); }}
+        hasPersonalAccount={hasPersonalAccount}
+        isConnectingLinkedIn={isConnectingLinkedIn}
       />
       <BugReportModal isOpen={isMobileBugModalOpen} onClose={() => setIsMobileBugModalOpen(false)} />
       <NewPostModal
