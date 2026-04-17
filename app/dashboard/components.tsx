@@ -574,6 +574,10 @@ export function MobileSidebar({
   onClose,
   onSelectAccount,
   onOpenBugReport,
+  onConnectLinkedIn,
+  onConnectLinkedInOrg,
+  hasPersonalAccount = false,
+  isConnectingLinkedIn = false,
 }: {
   isOpen: boolean;
   accounts: ConnectedAccount[];
@@ -582,6 +586,10 @@ export function MobileSidebar({
   onClose: () => void;
   onSelectAccount: (accountId: string) => void;
   onOpenBugReport?: () => void;
+  onConnectLinkedIn?: () => void;
+  onConnectLinkedInOrg?: () => void;
+  hasPersonalAccount?: boolean;
+  isConnectingLinkedIn?: boolean;
 }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [tierName, setTierName] = useState<string | null>(null);
@@ -641,14 +649,33 @@ export function MobileSidebar({
           <h2 className="text-[11px] font-bold uppercase tracking-widest text-[var(--color-text-secondary)]">
             Connected Accounts
           </h2>
-          <div className="flex items-center gap-3 text-[var(--color-text-secondary)]">
-            <button type="button" aria-label="Info" className="rounded-full p-1 hover:bg-[var(--color-border)]">
+          <div className="flex items-center gap-1 text-[var(--color-text-secondary)]">
+            <button
+              type="button"
+              aria-label="Info"
+              title="Connect your LinkedIn account to start publishing. Use + to add organization pages."
+              className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-[var(--color-border)]"
+            >
               <Info className="h-4 w-4" />
             </button>
-            <button type="button" aria-label="Refresh" className="rounded-full p-1 hover:bg-[var(--color-border)]">
+            <button
+              type="button"
+              aria-label="Re-authenticate LinkedIn account"
+              title="Re-authenticate your LinkedIn account"
+              disabled={!hasPersonalAccount || isConnectingLinkedIn}
+              onClick={onConnectLinkedIn}
+              className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-[var(--color-border)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
               <RefreshCw className="h-4 w-4" />
             </button>
-            <button type="button" aria-label="Add account" className="rounded-full p-1 hover:bg-[var(--color-border)]">
+            <button
+              type="button"
+              aria-label="Connect an organization page"
+              title="Connect an organization page"
+              disabled={accounts.length === 0 || !onConnectLinkedInOrg}
+              onClick={onConnectLinkedInOrg}
+              className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-[var(--color-border)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
               <Plus className="h-4 w-4" />
             </button>
           </div>
