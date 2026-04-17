@@ -7,7 +7,9 @@ import {
   CircleEllipsis,
   Edit3,
   LayoutDashboard,
+  LayoutList,
   PenSquare,
+  Plus,
   Search,
   Tags,
   TrendingUp,
@@ -1086,22 +1088,13 @@ export default function PostsClient({
       <div className="pointer-events-none absolute right-6 top-24 h-64 w-64 rounded-full bg-[var(--color-primary)]/20 blur-[120px]" />
 
       <div className="relative flex min-h-screen w-full flex-col gap-8 px-4 pt-8 pb-28 sm:px-6 md:py-10 lg:px-8">
-        <header className="flex items-end justify-between gap-3 md:hidden">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-[var(--color-text-secondary)]">
-              Manage your workflow
-            </p>
-            <h1 className="mt-1 truncate font-[var(--font-sora)] text-3xl font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
-              Posts
-            </h1>
-          </div>
-          <PillButton
-            icon={<PenSquare className="h-4 w-4" />}
-            onClick={openCreate}
-            className="shrink-0"
-          >
-            New post
-          </PillButton>
+        <header className="md:hidden">
+          <p className="text-sm font-semibold text-[var(--color-text-secondary)]">
+            Manage your workflow
+          </p>
+          <h1 className="mt-1 font-[var(--font-sora)] text-3xl font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">
+            Posts
+          </h1>
         </header>
 
         <div
@@ -1138,7 +1131,8 @@ export default function PostsClient({
               </div>
             ) : null}
 
-            <div className="hidden flex-wrap items-end justify-between gap-4 md:flex">
+            <div className="hidden md:grid md:grid-cols-3 md:items-center">
+              {/* Left: title */}
               <div>
                 <p className="text-sm font-semibold text-[var(--color-text-secondary)]">
                   Manage your publishing workflow
@@ -1147,26 +1141,42 @@ export default function PostsClient({
                   Posts
                 </h1>
               </div>
-              <div className="flex items-center gap-2 rounded-2xl border border-[var(--color-border)] bg-white/80 p-1">
+              {/* Center: view toggle */}
+              <div className="flex justify-center">
+                <div className="flex items-center gap-2 rounded-2xl border border-[var(--color-border)] bg-white/80 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("list")}
+                    className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition ${viewMode === "list"
+                      ? "bg-[#1C1B27] text-white"
+                      : "text-[var(--color-text-secondary)] hover:bg-white"
+                      }`}
+                  >
+                    <LayoutList className="h-4 w-4" />
+                    List
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("calendar")}
+                    className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition ${viewMode === "calendar"
+                      ? "bg-[#1C1B27] text-white"
+                      : "text-[var(--color-text-secondary)] hover:bg-white"
+                      }`}
+                  >
+                    <CalendarDays className="h-4 w-4" />
+                    Calendar
+                  </button>
+                </div>
+              </div>
+              {/* Right: New Post button */}
+              <div className="flex justify-end">
                 <button
                   type="button"
-                  onClick={() => setViewMode("list")}
-                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${viewMode === "list"
-                    ? "bg-[var(--color-primary)] text-white"
-                    : "text-[var(--color-text-secondary)] hover:bg-white"
-                    }`}
+                  onClick={openCreate}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#1C1B27] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_20px_-8px_rgba(28,27,39,0.55)] transition-all hover:bg-slate-800 hover:-translate-y-0.5"
                 >
-                  List
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode("calendar")}
-                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${viewMode === "calendar"
-                    ? "bg-[var(--color-primary)] text-white"
-                    : "text-[var(--color-text-secondary)] hover:bg-white"
-                    }`}
-                >
-                  Calendar
+                  <Plus className="h-4 w-4" />
+                  New post
                 </button>
               </div>
             </div>
@@ -1666,6 +1676,14 @@ export default function PostsClient({
         onClose={() => setDeleteModalState((prev) => ({ ...prev, isOpen: false }))}
         onConfirm={handleDeletePost}
       />
+      {/* Floating Action Button — mobile only */}
+      <button
+        onClick={openCreate}
+        aria-label="New post"
+        className="flex md:hidden fixed bottom-24 right-5 z-30 h-14 w-14 items-center justify-center rounded-full bg-[#1C1B27] text-white shadow-[0_8px_30px_-8px_rgba(28,27,39,0.6)] transition-all hover:bg-slate-800 hover:scale-105 active:scale-95"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
       <MobileBottomNav items={navItems} onMenuClick={() => setIsMobileSidebarOpen(true)} />
       <MobileSidebar
         isOpen={isMobileSidebarOpen}
