@@ -1656,13 +1656,41 @@ export default function NewPostModal({
               {mode === "edit" ? "Edit Post" : "Create Post"}
             </h2>
             <div className="flex items-center gap-2">
+              {/* Mobile: Edit/Preview pill toggle */}
+              {phase !== "ai_progress" ? (
+                <div className="flex lg:hidden items-center gap-1 rounded-2xl border border-[var(--color-border)] bg-white/80 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsPreviewVisible(false)}
+                    className={`flex items-center rounded-xl px-3 py-1.5 text-sm font-semibold transition ${
+                      !isPreviewVisible
+                        ? "bg-[#1C1B27] text-white"
+                        : "text-[var(--color-text-secondary)] hover:bg-white"
+                    }`}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsPreviewVisible(true)}
+                    className={`flex items-center rounded-xl px-3 py-1.5 text-sm font-semibold transition ${
+                      isPreviewVisible
+                        ? "bg-[#1C1B27] text-white"
+                        : "text-[var(--color-text-secondary)] hover:bg-white"
+                    }`}
+                  >
+                    Preview
+                  </button>
+                </div>
+              ) : null}
+              {/* Desktop: existing Preview button */}
               {phase !== "ai_progress" ? (
                 <button
                   type="button"
                   onClick={() => setIsPreviewVisible((value) => !value)}
                   aria-pressed={isPreviewVisible}
                   aria-controls="new-post-linkedin-preview-panel"
-                  className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold transition ${isPreviewVisible
+                  className={`hidden lg:inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold transition ${isPreviewVisible
                     ? "border-[#5575F5] bg-[#EEF3FF] text-[#1E40AF] shadow-[inset_0_0_0_1px_rgba(85,117,245,0.35)]"
                     : "border-[var(--color-border)] bg-white text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                     }`}
@@ -1687,7 +1715,7 @@ export default function NewPostModal({
               }`}
           >
             <section
-              className={`min-h-0 overflow-y-auto border-b border-[var(--color-border)] px-5 py-5 sm:px-6 ${isPreviewVisible ? "lg:col-span-2 lg:border-b-0 lg:border-r" : "lg:border-b-0"
+              className={`min-h-0 overflow-y-auto border-b border-[var(--color-border)] px-5 py-5 sm:px-6 ${isPreviewVisible ? "hidden lg:block lg:col-span-2 lg:border-b-0 lg:border-r" : "lg:border-b-0"
                 }`}
             >
               {phase === "ai_prompt" ? (
