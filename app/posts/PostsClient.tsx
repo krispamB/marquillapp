@@ -23,6 +23,7 @@ import NewPostModal, {
 import {
   Card,
   ConnectAccountCta,
+  ConnectOrgModal,
   MobileBottomNav,
   MobileSidebar,
   PillButton,
@@ -247,6 +248,7 @@ export default function PostsClient({
   const [generatedDraftId, setGeneratedDraftId] = useState<string | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isMobileBugModalOpen, setIsMobileBugModalOpen] = useState(false);
+  const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
   const [actionMenuPostId, setActionMenuPostId] = useState<string | null>(null);
   const [deleteModalState, setDeleteModalState] = useState<{
     isOpen: boolean;
@@ -280,6 +282,17 @@ export default function PostsClient({
 
   const initials = getInitials(user.name, user.email);
   const hasConnectedAccounts = connectedAccounts.length > 0 && Boolean(selectedAccountId);
+  const hasPersonalAccount = connectedAccounts.some((a) => a.accountType !== "ORGANIZATION");
+  const connectedOrgIds = useMemo(
+    () => connectedAccounts.filter((a) => a.accountType === "ORGANIZATION").map((a) => a.id),
+    [connectedAccounts],
+  );
+
+  const handleOpenOrgModal = () => setIsOrgModalOpen(true);
+  const handleOrgConnectSuccess = () => {
+    setIsOrgModalOpen(false);
+    window.location.reload();
+  };
   const selectedConnectedAccount = useMemo(
     () => connectedAccounts.find((account) => account.id === selectedAccountId) ?? connectedAccounts[0],
     [connectedAccounts, selectedAccountId],
@@ -1109,6 +1122,9 @@ export default function PostsClient({
             isConnectingLinkedIn={isConnectingLinkedIn}
             onToggleConnectMenu={() => setIsConnectMenuOpen((previousState) => !previousState)}
             onConnectLinkedIn={handleConnectLinkedIn}
+            onConnectLinkedInOrg={handleOpenOrgModal}
+            hasPersonalAccount={hasPersonalAccount}
+            isConnectingOrg={false}
           />
 
           <main className="flex flex-col gap-6">
@@ -1659,8 +1675,19 @@ export default function PostsClient({
         onClose={() => setIsMobileSidebarOpen(false)}
         onSelectAccount={setSelectedAccountId}
         onOpenBugReport={() => { setIsMobileSidebarOpen(false); setIsMobileBugModalOpen(true); }}
+        onConnectLinkedIn={handleConnectLinkedIn}
+        hasPersonalAccount={hasPersonalAccount}
+        isConnectingLinkedIn={isConnectingLinkedIn}
+        onConnectLinkedInOrg={() => { setIsMobileSidebarOpen(false); handleOpenOrgModal(); }}
       />
       <BugReportModal isOpen={isMobileBugModalOpen} onClose={() => setIsMobileBugModalOpen(false)} />
+      <ConnectOrgModal
+        isOpen={isOrgModalOpen}
+        onClose={() => setIsOrgModalOpen(false)}
+        onSuccess={handleOrgConnectSuccess}
+        alreadyConnectedOrgIds={connectedOrgIds}
+        apiBase={apiBase}
+      />
     </div>
   );
 }
