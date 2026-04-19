@@ -314,3 +314,15 @@ export type DisconnectAccountResponse = {
     scheduledPostsCanceled: number;
   };
 };
+
+export type VideoUploadInitResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: { uploadUrl: string; videoUrn: string };
+};
+
+export type VideoUploadStatusResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: { status: "PROCESSING" | "AVAILABLE" | "FAILED" };
+};
