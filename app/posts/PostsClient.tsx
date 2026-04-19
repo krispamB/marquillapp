@@ -635,28 +635,29 @@ export default function PostsClient({
     setRefreshKey((value) => value + 1);
   };
 
-  const uploadImageForPost = async (postId: string, file: File): Promise<void> => {
-    const formData = new FormData();
-    formData.append("file", file);
+  const uploadMediaForPost = async (postId: string, files: File[]): Promise<void> => {
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append("file", file);
 
-    const response = await fetch(`${apiBase}/posts/${postId}/image`, {
-      method: "PUT",
-      credentials: "include",
-      body: formData,
-    });
+      const response = await fetch(`${apiBase}/posts/${postId}/image`, {
+        method: "PUT",
+        credentials: "include",
+        body: formData,
+      });
 
-    let parsedResponse: ImageUploadResponse | null = null;
-    try {
-      parsedResponse = (await response.json()) as ImageUploadResponse;
-    } catch {
-      parsedResponse = null;
+      let parsedResponse: ImageUploadResponse | null = null;
+      try {
+        parsedResponse = (await response.json()) as ImageUploadResponse;
+      } catch {
+        parsedResponse = null;
+      }
+
+      if (!response.ok) {
+        throw new Error(parsedResponse?.message || "Image upload failed.");
+      }
     }
-
-    if (!response.ok) {
-      throw new Error(parsedResponse?.message || "Image upload failed.");
-    }
-
-    setConnectFeedback(parsedResponse?.message || "Image upload successful.");
+    setConnectFeedback("Media uploaded successfully.");
   };
 
   const buildFileFromRemoteImage = async (
@@ -772,36 +773,30 @@ export default function PostsClient({
       return;
     }
 
-    if (payload.imageFile) {
+    const hasDeviceMedia = payload.mediaFiles && payload.mediaFiles.length > 0;
+    const hasStockMedia = payload.mediaUrls && payload.mediaUrls.length > 0;
+    const hasAnyMedia = hasDeviceMedia || hasStockMedia;
+
+    if (hasAnyMedia) {
       if (!payload.postId) {
-        setConnectFeedback("Please save or generate this draft first before uploading a local image.");
+        setConnectFeedback("Please save or generate this draft first before uploading media.");
         return;
       }
       try {
-        await uploadImageForPost(payload.postId, payload.imageFile);
-      } catch (error) {
-        setConnectFeedback(error instanceof Error ? error.message : "Image upload failed.");
-        return;
-      }
-    } else if (
-      (payload.imageSource === "unsplash" || payload.imageSource === "pexels") &&
-      payload.imageUrl
-    ) {
-      const sourceLabel = payload.imageSource === "pexels" ? "Pexels" : "Unsplash";
-      if (!payload.postId) {
-        setConnectFeedback(`Please save or generate this draft first before uploading a ${sourceLabel} image.`);
-        return;
-      }
-      try {
-        const remoteFile = await buildFileFromRemoteImage(
-          payload.imageUrl,
-          payload.imageSource === "pexels" ? "pexels-image" : "unsplash-image",
-          payload.imageMimeType,
-        );
-        await uploadImageForPost(payload.postId, remoteFile);
+        if (hasDeviceMedia) {
+          await uploadMediaForPost(payload.postId, payload.mediaFiles!);
+        }
+        if (hasStockMedia) {
+          const remoteFiles = await Promise.all(
+            payload.mediaUrls!.map((url, i) =>
+              buildFileFromRemoteImage(url, `${payload.mediaSource ?? "stock"}-image-${i}`),
+            ),
+          );
+          await uploadMediaForPost(payload.postId, remoteFiles);
+        }
       } catch (error) {
         setConnectFeedback(
-          error instanceof Error ? error.message : `${sourceLabel} image upload failed.`,
+          error instanceof Error ? error.message : "Media upload failed.",
         );
         return;
       }

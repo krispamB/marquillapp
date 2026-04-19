@@ -49,10 +49,12 @@ export type NewPostSubmitPayload = {
   mode: NewPostMode;
   postId?: string;
   content: string;
-  imageFile?: File;
-  imageUrl?: string;
-  imageSource?: "device" | "unsplash" | "pexels" | "existing";
-  imageMimeType?: string;
+  /** Device-uploaded File objects (images or 1 video) */
+  mediaFiles?: File[];
+  /** Stock image URLs (Unsplash / Pexels) to be fetched and uploaded */
+  mediaUrls?: string[];
+  mediaSource?: "device" | "unsplash" | "pexels" | "existing";
+  mediaType?: "images" | "video";
   scheduledTime?: string;
   timezone?: string;
   aiPrompt?: string;
@@ -200,6 +202,121 @@ function formatOffsetDateTime(localDate: Date) {
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offset.slice(3)}`;
 }
 
+// ─── MediaGrid ───────────────────────────────────────────────────────────────
+// Renders image/video previews in a LinkedIn-style grid.
+// Pass onRemove to enable per-item delete buttons (editor use only).
+function MediaGrid({
+  srcs,
+  type,
+  onRemove,
+}: {
+  srcs: string[];
+  type: "images" | "video" | null;
+  onRemove?: (index: number) => void;
+}) {
+  if (!srcs.length || !type) return null;
+
+  const removeBtn = (i: number) =>
+    onRemove ? (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onRemove(i); }}
+        className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white opacity-0 transition group-hover/cell:opacity-100 hover:bg-black/80"
+        aria-label={`Remove image ${i + 1}`}
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    ) : null;
+
+  const imgCls = "h-full w-full object-cover";
+
+  if (type === "video") {
+    return (
+      <div className="relative mt-4 overflow-hidden rounded-xl border border-[var(--color-border)] group/cell">
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+        <video
+          src={srcs[0]}
+          controls
+          className="max-h-[360px] w-full object-contain"
+        />
+        {removeBtn(0)}
+      </div>
+    );
+  }
+
+  const count = srcs.length;
+  const shown = srcs.slice(0, 4);
+  const overflow = count - 4;
+
+  if (count === 1) {
+    return (
+      <div className="relative mt-4 overflow-hidden rounded-xl border border-[var(--color-border)] group/cell">
+        <img
+          src={srcs[0]}
+          alt="Media 1"
+          referrerPolicy="no-referrer"
+          className="max-h-[360px] w-full object-cover"
+        />
+        {removeBtn(0)}
+      </div>
+    );
+  }
+
+  if (count === 2) {
+    return (
+      <div className="mt-4 grid grid-cols-2 gap-0.5 overflow-hidden rounded-xl border border-[var(--color-border)]">
+        {shown.map((src, i) => (
+          <div key={i} className="relative aspect-[4/3] overflow-hidden group/cell">
+            <img src={src} alt={`Media ${i + 1}`} referrerPolicy="no-referrer" className={imgCls} />
+            {removeBtn(i)}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (count === 3) {
+    return (
+      <div
+        className="mt-4 grid gap-0.5 overflow-hidden rounded-xl border border-[var(--color-border)]"
+        style={{ gridTemplateColumns: "60% 40%", gridTemplateRows: "1fr 1fr" }}
+      >
+        <div className="relative row-span-2 overflow-hidden group/cell" style={{ minHeight: 220 }}>
+          <img src={srcs[0]} alt="Media 1" referrerPolicy="no-referrer" className={imgCls} style={{ height: "100%" }} />
+          {removeBtn(0)}
+        </div>
+        {[srcs[1], srcs[2]].map((src, i) => (
+          <div key={i} className="relative aspect-[4/3] overflow-hidden group/cell">
+            <img src={src} alt={`Media ${i + 2}`} referrerPolicy="no-referrer" className={imgCls} />
+            {removeBtn(i + 1)}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // 4+ images: 2×2 grid, last cell gets "+N more" overlay
+  return (
+    <div className="mt-4 grid grid-cols-2 gap-0.5 overflow-hidden rounded-xl border border-[var(--color-border)]">
+      {shown.map((src, i) => {
+        const isLast = i === 3 && overflow > 0;
+        return (
+          <div key={i} className="relative aspect-square overflow-hidden group/cell">
+            <img src={src} alt={`Media ${i + 1}`} referrerPolicy="no-referrer" className={imgCls} />
+            {isLast && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/55">
+                <span className="text-2xl font-bold text-white">+{overflow + 1}</span>
+              </div>
+            )}
+            {!isLast && removeBtn(i)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function NewPostModal({
   isOpen,
   mode,
@@ -242,14 +359,18 @@ export default function NewPostModal({
   );
   const [stylePreset, setStylePreset] = useState<StylePreset>(StylePreset.PROFESSIONAL);
   const [content, setContent] = useState(initialContent ?? "");
-  const [imageFile, setImageFile] = useState<File | undefined>(undefined);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | undefined>(
-    initialImageUrl,
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const [mediaPreviews, setMediaPreviews] = useState<string[]>(
+    initialImageUrl ? [initialImageUrl] : [],
   );
-  const [imageSource, setImageSource] = useState<"device" | "unsplash" | "pexels" | "existing" | undefined>(
+  const [mediaSources, setMediaSources] = useState<Array<"device" | "unsplash" | "pexels" | "existing">>(
+    initialImageUrl ? ["existing"] : [],
+  );
+  const [mediaType, setMediaType] = useState<"images" | "video" | null>(null);
+  const [mediaSource, setMediaSource] = useState<"device" | "unsplash" | "pexels" | "existing" | undefined>(
     initialImageUrl ? "existing" : undefined,
   );
-  const [imageMimeType, setImageMimeType] = useState<string | undefined>(undefined);
+  const [mediaError, setMediaError] = useState<string | null>(null);
   const [resolvedLinkedinPreviewUrl, setResolvedLinkedinPreviewUrl] = useState<string | null>(
     null,
   );
@@ -307,6 +428,9 @@ export default function NewPostModal({
   const pexelsInFlightRef = useRef<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const keepEditingButtonRef = useRef<HTMLButtonElement | null>(null);
+  const mediaErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks all blob: object URLs created so we can revoke on unmount
+  const objectUrlsRef = useRef<Set<string>>(new Set());
   const generatedObjectUrlRef = useRef<string | null>(null);
   const pollTimerRef = useRef<number | null>(null);
   const streamTimerRef = useRef<number | null>(null);
@@ -323,9 +447,7 @@ export default function NewPostModal({
   const isOpenRef = useRef(false);
   const selectionRangeRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
   const initialContentRef = useRef(initialContent ?? "");
-  const initialImageFingerprintRef = useRef(
-    buildImageFingerprint(initialImageUrl ? "existing" : undefined, initialImageUrl),
-  );
+  const initialImageFingerprintRef = useRef(initialImageUrl ?? "");
   const POLL_INTERVAL_MS = 6000;
   const POLL_TIMEOUT_MS = 240000;
   const unsplashAccessKey = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY?.trim() ?? "";
@@ -356,10 +478,15 @@ export default function NewPostModal({
     setPostType("quickPostLinkedin");
     setStylePreset(StylePreset.PROFESSIONAL);
     setContent(initialContent ?? "");
-    setImageFile(undefined);
-    setImagePreviewUrl(initialImageUrl);
-    setImageSource(initialImageUrl ? "existing" : undefined);
-    setImageMimeType(undefined);
+    // Revoke any previously generated blob: URLs
+    objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    objectUrlsRef.current.clear();
+    setMediaFiles([]);
+    setMediaPreviews(initialImageUrl ? [initialImageUrl] : []);
+    setMediaSources(initialImageUrl ? ["existing"] : []);
+    setMediaType(null);
+    setMediaSource(initialImageUrl ? "existing" : undefined);
+    setMediaError(null);
     setResolvedLinkedinPreviewUrl(null);
     setPromptError(null);
     setActiveDraftId(null);
@@ -396,10 +523,7 @@ export default function NewPostModal({
     setIsDiscardConfirmOpen(false);
     previewMediaFetchStateRef.current = { postId: null, status: "idle" };
     initialContentRef.current = initialContent ?? "";
-    initialImageFingerprintRef.current = buildImageFingerprint(
-      initialImageUrl ? "existing" : undefined,
-      initialImageUrl,
-    );
+    initialImageFingerprintRef.current = initialImageUrl ?? "";
     unsplashInFlightRef.current = "";
     pexelsInFlightRef.current = "";
     pollInFlightRef.current = false;
@@ -457,19 +581,20 @@ export default function NewPostModal({
     setPostMediaUrns([]);
     setResolvedLinkedinPreviewUrl(null);
     setIsResolvingPreviewMedia(false);
-    setImageFile(undefined);
-    setImagePreviewUrl(initialImageUrl);
-    setImageSource(initialImageUrl ? "existing" : undefined);
-    setImageMimeType(undefined);
+    objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    objectUrlsRef.current.clear();
+    setMediaFiles([]);
+    setMediaPreviews(initialImageUrl ? [initialImageUrl] : []);
+    setMediaSources(initialImageUrl ? ["existing"] : []);
+    setMediaType(null);
+    setMediaSource(initialImageUrl ? "existing" : undefined);
+    setMediaError(null);
     setHasUserSelectedStockImage(false);
     setIsDiscardConfirmOpen(false);
     setIsSchedulePopoverOpen(false);
     setScheduleError(null);
     initialContentRef.current = initialContent ?? "";
-    initialImageFingerprintRef.current = buildImageFingerprint(
-      initialImageUrl ? "existing" : undefined,
-      initialImageUrl,
-    );
+    initialImageFingerprintRef.current = initialImageUrl ?? "";
   }, [initialContent, initialImageUrl, isOpen, mode, postId]);
 
   useEffect(() => {
@@ -501,8 +626,7 @@ export default function NewPostModal({
       return;
     }
     const isContentDirty = content !== initialContentRef.current;
-    const isImageDirty =
-      buildImageFingerprint(imageSource, imagePreviewUrl) !== initialImageFingerprintRef.current;
+    const isImageDirty = mediaPreviews.join("|") !== initialImageFingerprintRef.current;
     const resolvedPostId = postId ?? activeDraftId ?? undefined;
     const shouldConfirmDiscard =
       phase === "editor" && Boolean(resolvedPostId) && (isContentDirty || isImageDirty);
@@ -514,8 +638,7 @@ export default function NewPostModal({
   }, [
     activeDraftId,
     content,
-    imagePreviewUrl,
-    imageSource,
+    mediaPreviews,
     isSchedulePopoverOpen,
     onClose,
     phase,
@@ -912,9 +1035,9 @@ export default function NewPostModal({
         window.clearInterval(streamTimerRef.current);
         streamTimerRef.current = null;
       }
-      if (generatedObjectUrlRef.current) {
-        URL.revokeObjectURL(generatedObjectUrlRef.current);
-      }
+      objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      objectUrlsRef.current.clear();
+      if (mediaErrorTimerRef.current) clearTimeout(mediaErrorTimerRef.current);
     };
   }, []);
 
@@ -922,8 +1045,7 @@ export default function NewPostModal({
   const isNearLimit = charsUsed >= Math.floor(maxChars * 0.85);
   const isOverLimit = charsUsed > maxChars;
   const isContentDirty = content !== initialContentRef.current;
-  const isImageDirty =
-    buildImageFingerprint(imageSource, imagePreviewUrl) !== initialImageFingerprintRef.current;
+  const isImageDirty = mediaPreviews.join("|") !== initialImageFingerprintRef.current;
   const isDirty = isContentDirty || isImageDirty;
   const resolvedPostId = postId ?? activeDraftId ?? undefined;
   const canSaveDraft =
@@ -933,7 +1055,7 @@ export default function NewPostModal({
     !isOverLimit &&
     pendingAction === null;
   const hasContent = content.trim().length > 0;
-  const hasPreviewContent = hasContent || Boolean(imagePreviewUrl ?? resolvedLinkedinPreviewUrl);
+  const hasPreviewContent = hasContent || mediaPreviews.length > 0 || Boolean(resolvedLinkedinPreviewUrl);
   const progressSegments = [0, 1, 2, 3].map((index) => {
     const segmentStart = index * 25;
     const segmentFill = ((progressPercent - segmentStart) / 25) * 100;
@@ -1167,24 +1289,106 @@ export default function NewPostModal({
     }
   };
 
-  const handleFileChange = (file?: File) => {
-    if (!file) {
+  const MAX_MEDIA_SIZE = 200 * 1024 * 1024; // 200 MB
+  const MAX_IMAGES = 20;
+
+  const showMediaError = (msg: string) => {
+    setMediaError(msg);
+    if (mediaErrorTimerRef.current) clearTimeout(mediaErrorTimerRef.current);
+    mediaErrorTimerRef.current = setTimeout(() => setMediaError(null), 4000);
+  };
+
+  const removeMedia = (index: number) => {
+    const preview = mediaPreviews[index];
+    const source = mediaSources[index];
+
+    if (source === "device" && preview?.startsWith("blob:")) {
+      URL.revokeObjectURL(preview);
+      objectUrlsRef.current.delete(preview);
+      // Remove the corresponding File (count device items before this index)
+      const deviceIndexBefore = mediaSources.slice(0, index).filter((s) => s === "device").length;
+      setMediaFiles((prev) => prev.filter((_, i) => i !== deviceIndexBefore));
+    }
+
+    const newPreviews = mediaPreviews.filter((_, i) => i !== index);
+    const newSources = mediaSources.filter((_, i) => i !== index);
+    setMediaPreviews(newPreviews);
+    setMediaSources(newSources);
+
+    if (newPreviews.length === 0) {
+      setMediaType(null);
+      setMediaSource(undefined);
+      setHasUserSelectedStockImage(false);
+    }
+  };
+
+  const handleFilesChange = (incoming: File[]) => {
+    if (!incoming.length) return;
+
+    // Determine incoming type
+    const allImages = incoming.every(
+      (f) => f.type === "image/jpeg" || f.type === "image/png",
+    );
+    const hasVideoIncoming = incoming.some((f) => f.type.startsWith("video/"));
+    const incomingType: "images" | "video" = hasVideoIncoming ? "video" : "images";
+
+    // Format validation
+    if (!allImages && !hasVideoIncoming) {
+      showMediaError("Only JPEG/PNG images or a single video are supported.");
+      return;
+    }
+    if (hasVideoIncoming && incoming.length > 1) {
+      showMediaError("Please select a single video file.");
+      return;
+    }
+    if (incomingType === "images") {
+      const badFormat = incoming.find(
+        (f) => f.type !== "image/jpeg" && f.type !== "image/png",
+      );
+      if (badFormat) {
+        showMediaError("Only JPEG and PNG images are supported.");
+        return;
+      }
+    }
+
+    // Type-mixing guard
+    if (mediaType !== null && mediaType !== incomingType) {
+      showMediaError(
+        incomingType === "video"
+          ? "Remove your images before adding a video."
+          : "Remove the video before adding images.",
+      );
       return;
     }
 
-    if (generatedObjectUrlRef.current) {
-      URL.revokeObjectURL(generatedObjectUrlRef.current);
-      generatedObjectUrlRef.current = null;
+    // Count limit (images)
+    if (incomingType === "images" && mediaPreviews.length + incoming.length > MAX_IMAGES) {
+      showMediaError(`LinkedIn allows up to ${MAX_IMAGES} images per post.`);
+      return;
     }
 
-    const objectUrl = URL.createObjectURL(file);
-    generatedObjectUrlRef.current = objectUrl;
-    setImageFile(file);
-    setImagePreviewUrl(objectUrl);
-    setImageSource("device");
-    setImageMimeType(file.type || undefined);
+    // Size limit
+    const bigFile = incoming.find((f) => f.size > MAX_MEDIA_SIZE);
+    if (bigFile) {
+      showMediaError(`"${bigFile.name}" exceeds the 200 MB file size limit.`);
+      return;
+    }
+
+    // All valid — create object URLs and update state
+    const newUrls = incoming.map((f) => URL.createObjectURL(f));
+    newUrls.forEach((url) => objectUrlsRef.current.add(url));
+
+    setMediaFiles((prev) => [...prev, ...incoming]);
+    setMediaPreviews((prev) => [...prev, ...newUrls]);
+    setMediaSources((prev) => [...prev, ...incoming.map(() => "device" as const)]);
+    setMediaType(incomingType);
+    setMediaSource("device");
+    setMediaError(null);
     setResolvedLinkedinPreviewUrl(null);
     setHasUserSelectedStockImage(false);
+
+    // Reset input so same file can be re-added after removal
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const openUnsplashModal = () => {
@@ -1233,20 +1437,24 @@ export default function NewPostModal({
 
   const handleSelectUnsplashPhoto = (photo: UnsplashPhoto) => {
     const selectedUrl = photo.urls?.regular ?? photo.urls?.small;
-    if (!selectedUrl) {
+    if (!selectedUrl) return;
+    if (mediaType === "video") {
+      showMediaError("Remove the video before adding images.");
       return;
     }
-    setImageFile(undefined);
-    setImagePreviewUrl(selectedUrl);
-    setImageSource("unsplash");
-    setImageMimeType(undefined);
+    if (mediaPreviews.length >= MAX_IMAGES) {
+      showMediaError(`LinkedIn allows up to ${MAX_IMAGES} images per post.`);
+      return;
+    }
+    setMediaPreviews((prev) => [...prev, selectedUrl]);
+    setMediaSources((prev) => [...prev, "unsplash"]);
+    setMediaType("images");
+    setMediaSource("unsplash");
     setResolvedLinkedinPreviewUrl(null);
     setIsUnsplashModalOpen(false);
     setSelectedMediaSource("unsplash");
     setHasUserSelectedStockImage(true);
-    window.requestAnimationFrame(() => {
-      editorRef.current?.focus();
-    });
+    window.requestAnimationFrame(() => editorRef.current?.focus());
   };
 
   const runPexelsSearch = () => {
@@ -1261,20 +1469,24 @@ export default function NewPostModal({
 
   const handleSelectPexelsPhoto = (photo: PexelsPhoto) => {
     const selectedUrl = photo.src?.large2x ?? photo.src?.large ?? photo.src?.medium ?? photo.src?.original;
-    if (!selectedUrl) {
+    if (!selectedUrl) return;
+    if (mediaType === "video") {
+      showMediaError("Remove the video before adding images.");
       return;
     }
-    setImageFile(undefined);
-    setImagePreviewUrl(selectedUrl);
-    setImageSource("pexels");
-    setImageMimeType(undefined);
+    if (mediaPreviews.length >= MAX_IMAGES) {
+      showMediaError(`LinkedIn allows up to ${MAX_IMAGES} images per post.`);
+      return;
+    }
+    setMediaPreviews((prev) => [...prev, selectedUrl]);
+    setMediaSources((prev) => [...prev, "pexels"]);
+    setMediaType("images");
+    setMediaSource("pexels");
     setResolvedLinkedinPreviewUrl(null);
     setIsPexelsModalOpen(false);
     setSelectedMediaSource("pexels");
     setHasUserSelectedStockImage(true);
-    window.requestAnimationFrame(() => {
-      editorRef.current?.focus();
-    });
+    window.requestAnimationFrame(() => editorRef.current?.focus());
   };
 
   const syncEditorSelection = () => {
@@ -1493,12 +1705,12 @@ export default function NewPostModal({
       return;
     }
     if (postMediaUrns.length === 0) {
-      if (!imagePreviewUrl) {
+      if (mediaPreviews.length === 0) {
         setResolvedLinkedinPreviewUrl(null);
       }
       return;
     }
-    if (imageFile || hasUserSelectedStockImage || isResolvingPreviewMedia) {
+    if (mediaFiles.length > 0 || hasUserSelectedStockImage || isResolvingPreviewMedia) {
       return;
     }
 
@@ -1516,7 +1728,7 @@ export default function NewPostModal({
           mediaResolveRequestSeqRef.current === requestSeq &&
           activePreviewPostIdRef.current === targetPostId &&
           resolvedUrl &&
-          !imageFile &&
+          mediaFiles.length === 0 &&
           !hasUserSelectedStockImage
         ) {
           setResolvedLinkedinPreviewUrl(resolvedUrl);
@@ -1539,8 +1751,8 @@ export default function NewPostModal({
     };
   }, [
     hasUserSelectedStockImage,
-    imageFile,
-    imagePreviewUrl,
+    mediaFiles,
+    mediaPreviews,
     isOpen,
     isPreviewVisible,
     isResolvingPreviewMedia,
@@ -1549,7 +1761,6 @@ export default function NewPostModal({
     resolveLinkedinMediaUrlFromCacheOrApi,
   ]);
 
-  const previewImageSrc = imagePreviewUrl ?? resolvedLinkedinPreviewUrl ?? undefined;
 
   const getScheduledTimeValue = () => {
     if (!scheduleDate || !scheduleTime) {
@@ -1587,18 +1798,22 @@ export default function NewPostModal({
 
   const buildPayload = (
     overrides?: Partial<Pick<NewPostSubmitPayload, "scheduledTime" | "timezone">>,
-  ): NewPostSubmitPayload => ({
-    mode,
-    postId: resolvedPostId,
-    content,
-    imageFile,
-    imageUrl: imagePreviewUrl,
-    imageSource,
-    imageMimeType,
-    aiPrompt,
-    postType,
-    ...overrides,
-  });
+  ): NewPostSubmitPayload => {
+    // Split previews: device blobs vs. stock URLs
+    const stockUrls = mediaPreviews.filter((_, i) => mediaSources[i] !== "device");
+    return {
+      mode,
+      postId: resolvedPostId,
+      content,
+      mediaFiles: mediaFiles.length > 0 ? mediaFiles : undefined,
+      mediaUrls: stockUrls.length > 0 ? stockUrls : undefined,
+      mediaSource,
+      mediaType: mediaType ?? undefined,
+      aiPrompt,
+      postType,
+      ...overrides,
+    };
+  };
 
   const runAction = async (
     action: "publish" | "schedule" | "save",
@@ -1610,7 +1825,7 @@ export default function NewPostModal({
       await callback(buildPayload(payloadOverrides));
       if (action === "save") {
         initialContentRef.current = content;
-        initialImageFingerprintRef.current = buildImageFingerprint(imageSource, imagePreviewUrl);
+        initialImageFingerprintRef.current = mediaPreviews.join("|");
       }
     } finally {
       setPendingAction(null);
@@ -1827,24 +2042,65 @@ export default function NewPostModal({
                       <input
                         ref={fileInputRef}
                         type="file"
-                        accept="image/png,image/jpeg,image/webp"
+                        accept="image/png,image/jpeg,video/*"
+                        multiple
                         className="hidden"
-                        onChange={(event) => handleFileChange(event.target.files?.[0])}
+                        onChange={(event) =>
+                          handleFilesChange(Array.from(event.target.files ?? []))
+                        }
                       />
+
+                      {/* ── Thumbnail strip (editor only) ── */}
+                      {mediaPreviews.length > 0 && (
+                        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                          {mediaPreviews.map((src, i) => (
+                            <div
+                              key={i}
+                              className="group/thumb relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-[#d6dae3] bg-[#f2f4f9]"
+                            >
+                              {mediaType === "video" ? (
+                                /* eslint-disable-next-line jsx-a11y/media-has-caption */
+                                <video
+                                  src={src}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <img
+                                  src={src}
+                                  alt={`Media ${i + 1}`}
+                                  referrerPolicy="no-referrer"
+                                  className="h-full w-full object-cover"
+                                />
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => removeMedia(i)}
+                                className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition group-hover/thumb:bg-black/40 group-hover/thumb:opacity-100"
+                                aria-label={`Remove media ${i + 1}`}
+                              >
+                                <X className="h-4 w-4 text-white drop-shadow" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div className="border-t border-[#dbe0ea] px-4 py-3 sm:px-5">
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="relative flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={openSelectedMediaSource}
-                            aria-label="Upload media"
-                            data-media-trigger="true"
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-text-primary)] transition hover:bg-[#f2f4f9]"
-                          >
-                            <ImagePlus className="h-5 w-5" />
-                          </button>
+                        <div className="flex flex-col gap-1.5">
+                          <div className="relative flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={openSelectedMediaSource}
+                              disabled={mediaType === "images" && mediaPreviews.length >= MAX_IMAGES}
+                              aria-label="Upload media"
+                              data-media-trigger="true"
+                              title="Add up to 20 images or 1 video"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-text-primary)] transition hover:bg-[#f2f4f9] disabled:pointer-events-none disabled:opacity-40"
+                            >
+                              <ImagePlus className="h-5 w-5" />
+                            </button>
                           <span className="h-7 w-px bg-[#d9dee8]" />
                           <button
                             type="button"
@@ -1969,6 +2225,21 @@ export default function NewPostModal({
                           >
                             <Hash className="h-5 w-5" />
                           </button>
+                          </div>
+                          {/* Media count + error */}
+                          {mediaPreviews.length > 0 && (
+                            <p className={`text-[11px] font-medium ${mediaPreviews.length >= MAX_IMAGES ? "text-rose-500" : "text-[var(--color-text-secondary)]"}`}>
+                              {mediaType === "video" ? "1 video" : `${mediaPreviews.length}/${MAX_IMAGES} images`}
+                            </p>
+                          )}
+                          {mediaError && (
+                            <p className="text-[11px] font-medium text-rose-500">{mediaError}</p>
+                          )}
+                          {!mediaPreviews.length && !mediaError && (
+                            <p className="text-[11px] text-[var(--color-text-secondary)]">
+                              {mediaType === "video" ? "1 video · max 200 MB" : "JPEG/PNG · up to 20 images or 1 video · 200 MB each"}
+                            </p>
+                          )}
                         </div>
                         <span
                           className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${isOverLimit
@@ -2046,16 +2317,14 @@ export default function NewPostModal({
                           {content}
                         </p>
                       ) : null}
-                      {previewImageSrc ? (
+                      {mediaPreviews.length > 0 ? (
+                        <MediaGrid srcs={mediaPreviews} type={mediaType} />
+                      ) : resolvedLinkedinPreviewUrl ? (
                         <img
-                          src={previewImageSrc}
+                          src={resolvedLinkedinPreviewUrl}
                           alt="Post preview"
                           referrerPolicy="no-referrer"
-                          onError={() => {
-                            if (!imagePreviewUrl) {
-                              setResolvedLinkedinPreviewUrl(null);
-                            }
-                          }}
+                          onError={() => setResolvedLinkedinPreviewUrl(null)}
                           className="mt-4 max-h-[360px] w-full rounded-xl border border-[var(--color-border)] object-cover"
                         />
                       ) : null}

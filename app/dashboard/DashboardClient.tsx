@@ -46,6 +46,8 @@ import type {
   FeatureLimitErrorResponse,
   PaymentUsageData,
   PaymentUsageResponse,
+  VideoUploadInitResponse,
+  VideoUploadStatusResponse,
 } from "../lib/types";
 import { FeatureLimitExceededError } from "../lib/types";
 
@@ -857,38 +859,39 @@ export default function DashboardPage({
       return;
     }
 
-    if (payload.imageFile) {
+    const hasDeviceMedia = payload.mediaFiles && payload.mediaFiles.length > 0;
+    const hasStockMedia = payload.mediaUrls && payload.mediaUrls.length > 0;
+    const hasAnyMedia = hasDeviceMedia || hasStockMedia;
+
+    if (hasAnyMedia) {
       if (!payload.postId) {
-        setConnectFeedback("Please save or generate this draft first before uploading a local image.");
+        setConnectFeedback("Please save or generate this draft first before uploading media.");
         return;
       }
       try {
-        await uploadImageForPost(payload.postId, payload.imageFile);
+        if (payload.mediaType === "video" && payload.mediaFiles?.[0]) {
+          await uploadVideoForPost(payload.postId, payload.mediaFiles[0], () => {});
+        } else {
+          // Upload device files
+          if (hasDeviceMedia) {
+            await uploadMediaForPost(payload.postId, payload.mediaFiles!);
+          }
+          // Fetch and upload stock images (Unsplash / Pexels)
+          if (hasStockMedia) {
+            const remoteFiles = await Promise.all(
+              payload.mediaUrls!.map((url, i) =>
+                buildFileFromRemoteImage(
+                  url,
+                  `${payload.mediaSource ?? "stock"}-image-${i}`,
+                ),
+              ),
+            );
+            await uploadMediaForPost(payload.postId, remoteFiles);
+          }
+        }
       } catch (error) {
         setConnectFeedback(
-          error instanceof Error ? error.message : "Image upload failed.",
-        );
-        return;
-      }
-    } else if (
-      (payload.imageSource === "unsplash" || payload.imageSource === "pexels") &&
-      payload.imageUrl
-    ) {
-      const sourceLabel = payload.imageSource === "pexels" ? "Pexels" : "Unsplash";
-      if (!payload.postId) {
-        setConnectFeedback(`Please save or generate this draft first before uploading a ${sourceLabel} image.`);
-        return;
-      }
-      try {
-        const remoteFile = await buildFileFromRemoteImage(
-          payload.imageUrl,
-          payload.imageSource === "pexels" ? "pexels-image" : "unsplash-image",
-          payload.imageMimeType,
-        );
-        await uploadImageForPost(payload.postId, remoteFile);
-      } catch (error) {
-        setConnectFeedback(
-          error instanceof Error ? error.message : `${sourceLabel} image upload failed.`,
+          error instanceof Error ? error.message : "Media upload failed.",
         );
         return;
       }
@@ -950,28 +953,88 @@ export default function DashboardPage({
     window.location.reload();
   };
 
-  const uploadImageForPost = async (postId: string, file: File): Promise<void> => {
-    const formData = new FormData();
-    formData.append("file", file);
+  const uploadMediaForPost = async (postId: string, files: File[]): Promise<void> => {
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append("file", file);
 
-    const response = await fetch(`${apiBase}/posts/${postId}/image`, {
-      method: "PUT",
+      const response = await fetch(`${apiBase}/posts/${postId}/image`, {
+        method: "PUT",
+        credentials: "include",
+        body: formData,
+      });
+
+      let parsedResponse: ImageUploadResponse | null = null;
+      try {
+        parsedResponse = (await response.json()) as ImageUploadResponse;
+      } catch {
+        parsedResponse = null;
+      }
+
+      if (!response.ok) {
+        throw new Error(parsedResponse?.message || "Image upload failed.");
+      }
+    }
+    setConnectFeedback("Media uploaded successfully.");
+  };
+
+  const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB per LinkedIn spec
+
+  const uploadVideoForPost = async (
+    postId: string,
+    file: File,
+    onProgress: (pct: number) => void,
+  ): Promise<void> => {
+    // 1. Initialize upload session
+    const initRes = await fetch(`${apiBase}/posts/${postId}/video`, {
+      method: "POST",
       credentials: "include",
-      body: formData,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileSize: file.size, fileName: file.name }),
     });
+    if (!initRes.ok) {
+      const json = await initRes.json().catch(() => ({}));
+      throw new Error((json as { message?: string }).message || "Failed to initialize video upload.");
+    }
+    const { data } = (await initRes.json()) as VideoUploadInitResponse;
+    const uploadUrl = data?.uploadUrl;
+    if (!uploadUrl) throw new Error("No upload URL returned from server.");
 
-    let parsedResponse: ImageUploadResponse | null = null;
-    try {
-      parsedResponse = (await response.json()) as ImageUploadResponse;
-    } catch {
-      parsedResponse = null;
+    // 2. Upload in 4 MB chunks
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, file.size);
+      const chunk = file.slice(start, end);
+      const chunkRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Range": `bytes ${start}-${end - 1}/${file.size}`,
+          "Content-Type": file.type,
+        },
+        body: chunk,
+      });
+      if (!chunkRes.ok) throw new Error(`Chunk ${i + 1}/${totalChunks} upload failed.`);
+      onProgress(Math.round(((i + 1) / totalChunks) * 90)); // 0–90% = upload phase
     }
 
-    if (!response.ok) {
-      throw new Error(parsedResponse?.message || "Image upload failed.");
+    // 3. Poll for video availability (max 60 s)
+    const deadline = Date.now() + 60_000;
+    while (Date.now() < deadline) {
+      await new Promise<void>((r) => setTimeout(r, 2000));
+      const statusRes = await fetch(`${apiBase}/posts/${postId}/video/status`, {
+        credentials: "include",
+      });
+      const statusJson = (await statusRes.json()) as VideoUploadStatusResponse;
+      if (statusJson.data?.status === "AVAILABLE") {
+        onProgress(100);
+        return;
+      }
+      if (statusJson.data?.status === "FAILED") {
+        throw new Error("Video processing failed on the server.");
+      }
     }
-
-    setConnectFeedback(parsedResponse?.message || "Image upload successful.");
+    throw new Error("Video availability timed out after 60 seconds.");
   };
 
   const buildFileFromRemoteImage = async (
