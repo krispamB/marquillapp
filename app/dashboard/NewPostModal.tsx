@@ -371,9 +371,7 @@ export default function NewPostModal({
     initialImageUrl ? "existing" : undefined,
   );
   const [mediaError, setMediaError] = useState<string | null>(null);
-  const [resolvedLinkedinPreviewUrl, setResolvedLinkedinPreviewUrl] = useState<string | null>(
-    null,
-  );
+  const [resolvedLinkedinPreviewUrls, setResolvedLinkedinPreviewUrls] = useState<string[]>([]);
   const [pendingAction, setPendingAction] = useState<
     "publish" | "schedule" | "save" | "generate" | null
   >(null);
@@ -487,7 +485,7 @@ export default function NewPostModal({
     setMediaType(null);
     setMediaSource(initialImageUrl ? "existing" : undefined);
     setMediaError(null);
-    setResolvedLinkedinPreviewUrl(null);
+    setResolvedLinkedinPreviewUrls([]);
     setPromptError(null);
     setActiveDraftId(null);
     setProgressPercent(0);
@@ -550,7 +548,7 @@ export default function NewPostModal({
     setIsSchedulePopoverOpen(false);
     setScheduleError(null);
     setIsResolvingPreviewMedia(false);
-    setResolvedLinkedinPreviewUrl(null);
+    setResolvedLinkedinPreviewUrls([]);
     setIsDiscardConfirmOpen(false);
     previewMediaFetchStateRef.current = { postId: null, status: "idle" };
     activePreviewPostIdRef.current = null;
@@ -579,7 +577,7 @@ export default function NewPostModal({
     activePreviewPostIdRef.current = postId ?? null;
     previewMediaFetchStateRef.current = { postId: postId ?? null, status: "idle" };
     setPostMediaUrns([]);
-    setResolvedLinkedinPreviewUrl(null);
+    setResolvedLinkedinPreviewUrls([]);
     setIsResolvingPreviewMedia(false);
     objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     objectUrlsRef.current.clear();
@@ -1055,7 +1053,7 @@ export default function NewPostModal({
     !isOverLimit &&
     pendingAction === null;
   const hasContent = content.trim().length > 0;
-  const hasPreviewContent = hasContent || mediaPreviews.length > 0 || Boolean(resolvedLinkedinPreviewUrl);
+  const hasPreviewContent = hasContent || mediaPreviews.length > 0 || resolvedLinkedinPreviewUrls.length > 0;
   const progressSegments = [0, 1, 2, 3].map((index) => {
     const segmentStart = index * 25;
     const segmentFill = ((progressPercent - segmentStart) / 25) * 100;
@@ -1384,7 +1382,7 @@ export default function NewPostModal({
     setMediaType(incomingType);
     setMediaSource("device");
     setMediaError(null);
-    setResolvedLinkedinPreviewUrl(null);
+    setResolvedLinkedinPreviewUrls([]);
     setHasUserSelectedStockImage(false);
 
     // Reset input so same file can be re-added after removal
@@ -1450,7 +1448,7 @@ export default function NewPostModal({
     setMediaSources((prev) => [...prev, "unsplash"]);
     setMediaType("images");
     setMediaSource("unsplash");
-    setResolvedLinkedinPreviewUrl(null);
+    setResolvedLinkedinPreviewUrls([]);
     setIsUnsplashModalOpen(false);
     setSelectedMediaSource("unsplash");
     setHasUserSelectedStockImage(true);
@@ -1482,7 +1480,7 @@ export default function NewPostModal({
     setMediaSources((prev) => [...prev, "pexels"]);
     setMediaType("images");
     setMediaSource("pexels");
-    setResolvedLinkedinPreviewUrl(null);
+    setResolvedLinkedinPreviewUrls([]);
     setIsPexelsModalOpen(false);
     setSelectedMediaSource("pexels");
     setHasUserSelectedStockImage(true);
@@ -1629,6 +1627,70 @@ export default function NewPostModal({
     [onGetLinkedinImageByUrn],
   );
 
+  /**
+   * Resolves ALL LinkedIn media URNs in parallel (cache-first, then API).
+   * Unlike resolveLinkedinMediaUrlFromCacheOrApi which stops at the first
+   * success, this returns one URL per URN so multi-image posts preview correctly.
+   */
+  const resolveAllLinkedinMediaUrls = useCallback(
+    async (urns: string[]): Promise<string[]> => {
+      if (!onGetLinkedinImageByUrn) return [];
+
+      const results = await Promise.all(
+        urns.map(async (urn): Promise<string | null> => {
+          const normalizedUrn = urn.trim();
+          if (!normalizedUrn) return null;
+
+          // Cache-first
+          try {
+            const cachedRaw = window.localStorage.getItem(normalizedUrn);
+            if (cachedRaw) {
+              const cached = JSON.parse(cachedRaw) as CachedLinkedinImage;
+              if (
+                typeof cached?.downloadUrl === "string" &&
+                cached.downloadUrl.length > 0 &&
+                typeof cached?.downloadUrlExpiresAt === "number" &&
+                cached.downloadUrlExpiresAt > Date.now()
+              ) {
+                return cached.downloadUrl;
+              }
+            }
+          } catch {
+            // Fall through to API.
+          }
+
+          // API fetch
+          try {
+            const details = await onGetLinkedinImageByUrn(normalizedUrn);
+            const resolvedUrl = details?.data?.downloadUrl;
+            const resolvedExpiry = details?.data?.downloadUrlExpiresAt;
+            if (typeof resolvedUrl === "string" && resolvedUrl.length > 0 && typeof resolvedExpiry === "number") {
+              try {
+                window.localStorage.setItem(
+                  normalizedUrn,
+                  JSON.stringify({
+                    downloadUrl: resolvedUrl,
+                    downloadUrlExpiresAt: resolvedExpiry,
+                  } satisfies CachedLinkedinImage),
+                );
+              } catch {
+                // Ignore write errors.
+              }
+              return resolvedUrl;
+            }
+          } catch {
+            // Return null for this URN.
+          }
+
+          return null;
+        }),
+      );
+
+      return results.filter((url): url is string => typeof url === "string" && url.length > 0);
+    },
+    [onGetLinkedinImageByUrn],
+  );
+
   useEffect(() => {
     if (!isOpen || !isPreviewVisible) {
       return;
@@ -1663,7 +1725,7 @@ export default function NewPostModal({
         ) {
           setPostMediaUrns(urns);
           if (urns.length === 0) {
-            setResolvedLinkedinPreviewUrl(null);
+            setResolvedLinkedinPreviewUrls([]);
           }
           previewMediaFetchStateRef.current = { postId: targetPostId, status: "done" };
           completed = true;
@@ -1706,7 +1768,7 @@ export default function NewPostModal({
     }
     if (postMediaUrns.length === 0) {
       if (mediaPreviews.length === 0) {
-        setResolvedLinkedinPreviewUrl(null);
+        setResolvedLinkedinPreviewUrls([]);
       }
       return;
     }
@@ -1722,16 +1784,16 @@ export default function NewPostModal({
     const resolvePreviewMedia = async () => {
       setIsResolvingPreviewMedia(true);
       try {
-        const resolvedUrl = await resolveLinkedinMediaUrlFromCacheOrApi(postMediaUrns);
+        const resolvedUrls = await resolveAllLinkedinMediaUrls(postMediaUrns);
         if (
           !cancelled &&
           mediaResolveRequestSeqRef.current === requestSeq &&
           activePreviewPostIdRef.current === targetPostId &&
-          resolvedUrl &&
+          resolvedUrls.length > 0 &&
           mediaFiles.length === 0 &&
           !hasUserSelectedStockImage
         ) {
-          setResolvedLinkedinPreviewUrl(resolvedUrl);
+          setResolvedLinkedinPreviewUrls(resolvedUrls);
         }
       } finally {
         if (
@@ -1758,7 +1820,7 @@ export default function NewPostModal({
     isResolvingPreviewMedia,
     postId,
     postMediaUrns,
-    resolveLinkedinMediaUrlFromCacheOrApi,
+    resolveAllLinkedinMediaUrls,
   ]);
 
 
@@ -2347,13 +2409,10 @@ export default function NewPostModal({
                       ) : null}
                       {mediaPreviews.length > 0 ? (
                         <MediaGrid srcs={mediaPreviews} type={mediaType} />
-                      ) : resolvedLinkedinPreviewUrl ? (
-                        <img
-                          src={resolvedLinkedinPreviewUrl}
-                          alt="Post preview"
-                          referrerPolicy="no-referrer"
-                          onError={() => setResolvedLinkedinPreviewUrl(null)}
-                          className="mt-4 max-h-[360px] w-full rounded-xl border border-[var(--color-border)] object-cover"
+                      ) : resolvedLinkedinPreviewUrls.length > 0 ? (
+                        <MediaGrid
+                          srcs={resolvedLinkedinPreviewUrls}
+                          type="images"
                         />
                       ) : null}
                     </>
