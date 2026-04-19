@@ -23,8 +23,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ApiError, apiFetch } from 'src/common/HelperFn/apiFetch.helper';
 import { EncryptionService } from 'src/encryption/encryption.service';
-import { ILinkedInPost } from './post.interface';
-import { formatLinkedinContent } from 'src/common/HelperFn';
+import { IContent, ILinkedInPost, IVideoInitResponse } from './post.interface';
+import { delay, formatLinkedinContent } from 'src/common/HelperFn';
 import { FeatureGatingService } from '../feature-gating/feature-gating.service';
 
 interface PostFilters {
@@ -271,20 +271,24 @@ export class PostService {
     );
 
     const url = `${this.LINKEDIN_API_BASE}/posts`;
-    const firstMedia = post.media?.[0];
+    const images = (post.media ?? []).filter((m) => m.type === 'IMAGE');
+    const videos = (post.media ?? []).filter((m) => m.type === 'VIDEO');
+
+    let content: IContent | undefined;
+    if (videos.length === 1) {
+      content = { media: { id: videos[0].id, title: videos[0].title } };
+    } else if (images.length === 1) {
+      content = { media: { id: images[0].id, title: images[0].title, altText: images[0].altText } };
+    } else if (images.length > 1) {
+      content = { multiImage: { images: images.map((m) => ({ id: m.id, altText: m.altText })) } };
+    }
+
     const data: ILinkedInPost = {
       author: this.resolveLinkedinAuthorUrn(connectedAccount),
       commentary: post.content
         ? formatLinkedinContent(post.content)
         : undefined,
-      content: firstMedia
-        ? {
-            media: {
-              id: firstMedia.id,
-              title: firstMedia.title,
-            },
-          }
-        : undefined,
+      content,
       visibility: 'PUBLIC',
       distribution: {
         feedDistribution: 'MAIN_FEED',
@@ -397,8 +401,12 @@ export class PostService {
   async addLinkedinMedia(
     user: User,
     postId: string,
-    file: Express.Multer.File,
+    files: Express.Multer.File[],
   ) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No files provided');
+    }
+
     const post = await this.postDraftModel.findById(postId);
     if (!post) {
       throw new NotFoundException('Post not found');
@@ -412,6 +420,25 @@ export class PostService {
       throw new BadRequestException('Post is already published');
     }
 
+    const imageFiles = files.filter((f) => f.mimetype.startsWith('image/'));
+    const videoFiles = files.filter((f) => f.mimetype.startsWith('video/'));
+
+    if (imageFiles.length > 0 && videoFiles.length > 0) {
+      throw new BadRequestException('Cannot mix images and videos in one post');
+    }
+    if (videoFiles.length > 1) {
+      throw new BadRequestException('Only one video per post is allowed');
+    }
+
+    const allowedImageMimes = new Set(['image/jpeg', 'image/png']);
+    for (const f of imageFiles) {
+      if (!allowedImageMimes.has(f.mimetype)) {
+        throw new BadRequestException(
+          `Unsupported image format: ${f.mimetype}. Use JPEG or PNG`,
+        );
+      }
+    }
+
     const connectedAccount = await this.getOwnedUsableLinkedinConnectedAccount(
       user._id.toString(),
       post.connectedAccount.toString(),
@@ -422,26 +449,25 @@ export class PostService {
       connectedAccount.accessToken!,
     );
 
-    const urn = await this.uploadLinkedinImage(
-      this.resolveLinkedinAuthorUrn(connectedAccount),
-      accessToken,
-      file,
-    );
-    if (post.media) {
-      post.media.push({
-        id: urn,
-        title: file.originalname,
-        altText: file.originalname,
-      });
+    const ownerUrn = this.resolveLinkedinAuthorUrn(connectedAccount);
+    const newMediaItems: NonNullable<typeof post.media> = [];
+
+    if (videoFiles.length === 1) {
+      const urn = await this.uploadLinkedinVideo(ownerUrn, accessToken, videoFiles[0]);
+      newMediaItems.push({ id: urn, type: 'VIDEO', title: videoFiles[0].originalname });
     } else {
-      post.media = [
-        {
+      for (const file of imageFiles) {
+        const urn = await this.uploadLinkedinImage(ownerUrn, accessToken, file);
+        newMediaItems.push({
           id: urn,
+          type: 'IMAGE',
           title: file.originalname,
           altText: file.originalname,
-        },
-      ];
+        });
+      }
     }
+
+    post.media = [...(post.media ?? []), ...newMediaItems];
     await post.save();
   }
 
@@ -501,6 +527,107 @@ export class PostService {
       }
       throw error;
     }
+  }
+
+  private async uploadLinkedinVideo(
+    ownerUrn: string,
+    accessToken: string,
+    file: Express.Multer.File,
+  ): Promise<string> {
+    const CHUNK_SIZE = 4_194_304;
+    const linkedinHeaders = {
+      'Content-Type': 'application/json',
+      'X-Restli-Protocol-Version': '2.0.0',
+      'LinkedIn-Version': '202601',
+      Authorization: `Bearer ${accessToken}`,
+    };
+
+    const initRes = await apiFetch<IVideoInitResponse>(
+      `${this.LINKEDIN_API_BASE}/videos?action=initializeUpload`,
+      {
+        method: 'POST',
+        headers: linkedinHeaders,
+        body: JSON.stringify({
+          initializeUploadRequest: {
+            owner: ownerUrn,
+            fileSizeBytes: file.size,
+            uploadCaptions: false,
+            uploadThumbnail: false,
+          },
+        }),
+      },
+    );
+
+    const { video: videoUrn, uploadToken, uploadInstructions } =
+      initRes.data.value;
+
+    const eTags: string[] = [];
+    for (const instruction of uploadInstructions) {
+      const chunk = file.buffer.slice(instruction.firstByte, instruction.lastByte + 1);
+      const { response } = await apiFetch<void>(instruction.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: chunk as any,
+        ...({ duplex: 'half' } as any),
+      });
+      const etag = response.headers.get('etag') ?? response.headers.get('ETag');
+      if (!etag) {
+        throw new InternalServerErrorException(
+          'LinkedIn video chunk upload did not return an ETag',
+        );
+      }
+      eTags.push(etag);
+    }
+
+    await apiFetch(`${this.LINKEDIN_API_BASE}/videos?action=finalizeUpload`, {
+      method: 'POST',
+      headers: linkedinHeaders,
+      body: JSON.stringify({
+        finalizeUploadRequest: {
+          video: videoUrn,
+          uploadToken,
+          uploadedPartIds: eTags,
+        },
+      }),
+    });
+
+    await this.waitForVideoAvailable(videoUrn, accessToken);
+    return videoUrn;
+  }
+
+  private async waitForVideoAvailable(
+    videoUrn: string,
+    accessToken: string,
+    timeoutMs = 60_000,
+  ): Promise<void> {
+    const encodedUrn = encodeURIComponent(videoUrn);
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      await delay(3000);
+      const { data } = await apiFetch<{ status: string }>(
+        `${this.LINKEDIN_API_BASE}/videos/${encodedUrn}`,
+        {
+          method: 'GET',
+          headers: {
+            'X-Restli-Protocol-Version': '2.0.0',
+            'LinkedIn-Version': '202601',
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+
+      if (data.status === 'AVAILABLE') return;
+      if (data.status === 'PROCESSING_FAILED') {
+        throw new InternalServerErrorException(
+          'LinkedIn video processing failed',
+        );
+      }
+    }
+
+    throw new InternalServerErrorException(
+      'Timed out waiting for LinkedIn video to become available',
+    );
   }
 
   async getLinkedinImage(user: User, urn: string) {

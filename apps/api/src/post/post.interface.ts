@@ -16,14 +16,22 @@ export interface IContent {
   media?: {
     title?: string;
     id: string;
+    altText?: string;
   };
-  multiImage?: any;
+  multiImage?: {
+    images: { id: string; altText?: string }[];
+  };
 }
 
-export interface IShareMedia {
-  status: string; // READY
-  description?: string;
-  media?: string; //DigitalMediaAsset URN
-  originalUrl?: string;
-  title?: string;
+export interface IVideoInitResponse {
+  value: {
+    video: string;
+    uploadToken: string;
+    uploadUrlsExpireAt: number;
+    uploadInstructions: {
+      uploadUrl: string;
+      firstByte: number;
+      lastByte: number;
+    }[];
+  };
 }

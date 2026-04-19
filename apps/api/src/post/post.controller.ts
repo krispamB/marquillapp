@@ -10,7 +10,7 @@ import {
   Post,
   Put,
   Query,
-  UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -21,7 +21,7 @@ import { JwtAuthGuard, SubscriptionAccessGuard } from '../common/guards';
 import { IAppResponse } from 'src/common/interfaces';
 import { GetUser } from 'src/common/decorators';
 import { User } from 'src/database/schemas';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import type { GetPostsResult } from './post.service';
 
 @UseGuards(JwtAuthGuard)
@@ -44,17 +44,17 @@ export class PostController {
     };
   }
 
-  @Put(':id/image')
-  @UseInterceptors(FileInterceptor('file'))
-  async getUploadUrl(
+  @Put(':id/media')
+  @UseInterceptors(FilesInterceptor('files', 20, { limits: { fileSize: 200 * 1024 * 1024 } }))
+  async uploadMedia(
     @GetUser() user: User,
     @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles() files: Express.Multer.File[],
   ): Promise<IAppResponse> {
-    await this.postService.addLinkedinMedia(user, id, file);
+    await this.postService.addLinkedinMedia(user, id, files);
     return {
       statusCode: HttpStatus.OK,
-      message: 'Image Upload Successful',
+      message: 'Media uploaded successfully',
     };
   }
 

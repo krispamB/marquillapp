@@ -48,6 +48,7 @@ export class PostDraft extends Document {
     raw([
       {
         id: { type: String, required: true },
+        type: { type: String, enum: ['IMAGE', 'VIDEO'], required: true },
         title: { type: String },
         altText: { type: String },
       },
@@ -55,6 +56,7 @@ export class PostDraft extends Document {
   )
   media?: {
     id: string;
+    type: 'IMAGE' | 'VIDEO';
     title?: string;
     altText?: string;
   }[];
