@@ -29,6 +29,7 @@ import {
   X,
 } from "lucide-react";
 import { UserAvatar, CustomSelect, type SelectOption } from "./components";
+import { ReschedulePopover } from "../posts/ReschedulePopover";
 import type {
   DraftStatusResponse,
   LinkedinImageDetailsResponse,
@@ -387,9 +388,6 @@ export default function NewPostModal({
   const [isUnsplashModalOpen, setIsUnsplashModalOpen] = useState(false);
   const [isPexelsModalOpen, setIsPexelsModalOpen] = useState(false);
   const [isSchedulePopoverOpen, setIsSchedulePopoverOpen] = useState(false);
-  const [scheduleDate, setScheduleDate] = useState("");
-  const [scheduleTime, setScheduleTime] = useState("");
-  const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [unsplashQuery, setUnsplashQuery] = useState(DEFAULT_UNSPLASH_QUERY);
   const [unsplashCommittedQuery, setUnsplashCommittedQuery] = useState(DEFAULT_UNSPLASH_QUERY);
   const [unsplashImages, setUnsplashImages] = useState<UnsplashPhoto[]>([]);
@@ -414,8 +412,7 @@ export default function NewPostModal({
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
   const mediaMenuRef = useRef<HTMLDivElement | null>(null);
-  const schedulePopoverRef = useRef<HTMLDivElement | null>(null);
-  const scheduleDateInputRef = useRef<HTMLInputElement | null>(null);
+
   const unsplashModalRef = useRef<HTMLDivElement | null>(null);
   const unsplashScrollRef = useRef<HTMLDivElement | null>(null);
   const unsplashSentinelRef = useRef<HTMLDivElement | null>(null);
@@ -498,9 +495,6 @@ export default function NewPostModal({
     setIsUnsplashModalOpen(false);
     setIsPexelsModalOpen(false);
     setIsSchedulePopoverOpen(false);
-    setScheduleDate("");
-    setScheduleTime("");
-    setScheduleError(null);
     setUnsplashQuery(DEFAULT_UNSPLASH_QUERY);
     setUnsplashCommittedQuery(DEFAULT_UNSPLASH_QUERY);
     setUnsplashImages([]);
@@ -546,7 +540,6 @@ export default function NewPostModal({
     setIsUnsplashModalOpen(false);
     setIsPexelsModalOpen(false);
     setIsSchedulePopoverOpen(false);
-    setScheduleError(null);
     setIsResolvingPreviewMedia(false);
     setResolvedLinkedinPreviewUrls([]);
     setIsDiscardConfirmOpen(false);
@@ -590,7 +583,6 @@ export default function NewPostModal({
     setHasUserSelectedStockImage(false);
     setIsDiscardConfirmOpen(false);
     setIsSchedulePopoverOpen(false);
-    setScheduleError(null);
     initialContentRef.current = initialContent ?? "";
     initialImageFingerprintRef.current = initialImageUrl ?? "";
   }, [initialContent, initialImageUrl, isOpen, mode, postId]);
@@ -620,7 +612,6 @@ export default function NewPostModal({
   const requestClose = useCallback(() => {
     if (isSchedulePopoverOpen) {
       setIsSchedulePopoverOpen(false);
-      setScheduleError(null);
       return;
     }
     const isContentDirty = content !== initialContentRef.current;
@@ -668,7 +659,6 @@ export default function NewPostModal({
         if (isSchedulePopoverOpen) {
           event.preventDefault();
           setIsSchedulePopoverOpen(false);
-          setScheduleError(null);
           return;
         }
         if (isMediaMenuOpen) {
@@ -792,38 +782,6 @@ export default function NewPostModal({
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [isMediaMenuOpen]);
 
-  useEffect(() => {
-    if (!isSchedulePopoverOpen) {
-      return;
-    }
-    const handlePointerDown = (event: globalThis.MouseEvent) => {
-      const target = event.target as Node | null;
-      if (!target) {
-        return;
-      }
-      if (schedulePopoverRef.current?.contains(target)) {
-        return;
-      }
-      if (target instanceof Element && target.closest("[data-schedule-trigger='true']")) {
-        return;
-      }
-      setIsSchedulePopoverOpen(false);
-      setScheduleError(null);
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [isSchedulePopoverOpen]);
-
-  useEffect(() => {
-    if (!isSchedulePopoverOpen) {
-      return;
-    }
-    const rafId = window.requestAnimationFrame(() => {
-      scheduleDateInputRef.current?.focus();
-    });
-    return () => window.cancelAnimationFrame(rafId);
-  }, [isSchedulePopoverOpen]);
 
   useEffect(() => {
     if (!isUnsplashModalOpen || unsplashPage < 1) {
@@ -1824,40 +1782,6 @@ export default function NewPostModal({
   ]);
 
 
-  const getScheduledTimeValue = () => {
-    if (!scheduleDate || !scheduleTime) {
-      return { error: "Please select both date and time." } as const;
-    }
-    const [year, month, day] = scheduleDate.split("-").map((value) => Number(value));
-    const [hours, minutes] = scheduleTime.split(":").map((value) => Number(value));
-    if (
-      !Number.isFinite(year) ||
-      !Number.isFinite(month) ||
-      !Number.isFinite(day) ||
-      !Number.isFinite(hours) ||
-      !Number.isFinite(minutes)
-    ) {
-      return { error: "Please provide a valid date and time." } as const;
-    }
-
-    const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
-    if (
-      Number.isNaN(localDate.getTime()) ||
-      localDate.getFullYear() !== year ||
-      localDate.getMonth() !== month - 1 ||
-      localDate.getDate() !== day
-    ) {
-      return { error: "Please provide a valid date and time." } as const;
-    }
-
-    const minLeadTimeMs = 5 * 60 * 1000;
-    if (localDate.getTime() < Date.now() + minLeadTimeMs) {
-      return { error: "Choose a time at least 5 minutes in the future." } as const;
-    }
-
-    return { scheduledTime: formatOffsetDateTime(localDate) } as const;
-  };
-
   const buildPayload = (
     overrides?: Partial<Pick<NewPostSubmitPayload, "scheduledTime" | "timezone">>,
   ): NewPostSubmitPayload => {
@@ -1894,18 +1818,9 @@ export default function NewPostModal({
     }
   };
 
-  const handleConfirmSchedule = () => {
-    const result = getScheduledTimeValue();
-    if ("error" in result && result.error) {
-      setScheduleError(result.error);
-      return;
-    }
-    setScheduleError(null);
+  const handleConfirmSchedule = (scheduledTime: string, timezone: string) => {
     setIsSchedulePopoverOpen(false);
-    void runAction("schedule", onSchedule, {
-      scheduledTime: result.scheduledTime,
-      timezone: userTimezone,
-    });
+    void runAction("schedule", onSchedule, { scheduledTime, timezone });
   };
 
   if (!mounted || !isOpen) {
@@ -2456,7 +2371,6 @@ export default function NewPostModal({
                 type="button"
                 disabled={!hasContent || isOverLimit || pendingAction !== null}
                 onClick={() => {
-                  setScheduleError(null);
                   setIsSchedulePopoverOpen(true);
                 }}
                 data-schedule-trigger="true"
@@ -2475,73 +2389,14 @@ export default function NewPostModal({
               >
                 {pendingAction === "publish" ? "Publishing..." : "Publish"}
               </button>
-              {isSchedulePopoverOpen ? (
-                <div
-                  id="schedule-popover"
-                  ref={schedulePopoverRef}
-                  role="dialog"
-                  aria-label="Schedule post"
-                  className="absolute bottom-full right-0 z-[72] mb-3 w-[min(92vw,380px)] rounded-2xl border border-[#d6dae3] bg-white p-4 shadow-[0_20px_44px_-28px_rgba(15,23,42,0.45)]"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#eef3ff] text-[#3451d1]">
-                      <CalendarClock className="h-4 w-4" />
-                    </span>
-                    <p className="text-sm font-semibold text-[var(--color-text-primary)]">Schedule Post</p>
-                  </div>
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <label className="block">
-                      <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-secondary)]">
-                        Date
-                      </span>
-                      <input
-                        ref={scheduleDateInputRef}
-                        type="date"
-                        value={scheduleDate}
-                        onChange={(event) => setScheduleDate(event.target.value)}
-                        className="h-11 w-full rounded-xl border border-[#cfd5e1] bg-white px-3 text-sm text-[var(--color-text-primary)] outline-none transition focus:border-[#5575F5] focus:ring-2 focus:ring-[#5575F5]/20"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-secondary)]">
-                        Time
-                      </span>
-                      <input
-                        type="time"
-                        value={scheduleTime}
-                        onChange={(event) => setScheduleTime(event.target.value)}
-                        className="h-11 w-full rounded-xl border border-[#cfd5e1] bg-white px-3 text-sm text-[var(--color-text-primary)] outline-none transition focus:border-[#5575F5] focus:ring-2 focus:ring-[#5575F5]/20"
-                      />
-                    </label>
-                  </div>
-                  <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#e2e7f2] bg-[#f7f9ff] px-3 py-2 text-xs font-medium text-[#445065]">
-                    <Clock3 className="h-4 w-4 text-[#5575F5]" />
-                    <span>{timezoneLabel}</span>
-                  </div>
-                  {scheduleError ? (
-                    <p className="mt-2 text-xs font-medium text-rose-600">{scheduleError}</p>
-                  ) : null}
-                  <div className="mt-4 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsSchedulePopoverOpen(false);
-                        setScheduleError(null);
-                      }}
-                      className="inline-flex items-center rounded-full border border-[#d4dae6] bg-white px-4 py-2 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:text-[var(--color-text-primary)]"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleConfirmSchedule}
-                      className="inline-flex items-center rounded-full bg-[var(--color-secondary)] px-4 py-2 text-xs font-semibold text-white transition hover:brightness-95"
-                    >
-                      Confirm Schedule
-                    </button>
-                  </div>
-                </div>
-              ) : null}
+              <ReschedulePopover
+                isOpen={isSchedulePopoverOpen}
+                onClose={() => setIsSchedulePopoverOpen(false)}
+                onConfirm={handleConfirmSchedule}
+                isScheduling={pendingAction === "schedule"}
+                positionClasses="bottom-full right-0 mb-3"
+                zIndexClass="z-[72]"
+              />
             </div>
           </footer>
         </div>
