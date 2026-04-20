@@ -526,13 +526,13 @@ export default function PostsClient({
     }
 
     const handleOutsidePointer = (event: MouseEvent) => {
-      const boundary = actionMenuBoundaryRef.current;
-      if (!boundary) {
+      if (
+        event.target instanceof Element &&
+        event.target.closest("[data-action-menu-boundary]")
+      ) {
         return;
       }
-      if (event.target instanceof Node && !boundary.contains(event.target)) {
-        setActionMenuPostId(null);
-      }
+      setActionMenuPostId(null);
     };
 
     const handleEscape = (event: KeyboardEvent) => {
@@ -1038,7 +1038,7 @@ export default function PostsClient({
     setIsRescheduling(true);
     try {
       const response = await fetch(`${apiBase}/posts/${postId}/schedule`, {
-        method: "PUT",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scheduledTime, timezone }),
         credentials: "include",
@@ -1388,19 +1388,6 @@ export default function PostsClient({
                             return (
                               <article
                                 key={post._id}
-                                {...(canEdit
-                                  ? {
-                                    role: "button" as const,
-                                    tabIndex: 0,
-                                    onClick: onEdit,
-                                    onKeyDown: (event) => {
-                                      if (event.key === "Enter" || event.key === " ") {
-                                        event.preventDefault();
-                                        onEdit();
-                                      }
-                                    },
-                                  }
-                                  : {})}
                                 className="grid gap-3 rounded-2xl border border-[var(--color-border)] bg-white/90 p-4 transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-28px_rgba(15,23,42,0.4)] md:grid-cols-[132px_1fr]"
                               >
                                 <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3 md:flex-col md:items-start md:justify-start md:gap-2 md:border-b-0 md:border-r md:pb-0 md:pr-3">
@@ -1466,36 +1453,7 @@ export default function PostsClient({
                                       ) : null}
                                     </div>
 
-                                    <div ref={actionMenuBoundaryRef} className="relative flex items-center gap-2">
-                                      {/* Schedule + Edit — desktop only */}
-                                      {!isPublished ? (
-                                        <div className="hidden md:block">
-                                          <PillButton
-                                            variant="secondary"
-                                            icon={<CalendarClock className="h-4 w-4" />}
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              onEdit();
-                                            }}
-                                          >
-                                            {scheduleLabel}
-                                          </PillButton>
-                                        </div>
-                                      ) : null}
-                                      {canEdit ? (
-                                        <button
-                                          type="button"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            onEdit();
-                                          }}
-                                          className="hidden h-9 w-9 place-items-center rounded-xl border border-[var(--color-border)] bg-white text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] md:grid"
-                                          aria-label="Edit post"
-                                        >
-                                          <Edit3 className="h-4 w-4" />
-                                        </button>
-                                      ) : null}
-
+                                    <div data-action-menu-boundary className="relative flex items-center gap-2">
                                       {/* ... menu — always visible */}
                                       <button
                                         type="button"
@@ -1511,21 +1469,41 @@ export default function PostsClient({
                                         <CircleEllipsis className="h-4 w-4" />
                                       </button>
 
+                                      {rescheduleModalState.isOpen && rescheduleModalState.postId === post._id ? (
+                                        <ReschedulePopover
+                                          isOpen={rescheduleModalState.isOpen}
+                                          initialDate={rescheduleModalState.initialDate}
+                                          initialTime={rescheduleModalState.initialTime}
+                                          onClose={() => setRescheduleModalState((prev) => ({ ...prev, isOpen: false }))}
+                                          onConfirm={handleReschedulePost}
+                                          isScheduling={isRescheduling}
+                                        />
+                                      ) : null}
                                       {actionMenuPostId === post._id ? (
                                         <div
                                           className="absolute right-0 top-full z-10 mt-2 w-44 rounded-xl border border-[var(--color-border)] bg-white p-1 shadow-lg"
                                           onClick={(event) => event.stopPropagation()}
                                         >
-                                          {/* Schedule/Edit in dropdown on mobile */}
                                           {!isPublished ? (
                                             <button
                                               type="button"
                                               onClick={(event) => {
                                                 event.stopPropagation();
                                                 setActionMenuPostId(null);
-                                                onEdit();
+                                                const scheduled = post.scheduledAt ? new Date(post.scheduledAt) : null;
+                                                const pad = (n: number) => String(n).padStart(2, "0");
+                                                setRescheduleModalState({
+                                                  isOpen: true,
+                                                  postId: post._id,
+                                                  initialDate: scheduled
+                                                    ? `${scheduled.getFullYear()}-${pad(scheduled.getMonth() + 1)}-${pad(scheduled.getDate())}`
+                                                    : "",
+                                                  initialTime: scheduled
+                                                    ? `${pad(scheduled.getHours())}:${pad(scheduled.getMinutes())}`
+                                                    : "",
+                                                });
                                               }}
-                                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--color-text-primary)] transition hover:bg-gray-50 md:hidden"
+                                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--color-text-primary)] transition hover:bg-gray-50"
                                             >
                                               <CalendarClock className="h-4 w-4 text-[var(--color-text-secondary)]" />
                                               {scheduleLabel}
@@ -1539,7 +1517,7 @@ export default function PostsClient({
                                                 setActionMenuPostId(null);
                                                 onEdit();
                                               }}
-                                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--color-text-primary)] transition hover:bg-gray-50 md:hidden"
+                                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--color-text-primary)] transition hover:bg-gray-50"
                                             >
                                               <Edit3 className="h-4 w-4 text-[var(--color-text-secondary)]" />
                                               Edit post
