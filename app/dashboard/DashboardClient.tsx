@@ -863,15 +863,27 @@ export default function DashboardPage({
       return;
     }
 
+    if (!payload.postId) {
+      setConnectFeedback("Unable to save because post ID is missing.");
+      return;
+    }
+
+    // Step 1: Always save content first (PATCH)
+    try {
+      await updatePostContent(payload.postId, payload.content);
+    } catch (error) {
+      setConnectFeedback(
+        error instanceof Error ? error.message : "Unable to save post content.",
+      );
+      return;
+    }
+
+    // Step 2: Upload media if new images/video were attached (PUT)
     const hasDeviceMedia = payload.mediaFiles && payload.mediaFiles.length > 0;
     const hasStockMedia = payload.mediaUrls && payload.mediaUrls.length > 0;
     const hasAnyMedia = hasDeviceMedia || hasStockMedia;
 
     if (hasAnyMedia) {
-      if (!payload.postId) {
-        setConnectFeedback("Please save or generate this draft first before uploading media.");
-        return;
-      }
       try {
         if (payload.mediaType === "video" && payload.mediaFiles?.[0]) {
           await uploadVideoForPost(payload.postId, payload.mediaFiles[0], () => {});
@@ -901,27 +913,14 @@ export default function DashboardPage({
       }
     }
 
+    // Step 3: If save-only, we're done
     if (kind === "draft") {
-      if (!payload.postId) {
-        setConnectFeedback("Unable to save draft because post ID is missing.");
-        return;
-      }
-      try {
-        const response = await updatePostContent(payload.postId, payload.content);
-        setConnectFeedback(response.message || "Post content updated successfully.");
-      } catch (error) {
-        setConnectFeedback(
-          error instanceof Error ? error.message : "Unable to save draft changes.",
-        );
-      }
+      setConnectFeedback("Post saved successfully.");
       return;
     }
 
+    // Step 4: Publish or schedule
     if (kind === "publish") {
-      if (!payload.postId) {
-        setConnectFeedback("Unable to publish because post ID is missing.");
-        return;
-      }
       try {
         const response = await publishPost(payload.postId);
         finalizeAndReload(response.message || "Post published successfully");
@@ -933,10 +932,6 @@ export default function DashboardPage({
       return;
     }
 
-    if (!payload.postId) {
-      setConnectFeedback("Unable to schedule because post ID is missing.");
-      return;
-    }
     if (!payload.scheduledTime) {
       setConnectFeedback("Please choose a valid schedule date and time.");
       return;
