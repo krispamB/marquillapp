@@ -658,7 +658,7 @@ export default function PostsClient({
   const uploadMediaForPost = async (postId: string, files: File[]): Promise<void> => {
     for (const file of files) {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("files", file);
 
       const response = await fetch(`${apiBase}/posts/${postId}/media`, {
         method: "PUT",
