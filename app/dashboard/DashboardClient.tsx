@@ -957,7 +957,7 @@ export default function DashboardPage({
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch(`${apiBase}/posts/${postId}/image`, {
+      const response = await fetch(`${apiBase}/posts/${postId}/media`, {
         method: "PUT",
         credentials: "include",
         body: formData,
