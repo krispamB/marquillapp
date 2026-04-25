@@ -45,7 +45,6 @@ import { OnboardingModule } from './onboarding';
     DatabaseModule,
     AuthModule,
     UserModule,
-    UserModule,
     PostModule,
     EncryptionModule,
     YoutubeTranscriptModule,

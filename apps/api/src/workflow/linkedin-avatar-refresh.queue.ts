@@ -1,5 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import IORedis from 'ioredis';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -8,18 +7,20 @@ import {
 } from './workflow.constants';
 
 @Injectable()
-export class LinkedinAvatarRefreshQueue implements OnModuleInit {
-  private connection: IORedis;
+export class LinkedinAvatarRefreshQueue implements OnModuleInit, OnModuleDestroy {
   public queue: Queue;
   constructor(private config: ConfigService) {}
 
   onModuleInit() {
-    this.connection = new IORedis(this.config.get<string>('REDIS_URL')!);
     this.queue = new Queue(LINKEDIN_AVATAR_REFRESH_QUEUE_NAME, {
       connection: {
         url: this.config.get<string>('REDIS_URL')!,
       },
     });
+  }
+
+  async onModuleDestroy() {
+    await this.queue.close();
   }
 
   async addAvatarRefreshJob(connectedAccountId: string) {
