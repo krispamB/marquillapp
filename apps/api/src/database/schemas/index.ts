@@ -5,4 +5,3 @@ export * from './tier.schema';
 export * from './subscription.schema';
 export * from './billing-customer.schema';
 export * from './usage.schema';
-export * from './onboarding-profile.schema'
