@@ -44,7 +44,6 @@ import { FeedbackModule } from './feedback/feedback.module';
     DatabaseModule,
     AuthModule,
     UserModule,
-    UserModule,
     PostModule,
     EncryptionModule,
     YoutubeTranscriptModule,
