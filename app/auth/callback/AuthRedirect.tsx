@@ -7,7 +7,11 @@ export default function AuthRedirect({ hasEmail }: { hasEmail: boolean }) {
   const router = useRouter();
 
   useEffect(() => {
-    const destination = hasEmail ? "/dashboard" : "/";
+    let destination = "/";
+    if (hasEmail) {
+      const completed = localStorage.getItem("marquill_onboarding_complete");
+      destination = completed ? "/dashboard" : "/onboarding";
+    }
     const timer = window.setTimeout(() => {
       router.replace(destination);
     }, 1500);

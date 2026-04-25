@@ -16,6 +16,20 @@
   --color-gradient: linear-gradient(135deg,
       rgba(226, 232, 240, 0.9),
       rgba(199, 210, 254, 0.8));
+
+  --color-surface-glass: rgba(255, 255, 255, 0.75);
+  --color-border-strong: rgba(15, 23, 42, 0.12);
+  --color-success: #10b981;
+  --color-linkedin: #0a66c2;
+  --color-status-draft-bg: #e8eafe;
+  --color-status-draft-fg: #4e5cf0;
+
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --shadow-card: 0 30px 70px -60px rgba(15, 23, 42, 0.4);
+  --shadow-button: 0 18px 40px -26px rgba(28, 27, 39, 0.55);
+  --shadow-primary: 0 18px 35px -26px rgba(91, 92, 246, 0.45);
+  --shadow-subtle: 0 2px 8px -2px rgba(0, 0, 0, 0.05);
 }
 
 @theme inline {
