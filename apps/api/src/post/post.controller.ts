@@ -22,6 +22,9 @@ import { IAppResponse } from 'src/common/interfaces';
 import { GetUser } from 'src/common/decorators';
 import { User } from 'src/database/schemas';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { tmpdir } from 'os';
+import { extname } from 'path';
 import type { GetPostsResult } from './post.service';
 
 @UseGuards(JwtAuthGuard)
@@ -45,7 +48,16 @@ export class PostController {
   }
 
   @Put(':id/media')
-  @UseInterceptors(FilesInterceptor('files', 20, { limits: { fileSize: 200 * 1024 * 1024 } }))
+  @UseInterceptors(
+    FilesInterceptor('files', 20, {
+      storage: diskStorage({
+        destination: tmpdir(),
+        filename: (_req, file, cb) =>
+          cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${extname(file.originalname)}`),
+      }),
+      limits: { fileSize: 200 * 1024 * 1024 },
+    }),
+  )
   async uploadMedia(
     @GetUser() user: User,
     @Param('id') id: string,

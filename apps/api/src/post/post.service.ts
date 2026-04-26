@@ -26,6 +26,9 @@ import { EncryptionService } from 'src/encryption/encryption.service';
 import { IContent, ILinkedInPost, IVideoInitResponse } from './post.interface';
 import { delay, formatLinkedinContent } from 'src/common/HelperFn';
 import { FeatureGatingService } from '../feature-gating/feature-gating.service';
+import { createReadStream } from 'fs';
+import { unlink } from 'fs/promises';
+import { Readable } from 'stream';
 
 interface PostFilters {
   availableMonths: string[];
@@ -407,68 +410,72 @@ export class PostService {
       throw new BadRequestException('No files provided');
     }
 
-    const post = await this.postDraftModel.findById(postId);
-    if (!post) {
-      throw new NotFoundException('Post not found');
-    }
-
-    if (post.user.toString() !== user._id.toString()) {
-      throw new ForbiddenException('You are not authorized to edit this post');
-    }
-
-    if (post.status === PostDraftStatus.PUBLISHED) {
-      throw new BadRequestException('Post is already published');
-    }
-
-    const imageFiles = files.filter((f) => f.mimetype.startsWith('image/'));
-    const videoFiles = files.filter((f) => f.mimetype.startsWith('video/'));
-
-    if (imageFiles.length > 0 && videoFiles.length > 0) {
-      throw new BadRequestException('Cannot mix images and videos in one post');
-    }
-    if (videoFiles.length > 1) {
-      throw new BadRequestException('Only one video per post is allowed');
-    }
-
-    const allowedImageMimes = new Set(['image/jpeg', 'image/png']);
-    for (const f of imageFiles) {
-      if (!allowedImageMimes.has(f.mimetype)) {
-        throw new BadRequestException(
-          `Unsupported image format: ${f.mimetype}. Use JPEG or PNG`,
-        );
+    try {
+      const post = await this.postDraftModel.findById(postId);
+      if (!post) {
+        throw new NotFoundException('Post not found');
       }
-    }
 
-    const connectedAccount = await this.getOwnedUsableLinkedinConnectedAccount(
-      user._id.toString(),
-      post.connectedAccount.toString(),
-      'upload media',
-    );
-
-    const accessToken = await this.encryptionService.decrypt(
-      connectedAccount.accessToken!,
-    );
-
-    const ownerUrn = this.resolveLinkedinAuthorUrn(connectedAccount);
-    const newMediaItems: NonNullable<typeof post.media> = [];
-
-    if (videoFiles.length === 1) {
-      const urn = await this.uploadLinkedinVideo(ownerUrn, accessToken, videoFiles[0]);
-      newMediaItems.push({ id: urn, type: 'VIDEO', title: videoFiles[0].originalname });
-    } else {
-      for (const file of imageFiles) {
-        const urn = await this.uploadLinkedinImage(ownerUrn, accessToken, file);
-        newMediaItems.push({
-          id: urn,
-          type: 'IMAGE',
-          title: file.originalname,
-          altText: file.originalname,
-        });
+      if (post.user.toString() !== user._id.toString()) {
+        throw new ForbiddenException('You are not authorized to edit this post');
       }
-    }
 
-    post.media = [...(post.media ?? []), ...newMediaItems];
-    await post.save();
+      if (post.status === PostDraftStatus.PUBLISHED) {
+        throw new BadRequestException('Post is already published');
+      }
+
+      const imageFiles = files.filter((f) => f.mimetype.startsWith('image/'));
+      const videoFiles = files.filter((f) => f.mimetype.startsWith('video/'));
+
+      if (imageFiles.length > 0 && videoFiles.length > 0) {
+        throw new BadRequestException('Cannot mix images and videos in one post');
+      }
+      if (videoFiles.length > 1) {
+        throw new BadRequestException('Only one video per post is allowed');
+      }
+
+      const allowedImageMimes = new Set(['image/jpeg', 'image/png']);
+      for (const f of imageFiles) {
+        if (!allowedImageMimes.has(f.mimetype)) {
+          throw new BadRequestException(
+            `Unsupported image format: ${f.mimetype}. Use JPEG or PNG`,
+          );
+        }
+      }
+
+      const connectedAccount = await this.getOwnedUsableLinkedinConnectedAccount(
+        user._id.toString(),
+        post.connectedAccount.toString(),
+        'upload media',
+      );
+
+      const accessToken = await this.encryptionService.decrypt(
+        connectedAccount.accessToken!,
+      );
+
+      const ownerUrn = this.resolveLinkedinAuthorUrn(connectedAccount);
+      const newMediaItems: NonNullable<typeof post.media> = [];
+
+      if (videoFiles.length === 1) {
+        const urn = await this.uploadLinkedinVideo(ownerUrn, accessToken, videoFiles[0]);
+        newMediaItems.push({ id: urn, type: 'VIDEO', title: videoFiles[0].originalname });
+      } else {
+        for (const file of imageFiles) {
+          const urn = await this.uploadLinkedinImage(ownerUrn, accessToken, file);
+          newMediaItems.push({
+            id: urn,
+            type: 'IMAGE',
+            title: file.originalname,
+            altText: file.originalname,
+          });
+        }
+      }
+
+      post.media = [...(post.media ?? []), ...newMediaItems];
+      await post.save();
+    } finally {
+      await Promise.allSettled(files.map((f) => unlink(f.path)));
+    }
   }
 
   private async uploadLinkedinImage(
@@ -509,7 +516,7 @@ export class PostService {
           'LinkedIn-Version': '202601',
           Authorization: `Bearer ${accessToken}`,
         },
-        body: file.buffer as any,
+        body: Readable.toWeb(createReadStream(file.path)) as any,
         ...({ duplex: 'half' } as any),
       });
 
@@ -563,7 +570,9 @@ export class PostService {
 
     const eTags: string[] = [];
     for (const instruction of uploadInstructions) {
-      const chunk = file.buffer.slice(instruction.firstByte, instruction.lastByte + 1);
+      const chunk = Readable.toWeb(
+        createReadStream(file.path, { start: instruction.firstByte, end: instruction.lastByte }),
+      );
       const { response } = await apiFetch<void>(instruction.uploadUrl, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/octet-stream' },
