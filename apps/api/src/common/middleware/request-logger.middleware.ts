@@ -8,17 +8,27 @@ export class RequestLoggerMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
     const { method, originalUrl, ip } = req;
     const userAgent = req.get('user-agent') || '';
-
     const start = Date.now();
 
-    res.on('finish', () => {
+    const logFinish = () => {
+      res.removeListener('close', logClose);
       const { statusCode } = res;
       const duration = Date.now() - start;
-
       this.logger.log(
         `${method} ${originalUrl} ${statusCode} - ${duration}ms - ${userAgent} ${ip}`,
       );
-    });
+    };
+
+    const logClose = () => {
+      res.removeListener('finish', logFinish);
+      const duration = Date.now() - start;
+      this.logger.warn(
+        `${method} ${originalUrl} - connection closed early after ${duration}ms - ${userAgent} ${ip}`,
+      );
+    };
+
+    res.once('finish', logFinish);
+    res.once('close', logClose);
 
     next();
   }

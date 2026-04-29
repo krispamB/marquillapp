@@ -1,10 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import compression from "compression"
 import { Logger, ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create(AppModule);
   const logger = new Logger(
     bootstrap.name.charAt(0).toUpperCase() + bootstrap.name.slice(1),
   );
@@ -12,6 +13,8 @@ async function bootstrap() {
     origin: [process.env.FRONTEND_URL, process.env.FRONTEND_URL_DEV],
     credentials: true,
   });
+
+  app.use(compression())
 
   app.setGlobalPrefix('api/v1');
 

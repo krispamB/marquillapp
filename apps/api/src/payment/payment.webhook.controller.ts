@@ -7,10 +7,8 @@ import {
   Post,
   Req,
 } from '@nestjs/common';
-import { Request } from 'express';
+import type { Request } from 'express';
 import { PaymentService } from './payment.service';
-
-type RawBodyRequest = Request & { rawBody?: Buffer };
 
 @Controller('payment/webhooks')
 export class PaymentWebhookController {
@@ -20,11 +18,11 @@ export class PaymentWebhookController {
 
   @Post('paddle')
   @HttpCode(HttpStatus.OK)
-  async handlePaddleWebhook(@Req() request: RawBodyRequest) {
-    const rawBody = request.rawBody;
-    if (!rawBody) {
+  async handlePaddleWebhook(@Req() request: Request) {
+    const rawBody = request.body as Buffer;
+    if (!Buffer.isBuffer(rawBody)) {
       this.logger.error(
-        'Paddle webhook missing raw body. Ensure rawBody is enabled.',
+        'Paddle webhook missing raw body. Ensure raw() middleware is applied.',
       );
       throw new BadRequestException('Webhook raw body not available');
     }
