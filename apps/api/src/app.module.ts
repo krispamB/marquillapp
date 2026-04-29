@@ -25,6 +25,7 @@ import { TierModule } from './tier/tier.module';
 import { MailModule } from './mail';
 import { FeedbackModule } from './feedback/feedback.module';
 import { OnboardingModule } from './onboarding';
+import { DiagnosticsModule } from './diagnostics/diagnostics.module';
 import { raw } from 'express';
 
 @Module({
@@ -49,6 +50,7 @@ import { raw } from 'express';
     EncryptionModule,
     YoutubeTranscriptModule,
     OnboardingModule,
+    DiagnosticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
@@ -57,7 +59,7 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(raw({ type: 'application/json' }))
-      .forRoutes({ path: 'payment/webhooks*', method: RequestMethod.POST })
+      .forRoutes({ path: '*payment/webhooks', method: RequestMethod.POST })
     consumer
       .apply(RequestLoggerMiddleware)
       .forRoutes({ path: '*v1', method: RequestMethod.ALL });
