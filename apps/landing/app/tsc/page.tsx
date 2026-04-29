@@ -14,7 +14,7 @@ export default function TermsOfServicePage() {
     <article className="min-h-screen bg-white">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16">
         <h1 className="text-4xl font-bold text-text-primary mb-4">Terms of Service</h1>
-        <p className="text-sm text-text-secondary mb-12">Last Updated: 12 April 2026</p>
+        <p className="text-sm text-text-secondary mb-12">Last Updated: 29 April 2026</p>
 
         <div className="prose prose-lg max-w-none">
 
@@ -38,6 +38,18 @@ export default function TermsOfServicePage() {
               <li>You may not use Marquill for any unlawful purpose or in violation of LinkedIn&apos;s terms of service.</li>
               <li>You may not attempt to reverse-engineer, scrape, or abuse the platform&apos;s infrastructure.</li>
               <li>One account per user unless explicitly authorised under a team or agency plan.</li>
+              <li>
+                Marquill uses YouTube API Services. By using Marquill, you also agree to be bound by the{' '}
+                <a
+                  href="https://www.youtube.com/t/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#5B5CF6] underline hover:text-[#4a4bc4]"
+                >
+                  YouTube Terms of Service
+                </a>
+                .
+              </li>
             </ul>
           </section>
 
