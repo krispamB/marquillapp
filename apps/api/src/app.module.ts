@@ -24,6 +24,7 @@ import { YoutubeTranscriptModule } from './youtube-transcript';
 import { TierModule } from './tier/tier.module';
 import { MailModule } from './mail';
 import { FeedbackModule } from './feedback/feedback.module';
+import { OnboardingModule } from './onboarding';
 import { raw } from 'express';
 
 @Module({
@@ -47,6 +48,7 @@ import { raw } from 'express';
     PostModule,
     EncryptionModule,
     YoutubeTranscriptModule,
+    OnboardingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
