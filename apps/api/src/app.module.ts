@@ -17,7 +17,6 @@ import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './users/users.module';
 import { PostModule } from './post/post.module';
-import { ConfigService } from '@nestjs/config';
 import { EncryptionModule } from './encryption/encryption.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { PaymentModule } from './payment/payment.module';
@@ -25,6 +24,7 @@ import { YoutubeTranscriptModule } from './youtube-transcript';
 import { TierModule } from './tier/tier.module';
 import { MailModule } from './mail';
 import { FeedbackModule } from './feedback/feedback.module';
+import { raw } from 'express';
 
 @Module({
   imports: [
@@ -53,6 +53,9 @@ import { FeedbackModule } from './feedback/feedback.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(raw({ type: 'application/json' }))
+      .forRoutes({ path: 'payment/webhooks*', method: RequestMethod.POST })
     consumer
       .apply(RequestLoggerMiddleware)
       .forRoutes({ path: '*v1', method: RequestMethod.ALL });
