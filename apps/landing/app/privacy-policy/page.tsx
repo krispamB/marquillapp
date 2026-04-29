@@ -14,7 +14,7 @@ export default function PrivacyPolicyPage() {
     <article className="min-h-screen bg-white">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16">
         <h1 className="text-4xl font-bold text-text-primary mb-4">Privacy Policy</h1>
-        <p className="text-sm text-text-secondary mb-12">Last Updated: 20 November 2025</p>
+        <p className="text-sm text-text-secondary mb-12">Last Updated: 29 April 2026</p>
 
         <div className="prose prose-lg max-w-none">
           {/* Introduction */}
@@ -129,6 +129,59 @@ export default function PrivacyPolicyPage() {
             </p>
             <p className="text-text-secondary leading-relaxed">
               We only access data necessary for the features of our platform.
+            </p>
+          </section>
+
+          {/* YouTube API Services */}
+          <section className="mb-12" aria-labelledby="youtube-api-heading">
+            <h2 id="youtube-api-heading" className="text-2xl font-semibold text-text-primary mb-4">6a. YouTube API Services</h2>
+            <p className="text-text-secondary leading-relaxed mb-4">
+              Marquill uses{' '}
+              <a
+                href="https://developers.google.com/youtube/terms/api-services-terms-of-service"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#5B5CF6] underline hover:text-[#4a4bc4]"
+              >
+                YouTube API Services
+              </a>{' '}
+              to pull publicly available video context (titles, descriptions, and transcripts) based on topics you provide, which is then used to generate LinkedIn content drafts. No private YouTube account data is accessed or stored.
+            </p>
+            <p className="text-text-secondary leading-relaxed mb-4">
+              By using Marquill, you agree to be bound by the{' '}
+              <a
+                href="https://www.youtube.com/t/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#5B5CF6] underline hover:text-[#4a4bc4]"
+              >
+                YouTube Terms of Service
+              </a>
+              .
+            </p>
+            <p className="text-text-secondary leading-relaxed mb-4">
+              Data accessed through YouTube API Services is also governed by{' '}
+              <a
+                href="https://policies.google.com/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#5B5CF6] underline hover:text-[#4a4bc4]"
+              >
+                Google&apos;s Privacy Policy
+              </a>
+              . By using Marquill&apos;s YouTube-powered features, you acknowledge that Google&apos;s Privacy Policy applies to any data processed through the YouTube API.
+            </p>
+            <p className="text-text-secondary leading-relaxed">
+              You can revoke Marquill&apos;s access to your Google account data at any time via{' '}
+              <a
+                href="https://security.google.com/settings/security/permissions"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#5B5CF6] underline hover:text-[#4a4bc4]"
+              >
+                Google&apos;s security settings
+              </a>
+              .
             </p>
           </section>
 
