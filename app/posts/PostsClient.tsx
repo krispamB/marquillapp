@@ -1434,15 +1434,7 @@ export default function PostsClient({
                                           aria-controls={researchPanelId}
                                           className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-white/85 px-3 py-1.5 text-sm font-semibold text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary)]/45 hover:text-[var(--color-primary)]"
                                         >
-                                          <span className="grid h-5 w-5 place-items-center rounded-full bg-[#FF0033]">
-                                            <svg
-                                              aria-hidden="true"
-                                              viewBox="0 0 24 24"
-                                              className="h-3.5 w-3.5 fill-white"
-                                            >
-                                              <path d="M10 8l6 4-6 4V8z" />
-                                            </svg>
-                                          </span>
+                                          <img src="/yt.png" alt="YouTube" className="h-5 w-5" />
                                           <span>YouTube +{researchCount}</span>
                                         </button>
                                       ) : null}
@@ -1558,10 +1550,10 @@ export default function PostsClient({
                                                 <img
                                                   src={video.thumbnail}
                                                   alt={video.title ?? "YouTube video thumbnail"}
-                                                  className="h-14 w-20 shrink-0 rounded-lg border border-[var(--color-border)] object-cover"
+                                                  className="h-[70px] w-30 shrink-0 rounded-lg border border-[var(--color-border)] object-cover"
                                                 />
                                               ) : (
-                                                <div className="h-14 w-20 shrink-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)]" />
+                                                <div className="h-[70px] w-30 shrink-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)]" />
                                               )}
                                               <div className="min-w-0">
                                                 <p className="line-clamp-2 text-sm font-semibold text-[var(--color-text-primary)]">
