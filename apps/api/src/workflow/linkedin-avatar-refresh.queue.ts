@@ -28,7 +28,7 @@ export class LinkedinAvatarRefreshQueue implements OnModuleInit, OnModuleDestroy
       LINKEDIN_AVATAR_REFRESH_JOB_NAME,
       { connectedAccountId },
       {
-        jobId: `linkedin-avatar-refresh:${connectedAccountId}`,
+        jobId: `linkedin-avatar-refresh-${connectedAccountId}`,
         attempts: 5,
         backoff: {
           type: 'exponential',
