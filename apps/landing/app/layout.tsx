@@ -3,6 +3,7 @@ import { Sofia_Sans, Sora } from 'next/font/google';
 import './globals.css';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { Analytics } from '@vercel/analytics/next';
 
 const sofiaSans = Sofia_Sans({
   subsets: ['latin'],
@@ -67,6 +68,7 @@ export default function RootLayout({
         <Header />
         <main id="main-content">{children}</main>
         <Footer />
+        <Analytics />
       </body>
     </html>
   );
