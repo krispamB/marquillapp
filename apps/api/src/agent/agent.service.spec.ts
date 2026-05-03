@@ -12,9 +12,6 @@ jest.mock('../llm/parsers/responseParser.service', () => ({
 jest.mock('@nestjs/config', () => ({
   ConfigService: class ConfigService {},
 }));
-jest.mock('@nestjs/axios', () => ({
-  HttpService: class HttpService {},
-}));
 jest.mock('@supadata/js', () => ({
   Supadata: class Supadata {},
 }));

@@ -6,6 +6,26 @@ import { ConfigService } from '@nestjs/config';
 import { FeedbackService } from './feedback.service';
 import { FeedbackIssueType } from './dto';
 
+jest.mock(
+  '../common/HelperFn',
+  () => ({
+    apiFetch: jest.fn(),
+    ApiError: class ApiError extends Error {
+      constructor(
+        public statusCode: number,
+        public statusText: string,
+        public data: any,
+      ) {
+        super(`HTTP error! status: ${statusCode} ${statusText}`);
+        this.name = 'ApiError';
+      }
+    },
+  }),
+  { virtual: true },
+);
+
+import { ApiError, apiFetch } from '../common/HelperFn';
+
 describe('FeedbackService', () => {
   const createConfigService = (
     overrides: Record<string, string | undefined> = {},
@@ -24,19 +44,17 @@ describe('FeedbackService', () => {
 
   beforeEach(() => {
     jest.restoreAllMocks();
-    (global as any).fetch = jest.fn();
+    (apiFetch as jest.Mock).mockReset();
   });
 
   it('creates a bug issue with bug label and reporter metadata', async () => {
     const service = new FeedbackService(createConfigService());
-    const fetchMock = global.fetch as jest.Mock;
-    fetchMock.mockResolvedValue({
-      ok: true,
-      status: 201,
-      json: jest.fn().mockResolvedValue({
+    (apiFetch as jest.Mock).mockResolvedValue({
+      data: {
         number: 45,
         html_url: 'https://github.com/acme/linkgenserver/issues/45',
-      }),
+      },
+      response: { status: 201 },
     });
 
     const result = await service.submitIssue(
@@ -61,14 +79,14 @@ describe('FeedbackService', () => {
       type: FeedbackIssueType.BUG,
     });
 
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(apiFetch).toHaveBeenCalledWith(
       'https://api.github.com/repos/acme/linkgenserver/issues',
       expect.objectContaining({
         method: 'POST',
       }),
     );
 
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const body = JSON.parse((apiFetch as jest.Mock).mock.calls[0][1].body);
     expect(body.title).toBe('Cannot schedule post');
     expect(body.labels).toEqual(['bug']);
     expect(body.body).toContain('## Description');
@@ -88,14 +106,12 @@ describe('FeedbackService', () => {
 
   it('creates a feature issue with feature-request label', async () => {
     const service = new FeedbackService(createConfigService());
-    const fetchMock = global.fetch as jest.Mock;
-    fetchMock.mockResolvedValue({
-      ok: true,
-      status: 201,
-      json: jest.fn().mockResolvedValue({
+    (apiFetch as jest.Mock).mockResolvedValue({
+      data: {
         number: 46,
         html_url: 'https://github.com/acme/linkgenserver/issues/46',
-      }),
+      },
+      response: { status: 201 },
     });
 
     await service.submitIssue(
@@ -114,7 +130,7 @@ describe('FeedbackService', () => {
       },
     );
 
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const body = JSON.parse((apiFetch as jest.Mock).mock.calls[0][1].body);
     expect(body.labels).toEqual(['feature-request']);
   });
 
@@ -148,14 +164,9 @@ describe('FeedbackService', () => {
 
   it('maps GitHub 422 errors to BadRequestException', async () => {
     const service = new FeedbackService(createConfigService());
-    const fetchMock = global.fetch as jest.Mock;
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 422,
-      json: jest.fn().mockResolvedValue({
-        message: 'Validation Failed',
-      }),
-    });
+    (apiFetch as jest.Mock).mockRejectedValue(
+      new ApiError(422, 'Unprocessable Entity', { message: 'Validation Failed' }),
+    );
 
     await expect(
       service.submitIssue(
@@ -178,14 +189,9 @@ describe('FeedbackService', () => {
 
   it('maps non-validation GitHub errors to InternalServerErrorException', async () => {
     const service = new FeedbackService(createConfigService());
-    const fetchMock = global.fetch as jest.Mock;
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 500,
-      json: jest.fn().mockResolvedValue({
-        message: 'Server Error',
-      }),
-    });
+    (apiFetch as jest.Mock).mockRejectedValue(
+      new ApiError(500, 'Internal Server Error', { message: 'Server Error' }),
+    );
 
     await expect(
       service.submitIssue(
