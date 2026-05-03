@@ -5,9 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev      # dev server at localhost:3000
-npm run build    # production build
-npm run lint     # ESLint
+bun run dev      # dev server at localhost:3000
+bun run build    # production build
+bun run lint     # ESLint
 ```
 
 No test suite is configured.
