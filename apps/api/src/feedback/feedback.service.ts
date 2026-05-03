@@ -6,6 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { User } from '../database/schemas';
 import { CreateFeedbackIssueDto, DeviceReport, FeedbackIssueType } from './dto';
+import { ApiError, apiFetch } from '../common/HelperFn';
 
 type GithubIssueResponse = {
   number?: number;
@@ -31,9 +32,9 @@ export class FeedbackService {
     const label = this.mapLabel(dto.type);
     const issueBody = this.buildIssueBody(user, dto.description, dto.deviceReport);
 
-    let response: Response;
+    let payload: GithubIssueResponse;
     try {
-      response = await fetch(
+      const { data } = await apiFetch<GithubIssueResponse>(
         `https://api.github.com/repos/${owner}/${repo}/issues`,
         {
           method: 'POST',
@@ -51,26 +52,17 @@ export class FeedbackService {
           }),
         },
       );
-    } catch {
-      throw new InternalServerErrorException(
-        'Failed to connect to GitHub issue API',
-      );
-    }
-
-    let payload: GithubIssueResponse;
-    try {
-      payload = (await response.json()) as GithubIssueResponse;
-    } catch {
-      throw new InternalServerErrorException('Invalid response from GitHub API');
-    }
-
-    if (!response.ok) {
-      const message = payload.message ?? 'Failed to create GitHub issue';
-      if (response.status === 400 || response.status === 422) {
-        throw new BadRequestException(message);
+      payload = data;
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const message =
+          (err.data as GithubIssueResponse)?.message ?? 'Failed to create GitHub issue';
+        if (err.statusCode === 400 || err.statusCode === 422) {
+          throw new BadRequestException(message);
+        }
+        throw new InternalServerErrorException(message);
       }
-
-      throw new InternalServerErrorException(message);
+      throw new InternalServerErrorException('Failed to connect to GitHub issue API');
     }
 
     return {
