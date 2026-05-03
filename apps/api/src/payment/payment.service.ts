@@ -206,7 +206,16 @@ export class PaymentService {
       customerId: billingCustomer.providerCustomerId,
     });
 
-    return { items: transactions };
+    const items = transactions.map((tx) => ({
+      id: tx.id,
+      customer: tx.customData?.name,
+      plan: tx.details?.lineItems?.[0]?.product?.name,
+      amount: tx.details?.totals?.grandTotal,
+      status: tx.status,
+      date: tx.createdAt,
+    }));
+
+    return { items };
   }
 
   async getUsageSummary(userId: string) {
