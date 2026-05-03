@@ -10,9 +10,11 @@ import type { UserProfile, ConnectedAccount, Tier } from "../lib/types";
 
 type Invoice = {
     id: string;
-    createdAt: string;
-    amount: number;
+    customer: string;
+    plan: string;
+    amount: string;
     status: string;
+    date: string;
 };
 
 type ActiveTier = {
@@ -92,7 +94,7 @@ export default function BillingClient({
 
                 const [tiersRes, invoicesRes] = await Promise.all([
                     fetch(`${apiBase}/tiers/active`, { credentials: "include" }),
-                    fetch(`${apiBase}/payment/invoices`, { credentials: "include" }).catch(() => null),
+                    fetch(`${apiBase}/payment/invoice`, { credentials: "include" }).catch(() => null),
                 ]);
 
                 if (tiersRes.ok) {
@@ -256,33 +258,54 @@ export default function BillingClient({
                                                 <table className="w-full text-left text-[14px] text-[var(--color-text-secondary)] border-collapse whitespace-nowrap">
                                                     <thead className="bg-white border-b border-slate-100">
                                                         <tr>
-                                                            <th className="px-6 py-5 font-medium text-[var(--color-text-secondary)] w-[30%]">Date</th>
-                                                            <th className="px-6 py-5 font-medium text-[var(--color-text-secondary)] w-[30%]">Total</th>
-                                                            <th className="px-6 py-5 font-medium text-[var(--color-text-secondary)] w-[40%]">Status</th>
+                                                            <th className="px-6 py-5 text-[11px] font-semibold tracking-widest uppercase text-[var(--color-text-secondary)]">Invoice ID</th>
+                                                            <th className="px-6 py-5 text-[11px] font-semibold tracking-widest uppercase text-[var(--color-text-secondary)]">Customer</th>
+                                                            <th className="px-6 py-5 text-[11px] font-semibold tracking-widest uppercase text-[var(--color-text-secondary)]">Plan</th>
+                                                            <th className="px-6 py-5 text-[11px] font-semibold tracking-widest uppercase text-[var(--color-text-secondary)]">Amount</th>
+                                                            <th className="px-6 py-5 text-[11px] font-semibold tracking-widest uppercase text-[var(--color-text-secondary)]">Status</th>
+                                                            <th className="px-6 py-5 text-[11px] font-semibold tracking-widest uppercase text-[var(--color-text-secondary)]">Date</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100">
                                                         {invoices.length > 0 ? invoices.map((invoice) => {
-                                                            const isPaid = invoice.status?.toLowerCase() === "succeeded" || invoice.status?.toLowerCase() === "paid";
+                                                            const statusKey = invoice.status?.toLowerCase();
+                                                            const statusBadge =
+                                                                statusKey === "completed"
+                                                                    ? "bg-emerald-100/60 text-emerald-600"
+                                                                    : statusKey === "ready"
+                                                                    ? "bg-amber-100 text-amber-700"
+                                                                    : "bg-slate-100 text-slate-600";
+                                                            const truncatedId = invoice.id.length > 18
+                                                                ? `${invoice.id.slice(0, 18)}…`
+                                                                : invoice.id;
 
                                                             return (
                                                                 <tr key={invoice.id} className="transition-colors hover:bg-slate-50/50">
-                                                                    <td className="px-6 py-5 font-medium text-[#12111A]">
-                                                                        {formatDate(invoice.createdAt)}
+                                                                    <td className="px-6 py-5 font-mono text-[13px] text-[#12111A]">
+                                                                        {truncatedId}
                                                                     </td>
                                                                     <td className="px-6 py-5 font-medium text-[#12111A]">
-                                                                        ${(invoice.amount / 100).toFixed(2)}
+                                                                        {invoice.customer}
+                                                                    </td>
+                                                                    <td className="px-6 py-5 text-[var(--color-text-secondary)]">
+                                                                        {invoice.plan}
+                                                                    </td>
+                                                                    <td className="px-6 py-5 font-medium text-[#12111A]">
+                                                                        ${(parseInt(invoice.amount, 10) / 100).toFixed(2)}
                                                                     </td>
                                                                     <td className="px-6 py-5">
-                                                                        <div className={`inline-flex items-center rounded-full px-3 py-1 text-[13px] font-medium ${isPaid ? 'bg-emerald-100/60 text-emerald-600' : 'bg-slate-100 text-slate-600'}`}>
-                                                                            {isPaid ? "Paid" : invoice.status}
+                                                                        <div className={`inline-flex items-center rounded-full px-3 py-1 text-[13px] font-medium capitalize ${statusBadge}`}>
+                                                                            {invoice.status}
                                                                         </div>
+                                                                    </td>
+                                                                    <td className="px-6 py-5 text-[var(--color-text-secondary)]">
+                                                                        {formatDate(invoice.date)}
                                                                     </td>
                                                                 </tr>
                                                             );
                                                         }) : (
                                                             <tr>
-                                                                <td colSpan={3} className="px-6 py-12 text-center text-slate-400">
+                                                                <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
                                                                     No invoices found.
                                                                 </td>
                                                             </tr>
