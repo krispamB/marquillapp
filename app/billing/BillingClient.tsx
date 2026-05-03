@@ -94,7 +94,7 @@ export default function BillingClient({
 
                 const [tiersRes, invoicesRes] = await Promise.all([
                     fetch(`${apiBase}/tiers/active`, { credentials: "include" }),
-                    fetch(`${apiBase}/payment/invoice`, { credentials: "include" }).catch(() => null),
+                    fetch(`${apiBase}/payment/invoices`, { credentials: "include" }).catch(() => null),
                 ]);
 
                 if (tiersRes.ok) {
