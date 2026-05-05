@@ -120,7 +120,7 @@ describe('FeatureGatingService', () => {
     const tier = {
       _id: new Types.ObjectId(),
       name: 'Broken',
-      limits: { ai_drafts: -1 },
+      limits: {},
     } as any;
 
     expect(() => service.getLimitFromTier(tier, 'ai_drafts')).toThrow(
@@ -234,6 +234,7 @@ describe('FeatureGatingService', () => {
     const tierId = new Types.ObjectId();
     const currentPeriodStart = new Date('2026-03-14T00:00:00.000Z');
     const currentPeriodEnd = new Date('2026-04-14T00:00:00.000Z');
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-20T00:00:00.000Z'));
     const tier = {
       _id: tierId,
       name: 'Starter',
@@ -285,6 +286,7 @@ describe('FeatureGatingService', () => {
         scheduled_posts: { used: 1, limit: 3, remaining: 2 },
       },
     });
+    jest.useRealTimers();
   });
 
   it('returns default cycle usage summary and floors remaining at zero', async () => {

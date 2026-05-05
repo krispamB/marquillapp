@@ -129,6 +129,8 @@ Rules:
 
 ## Writing Tests
 
+**Every new service must have a corresponding `<name>.spec.ts` file.** When creating a service, write tests for all public methods before considering the task complete. Tests live alongside the source file.
+
 Test files are colocated with their source files as `<name>.spec.ts`. Run a single file with:
 
 ```bash

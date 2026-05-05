@@ -224,7 +224,7 @@ describe('AuthService.linkedinCallback', () => {
     };
   };
 
-  it('enforces connected account limit for new connections', async () => {
+  it('upserts a new LinkedIn account when no existing connection is found', async () => {
     const { service, mocks } = makeService();
     const userId = new Types.ObjectId().toString();
     jest
@@ -244,12 +244,6 @@ describe('AuthService.linkedinCallback', () => {
 
     await service.linkedinCallback('code', userId);
 
-    expect(
-      mocks.featureGatingService.assertConnectedAccountCapacity,
-    ).toHaveBeenCalledWith({
-      userId,
-      isReconnect: false,
-    });
     expect(mocks.connectedAccountModel.findOneAndUpdate).toHaveBeenCalled();
     const updatePayload =
       mocks.connectedAccountModel.findOneAndUpdate.mock.calls[0][1];
@@ -259,7 +253,7 @@ describe('AuthService.linkedinCallback', () => {
     expect(updatePayload.profileMetadata.avatarUrl).toBeUndefined();
   });
 
-  it('treats existing linked account as reconnect and bypasses capacity usage', async () => {
+  it('updates the existing LinkedIn account when the same memberId reconnects', async () => {
     const { service, mocks } = makeService();
     const userId = new Types.ObjectId().toString();
     jest
@@ -285,12 +279,6 @@ describe('AuthService.linkedinCallback', () => {
 
     await service.linkedinCallback('code', userId);
 
-    expect(
-      mocks.featureGatingService.assertConnectedAccountCapacity,
-    ).toHaveBeenCalledWith({
-      userId,
-      isReconnect: true,
-    });
     expect(mocks.connectedAccountModel.findOne).toHaveBeenCalledWith({
       user: new Types.ObjectId(userId),
       provider: AccountProvider.LINKEDIN,
@@ -318,6 +306,7 @@ describe('AuthService.linkedinCallback', () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({
         user: userId,
+        isActive: true,
         profileMetadata: { sub: 'existing-sub' },
       });
 
@@ -748,6 +737,7 @@ describe('AuthService.getConnectedAccounts', () => {
 
     expect(connectedAccountModel.find).toHaveBeenCalledWith({
       user: new Types.ObjectId(userId),
+      isActive: true,
     });
     expect(linkedinAvatarRefreshQueue.addAvatarRefreshJob).toHaveBeenCalledTimes(
       2,
