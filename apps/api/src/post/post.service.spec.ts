@@ -694,7 +694,7 @@ describe('PostService.publishOnLinkedIn', () => {
       connectedAccount: new Types.ObjectId(),
       status: 'SCHEDULED',
       content: 'with media',
-      media: [{ id: 'urn:li:image:1', title: 'image-1' }],
+      media: [{ id: 'urn:li:image:1', title: 'image-1', type: 'IMAGE' }],
       save: mocks.save,
     } as any;
     mocks.findById.mockResolvedValue(post);
