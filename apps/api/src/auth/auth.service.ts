@@ -872,13 +872,20 @@ export class AuthService {
       return false;
     }
 
+    // Permanent failure recorded — user must reconnect LinkedIn to clear this.
+    if (account.profileMetadata?.avatarRefreshFailureReason) {
+      return false;
+    }
+
     if (!account.avatarUrl) {
       return true;
     }
 
     const expiresAtMs = this.parseExpiryToMs(account.avatarUrlExpiresAt);
     if (expiresAtMs === null) {
-      return true;
+      // URL is set but LinkedIn returned no expiry — treat as valid rather than
+      // triggering a refresh on every request.
+      return false;
     }
 
     return expiresAtMs <= refreshDeadline;
