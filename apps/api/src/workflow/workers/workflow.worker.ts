@@ -106,14 +106,19 @@ async function bootstrapWorker() {
   new Worker(
     LINKEDIN_AVATAR_REFRESH_QUEUE_NAME,
     async (job: Job) => {
-      const connectedAccountId = job.data?.connectedAccountId;
-      if (!connectedAccountId) {
-        logger.warn(`Skipping avatar refresh job ${job.id}; missing account id`);
-        return;
-      }
+      try {
+        const connectedAccountId = job.data?.connectedAccountId;
+        if (!connectedAccountId) {
+          logger.warn(`Skipping avatar refresh job ${job.id}; missing account id`);
+          return;
+        }
 
-      logger.log(`Processing LinkedIn avatar refresh for ${connectedAccountId}`);
-      await authService.refreshLinkedinAvatarForAccount(connectedAccountId);
+        logger.log(`Processing LinkedIn avatar refresh for ${connectedAccountId}`);
+        await authService.refreshLinkedinAvatarForAccount(connectedAccountId);
+      } catch (error) {
+        logger.error(error);
+        throw error;
+      }
     },
     {
       connection: {
@@ -127,7 +132,12 @@ async function bootstrapWorker() {
   new Worker(
     EMAIL_QUEUE_NAME,
     async (job: Job) => {
-      await processEmailJob(job, logger, mailService);
+      try {
+        await processEmailJob(job, logger, mailService);
+      } catch (error) {
+        logger.error(error);
+        throw error;
+      }
     },
     {
       connection: {
