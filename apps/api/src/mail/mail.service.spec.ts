@@ -17,17 +17,25 @@ describe('MailService', () => {
     } as unknown as ConfigService;
   };
 
-  it('compiles welcome template and sends through Resend', async () => {
-    const service = new MailService(mockConfigService());
+  const makeService = (overrides: Record<string, string | undefined> = {}) => {
+    const service = new MailService(mockConfigService(overrides));
+    service.onModuleInit();
+    return service;
+  };
+
+  const mockResend = (service: MailService) => {
     const send = jest.fn().mockResolvedValue({
       data: { id: 'email_123' },
       error: null,
       headers: null,
     });
+    (service as any).resend = { emails: { send } };
+    return send;
+  };
 
-    jest
-      .spyOn(service as any, 'createResendClient')
-      .mockReturnValue({ emails: { send } });
+  it('compiles welcome template and sends through Resend', async () => {
+    const service = makeService();
+    const send = mockResend(service);
 
     const result = await service.sendTemplate({
       to: 'user@example.com',
@@ -55,24 +63,18 @@ describe('MailService', () => {
     expect(result.error).toBeNull();
   });
 
-  it('fails fast when RESEND_API_KEY is missing', async () => {
+  it('fails fast when RESEND_API_KEY is missing', () => {
     const service = new MailService(
       mockConfigService({ RESEND_API_KEY: undefined }),
     );
 
-    await expect(
-      service.sendTemplate({
-        to: 'user@example.com',
-        template: 'welcome',
-        data: { name: 'Jane Doe' },
-      }),
-    ).rejects.toThrow(
+    expect(() => service.onModuleInit()).toThrow(
       new InternalServerErrorException('RESEND_API_KEY is not configured'),
     );
   });
 
   it('fails fast when MAIL_FROM is missing and no override is provided', async () => {
-    const service = new MailService(mockConfigService({ MAIL_FROM: undefined }));
+    const service = makeService({ MAIL_FROM: undefined });
 
     await expect(
       service.sendTemplate({
@@ -86,16 +88,13 @@ describe('MailService', () => {
   });
 
   it('smoke test: sendTemplate succeeds with mocked Resend', async () => {
-    const service = new MailService(mockConfigService());
+    const service = makeService();
     const send = jest.fn().mockResolvedValue({
       data: { id: 'email_456' },
       error: null,
       headers: null,
     });
-
-    jest
-      .spyOn(service as any, 'createResendClient')
-      .mockReturnValue({ emails: { send } });
+    (service as any).resend = { emails: { send } };
 
     await expect(
       service.sendTemplate({
