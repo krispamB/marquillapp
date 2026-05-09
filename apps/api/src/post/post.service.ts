@@ -114,8 +114,9 @@ export class PostService {
 
     const postsQuery = this.postDraftModel
       .find(filter)
-      .select('-userIntent')
+      .select('-userIntent -compressionResult -youtubeResearch')
       .sort({ createdAt: -1 })
+      .lean()
       .exec();
 
     const availableMonthsQuery = this.postDraftModel.aggregate<{
