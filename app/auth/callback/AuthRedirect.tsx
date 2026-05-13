@@ -3,20 +3,25 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+const API = process.env.NEXT_PUBLIC_API_BASE_URL;
+
 export default function AuthRedirect({ hasEmail }: { hasEmail: boolean }) {
   const router = useRouter();
 
   useEffect(() => {
-    let destination = "/";
-    if (hasEmail) {
-      const completed = localStorage.getItem("marquill_onboarding_complete");
-      destination = completed ? "/dashboard" : "/onboarding";
+    if (!hasEmail) {
+      router.replace("/");
+      return;
     }
-    const timer = window.setTimeout(() => {
-      router.replace(destination);
-    }, 1500);
 
-    return () => window.clearTimeout(timer);
+    fetch(`${API}/onboarding`, { credentials: "include" })
+      .then(res => (res.ok ? res.json() : null))
+      .then(session => {
+        router.replace(session?.isComplete ? "/dashboard" : "/onboarding");
+      })
+      .catch(() => {
+        router.replace("/onboarding");
+      });
   }, [hasEmail, router]);
 
   return null;
