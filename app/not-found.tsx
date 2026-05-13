@@ -1,25 +1,28 @@
 import Link from 'next/link';
-import { LayoutDashboard } from 'lucide-react';
-
-const LogoIcon = () => (
-  <svg width="28" height="28" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-    <rect width="50" height="50" rx="5" fill="#B5B6FF"/>
-    <path d="M39 5C42.3137 5 45 7.68629 45 11V35H35V45H11C7.68629 45 5 42.3137 5 39V15H15V5H39ZM9.7998 29.7998V39.7998H19.7998V29.7998H9.7998ZM19.7998 29.7998H29.7998V19.7998H19.7998V29.7998ZM29.7998 19.7998H39.7998V9.7998H29.7998V19.7998Z" fill="#5B5CF6"/>
-  </svg>
-);
 
 export default function NotFound() {
   return (
     <div className="min-h-screen bg-[var(--color-background)] flex flex-col font-sans text-[var(--color-text-primary)]">
-      
+
       {/* Header Layout */}
       <header className="flex w-full items-center justify-between px-6 py-6 sm:px-12 sm:py-8">
         <Link href="/" aria-label="Homepage" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <LogoIcon />
+          <img
+            src="https://res.cloudinary.com/dnpvndlmy/image/upload/q_auto/f_auto/v1775562587/marquill/icon_ngg31p.svg"
+            alt="Marquill"
+            width={28}
+            height={28}
+            className="shrink-0"
+          />
           <span className="font-heading text-xl font-bold tracking-tight">Marquill</span>
         </Link>
-        <Link href="/dashboard" aria-label="Go to Dashboard" className="flex items-center justify-center p-2.5 sm:p-3 border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-border-inset)] transition-colors shadow-sm bg-white group">
-          <LayoutDashboard size={20} className="text-[var(--color-text-primary)] group-hover:text-[var(--color-primary)] transition-colors" />
+        <Link
+          href="/dashboard"
+          aria-label="Go to Dashboard"
+          className="flex items-center gap-2 px-4 py-2 rounded-full border border-[var(--color-border)] bg-white text-sm font-semibold text-[var(--color-text-primary)] shadow-sm hover:bg-[var(--color-primary)] hover:text-white hover:border-[var(--color-primary)] transition-all duration-200 group"
+        >
+          <span className="font-heading tracking-tight">Dashboard</span>
+          <span className="text-base leading-none transition-transform duration-200 group-hover:translate-x-0.5">→</span>
         </Link>
       </header>
       
