@@ -237,7 +237,6 @@ export default function OnboardingClient() {
   };
 
   const finish = () => {
-    localStorage.setItem("marquill_onboarding_complete", "1");
     setToast(true);
     setTimeout(() => {
       router.push("/dashboard");
