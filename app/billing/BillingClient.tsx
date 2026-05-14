@@ -170,11 +170,6 @@ export default function BillingClient({
                             onConnectLinkedInOrg={handleOpenOrgModal}
                             hasPersonalAccount={hasPersonalAccount}
                             isConnectingOrg={false}
-                            onSubscriptionLoaded={(data) => {
-                                if (data?.tier) {
-                                    setActivePlan(data.tier);
-                                }
-                            }}
                         />
 
                         <main className="relative mx-auto max-w-5xl px-6 py-12 sm:px-8">
