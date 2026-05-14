@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import "./onboarding.css";
@@ -27,7 +27,7 @@ const API = process.env.NEXT_PUBLIC_API_BASE_URL;
 // ── Value maps: UI keys → server enum values ──
 
 const EXPERIENCE_MAP: Record<string, CreatorLevel> = {
-  new:      CreatorLevel.GETTING_STARTED,
+  new: CreatorLevel.GETTING_STARTED,
   building: CreatorLevel.BUILDING_MOMENTUM,
   seasoned: CreatorLevel.SEASONED,
 };
@@ -41,19 +41,19 @@ const CADENCE_MAP: Record<string, PostingFrequency> = {
 
 const GOAL_MAP: Record<string, Goal> = {
   // Creator goals
-  followers:  Goal.GROW_AUDIENCE,
+  followers: Goal.GROW_AUDIENCE,
   leadership: Goal.THOUGHT_LEADERSHIP,
-  leads:      Goal.GENERATE_LEADS,
-  brand:      Goal.PERSONAL_BRAND,
-  hiring:     Goal.HIRING,
-  community:  Goal.BUILD_COMMUNITY,
+  leads: Goal.GENERATE_LEADS,
+  brand: Goal.PERSONAL_BRAND,
+  hiring: Goal.HIRING,
+  community: Goal.BUILD_COMMUNITY,
   // Writer goals
-  volume:      Goal.SCALE_OUTPUT,
-  quality:     Goal.SHARPER_DRAFTS,
+  volume: Goal.SCALE_OUTPUT,
+  quality: Goal.SHARPER_DRAFTS,
   consistency: Goal.HIT_SCHEDULES,
-  handoff:     Goal.CLEANER_HANDOFF,
-  voice:       Goal.MATCH_EACH_VOICE,
-  reporting:   Goal.CLIENT_REPORTING,
+  handoff: Goal.CLEANER_HANDOFF,
+  voice: Goal.MATCH_EACH_VOICE,
+  reporting: Goal.CLIENT_REPORTING,
 };
 
 export const CADENCE_DEFAULTS: Record<string, DayOfWeek[]> = {
@@ -98,7 +98,7 @@ function canAdvance(step: number, data: OnboardingData): boolean {
   if (step === 2) {
     if (!data.firstName.trim()) return false;
     if (data.persona === "creator") return !!data.experience;
-    if (data.persona === "writer")  return data.clientCount !== "";
+    if (data.persona === "writer") return data.clientCount !== "";
     return false;
   }
   if (step === 3) return data.goals.length > 0;
@@ -180,7 +180,7 @@ function restoreData(serverData: Record<string, any>): Partial<OnboardingData> {
     experience,
     clientCount: (serverData.numberOfClients ?? "") as OnboardingData["clientCount"],
     agencyName: serverData.agencyName ?? "",
-    goals: (serverData.goals ?? []).map((g: string) => goalReverseMap[g]).filter(Boolean),
+    goals: (serverData.goals ?? serverData.clientGoal ?? []).map((g: string) => goalReverseMap[g]).filter(Boolean),
     cadence,
     postingDays: serverData.postingDays ?? CADENCE_DEFAULTS[cadence],
     topics: serverData.topics ?? [],
@@ -189,35 +189,26 @@ function restoreData(serverData: Record<string, any>): Partial<OnboardingData> {
 
 // ── Component ──
 
-export default function OnboardingClient() {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type OnboardingSession = { userType?: string; currentStep?: number; isComplete?: boolean; data?: Record<string, any> };
+
+export default function OnboardingClient({ initialSession }: { initialSession: OnboardingSession | null }) {
   const router = useRouter();
-  const [data, setData] = useState<OnboardingData>(INITIAL_DATA);
-  const [step, setStep] = useState(1);
+  const [data, setData] = useState<OnboardingData>(() => {
+    if (!initialSession) return INITIAL_DATA;
+    const serverPayload = { userType: initialSession.userType, ...(initialSession.data ?? {}) };
+    return { ...INITIAL_DATA, ...restoreData(serverPayload) };
+  });
+  const [step, setStep] = useState(() => {
+    if (!initialSession?.currentStep) return initialSession?.userType ? 2 : 1;
+    return Math.max(initialSession.currentStep, initialSession.userType ? 2 : 1);
+  });
   const [toast, setToast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
   const update = (patch: Partial<OnboardingData>) =>
     setData(d => ({ ...d, ...patch }));
-
-  // GET on mount — resume partial session
-  useEffect(() => {
-    fetch(`${API}/onboarding`, { credentials: "include" })
-      .then(res => (res.ok ? res.json() : null))
-      .then(session => {
-        if (!session) return;
-        if (session.isComplete) { router.replace("/dashboard"); return; }
-        const serverPayload = { userType: session.userType, ...(session.data ?? {}) };
-        setData(d => ({ ...d, ...restoreData(serverPayload) }));
-        if (session.currentStep) {
-          setStep(Math.max(session.currentStep, session.userType ? 2 : 1));
-        } else if (session.userType) {
-          setStep(2);
-        }
-      })
-      .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const advance = async () => {
     setIsLoading(true);
@@ -265,9 +256,9 @@ export default function OnboardingClient() {
           <div className="ob-card">
             {step === 1 && <StepPersona data={data} update={update} />}
             {step === 2 && <StepProfile data={data} update={update} />}
-            {step === 3 && <StepGoals   data={data} update={update} />}
+            {step === 3 && <StepGoals data={data} update={update} />}
             {step === 4 && <StepCadence data={data} update={update} />}
-            {step === 5 && <StepTopics  data={data} update={update} />}
+            {step === 5 && <StepTopics data={data} update={update} />}
             {step === 6 && <StepConnect data={data} update={update} />}
           </div>
 
