@@ -207,8 +207,13 @@ export default function OnboardingClient() {
       .then(session => {
         if (!session) return;
         if (session.isComplete) { router.replace("/dashboard"); return; }
-        setData(d => ({ ...d, ...restoreData(session.data ?? {}) }));
-        if (session.currentStep) setStep(Math.max(session.currentStep, 2));
+        const serverPayload = { userType: session.userType, ...(session.data ?? {}) };
+        setData(d => ({ ...d, ...restoreData(serverPayload) }));
+        if (session.currentStep) {
+          setStep(Math.max(session.currentStep, session.userType ? 2 : 1));
+        } else if (session.userType) {
+          setStep(2);
+        }
       })
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
