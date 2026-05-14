@@ -84,11 +84,24 @@ export default async function DashboardPage() {
 
   const primaryAccountId = connectedAccounts[0]?.id;
 
+  let subscription: { name: string; isDefault: boolean } | null = null;
+  try {
+    const res = await fetch(`${apiBase}/payment/subscription`, {
+      cache: "no-store",
+      headers: { cookie: cookieHeader },
+    });
+    if (res.ok) {
+      const body = await res.json();
+      subscription = body?.tier ?? null;
+    }
+  } catch {}
+
   return (
     <DashboardClient
       user={user}
       connectedAccounts={connectedAccounts}
       primaryAccountId={primaryAccountId}
+      subscription={subscription}
     />
   );
 }

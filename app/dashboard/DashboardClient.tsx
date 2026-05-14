@@ -233,10 +233,12 @@ export default function DashboardPage({
   user,
   connectedAccounts,
   primaryAccountId,
+  subscription,
 }: {
   user: UserProfile;
   connectedAccounts: ConnectedAccount[];
   primaryAccountId?: string;
+  subscription: { name: string; isDefault: boolean } | null;
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [connectFeedback, setConnectFeedback] = useState<string | null>(null);
@@ -1320,6 +1322,7 @@ export default function DashboardPage({
             }
             onConnectLinkedIn={handleConnectLinkedIn}
             onConnectLinkedInOrg={handleOpenOrgModal}
+            subscription={subscription}
             onRemoveAccount={(accountId) => {
               const account = connectedAccounts.find((a) => a.id === accountId);
               setDisconnectTarget({
@@ -1778,6 +1781,7 @@ export default function DashboardPage({
         onConnectLinkedInOrg={() => { setIsMobileSidebarOpen(false); handleOpenOrgModal(); }}
         hasPersonalAccount={hasPersonalAccount}
         isConnectingLinkedIn={isConnectingLinkedIn}
+        subscription={subscription}
       />
       <BugReportModal isOpen={isMobileBugModalOpen} onClose={() => setIsMobileBugModalOpen(false)} />
       <NewPostModal
