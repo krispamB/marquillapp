@@ -10,6 +10,8 @@ bun run build    # production build
 bun run lint     # ESLint
 ```
 
+Run `bun run build` before `git add` to catch type and compile errors.
+
 No test suite is configured.
 
 ## Architecture

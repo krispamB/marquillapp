@@ -47,7 +47,7 @@ export default function Sidebar({
   onConnectLinkedInOrg,
   onSelectAccount,
   onRemoveAccount,
-  onSubscriptionLoaded,
+  subscription,
 }: {
   user: SidebarUser;
   items: SidebarItem[];
@@ -66,36 +66,14 @@ export default function Sidebar({
   onConnectLinkedInOrg?: () => void;
   onSelectAccount?: (accountId: string) => void;
   onRemoveAccount?: (accountId: string) => void;
-  onSubscriptionLoaded?: (data: { tier?: { id: string; name: string; isDefault?: boolean } | null }) => void;
+  subscription?: { name: string; isDefault?: boolean } | null;
 }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isBugModalOpen, setIsBugModalOpen] = useState(false);
-  const [isDefaultTier, setIsDefaultTier] = useState(false);
-  const [tierName, setTierName] = useState("Free plan");
+  const [isDefaultTier] = useState(subscription?.isDefault ?? false);
+  const [tierName] = useState(subscription?.name ? `${subscription.name} plan` : "Free plan");
   const settingsRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
-    fetch(`${apiBase}/payment/subscription`, { credentials: "include" })
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch subscription tier");
-        return res.json();
-      })
-      .then((data) => {
-        if (onSubscriptionLoaded) {
-          onSubscriptionLoaded(data);
-        }
-        if (data?.tier?.name) {
-          setTierName(`${data.tier.name} plan`);
-        }
-        if (data?.tier?.isDefault !== undefined) {
-          setIsDefaultTier(data.tier.isDefault);
-        }
-      })
-      .catch((err) => console.error("Error fetching subscription tier:", err));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {

@@ -578,6 +578,7 @@ export function MobileSidebar({
   onConnectLinkedInOrg,
   hasPersonalAccount = false,
   isConnectingLinkedIn = false,
+  subscription,
 }: {
   isOpen: boolean;
   accounts: ConnectedAccount[];
@@ -590,21 +591,11 @@ export function MobileSidebar({
   onConnectLinkedInOrg?: () => void;
   hasPersonalAccount?: boolean;
   isConnectingLinkedIn?: boolean;
+  subscription?: { name: string; isDefault?: boolean } | null;
 }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [tierName, setTierName] = useState<string | null>(null);
-  const [isDefaultTier, setIsDefaultTier] = useState(true);
-
-  useEffect(() => {
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
-    fetch(`${apiBase}/payment/subscription`, { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.tier?.name) setTierName(data.tier.name);
-        if (data?.tier?.isDefault !== undefined) setIsDefaultTier(data.tier.isDefault);
-      })
-      .catch(() => {});
-  }, []);
+  const [tierName] = useState<string | null>(subscription?.name ?? null);
+  const [isDefaultTier] = useState(subscription?.isDefault ?? true);
 
   function getDaysUntilExpiry(expiresAt?: string | null): number | null {
     if (!expiresAt) return null;
