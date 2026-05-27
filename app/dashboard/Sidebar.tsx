@@ -70,8 +70,9 @@ export default function Sidebar({
 }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isBugModalOpen, setIsBugModalOpen] = useState(false);
-  const [isDefaultTier] = useState(subscription?.isDefault ?? false);
-  const [tierName] = useState(subscription?.name ? `${subscription.name} plan` : "Free plan");
+  const tier = subscription ?? user.tier ?? null;
+  const [isDefaultTier] = useState(tier?.isDefault ?? false);
+  const [tierName] = useState(tier?.name ? `${tier.name} plan` : "Free plan");
   const settingsRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 

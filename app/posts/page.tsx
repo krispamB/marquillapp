@@ -3,9 +3,9 @@ import { redirect } from "next/navigation";
 import type {
   ConnectedAccount,
   ConnectedAccountsResponse,
-  UserApiResponse,
   UserProfile,
 } from "../lib/types";
+import { getCachedUser, getCachedSubscription } from "../lib/session";
 import PostsClient from "./PostsClient";
 
 export default async function PostsPage() {
@@ -24,23 +24,10 @@ export default async function PostsPage() {
     .map(({ name, value }) => `${name}=${value}`)
     .join("; ");
 
-  let apiUser: UserApiResponse | null = null;
-  try {
-    const response = await fetch(`${apiBase}/users/me`, {
-      cache: "no-store",
-      headers: {
-        cookie: cookieHeader,
-      },
-    });
-
-    if (!response.ok) {
-      redirect("/");
-    }
-
-    apiUser = (await response.json()) as UserApiResponse;
-  } catch {
-    apiUser = null;
-  }
+  const [apiUser, subscription] = await Promise.all([
+    getCachedUser(cookieHeader, accessToken),
+    getCachedSubscription(cookieHeader, accessToken),
+  ]);
 
   const name = apiUser?.name?.trim();
   const email = apiUser?.email?.trim();
@@ -89,6 +76,7 @@ export default async function PostsPage() {
       user={user}
       connectedAccounts={connectedAccounts}
       primaryAccountId={primaryAccountId}
+      subscription={subscription}
     />
   );
 }
