@@ -4,9 +4,9 @@ import DashboardClient from "./DashboardClient";
 import type {
   ConnectedAccount,
   ConnectedAccountsResponse,
-  UserApiResponse,
   UserProfile,
 } from "../lib/types";
+import { getCachedUser, getCachedSubscription } from "../lib/session";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
@@ -24,23 +24,10 @@ export default async function DashboardPage() {
     .map(({ name, value }) => `${name}=${value}`)
     .join("; ");
 
-  let apiUser: UserApiResponse | null = null;
-  try {
-    const response = await fetch(`${apiBase}/users/me`, {
-      cache: "no-store",
-      headers: {
-        cookie: cookieHeader,
-      },
-    });
-
-    if (!response.ok) {
-      redirect("/");
-    }
-
-    apiUser = (await response.json()) as UserApiResponse;
-  } catch {
-    apiUser = null;
-  }
+  const [apiUser, subscription] = await Promise.all([
+    getCachedUser(cookieHeader, accessToken),
+    getCachedSubscription(cookieHeader, accessToken),
+  ]);
 
   const name = apiUser?.name?.trim();
   const email = apiUser?.email?.trim();
@@ -83,18 +70,6 @@ export default async function DashboardPage() {
   }
 
   const primaryAccountId = connectedAccounts[0]?.id;
-
-  let subscription: { name: string; isDefault: boolean } | null = null;
-  try {
-    const res = await fetch(`${apiBase}/payment/subscription`, {
-      cache: "no-store",
-      headers: { cookie: cookieHeader },
-    });
-    if (res.ok) {
-      const body = await res.json();
-      subscription = body?.tier ?? null;
-    }
-  } catch {}
 
   return (
     <DashboardClient

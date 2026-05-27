@@ -222,10 +222,12 @@ export default function PostsClient({
   user,
   connectedAccounts,
   primaryAccountId,
+  subscription,
 }: {
   user: UserProfile;
   connectedAccounts: ConnectedAccount[];
   primaryAccountId?: string;
+  subscription?: { name: string; isDefault?: boolean } | null;
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [connectFeedback, setConnectFeedback] = useState<string | null>(null);
@@ -1108,6 +1110,7 @@ export default function PostsClient({
             onConnectLinkedInOrg={handleOpenOrgModal}
             hasPersonalAccount={hasPersonalAccount}
             isConnectingOrg={false}
+            subscription={subscription}
           />
 
           <main className="flex flex-col gap-6">

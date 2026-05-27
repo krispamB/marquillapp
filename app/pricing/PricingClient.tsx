@@ -47,10 +47,12 @@ export default function PricingClient({
     user,
     connectedAccounts,
     primaryAccountId,
+    subscription,
 }: {
     user: UserProfile;
     connectedAccounts: ConnectedAccount[];
     primaryAccountId?: string;
+    subscription?: { name: string; isDefault?: boolean } | null;
 }) {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>(
@@ -180,6 +182,7 @@ export default function PricingClient({
                             onConnectLinkedInOrg={handleOpenOrgModal}
                             hasPersonalAccount={hasPersonalAccount}
                             isConnectingOrg={false}
+                            subscription={subscription}
                         />
 
                         <main className="relative mx-auto max-w-7xl px-6 py-16 sm:px-8">
