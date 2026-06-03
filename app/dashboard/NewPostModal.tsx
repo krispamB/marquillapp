@@ -1011,7 +1011,18 @@ export default function NewPostModal({
     !isOverLimit &&
     pendingAction === null;
   const hasContent = content.trim().length > 0;
-  const hasPreviewContent = hasContent || mediaPreviews.length > 0 || resolvedLinkedinPreviewUrls.length > 0;
+  // The post has media (urns exist) but the displayable URL isn't ready yet —
+  // we're still resolving it from cache/endpoint. Used to show a "media coming"
+  // hint under the text instead of leaving the preview looking empty.
+  const isPreviewMediaPending =
+    mediaPreviews.length === 0 &&
+    resolvedLinkedinPreviewUrls.length === 0 &&
+    (postMediaUrns.length > 0 || isResolvingPreviewMedia);
+  const hasPreviewContent =
+    hasContent ||
+    mediaPreviews.length > 0 ||
+    resolvedLinkedinPreviewUrls.length > 0 ||
+    isPreviewMediaPending;
   const progressSegments = [0, 1, 2, 3].map((index) => {
     const segmentStart = index * 25;
     const segmentFill = ((progressPercent - segmentStart) / 25) * 100;
@@ -1730,7 +1741,7 @@ export default function NewPostModal({
       }
       return;
     }
-    if (mediaFiles.length > 0 || hasUserSelectedStockImage || isResolvingPreviewMedia) {
+    if (mediaFiles.length > 0 || hasUserSelectedStockImage) {
       return;
     }
 
@@ -1775,7 +1786,6 @@ export default function NewPostModal({
     mediaPreviews,
     isOpen,
     isPreviewVisible,
-    isResolvingPreviewMedia,
     postId,
     postMediaUrns,
     resolveAllLinkedinMediaUrls,
@@ -2335,6 +2345,21 @@ export default function NewPostModal({
                           srcs={resolvedLinkedinPreviewUrls}
                           type="images"
                         />
+                      ) : isPreviewMediaPending ? (
+                        <div
+                          role="status"
+                          aria-live="polite"
+                          className="mt-3 flex items-center gap-2.5 rounded-xl bg-[#f3f2ef] px-3.5 py-3"
+                        >
+                          <span className="flex gap-1" aria-hidden="true">
+                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#999999] [animation-delay:-0.3s]" />
+                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#999999] [animation-delay:-0.15s]" />
+                            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#999999]" />
+                          </span>
+                          <span className="text-[13px] font-medium text-[#666666]">
+                            Loading media…
+                          </span>
+                        </div>
                       ) : null}
                     </>
                   ) : (
