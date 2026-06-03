@@ -1785,13 +1785,19 @@ export default function NewPostModal({
   const buildPayload = (
     overrides?: Partial<Pick<NewPostSubmitPayload, "scheduledTime" | "timezone">>,
   ): NewPostSubmitPayload => {
-    // Split previews: device blobs vs. stock URLs
-    const stockUrls = mediaPreviews.filter((_, i) => mediaSources[i] !== "device");
+    // Only send media when it differs from what's already on the server.
+    // After a save (or when editing a post with an existing image) the media
+    // is already uploaded, so a subsequent schedule/publish must not re-upload
+    // it — otherwise the same files get uploaded twice.
+    const stockUrls = isImageDirty
+      ? mediaPreviews.filter((_, i) => mediaSources[i] !== "device")
+      : [];
+    const deviceFiles = isImageDirty ? mediaFiles : [];
     return {
       mode,
       postId: resolvedPostId,
       content,
-      mediaFiles: mediaFiles.length > 0 ? mediaFiles : undefined,
+      mediaFiles: deviceFiles.length > 0 ? deviceFiles : undefined,
       mediaUrls: stockUrls.length > 0 ? stockUrls : undefined,
       mediaSource,
       mediaType: mediaType ?? undefined,
