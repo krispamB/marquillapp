@@ -7,7 +7,9 @@ import {
 } from './workflow.constants';
 
 @Injectable()
-export class LinkedinAvatarRefreshQueue implements OnModuleInit, OnModuleDestroy {
+export class LinkedinAvatarRefreshQueue
+  implements OnModuleInit, OnModuleDestroy
+{
   public queue: Queue;
   constructor(private config: ConfigService) {}
 

@@ -246,8 +246,7 @@ export class FeatureGatingService {
           id: tier._id.toString(),
           name: tier.name,
         },
-        upgradeHint:
-          'Upgrade to Pro Writer to connect LinkedIn company pages.',
+        upgradeHint: 'Upgrade to Pro Writer to connect LinkedIn company pages.',
       });
     }
   }

@@ -29,7 +29,9 @@ export class PaymentWebhookController {
 
     const paddleSignature = request.headers['paddle-signature'];
     if (!paddleSignature || Array.isArray(paddleSignature)) {
-      throw new BadRequestException('Missing or invalid paddle-signature header');
+      throw new BadRequestException(
+        'Missing or invalid paddle-signature header',
+      );
     }
 
     const result = await this.paymentService.handlePaddleWebhook(

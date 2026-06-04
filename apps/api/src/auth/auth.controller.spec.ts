@@ -62,7 +62,9 @@ describe('AuthController linkedin callback html responses', () => {
     expect(authService.linkedinCallback).toHaveBeenCalledWith('code', 'state');
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.type).toHaveBeenCalledWith('html');
-    expect(res.send).toHaveBeenCalledWith(expect.stringContaining('<!doctype html>'));
+    expect(res.send).toHaveBeenCalledWith(
+      expect.stringContaining('<!doctype html>'),
+    );
     expect(res.send).toHaveBeenCalledWith(
       expect.stringContaining('LinkedIn Connected'),
     );
@@ -76,7 +78,9 @@ describe('AuthController linkedin callback html responses', () => {
       expect.stringContaining('shouldAutoClose'),
     );
     expect(res.send).toHaveBeenCalledWith(
-      expect.not.stringContaining('setTimeout(function () { window.close(); }, 60);'),
+      expect.not.stringContaining(
+        'setTimeout(function () { window.close(); }, 60);',
+      ),
     );
   });
 
@@ -114,7 +118,9 @@ describe('AuthController linkedin callback html responses', () => {
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.type).toHaveBeenCalledWith('html');
     expect(res.send).toHaveBeenCalledWith(
-      expect.stringContaining('different LinkedIn account is already connected'),
+      expect.stringContaining(
+        'different LinkedIn account is already connected',
+      ),
     );
   });
 

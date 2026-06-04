@@ -36,7 +36,7 @@ describe('processEmailJob', () => {
         appName: 'Marquill',
       },
     });
-    expect((logger.warn as jest.Mock)).not.toHaveBeenCalled();
+    expect(logger.warn as jest.Mock).not.toHaveBeenCalled();
   });
 
   it('sends scheduled-post-published email when payload is valid', async () => {
@@ -70,7 +70,7 @@ describe('processEmailJob', () => {
         postId: 'post123',
       },
     });
-    expect((logger.warn as jest.Mock)).not.toHaveBeenCalled();
+    expect(logger.warn as jest.Mock).not.toHaveBeenCalled();
   });
 
   it('warns and skips scheduled-post-published email when payload is invalid', async () => {

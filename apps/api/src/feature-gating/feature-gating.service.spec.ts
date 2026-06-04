@@ -175,17 +175,17 @@ describe('FeatureGatingService', () => {
       lean: jest.fn().mockResolvedValue({ count: 5 }),
     });
 
-    await expect(service.assertScheduledPostQuota(userId)).rejects.toMatchObject(
-      {
-        response: {
-          code: 'FEATURE_LIMIT_EXCEEDED',
-          feature: 'scheduled_posts',
-          limit: 5,
-          currentUsage: 5,
-        },
-        status: 403,
+    await expect(
+      service.assertScheduledPostQuota(userId),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'FEATURE_LIMIT_EXCEEDED',
+        feature: 'scheduled_posts',
+        limit: 5,
+        currentUsage: 5,
       },
-    );
+      status: 403,
+    });
   });
 
   it('allows post scheduling when usage is below the plan limit', async () => {
@@ -206,7 +206,9 @@ describe('FeatureGatingService', () => {
       lean: jest.fn().mockResolvedValue({ count: 4 }),
     });
 
-    await expect(service.assertScheduledPostQuota(userId)).resolves.toBeUndefined();
+    await expect(
+      service.assertScheduledPostQuota(userId),
+    ).resolves.toBeUndefined();
   });
 
   it('uses active subscription period start for metered usage', async () => {

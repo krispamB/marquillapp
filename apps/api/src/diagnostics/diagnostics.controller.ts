@@ -10,10 +10,7 @@ export class DiagnosticsController {
   takeHeapSnapshot(@Res() res: Response) {
     const filename = `heap-${Date.now()}.heapsnapshot`;
     res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${filename}"`,
-    );
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     const snapshot = getHeapSnapshot();
     snapshot.pipe(res);
   }

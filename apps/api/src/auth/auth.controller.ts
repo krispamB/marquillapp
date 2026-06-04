@@ -288,7 +288,11 @@ export class AuthController {
     }
 
     const response = error.getResponse();
-    if (typeof response === 'object' && response !== null && 'code' in response) {
+    if (
+      typeof response === 'object' &&
+      response !== null &&
+      'code' in response
+    ) {
       return String((response as { code?: unknown }).code ?? '');
     }
 

@@ -108,11 +108,15 @@ async function bootstrapWorker() {
     async (job: Job) => {
       const connectedAccountId = job.data?.connectedAccountId;
       if (!connectedAccountId) {
-        logger.warn(`Skipping avatar refresh job ${job.id}; missing account id`);
+        logger.warn(
+          `Skipping avatar refresh job ${job.id}; missing account id`,
+        );
         return;
       }
 
-      logger.log(`Processing LinkedIn avatar refresh for ${connectedAccountId}`);
+      logger.log(
+        `Processing LinkedIn avatar refresh for ${connectedAccountId}`,
+      );
       await authService.refreshLinkedinAvatarForAccount(connectedAccountId);
     },
     {

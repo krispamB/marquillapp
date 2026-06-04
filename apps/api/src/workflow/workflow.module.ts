@@ -7,7 +7,17 @@ import { EmailQueue } from './email.queue';
 
 @Module({
   controllers: [WorkflowController],
-  providers: [WorkflowQueue, ScheduleQueue, LinkedinAvatarRefreshQueue, EmailQueue],
-  exports: [WorkflowQueue, ScheduleQueue, LinkedinAvatarRefreshQueue, EmailQueue],
+  providers: [
+    WorkflowQueue,
+    ScheduleQueue,
+    LinkedinAvatarRefreshQueue,
+    EmailQueue,
+  ],
+  exports: [
+    WorkflowQueue,
+    ScheduleQueue,
+    LinkedinAvatarRefreshQueue,
+    EmailQueue,
+  ],
 })
 export class WorkflowModule {}

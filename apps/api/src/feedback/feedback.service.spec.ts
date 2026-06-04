@@ -140,21 +140,18 @@ describe('FeedbackService', () => {
     );
 
     await expect(
-      service.submitIssue(
-        { _id: 'user-1', email: 'user@example.com' } as any,
-        {
-          type: FeedbackIssueType.BUG,
-          title: 'Broken',
-          description: 'Broken description',
-          deviceReport: {
-            browser: 'Chrome 124',
-            os: 'macOS 14',
-            screenResolution: '1728x1117',
-            viewportSize: '1440x900',
-            language: 'en-US',
-          },
+      service.submitIssue({ _id: 'user-1', email: 'user@example.com' } as any, {
+        type: FeedbackIssueType.BUG,
+        title: 'Broken',
+        description: 'Broken description',
+        deviceReport: {
+          browser: 'Chrome 124',
+          os: 'macOS 14',
+          screenResolution: '1728x1117',
+          viewportSize: '1440x900',
+          language: 'en-US',
         },
-      ),
+      }),
     ).rejects.toThrow(
       new InternalServerErrorException(
         'GitHub issue integration is not configured',
@@ -165,25 +162,24 @@ describe('FeedbackService', () => {
   it('maps GitHub 422 errors to BadRequestException', async () => {
     const service = new FeedbackService(createConfigService());
     (apiFetch as jest.Mock).mockRejectedValue(
-      new ApiError(422, 'Unprocessable Entity', { message: 'Validation Failed' }),
+      new ApiError(422, 'Unprocessable Entity', {
+        message: 'Validation Failed',
+      }),
     );
 
     await expect(
-      service.submitIssue(
-        { _id: 'user-1', email: 'user@example.com' } as any,
-        {
-          type: FeedbackIssueType.BUG,
-          title: 'Broken',
-          description: 'Broken description',
-          deviceReport: {
-            browser: 'Chrome 124',
-            os: 'macOS 14',
-            screenResolution: '1728x1117',
-            viewportSize: '1440x900',
-            language: 'en-US',
-          },
+      service.submitIssue({ _id: 'user-1', email: 'user@example.com' } as any, {
+        type: FeedbackIssueType.BUG,
+        title: 'Broken',
+        description: 'Broken description',
+        deviceReport: {
+          browser: 'Chrome 124',
+          os: 'macOS 14',
+          screenResolution: '1728x1117',
+          viewportSize: '1440x900',
+          language: 'en-US',
         },
-      ),
+      }),
     ).rejects.toThrow(new BadRequestException('Validation Failed'));
   });
 
@@ -194,21 +190,18 @@ describe('FeedbackService', () => {
     );
 
     await expect(
-      service.submitIssue(
-        { _id: 'user-1', email: 'user@example.com' } as any,
-        {
-          type: FeedbackIssueType.BUG,
-          title: 'Broken',
-          description: 'Broken description',
-          deviceReport: {
-            browser: 'Chrome 124',
-            os: 'macOS 14',
-            screenResolution: '1728x1117',
-            viewportSize: '1440x900',
-            language: 'en-US',
-          },
+      service.submitIssue({ _id: 'user-1', email: 'user@example.com' } as any, {
+        type: FeedbackIssueType.BUG,
+        title: 'Broken',
+        description: 'Broken description',
+        deviceReport: {
+          browser: 'Chrome 124',
+          os: 'macOS 14',
+          screenResolution: '1728x1117',
+          viewportSize: '1440x900',
+          language: 'en-US',
         },
-      ),
+      }),
     ).rejects.toThrow(new InternalServerErrorException('Server Error'));
   });
 });

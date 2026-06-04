@@ -72,7 +72,9 @@ describe('MailService', () => {
   });
 
   it('fails fast when MAIL_FROM is missing and no override is provided', async () => {
-    const service = new MailService(mockConfigService({ MAIL_FROM: undefined }));
+    const service = new MailService(
+      mockConfigService({ MAIL_FROM: undefined }),
+    );
 
     await expect(
       service.sendTemplate({
