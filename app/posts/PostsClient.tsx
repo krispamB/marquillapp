@@ -1184,7 +1184,7 @@ export default function PostsClient({
               />
             ) : null}
 
-            <Card className="p-4 sm:p-5">
+            <Card className="relative z-10 p-4 sm:p-5">
               {/* Tabs row */}
               <div className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                 {(Object.keys(postCounts) as PostTab[]).map((tab) => (
