@@ -1,9 +1,16 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { CalendarClock, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3 } from "lucide-react";
+import { CalendarClock, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, Sparkles } from "lucide-react";
+import {
+    parseNaturalDate,
+    getGhostCompletion,
+    formatCanonicalText,
+    formatPreviewText,
+    EMPTY_INPUT_PRESETS,
+} from "./naturalDate";
 
-// ─── Utility functions (unchanged) ────────────────────────────────────────────
+// ─── Utility functions ─────────────────────────────────────────────────────────
 
 export function formatUtcOffsetLabel(offsetMinutes: number) {
     const totalMinutes = -offsetMinutes;
@@ -32,6 +39,8 @@ const MONTH_NAMES = [
     "July", "August", "September", "October", "November", "December",
 ];
 const DAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+const MIN_LEAD_MS = 5 * 60 * 1000;
 
 // ─── Calendar grid ─────────────────────────────────────────────────────────────
 
@@ -232,110 +241,81 @@ function TimeStepper({
     );
 }
 
-// ─── Shared inner content ──────────────────────────────────────────────────────
+// ─── Natural language input with ghost completion ──────────────────────────────
 
-function PickerContent({
-    viewYear,
-    viewMonth,
-    scheduleDate,
-    hours,
-    minutes,
-    scheduleError,
-    timezoneLabel,
+function NaturalInput({
+    text,
+    ghost,
     isScheduling,
-    onPrevMonth,
-    onNextMonth,
-    onSelectDay,
-    onChangeHours,
-    onChangeMinutes,
-    onClose,
-    onConfirm,
+    onTextChange,
+    onAcceptGhost,
+    onEnter,
+    onFocusChange,
+    inputRef,
 }: {
-    viewYear: number;
-    viewMonth: number;
-    scheduleDate: string;
-    hours: number;
-    minutes: number;
-    scheduleError: string | null;
-    timezoneLabel: string;
+    text: string;
+    ghost: string | null;
     isScheduling: boolean;
-    onPrevMonth: () => void;
-    onNextMonth: () => void;
-    onSelectDay: (d: string) => void;
-    onChangeHours: (h: number) => void;
-    onChangeMinutes: (m: number) => void;
-    onClose: () => void;
-    onConfirm: () => void;
+    onTextChange: (value: string) => void;
+    onAcceptGhost: () => void;
+    onEnter: () => void;
+    onFocusChange: (focused: boolean) => void;
+    inputRef: React.RefObject<HTMLInputElement | null>;
 }) {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (ghost && (e.key === "Tab" || (e.key === "ArrowRight" && e.currentTarget.selectionStart === text.length))) {
+            e.preventDefault();
+            onAcceptGhost();
+            return;
+        }
+        if (e.key === "Enter") {
+            e.preventDefault();
+            onEnter();
+        }
+    };
+
     return (
-        <>
-            {/* Header */}
-            <div className="mb-4 flex items-center gap-2">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#eef3ff] text-[#3451d1]">
-                    <CalendarClock className="h-4 w-4" />
-                </span>
-                <p className="text-sm font-semibold text-[var(--color-text-primary)]">Schedule Post</p>
-            </div>
-
-            {/* Calendar */}
-            <CalendarGrid
-                viewYear={viewYear}
-                viewMonth={viewMonth}
-                scheduleDate={scheduleDate}
-                isScheduling={isScheduling}
-                onPrevMonth={onPrevMonth}
-                onNextMonth={onNextMonth}
-                onSelectDay={onSelectDay}
+        <div className="relative">
+            <input
+                ref={inputRef}
+                type="text"
+                value={text}
+                disabled={isScheduling}
+                onChange={(e) => onTextChange(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => onFocusChange(true)}
+                onBlur={() => onFocusChange(false)}
+                placeholder={ghost ? "" : "Try “tomorrow at 9am” or “in 2 hours”…"}
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                aria-label="Schedule time in natural language"
+                className="w-full rounded-xl border border-[#cfd5e1] bg-white px-3 py-2.5 text-sm font-medium text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]/60 focus:border-[var(--color-primary)] focus:outline-none disabled:opacity-50"
             />
-
-            {/* Divider */}
-            <div className="my-4 border-t border-[var(--color-border)]" />
-
-            {/* Time label */}
-            <p className="mb-2 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-secondary)]">
-                Time
-            </p>
-
-            {/* Time stepper */}
-            <TimeStepper
-                hours={hours}
-                minutes={minutes}
-                isScheduling={isScheduling}
-                onChangeHours={onChangeHours}
-                onChangeMinutes={onChangeMinutes}
-            />
-
-            {/* Timezone */}
-            <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#e2e7f2] bg-[#f7f9ff] px-3 py-2 text-xs font-medium text-[#445065]">
-                <Clock3 className="h-4 w-4 shrink-0 text-[#5575F5]" />
-                <span className="truncate">{timezoneLabel}</span>
-            </div>
-
-            {/* Error */}
-            {scheduleError ? (
-                <p className="mt-2 text-xs font-medium text-rose-600">{scheduleError}</p>
+            {/* Ghost completion overlay: mirrors the typed text invisibly so the
+                gray suffix lands exactly where the caret is. */}
+            {ghost ? (
+                <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre px-3 text-sm font-medium"
+                >
+                    <span className="invisible">{text}</span>
+                    <span
+                        className="pointer-events-auto cursor-pointer text-[var(--color-text-secondary)]/50"
+                        onMouseDown={(e) => {
+                            // preventDefault keeps focus in the input; stopPropagation
+                            // keeps document-level outside-click handlers from seeing a
+                            // node that React unmounts when the ghost is accepted.
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onAcceptGhost();
+                        }}
+                    >
+                        {ghost}
+                    </span>
+                </div>
             ) : null}
-
-            {/* Actions */}
-            <div className="mt-4 flex items-center justify-end gap-2">
-                <button
-                    type="button"
-                    onClick={onClose}
-                    disabled={isScheduling}
-                    className="inline-flex items-center rounded-full border border-[#d4dae6] bg-white px-4 py-2 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:text-[var(--color-text-primary)] disabled:opacity-50"
-                >
-                    Cancel
-                </button>
-                <button
-                    type="button"
-                    onClick={onConfirm}
-                    disabled={isScheduling}
-                    className="inline-flex items-center rounded-full bg-[#1C1B27] px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
-                >
-                    {isScheduling ? "Scheduling…" : "Confirm Schedule"}
-                </button>
-            </div>
-        </>
+        </div>
     );
 }
 
@@ -360,45 +340,19 @@ export function ReschedulePopover({
     positionClasses?: string;
     zIndexClass?: string;
 }) {
-    const now = new Date();
-
     // ── State ──
-    const [scheduleDate, setScheduleDate] = useState(initialDate || "");
-    const [hours, setHours] = useState(() => {
-        if (initialTime) {
-            const h = parseInt(initialTime.split(":")[0], 10);
-            return Number.isFinite(h) ? h : now.getHours();
-        }
-        return now.getHours();
-    });
-    const [minutes, setMinutes] = useState(() => {
-        if (initialTime) {
-            const m = parseInt(initialTime.split(":")[1], 10);
-            return Number.isFinite(m) ? m : now.getMinutes();
-        }
-        return now.getMinutes();
-    });
-    const [viewYear, setViewYear] = useState(() => {
-        if (initialDate) {
-            const y = parseInt(initialDate.split("-")[0], 10);
-            return Number.isFinite(y) ? y : now.getFullYear();
-        }
-        return now.getFullYear();
-    });
-    const [viewMonth, setViewMonth] = useState(() => {
-        if (initialDate) {
-            const m = parseInt(initialDate.split("-")[1], 10);
-            return Number.isFinite(m) ? m - 1 : now.getMonth();
-        }
-        return now.getMonth();
-    });
+    const [text, setText] = useState("");
+    const [resolved, setResolved] = useState<Date | null>(null);
+    const [showManual, setShowManual] = useState(false);
+    const [isInputFocused, setIsInputFocused] = useState(false);
+    const [presetIndex, setPresetIndex] = useState(0);
+    const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
+    const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
     const [scheduleError, setScheduleError] = useState<string | null>(null);
     const [isMobile, setIsMobile] = useState(false);
 
-    // scheduleTime string derived from hours/minutes
-    const scheduleTime = `${pad(hours)}:${pad(minutes)}`;
-
     const desktopPopoverRef = useRef<HTMLDivElement | null>(null);
+    const inputRef = useRef<HTMLInputElement | null>(null);
 
     const userTimezone = useMemo(
         () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
@@ -421,30 +375,41 @@ export function ReschedulePopover({
     // ── Reset state on open ──
     useEffect(() => {
         if (!isOpen) return;
-        const d = new Date();
-        setScheduleDate(initialDate || "");
+        const now = new Date();
         setScheduleError(null);
-        if (initialTime) {
-            const h = parseInt(initialTime.split(":")[0], 10);
-            const m = parseInt(initialTime.split(":")[1], 10);
-            setHours(Number.isFinite(h) ? h : d.getHours());
-            setMinutes(Number.isFinite(m) ? m : d.getMinutes());
-        } else {
-            setHours(d.getHours());
-            setMinutes(d.getMinutes());
-        }
+        setShowManual(false);
+
+        let initial: Date | null = null;
         if (initialDate) {
-            const y = parseInt(initialDate.split("-")[0], 10);
-            const mo = parseInt(initialDate.split("-")[1], 10);
-            if (Number.isFinite(y) && Number.isFinite(mo)) {
-                setViewYear(y);
-                setViewMonth(mo - 1);
+            const [y, mo, d] = initialDate.split("-").map(Number);
+            const [h, mi] = (initialTime || "").split(":").map(Number);
+            if (Number.isFinite(y) && Number.isFinite(mo) && Number.isFinite(d)) {
+                initial = new Date(
+                    y, mo - 1, d,
+                    Number.isFinite(h) ? h : now.getHours(),
+                    Number.isFinite(mi) ? mi : now.getMinutes(),
+                    0, 0,
+                );
             }
-        } else {
-            setViewYear(d.getFullYear());
-            setViewMonth(d.getMonth());
         }
+        setResolved(initial);
+        setText(initial ? formatCanonicalText(initial) : "");
+        setViewYear((initial ?? now).getFullYear());
+        setViewMonth((initial ?? now).getMonth());
+
+        // Focus the input once the popover has rendered.
+        requestAnimationFrame(() => inputRef.current?.focus());
     }, [isOpen, initialDate, initialTime]);
+
+    // ── Cycle ghost presets while focused and empty ──
+    useEffect(() => {
+        if (!isOpen || !isInputFocused || text.trim()) return;
+        const id = setInterval(
+            () => setPresetIndex((i) => (i + 1) % EMPTY_INPUT_PRESETS.length),
+            3000,
+        );
+        return () => clearInterval(id);
+    }, [isOpen, isInputFocused, text]);
 
     // ── Desktop outside-click handler ──
     useEffect(() => {
@@ -453,6 +418,10 @@ export function ReschedulePopover({
         const handlePointerDown = (event: MouseEvent) => {
             const target = event.target as Node | null;
             if (!target) return;
+            // A click can unmount its own target (e.g. accepting the ghost
+            // completion) before this listener runs; a detached node is never
+            // "contained", so it would read as an outside click and close us.
+            if (!target.isConnected) return;
             if (desktopPopoverRef.current?.contains(target)) return;
             if (target instanceof Element && target.closest("[data-action-menu-boundary]")) return;
             if (target instanceof Element && target.closest("[data-schedule-trigger='true']")) return;
@@ -475,7 +444,74 @@ export function ReschedulePopover({
         };
     }, [isOpen, isMobile, onClose]);
 
-    // ── Navigation ──
+    // ── Text editing ──
+    const handleTextChange = useCallback((value: string) => {
+        setText(value);
+        setScheduleError(null);
+        const parsed = parseNaturalDate(value);
+        setResolved(parsed ? parsed.date : null);
+    }, []);
+
+    const ghost = useMemo(() => {
+        if (!isOpen || isScheduling) return null;
+        if (!text.trim()) {
+            return isInputFocused ? EMPTY_INPUT_PRESETS[presetIndex] : null;
+        }
+        return getGhostCompletion(text);
+    }, [isOpen, isScheduling, text, isInputFocused, presetIndex]);
+
+    const handleAcceptGhost = useCallback(() => {
+        if (!ghost) return;
+        handleTextChange(text + ghost);
+        inputRef.current?.focus();
+    }, [ghost, text, handleTextChange]);
+
+    // ── Manual picker (two-way sync: picks write canonical text back) ──
+    const applyManualDate = useCallback((next: Date) => {
+        setResolved(next);
+        setText(formatCanonicalText(next));
+        setScheduleError(null);
+    }, []);
+
+    const manualBase = useCallback(() => {
+        if (resolved) return new Date(resolved);
+        const d = new Date();
+        d.setHours(9, 0, 0, 0);
+        if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+        return d;
+    }, [resolved]);
+
+    const handleSelectDay = useCallback((dateStr: string) => {
+        const [y, mo, d] = dateStr.split("-").map(Number);
+        const next = manualBase();
+        next.setFullYear(y, mo - 1, d);
+        applyManualDate(next);
+    }, [manualBase, applyManualDate]);
+
+    const handleChangeHours = useCallback((h: number) => {
+        const next = manualBase();
+        next.setHours(h);
+        applyManualDate(next);
+    }, [manualBase, applyManualDate]);
+
+    const handleChangeMinutes = useCallback((m: number) => {
+        const next = manualBase();
+        next.setMinutes(m);
+        applyManualDate(next);
+    }, [manualBase, applyManualDate]);
+
+    const handleToggleManual = useCallback(() => {
+        setShowManual((prev) => {
+            const opening = !prev;
+            if (opening) {
+                const base = resolved ?? new Date();
+                setViewYear(base.getFullYear());
+                setViewMonth(base.getMonth());
+            }
+            return opening;
+        });
+    }, [resolved]);
+
     const handlePrevMonth = useCallback(() => {
         setViewMonth((m) => {
             if (m === 0) { setViewYear((y) => y - 1); return 11; }
@@ -491,38 +527,26 @@ export function ReschedulePopover({
     }, []);
 
     // ── Validation + confirm ──
-    const getScheduledTimeValue = useCallback(() => {
-        if (!scheduleDate || !scheduleTime) {
-            return { error: "Please select both date and time." } as const;
-        }
-        const [year, month, day] = scheduleDate.split("-").map(Number);
-        const [h, m] = scheduleTime.split(":").map(Number);
-        if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day) ||
-            !Number.isFinite(h) || !Number.isFinite(m)) {
-            return { error: "Please provide a valid date and time." } as const;
-        }
-        const localDate = new Date(year, month - 1, day, h, m, 0, 0);
-        if (Number.isNaN(localDate.getTime()) ||
-            localDate.getFullYear() !== year ||
-            localDate.getMonth() !== month - 1 ||
-            localDate.getDate() !== day) {
-            return { error: "Please provide a valid date and time." } as const;
-        }
-        if (localDate.getTime() < Date.now() + 5 * 60 * 1000) {
-            return { error: "Choose a time at least 5 minutes in the future." } as const;
-        }
-        return { scheduledTime: formatOffsetDateTime(localDate) } as const;
-    }, [scheduleDate, scheduleTime]);
+    const isTooSoon = resolved !== null && resolved.getTime() < Date.now() + MIN_LEAD_MS;
+    const isConfirmable = resolved !== null && !isTooSoon;
 
     const handleConfirm = useCallback(() => {
-        const result = getScheduledTimeValue();
-        if ("error" in result) {
-            setScheduleError(result.error as string);
+        if (!resolved) {
+            setScheduleError(
+                text.trim()
+                    ? "Couldn’t understand that — try “tomorrow at 9am” or pick a date below."
+                    : "Type a time like “friday at 7am”, or pick a date.",
+            );
+            if (text.trim()) setShowManual(true);
+            return;
+        }
+        if (resolved.getTime() < Date.now() + MIN_LEAD_MS) {
+            setScheduleError("Choose a time at least 5 minutes in the future.");
             return;
         }
         setScheduleError(null);
-        onConfirm(result.scheduledTime, userTimezone);
-    }, [getScheduledTimeValue, onConfirm, userTimezone]);
+        onConfirm(formatOffsetDateTime(resolved), userTimezone);
+    }, [resolved, text, onConfirm, userTimezone]);
 
     const handleClose = useCallback(() => {
         setScheduleError(null);
@@ -531,38 +555,147 @@ export function ReschedulePopover({
 
     if (!isOpen) return null;
 
-    const contentProps = {
-        viewYear,
-        viewMonth,
-        scheduleDate,
-        hours,
-        minutes,
-        scheduleError,
-        timezoneLabel,
-        isScheduling,
-        onPrevMonth: handlePrevMonth,
-        onNextMonth: handleNextMonth,
-        onSelectDay: setScheduleDate,
-        onChangeHours: setHours,
-        onChangeMinutes: setMinutes,
-        onClose: handleClose,
-        onConfirm: handleConfirm,
-    };
+    const scheduleDateStr = resolved
+        ? `${resolved.getFullYear()}-${pad(resolved.getMonth() + 1)}-${pad(resolved.getDate())}`
+        : "";
+
+    const content = (
+        <>
+            {/* Header */}
+            <div className="mb-4 flex items-center gap-2">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#eef3ff] text-[#3451d1]">
+                    <CalendarClock className="h-4 w-4" />
+                </span>
+                <p className="flex-1 text-sm font-semibold text-[var(--color-text-primary)]">Schedule Post</p>
+                <button
+                    type="button"
+                    onClick={handleToggleManual}
+                    disabled={isScheduling}
+                    className={[
+                        "flex h-8 w-8 items-center justify-center rounded-full transition disabled:opacity-40",
+                        showManual
+                            ? "bg-[#eef3ff] text-[#3451d1]"
+                            : "text-[var(--color-text-secondary)] hover:bg-slate-100",
+                    ].join(" ")}
+                    aria-label={showManual ? "Hide calendar" : "Pick from calendar"}
+                    aria-pressed={showManual}
+                >
+                    <CalendarDays className="h-4 w-4" />
+                </button>
+            </div>
+
+            {/* Natural language input */}
+            <NaturalInput
+                text={text}
+                ghost={ghost}
+                isScheduling={isScheduling}
+                onTextChange={handleTextChange}
+                onAcceptGhost={handleAcceptGhost}
+                onEnter={handleConfirm}
+                onFocusChange={setIsInputFocused}
+                inputRef={inputRef}
+            />
+
+            {/* Live preview */}
+            <div className="mt-2 min-h-[1.25rem] text-xs font-medium">
+                {resolved ? (
+                    <p className={isTooSoon ? "text-rose-600" : "text-[#3451d1]"}>
+                        <Sparkles className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />
+                        {formatPreviewText(resolved)}
+                        {isTooSoon ? " — at least 5 minutes ahead, please" : ""}
+                    </p>
+                ) : text.trim() ? (
+                    <p className="text-amber-600">
+                        Couldn’t read that yet —{" "}
+                        <button
+                            type="button"
+                            onClick={handleToggleManual}
+                            className="cursor-pointer font-semibold underline underline-offset-2"
+                        >
+                            pick manually
+                        </button>
+                    </p>
+                ) : (
+                    <p className="text-[var(--color-text-secondary)]/70">
+                        Press Tab to accept a suggestion
+                    </p>
+                )}
+            </div>
+
+            {/* Manual fallback: calendar + time stepper */}
+            {showManual ? (
+                <>
+                    <div className="my-4 border-t border-[var(--color-border)]" />
+                    <CalendarGrid
+                        viewYear={viewYear}
+                        viewMonth={viewMonth}
+                        scheduleDate={scheduleDateStr}
+                        isScheduling={isScheduling}
+                        onPrevMonth={handlePrevMonth}
+                        onNextMonth={handleNextMonth}
+                        onSelectDay={handleSelectDay}
+                    />
+                    <div className="my-4 border-t border-[var(--color-border)]" />
+                    <p className="mb-2 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-secondary)]">
+                        Time
+                    </p>
+                    <TimeStepper
+                        hours={resolved ? resolved.getHours() : 9}
+                        minutes={resolved ? resolved.getMinutes() : 0}
+                        isScheduling={isScheduling}
+                        onChangeHours={handleChangeHours}
+                        onChangeMinutes={handleChangeMinutes}
+                    />
+                </>
+            ) : null}
+
+            {/* Timezone */}
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#e2e7f2] bg-[#f7f9ff] px-3 py-2 text-xs font-medium text-[#445065]">
+                <Clock3 className="h-4 w-4 shrink-0 text-[#5575F5]" />
+                <span className="truncate">{timezoneLabel}</span>
+            </div>
+
+            {/* Error */}
+            {scheduleError ? (
+                <p className="mt-2 text-xs font-medium text-rose-600">{scheduleError}</p>
+            ) : null}
+
+            {/* Actions */}
+            <div className="mt-4 flex items-center justify-end gap-2">
+                <button
+                    type="button"
+                    onClick={handleClose}
+                    disabled={isScheduling}
+                    className="inline-flex items-center rounded-full border border-[#d4dae6] bg-white px-4 py-2 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:text-[var(--color-text-primary)] disabled:opacity-50"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    onClick={handleConfirm}
+                    disabled={isScheduling || !isConfirmable}
+                    className="inline-flex items-center rounded-full bg-[#1C1B27] px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
+                >
+                    {isScheduling ? "Scheduling…" : "Confirm Schedule"}
+                </button>
+            </div>
+        </>
+    );
 
     // ── Mobile: bottom sheet ──
     if (isMobile) {
         return (
             <>
                 <div
-                    className="fixed inset-0 z-40 bg-black/40"
+                    className="fixed inset-0 z-[100] bg-black/40"
                     onClick={handleClose}
                 />
                 <div
-                    className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl bg-white px-5 pb-10 pt-4 shadow-[0_-8px_30px_-4px_rgba(15,23,42,0.15)]"
+                    className="fixed bottom-0 left-0 right-0 z-[101] max-h-[90dvh] overflow-y-auto rounded-t-3xl bg-white px-5 pb-10 pt-4 shadow-[0_-8px_30px_-4px_rgba(15,23,42,0.15)]"
                     onClick={(e) => e.stopPropagation()}
                 >
                     <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-slate-200" />
-                    <PickerContent {...contentProps} />
+                    {content}
                 </div>
             </>
         );
@@ -578,7 +711,7 @@ export function ReschedulePopover({
             className={`absolute ${positionClasses} ${zIndexClass} w-[min(92vw,380px)] rounded-2xl border border-[#d6dae3] bg-white p-5 shadow-[0_20px_44px_-28px_rgba(15,23,42,0.45)]`}
             onClick={(e) => e.stopPropagation()}
         >
-            <PickerContent {...contentProps} />
+            {content}
         </div>
     );
 }
