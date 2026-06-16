@@ -1,15 +1,20 @@
-import { cookies } from "next/headers";
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import OnboardingClient from "./OnboardingClient";
+import { getServerCookieHeader } from "../lib/session";
 
-const API = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API = process.env.BACKEND_API_URL ?? "http://localhost:3500/api/v1";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type OnboardingSession = { userType?: string; currentStep?: number; isComplete?: boolean; data?: Record<string, any> };
 
 export default async function OnboardingPage() {
-  const cookieStore = await cookies();
-  const cookieHeader = cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join("; ");
+  const { userId } = await auth();
+  if (!userId) {
+    redirect("/sign-in");
+  }
+
+  const cookieHeader = await getServerCookieHeader();
 
   let session: OnboardingSession | null = null;
   try {

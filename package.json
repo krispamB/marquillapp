@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.5.2",
     "@vercel/analytics": "^1",
     "chrono-node": "^2.9.1",
     "lucide-react": "^0.563.0",
