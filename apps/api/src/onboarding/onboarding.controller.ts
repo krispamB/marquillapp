@@ -7,7 +7,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../common/guards';
+import { ClerkAuthGuard } from '../auth/clerk';
 import { GetUser } from '../common/decorators';
 import { User } from '../database/schemas';
 import { IAppResponse } from '../common/interfaces';
@@ -15,7 +15,7 @@ import { OnboardingService } from './onboarding.service';
 import { InitOnboardingDto, UpdateOnboardingDto } from './dto';
 
 @Controller('onboarding')
-@UseGuards(JwtAuthGuard)
+@UseGuards(ClerkAuthGuard)
 export class OnboardingController {
   constructor(private readonly onboardingService: OnboardingService) {}
 

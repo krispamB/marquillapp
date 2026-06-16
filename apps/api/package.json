@@ -22,6 +22,7 @@
     "seed:tiers:temp": "ts-node src/scripts/temp-seed-tiers.ts"
   },
   "dependencies": {
+    "@clerk/backend": "^3.7.0",
     "@googleapis/youtube": "^31.0.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",

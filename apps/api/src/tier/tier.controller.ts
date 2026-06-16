@@ -1,7 +1,7 @@
 import { Controller, Get, HttpStatus, UseGuards } from '@nestjs/common';
 import { TierService } from './tier.service';
 import { IAppResponse } from '../common/interfaces';
-import { JwtAuthGuard } from '../common/guards';
+import { ClerkAuthGuard } from '../auth/clerk';
 import { GetUser } from '../common/decorators';
 import { User } from '../database/schemas';
 
@@ -18,7 +18,7 @@ export class TierController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(ClerkAuthGuard)
   @Get('me')
   async getMyTier(@GetUser() user: User): Promise<IAppResponse> {
     return {

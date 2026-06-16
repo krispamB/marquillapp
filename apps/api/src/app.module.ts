@@ -15,6 +15,7 @@ import { ActorsModule } from './actors/actors.module';
 import { WorkflowModule } from './workflow/workflow.module';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
+import { ClerkAuthModule } from './auth/clerk';
 import { UserModule } from './users/users.module';
 import { PostModule } from './post/post.module';
 import { EncryptionModule } from './encryption/encryption.module';
@@ -44,6 +45,7 @@ import { DiagnosticsModule } from './diagnostics/diagnostics.module';
     WorkflowModule,
     DatabaseModule,
     AuthModule,
+    ClerkAuthModule,
     UserModule,
     PostModule,
     EncryptionModule,
