@@ -8,13 +8,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { PaymentService } from './payment.service';
-import { JwtAuthGuard } from '../common/guards';
+import { ClerkAuthGuard } from '../auth/clerk';
 import { GetUser } from '../common/decorators';
 import { User } from '../database/schemas';
 import { CreateCheckoutDto } from './payment.dto';
 import { IAppResponse } from '../common/interfaces';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(ClerkAuthGuard)
 @Controller('payment')
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}

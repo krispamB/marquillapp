@@ -16,7 +16,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { GetUser } from '../common/decorators';
 import { User } from '../database/schemas';
-import { JwtAuthGuard } from 'src/common/guards';
+import { ClerkAuthGuard } from './clerk';
 import type { IAppResponse } from 'src/common/interfaces';
 import { ConnectLinkedinOrganizationsDto } from './dto/connect-linkedin-organizations.dto';
 
@@ -63,7 +63,7 @@ export class AuthController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(ClerkAuthGuard)
   @Post('linkedin')
   async linkedinAuth(@GetUser() user: User): Promise<IAppResponse> {
     const url = await this.authService.createLinkedinOath(user);
@@ -110,7 +110,7 @@ export class AuthController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(ClerkAuthGuard)
   @Get('linkedin/orgs')
   async getLinkedinOrganizations(@GetUser() user: User): Promise<IAppResponse> {
     return {
@@ -122,7 +122,7 @@ export class AuthController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(ClerkAuthGuard)
   @Post('linkedin/orgs')
   async connectLinkedinOrganizations(
     @GetUser() user: User,
@@ -138,7 +138,7 @@ export class AuthController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(ClerkAuthGuard)
   @Get('connected-accounts')
   async getConnectedAccounts(@GetUser() user: User): Promise<IAppResponse> {
     const accounts = await this.authService.getConnectedAccounts(
@@ -151,7 +151,7 @@ export class AuthController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(ClerkAuthGuard)
   @Delete('connected-accounts/:connectedAccountId')
   async disconnectConnectedAccount(
     @GetUser() user: User,
