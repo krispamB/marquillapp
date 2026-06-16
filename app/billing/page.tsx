@@ -1,82 +1,50 @@
-import { cookies } from "next/headers";
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import type {
-    ConnectedAccount,
-    ConnectedAccountsResponse,
-    UserProfile,
-} from "../lib/types";
-import { getCachedUser, getCachedSubscription } from "../lib/session";
+import type { UserProfile } from "../lib/types";
+import {
+  getCachedUser,
+  getCachedSubscription,
+  getConnectedAccounts,
+  getServerCookieHeader,
+} from "../lib/session";
 import BillingClient from "./BillingClient";
 
 export default async function BillingPage() {
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get("access_token")?.value;
-    const userCookie = cookieStore.get("user")?.value;
+  const { userId, sessionId } = await auth();
+  if (!userId) {
+    redirect("/sign-in");
+  }
 
-    if (!accessToken || !userCookie) {
-        redirect("/");
-    }
+  const cacheKey = sessionId ?? userId;
+  const cookieHeader = await getServerCookieHeader();
 
-    const apiBase =
-        process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
-    const cookieHeader = cookieStore
-        .getAll()
-        .map(({ name, value }) => `${name}=${value}`)
-        .join("; ");
+  const [apiUser, subscription] = await Promise.all([
+    getCachedUser(cookieHeader, cacheKey),
+    getCachedSubscription(cookieHeader, cacheKey),
+  ]);
 
-    const [apiUser, subscription] = await Promise.all([
-        getCachedUser(cookieHeader, accessToken),
-        getCachedSubscription(cookieHeader, accessToken),
-    ]);
+  const name = apiUser?.name?.trim();
+  const email = apiUser?.email?.trim();
+  if (!name || !email) {
+    redirect("/onboarding");
+  }
 
-    const name = apiUser?.name?.trim();
-    const email = apiUser?.email?.trim();
-    if (!name || !email) {
-        redirect("/");
-    }
+  const user: UserProfile = {
+    name,
+    email,
+    avatar: apiUser?.avatar ?? undefined,
+    tier: apiUser?.tier ?? undefined,
+  };
 
-    const user: UserProfile = {
-        name,
-        email,
-        avatar: apiUser?.avatar ?? undefined,
-        tier: apiUser?.tier ?? undefined,
-    };
+  const connectedAccounts = await getConnectedAccounts(cookieHeader);
+  const primaryAccountId = connectedAccounts[0]?.id;
 
-    let connectedAccounts: ConnectedAccount[] = [];
-    try {
-        const response = await fetch(`${apiBase}/auth/connected-accounts`, {
-            cache: "no-store",
-            headers: {
-                cookie: cookieHeader,
-            },
-        });
-
-        if (response.ok) {
-            const payload = (await response.json()) as ConnectedAccountsResponse;
-            connectedAccounts =
-                payload?.data?.map((account) => ({
-                    id: account._id,
-                    provider: account.provider,
-                    accessTokenExpiresAt: account.accessTokenExpiresAt,
-                    displayName: account.displayName,
-                    avatarUrl: account.avatarUrl,
-                    vanityName: account.vanityName ?? account.profileMetadata?.vanityName,
-                    headline: account.profileMetadata?.localizedHeadline,
-                    isActive: account.isActive,
-                })) ?? [];
-        }
-    } catch {
-        connectedAccounts = [];
-    }
-
-    const primaryAccountId = connectedAccounts[0]?.id;
-
-    return (
-        <BillingClient
-            user={user}
-            connectedAccounts={connectedAccounts}
-            primaryAccountId={primaryAccountId}
-            subscription={subscription}
-        />
-    );
+  return (
+    <BillingClient
+      user={user}
+      connectedAccounts={connectedAccounts}
+      primaryAccountId={primaryAccountId}
+      subscription={subscription}
+    />
+  );
 }

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { ChevronLeft, Info, Plus, RefreshCw, Settings, LogOut, Sparkles, CreditCard, Bug } from "lucide-react";
+import { useClerk } from "@clerk/nextjs";
 import BugReportModal from "./BugReportModal";
 import {
   Card,
@@ -75,6 +76,7 @@ export default function Sidebar({
   const [tierName] = useState(tier?.name ? `${tier.name} plan` : "Free plan");
   const settingsRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const { signOut } = useClerk();
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
@@ -94,12 +96,10 @@ export default function Sidebar({
   }, [isSettingsOpen]);
 
   const handleLogout = () => {
-    document.cookie.split(";").forEach((c) => {
-      document.cookie = c
-        .replace(/^ +/, "")
-        .replace(/=.*/, `=;expires=${new Date(0).toUTCString()};path=/`);
+    // Clerk clears its __session cookie and ends the session, then redirects.
+    void signOut({
+      redirectUrl: process.env.NEXT_PUBLIC_LANDING || "/sign-in",
     });
-    window.location.href = process.env.NEXT_PUBLIC_LANDING || "http://localhost:3001";
   };
 
   const providerLabel = (account: ConnectedAccount) => {
