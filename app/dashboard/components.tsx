@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { MouseEventHandler, ReactNode } from "react";
+import { useClerk } from "@clerk/nextjs";
 import { apiFetch } from "../lib/api";
 import Link from "next/link";
 import { CalendarClock, CheckCheck, PenLine, Plug, ChevronDown, Check, X, AlertTriangle, Building2, Trash2, Info, RefreshCw, Plus, Menu, Sparkles, CreditCard, Settings, Bug, LogOut } from "lucide-react";
@@ -597,6 +598,7 @@ export function MobileSidebar({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [tierName] = useState<string | null>(subscription?.name ?? null);
   const [isDefaultTier] = useState(subscription?.isDefault ?? true);
+  const { signOut } = useClerk();
 
   function getDaysUntilExpiry(expiresAt?: string | null): number | null {
     if (!expiresAt) return null;
@@ -605,12 +607,10 @@ export function MobileSidebar({
   }
 
   function handleLogout() {
-    document.cookie.split(";").forEach((c) => {
-      document.cookie = c
-        .replace(/^ +/, "")
-        .replace(/=.*/, `=;expires=${new Date(0).toUTCString()};path=/`);
+    // Clerk clears its __session cookie and ends the session, then redirects.
+    void signOut({
+      redirectUrl: process.env.NEXT_PUBLIC_LANDING || "/sign-in",
     });
-    window.location.href = process.env.NEXT_PUBLIC_LANDING ?? "/";
   }
 
   const displayTierName = tierName ?? "Free";
