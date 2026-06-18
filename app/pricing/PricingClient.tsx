@@ -154,9 +154,18 @@ export default function PricingClient({
     return (
         <div className="relative min-h-screen bg-[var(--color-background)] font-sans text-[var(--color-text-primary)]">
             {/* Decorative Gradients */}
-            <div className="pointer-events-none fixed left-1/2 top-0 h-[600px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--color-primary)]/10 blur-[120px]" />
-            <div className="pointer-events-none fixed bottom-0 left-0 h-96 w-96 -translate-x-1/4 translate-y-1/4 rounded-full bg-[var(--color-accent)]/15 blur-[120px]" />
-            <div className="pointer-events-none fixed right-0 top-1/4 h-80 w-80 translate-x-1/4 rounded-full bg-[#EC4899]/10 blur-[120px]" />
+            <div
+                className="pointer-events-none fixed left-1/2 top-0 h-[700px] w-[1100px] -translate-x-1/2 -translate-y-1/2"
+                style={{ background: "radial-gradient(ellipse, color-mix(in srgb, var(--color-primary) 10%, transparent), transparent 70%)" }}
+            />
+            <div
+                className="pointer-events-none fixed bottom-0 left-0 h-[34rem] w-[34rem] -translate-x-1/3 translate-y-1/3"
+                style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--color-accent) 15%, transparent), transparent 70%)" }}
+            />
+            <div
+                className="pointer-events-none fixed right-0 top-1/4 h-[34rem] w-[34rem] translate-x-1/3"
+                style={{ background: "radial-gradient(circle, color-mix(in srgb, #EC4899 10%, transparent), transparent 70%)" }}
+            />
 
             <div className="mx-auto flex w-full max-w-[1920px] justify-center lg:justify-start">
                 <div className="w-full lg:max-w-none">
