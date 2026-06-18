@@ -92,8 +92,7 @@ export function LocalOrbs() {
 }
 
 // ── Brand row ──
-const BRAND_WORDMARK =
-  "https://res.cloudinary.com/dnpvndlmy/image/upload/q_auto/f_auto/v1775561659/marquill/logo_nwvdon.svg";
+const BRAND_WORDMARK = "/marquill-logo.svg";
 
 interface BrandRowProps {
   right?: React.ReactNode;

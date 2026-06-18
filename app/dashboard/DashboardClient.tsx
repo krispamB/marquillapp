@@ -8,13 +8,22 @@ import {
   PenSquare,
   TrendingUp,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Sidebar from "./Sidebar";
-import BugReportModal from "./BugReportModal";
-import NewPostModal, {
-  type NewDraftGeneratePayload,
-  type NewDraftGenerateResult,
-  type NewPostSubmitPayload,
+import type {
+  NewDraftGeneratePayload,
+  NewDraftGenerateResult,
+  NewPostSubmitPayload,
 } from "./NewPostModal";
+
+// Interaction-gated modals — lazy-loaded so their JS stays out of the
+// dashboard's initial bundle until the user opens them. NewPostModal is
+// ~2.8k LOC and pulls chrono-node (via the reschedule popover); BugReportModal
+// is rarely opened.
+const NewPostModal = dynamic(() => import("./NewPostModal"), { ssr: false });
+const BugReportModal = dynamic(() => import("./BugReportModal"), {
+  ssr: false,
+});
 import {
   Card,
   ConnectAccountCta,
@@ -1783,7 +1792,10 @@ export default function DashboardPage({
         isConnectingLinkedIn={isConnectingLinkedIn}
         subscription={subscription}
       />
-      <BugReportModal isOpen={isMobileBugModalOpen} onClose={() => setIsMobileBugModalOpen(false)} />
+      {isMobileBugModalOpen && (
+        <BugReportModal isOpen onClose={() => setIsMobileBugModalOpen(false)} />
+      )}
+      {newPostModalState.isOpen && (
       <NewPostModal
         isOpen={newPostModalState.isOpen}
         mode={newPostModalState.mode}
@@ -1805,6 +1817,7 @@ export default function DashboardPage({
         onGetDraftById={handleGetDraftById}
         onGetLinkedinImageByUrn={handleGetLinkedinImageByUrn}
       />
+      )}
       <ConnectOrgModal
         isOpen={isOrgModalOpen}
         onClose={() => setIsOrgModalOpen(false)}

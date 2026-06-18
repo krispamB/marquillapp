@@ -5,7 +5,10 @@ import { ChevronLeft, LayoutDashboard, PenSquare, CalendarClock, TrendingUp } fr
 import Link from "next/link";
 import Sidebar from "../dashboard/Sidebar";
 import { ConnectOrgModal, MobileAccountSwitcherSheet, MobileBottomNav, MobileSidebar } from "../dashboard/components";
-import BugReportModal from "../dashboard/BugReportModal";
+import dynamic from "next/dynamic";
+const BugReportModal = dynamic(() => import("../dashboard/BugReportModal"), {
+  ssr: false,
+});
 import type { UserProfile, ConnectedAccount } from "../lib/types";
 
 type Tier = {
@@ -298,7 +301,9 @@ export default function PricingClient({
                 onOpenBugReport={() => { setIsMobileSidebarOpen(false); setIsMobileBugModalOpen(true); }}
                 onConnectLinkedInOrg={() => { setIsMobileSidebarOpen(false); handleOpenOrgModal(); }}
             />
-            <BugReportModal isOpen={isMobileBugModalOpen} onClose={() => setIsMobileBugModalOpen(false)} />
+            {isMobileBugModalOpen && (
+              <BugReportModal isOpen onClose={() => setIsMobileBugModalOpen(false)} />
+            )}
             <ConnectOrgModal
                 isOpen={isOrgModalOpen}
                 onClose={() => setIsOrgModalOpen(false)}

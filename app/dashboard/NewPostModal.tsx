@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import {
   ArrowUp,
   CalendarClock,
@@ -91,6 +92,8 @@ const STYLE_PRESET_OPTIONS: SelectOption[] = Object.values(StylePreset).map((pre
 type UnsplashPhoto = {
   id: string;
   alt_description?: string | null;
+  width?: number;
+  height?: number;
   urls?: {
     small?: string;
     regular?: string;
@@ -110,6 +113,8 @@ type UnsplashSearchResponse = {
 type PexelsPhoto = {
   id: number;
   alt?: string;
+  width?: number;
+  height?: number;
   src?: {
     medium?: string;
     large?: string;
@@ -2554,7 +2559,14 @@ export default function NewPostModal({
                           className="w-full overflow-hidden rounded-md border border-[#d6dae3] bg-white text-left transition hover:shadow-[0_14px_32px_-24px_rgba(15,23,42,0.45)]"
                         >
                           {previewUrl ? (
-                            <img src={previewUrl} alt={altText} className="h-auto w-full object-cover" />
+                            <Image
+                              src={previewUrl}
+                              alt={altText}
+                              width={photo.width ?? 400}
+                              height={photo.height ?? 300}
+                              sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                              className="h-auto w-full object-cover"
+                            />
                           ) : (
                             <div className="grid h-48 w-full place-items-center bg-[#f4f6fb] text-sm text-[var(--color-text-secondary)]">
                               Image unavailable
@@ -2669,7 +2681,14 @@ export default function NewPostModal({
                           className="w-full overflow-hidden rounded-md border border-[#d6dae3] bg-white text-left transition hover:shadow-[0_14px_32px_-24px_rgba(15,23,42,0.45)]"
                         >
                           {previewUrl ? (
-                            <img src={previewUrl} alt={altText} className="h-auto w-full object-cover" />
+                            <Image
+                              src={previewUrl}
+                              alt={altText}
+                              width={photo.width ?? 400}
+                              height={photo.height ?? 300}
+                              sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                              className="h-auto w-full object-cover"
+                            />
                           ) : (
                             <div className="grid h-48 w-full place-items-center bg-[#f4f6fb] text-sm text-[var(--color-text-secondary)]">
                               Image unavailable
