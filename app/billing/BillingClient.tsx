@@ -130,8 +130,18 @@ export default function BillingClient({
         }).format(new Date(dateString));
     };
 
+    // The authoritative current plan comes from /payment/subscription (the
+    // `subscription` prop). `user.tier` from /users/me is unreliable and, when
+    // empty, made the card fall through to the default (Free) tier — so the card
+    // always showed "Free". Resolve the matching tier by name first, then fall
+    // back to the older id/default heuristics.
+    const subscriptionName = subscription?.name?.trim();
     const activeId = activePlan?.id ?? user?.tier?._id;
-    const tierMatch = tiers.find((t: Tier) => t._id === activeId) ||
+    const tierMatch =
+        (subscriptionName
+            ? tiers.find((t: Tier) => t.name.toLowerCase() === subscriptionName.toLowerCase())
+            : undefined) ||
+        tiers.find((t: Tier) => t._id === activeId) ||
         tiers.find((t: Tier) => t.isDefault);
 
     const defaultFeatures = [
@@ -141,7 +151,7 @@ export default function BillingClient({
     ];
     // @ts-ignore - metadata.features is present in API response but absent from TierMetadata type
     const activePlanFeatures = (tierMatch?.metadata as any)?.features ?? defaultFeatures;
-    const planName = activePlan?.name ?? tierMatch?.name ?? user?.tier?.name ?? "Free";
+    const planName = subscriptionName ?? activePlan?.name ?? tierMatch?.name ?? user?.tier?.name ?? "Free";
 
     return (
         <div className="relative min-h-screen bg-[var(--color-background)] font-sans text-[var(--color-text-primary)]">
