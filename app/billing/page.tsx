@@ -5,7 +5,7 @@ import {
   getCachedUser,
   getCachedSubscription,
   getConnectedAccounts,
-  getServerCookieHeader,
+  getServerAuth,
 } from "../lib/session";
 import BillingClient from "./BillingClient";
 
@@ -16,11 +16,11 @@ export default async function BillingPage() {
   }
 
   const cacheKey = sessionId ?? userId;
-  const cookieHeader = await getServerCookieHeader();
+  const serverAuth = await getServerAuth();
 
   const [apiUser, subscription] = await Promise.all([
-    getCachedUser(cookieHeader, cacheKey),
-    getCachedSubscription(cookieHeader, cacheKey),
+    getCachedUser(serverAuth, cacheKey),
+    getCachedSubscription(serverAuth, cacheKey),
   ]);
 
   const name = apiUser?.name?.trim();
@@ -36,7 +36,7 @@ export default async function BillingPage() {
     tier: apiUser?.tier ?? undefined,
   };
 
-  const connectedAccounts = await getConnectedAccounts(cookieHeader);
+  const connectedAccounts = await getConnectedAccounts(serverAuth);
   const primaryAccountId = connectedAccounts[0]?.id;
 
   return (

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { X, Check, XCircle } from "lucide-react";
+import { apiFetch } from "../lib/api";
 import { PillButton, CustomSelect, type SelectOption } from "./components";
 
 const BUG_REPORT_OPTIONS: SelectOption[] = [
@@ -87,7 +88,7 @@ export default function BugReportModal({ isOpen, onClose }: BugReportModalProps)
       const payloadType = type === "Report a bug" ? "BUG" : "FEATURE_REQUEST";
       
       const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
-      const res = await fetch(`${apiBase}/feedback/issues`, {
+      const res = await apiFetch(`${apiBase}/feedback/issues`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

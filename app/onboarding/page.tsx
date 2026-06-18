@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import OnboardingClient from "./OnboardingClient";
-import { getServerCookieHeader } from "../lib/session";
+import { getServerAuth, authHeaders } from "../lib/session";
 
 const API = process.env.BACKEND_API_URL ?? "http://localhost:3500/api/v1";
 
@@ -14,12 +14,12 @@ export default async function OnboardingPage() {
     redirect("/sign-in");
   }
 
-  const cookieHeader = await getServerCookieHeader();
+  const serverAuth = await getServerAuth();
 
   let session: OnboardingSession | null = null;
   try {
     const res = await fetch(`${API}/onboarding`, {
-      headers: { Cookie: cookieHeader },
+      headers: authHeaders(serverAuth),
       cache: "no-store",
     });
     if (res.ok) {

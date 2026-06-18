@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { MouseEventHandler, ReactNode } from "react";
+import { apiFetch } from "../lib/api";
 import Link from "next/link";
 import { CalendarClock, CheckCheck, PenLine, Plug, ChevronDown, Check, X, AlertTriangle, Building2, Trash2, Info, RefreshCw, Plus, Menu, Sparkles, CreditCard, Settings, Bug, LogOut } from "lucide-react";
 import type {
@@ -981,7 +982,7 @@ export function ConnectOrgModal({
     setPhase("loading_orgs");
     setErrorMsg("");
     try {
-      const res = await fetch(`${apiBase}/auth/linkedin/orgs`, {
+      const res = await apiFetch(`${apiBase}/auth/linkedin/orgs`, {
         credentials: "include",
       });
       const json: ListOrgsResponse = await res.json().catch(() => ({}));
@@ -1026,7 +1027,7 @@ export function ConnectOrgModal({
     setPhase("connecting");
     setErrorMsg("");
     try {
-      const res = await fetch(`${apiBase}/auth/linkedin/orgs`, {
+      const res = await apiFetch(`${apiBase}/auth/linkedin/orgs`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

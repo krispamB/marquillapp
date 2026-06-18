@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, LayoutDashboard, PenSquare, CalendarClock, TrendingUp } from "lucide-react";
+import { apiFetch } from "../lib/api";
 import Link from "next/link";
 import Sidebar from "../dashboard/Sidebar";
 import { ConnectOrgModal, MobileAccountSwitcherSheet, MobileBottomNav, MobileSidebar } from "../dashboard/components";
@@ -94,7 +95,7 @@ export default function PricingClient({
         const fetchTiers = async () => {
             try {
                 const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
-                const res = await fetch(`${apiBase}/tiers/active`, {
+                const res = await apiFetch(`${apiBase}/tiers/active`, {
                     credentials: "include",
                 });
 
@@ -122,7 +123,7 @@ export default function PricingClient({
         const fetchSubscription = async () => {
             try {
                 const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
-                const res = await fetch(`${apiBase}/payment/subscription`, {
+                const res = await apiFetch(`${apiBase}/payment/subscription`, {
                     credentials: "include",
                 });
                 if (res.ok) {
