@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "../lib/api";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import "./onboarding.css";
+import { revalidateUserCache } from "../lib/actions";
 import { BrandRow, LocalOrbs, Progress, SuccessToast } from "./components";
 import {
   StepPersona,
@@ -155,7 +157,7 @@ async function callStepApi(step: number, data: OnboardingData): Promise<void> {
     return;
   }
 
-  const res = await fetch(`${API}/onboarding`, {
+  const res = await apiFetch(`${API}/onboarding`, {
     method,
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -234,6 +236,9 @@ export default function OnboardingClient({ initialSession }: { initialSession: O
 
   const finish = () => {
     setToast(true);
+    // Bust the cached (empty) profile so the dashboard sees the completed one
+    // instead of redirecting back here.
+    void revalidateUserCache();
     setTimeout(() => {
       router.push("/dashboard");
     }, 4000);

@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import { apiFetch } from "../lib/api";
 import {
   CalendarClock,
   CalendarDays,
@@ -15,13 +17,23 @@ import {
   TrendingUp,
   Trash2,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Sidebar from "../dashboard/Sidebar";
-import BugReportModal from "../dashboard/BugReportModal";
-import NewPostModal, {
-  type NewDraftGeneratePayload,
-  type NewDraftGenerateResult,
-  type NewPostSubmitPayload,
+import type {
+  NewDraftGeneratePayload,
+  NewDraftGenerateResult,
+  NewPostSubmitPayload,
 } from "../dashboard/NewPostModal";
+
+// Interaction-gated modals/popovers — lazy-loaded to keep their JS out of the
+// posts page's initial bundle. ReschedulePopover (and the chrono-node parser it
+// pulls) and NewPostModal are the heaviest; all only mount on user action.
+const NewPostModal = dynamic(() => import("../dashboard/NewPostModal"), {
+  ssr: false,
+});
+const BugReportModal = dynamic(() => import("../dashboard/BugReportModal"), {
+  ssr: false,
+});
 import {
   Card,
   ConnectAccountCta,
@@ -34,8 +46,14 @@ import {
   CustomSelect,
   type SelectOption,
 } from "../dashboard/components";
-import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
-import { ReschedulePopover } from "./ReschedulePopover";
+const ConfirmDeleteModal = dynamic(
+  () => import("./ConfirmDeleteModal").then((m) => m.ConfirmDeleteModal),
+  { ssr: false },
+);
+const ReschedulePopover = dynamic(
+  () => import("./ReschedulePopover").then((m) => m.ReschedulePopover),
+  { ssr: false },
+);
 import { useNewPostModal } from "../dashboard/useNewPostModal";
 import type {
   ConnectedAccount,
@@ -405,7 +423,7 @@ export default function PostsClient({
           month: selectedMonth,
         });
 
-        const response = await fetch(`${apiBase}/posts?${query.toString()}`, {
+        const response = await apiFetch(`${apiBase}/posts?${query.toString()}`, {
           credentials: "include",
           signal,
         });
@@ -597,7 +615,7 @@ export default function PostsClient({
     try {
       popup.document.title = "Connecting to LinkedIn";
 
-      const response = await fetch(`${apiBase}/auth/linkedin`, {
+      const response = await apiFetch(`${apiBase}/auth/linkedin`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -662,7 +680,7 @@ export default function PostsClient({
       const formData = new FormData();
       formData.append("files", file);
 
-      const response = await fetch(`${apiBase}/posts/${postId}/media`, {
+      const response = await apiFetch(`${apiBase}/posts/${postId}/media`, {
         method: "PUT",
         credentials: "include",
         body: formData,
@@ -715,7 +733,7 @@ export default function PostsClient({
     postId: string,
     content: string,
   ): Promise<UpdatePostResponse> => {
-    const response = await fetch(`${apiBase}/posts/${postId}`, {
+    const response = await apiFetch(`${apiBase}/posts/${postId}`, {
       method: "PATCH",
       credentials: "include",
       headers: {
@@ -739,7 +757,7 @@ export default function PostsClient({
   };
 
   const publishPost = async (postId: string): Promise<PublishPostResponse> => {
-    const response = await fetch(`${apiBase}/posts/${postId}/publish`, {
+    const response = await apiFetch(`${apiBase}/posts/${postId}/publish`, {
       method: "POST",
       credentials: "include",
     });
@@ -762,7 +780,7 @@ export default function PostsClient({
     postId: string,
     scheduledTime: string,
   ): Promise<SchedulePostResponse> => {
-    const response = await fetch(`${apiBase}/posts/${postId}/schedule`, {
+    const response = await apiFetch(`${apiBase}/posts/${postId}/schedule`, {
       method: "POST",
       credentials: "include",
       headers: {
@@ -887,7 +905,7 @@ export default function PostsClient({
       stylePreset: payload.stylePreset,
     };
 
-    const response = await fetch(`${apiBase}/posts/${selectedAccountId}/draft`, {
+    const response = await apiFetch(`${apiBase}/posts/${selectedAccountId}/draft`, {
       method: "POST",
       credentials: "include",
       headers: {
@@ -934,7 +952,7 @@ export default function PostsClient({
   };
 
   const handleGetDraftStatus = async (draftId: string): Promise<DraftStatusResponse> => {
-    const response = await fetch(`${apiBase}/posts/${draftId}/status`, {
+    const response = await apiFetch(`${apiBase}/posts/${draftId}/status`, {
       credentials: "include",
     });
 
@@ -954,7 +972,7 @@ export default function PostsClient({
 
   const handleGetDraftById = useCallback(
     async (draftId: string): Promise<PostDetailResponse> => {
-      const response = await fetch(`${apiBase}/posts/${draftId}`, {
+      const response = await apiFetch(`${apiBase}/posts/${draftId}`, {
         credentials: "include",
       });
 
@@ -976,7 +994,7 @@ export default function PostsClient({
 
   const handleGetLinkedinImageByUrn = useCallback(
     async (urn: string): Promise<LinkedinImageDetailsResponse> => {
-      const response = await fetch(`${apiBase}/posts/linkedin/image/${encodeURIComponent(urn)}`, {
+      const response = await apiFetch(`${apiBase}/posts/linkedin/image/${encodeURIComponent(urn)}`, {
         credentials: "include",
       });
 
@@ -1002,7 +1020,7 @@ export default function PostsClient({
 
     setIsDeleting(true);
     try {
-      const response = await fetch(`${apiBase}/posts/${postId}`, {
+      const response = await apiFetch(`${apiBase}/posts/${postId}`, {
         method: "DELETE",
         credentials: "include",
       });
@@ -1034,7 +1052,7 @@ export default function PostsClient({
 
     setIsRescheduling(true);
     try {
-      const response = await fetch(`${apiBase}/posts/${postId}/schedule`, {
+      const response = await apiFetch(`${apiBase}/posts/${postId}/schedule`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scheduledTime, timezone }),
@@ -1443,7 +1461,8 @@ export default function PostsClient({
                                           aria-controls={researchPanelId}
                                           className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-white/85 px-3 py-1.5 text-sm font-semibold text-[var(--color-text-secondary)] transition hover:border-[var(--color-primary)]/45 hover:text-[var(--color-primary)]"
                                         >
-                                          <img src="/yt.png" alt="YouTube" className="h-5 w-5" />
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img src="/yt.webp" alt="YouTube" width={20} height={20} className="h-5 w-5" />
                                           <span>YouTube +{researchCount}</span>
                                         </button>
                                       ) : null}
@@ -1556,9 +1575,11 @@ export default function PostsClient({
                                           const rowContent = (
                                             <>
                                               {video.thumbnail ? (
-                                                <img
+                                                <Image
                                                   src={video.thumbnail}
                                                   alt={video.title ?? "YouTube video thumbnail"}
+                                                  width={120}
+                                                  height={70}
                                                   className="h-[70px] w-30 shrink-0 rounded-lg border border-[var(--color-border)] object-cover"
                                                 />
                                               ) : (
@@ -1617,6 +1638,7 @@ export default function PostsClient({
         </div>
       </div>
 
+      {newPostModalState.isOpen && (
       <NewPostModal
         isOpen={newPostModalState.isOpen}
         mode={newPostModalState.mode}
@@ -1638,13 +1660,16 @@ export default function PostsClient({
         onGetDraftById={handleGetDraftById}
         onGetLinkedinImageByUrn={handleGetLinkedinImageByUrn}
       />
-      <ConfirmDeleteModal
-        isOpen={deleteModalState.isOpen}
-        isPublished={deleteModalState.isPublished}
-        isDeleting={isDeleting}
-        onClose={() => setDeleteModalState((prev) => ({ ...prev, isOpen: false }))}
-        onConfirm={handleDeletePost}
-      />
+      )}
+      {deleteModalState.isOpen && (
+        <ConfirmDeleteModal
+          isOpen={deleteModalState.isOpen}
+          isPublished={deleteModalState.isPublished}
+          isDeleting={isDeleting}
+          onClose={() => setDeleteModalState((prev) => ({ ...prev, isOpen: false }))}
+          onConfirm={handleDeletePost}
+        />
+      )}
       {/* Floating Action Button — mobile only */}
       <button
         onClick={openCreate}
@@ -1667,7 +1692,9 @@ export default function PostsClient({
         isConnectingLinkedIn={isConnectingLinkedIn}
         onConnectLinkedInOrg={() => { setIsMobileSidebarOpen(false); handleOpenOrgModal(); }}
       />
-      <BugReportModal isOpen={isMobileBugModalOpen} onClose={() => setIsMobileBugModalOpen(false)} />
+      {isMobileBugModalOpen && (
+        <BugReportModal isOpen onClose={() => setIsMobileBugModalOpen(false)} />
+      )}
       <ConnectOrgModal
         isOpen={isOrgModalOpen}
         onClose={() => setIsOrgModalOpen(false)}

@@ -5,7 +5,10 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { ChevronLeft, Info, Plus, RefreshCw, Settings, LogOut, Sparkles, CreditCard, Bug } from "lucide-react";
 import { useClerk } from "@clerk/nextjs";
-import BugReportModal from "./BugReportModal";
+import dynamic from "next/dynamic";
+const BugReportModal = dynamic(() => import("./BugReportModal"), {
+  ssr: false,
+});
 import {
   Card,
   NavItem,
@@ -193,12 +196,9 @@ export default function Sidebar({
       >
         <div className="flex w-full items-center justify-between">
           <div className={`${collapsed ? "w-full" : ""}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={
-                collapsed
-                  ? "https://res.cloudinary.com/dnpvndlmy/image/upload/q_auto/f_auto/v1775562587/marquill/icon_ngg31p.svg"
-                  : "https://res.cloudinary.com/dnpvndlmy/image/upload/q_auto/f_auto/v1775561659/marquill/logo_nwvdon.svg"
-              }
+              src={collapsed ? "/marquill-icon.svg" : "/marquill-logo.svg"}
               alt="Marquill"
               className={`${collapsed ? "mx-auto h-10 w-10" : "h-8 w-auto"}`}
             />
@@ -444,7 +444,9 @@ export default function Sidebar({
         </div>
       )
       }
-      <BugReportModal isOpen={isBugModalOpen} onClose={() => setIsBugModalOpen(false)} />
+      {isBugModalOpen && (
+        <BugReportModal isOpen onClose={() => setIsBugModalOpen(false)} />
+      )}
     </aside >
   );
 }

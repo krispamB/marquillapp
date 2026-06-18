@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { User, Briefcase, PlusCircle, CheckCircle2, ArrowRight, ShieldCheck, EyeOff, Settings2 } from "lucide-react";
+import { apiFetch } from "../lib/api";
 import { RadioTile, GoalTile, Chip, Icon } from "./components";
 import type { OnboardingData } from "./OnboardingClient";
 import { CADENCE_DEFAULTS } from "./OnboardingClient";
@@ -332,7 +333,7 @@ export function StepConnect({ data, update }: StepConnectProps) {
 
   // Check if a personal LinkedIn account is already connected
   useEffect(() => {
-    fetch(`${API}/auth/connected-accounts`, { credentials: "include" })
+    apiFetch(`${API}/auth/connected-accounts`, { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(payload => {
         const accounts: Array<{ provider: string; accountType: string }> = payload?.data ?? [];
@@ -368,7 +369,7 @@ export function StepConnect({ data, update }: StepConnectProps) {
 
     setIsConnecting(true);
     try {
-      const res = await fetch(`${API}/auth/linkedin`, {
+      const res = await apiFetch(`${API}/auth/linkedin`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -391,7 +392,7 @@ export function StepConnect({ data, update }: StepConnectProps) {
           setIsConnecting(false);
           // Verify connection after popup closes
           try {
-            const accountsRes = await fetch(`${API}/auth/connected-accounts`, { credentials: "include" });
+            const accountsRes = await apiFetch(`${API}/auth/connected-accounts`, { credentials: "include" });
             if (accountsRes.ok) {
               const accountsPayload = await accountsRes.json();
               const accounts: Array<{ provider: string; accountType: string }> = accountsPayload?.data ?? [];

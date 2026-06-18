@@ -7,8 +7,9 @@ export default function NotFound() {
       {/* Header Layout */}
       <header className="flex w-full items-center justify-between px-6 py-6 sm:px-12 sm:py-8">
         <Link href="/" aria-label="Homepage" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="https://res.cloudinary.com/dnpvndlmy/image/upload/q_auto/f_auto/v1775562587/marquill/icon_ngg31p.svg"
+            src="/marquill-icon.svg"
             alt="Marquill"
             width={28}
             height={28}

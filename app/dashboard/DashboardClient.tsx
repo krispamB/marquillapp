@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { apiFetch } from "../lib/api";
 import {
   Activity,
   CalendarClock,
@@ -8,13 +9,22 @@ import {
   PenSquare,
   TrendingUp,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Sidebar from "./Sidebar";
-import BugReportModal from "./BugReportModal";
-import NewPostModal, {
-  type NewDraftGeneratePayload,
-  type NewDraftGenerateResult,
-  type NewPostSubmitPayload,
+import type {
+  NewDraftGeneratePayload,
+  NewDraftGenerateResult,
+  NewPostSubmitPayload,
 } from "./NewPostModal";
+
+// Interaction-gated modals — lazy-loaded so their JS stays out of the
+// dashboard's initial bundle until the user opens them. NewPostModal is
+// ~2.8k LOC and pulls chrono-node (via the reschedule popover); BugReportModal
+// is rarely opened.
+const NewPostModal = dynamic(() => import("./NewPostModal"), { ssr: false });
+const BugReportModal = dynamic(() => import("./BugReportModal"), {
+  ssr: false,
+});
 import {
   Card,
   ConnectAccountCta,
@@ -497,7 +507,7 @@ export default function DashboardPage({
       setUsageError(null);
 
       try {
-        const response = await fetch(`${apiBase}/payment/usage`, {
+        const response = await apiFetch(`${apiBase}/payment/usage`, {
           credentials: "include",
           signal: controller.signal,
         });
@@ -550,7 +560,7 @@ export default function DashboardPage({
       setPostMetricsError(null);
 
       try {
-        const response = await fetch(`${apiBase}/posts/metrics/${selectedAccountId}`, {
+        const response = await apiFetch(`${apiBase}/posts/metrics/${selectedAccountId}`, {
           credentials: "include",
           signal: controller.signal,
         });
@@ -629,7 +639,7 @@ export default function DashboardPage({
           accountConnected: selectedAccountId,
           month,
         });
-        const response = await fetch(`${apiBase}/posts?${query.toString()}`, {
+        const response = await apiFetch(`${apiBase}/posts?${query.toString()}`, {
           credentials: "include",
           signal: controller.signal,
         });
@@ -763,7 +773,7 @@ export default function DashboardPage({
     try {
       popup.document.title = "Connecting to LinkedIn";
 
-      const response = await fetch(`${apiBase}/auth/linkedin`, {
+      const response = await apiFetch(`${apiBase}/auth/linkedin`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -831,7 +841,7 @@ export default function DashboardPage({
   const handleDisconnect = async () => {
     if (!disconnectTarget) return;
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `${apiBase}/auth/connected-accounts/${disconnectTarget.accountId}`,
         { method: "DELETE", credentials: "include" },
       );
@@ -959,7 +969,7 @@ export default function DashboardPage({
       const formData = new FormData();
       formData.append("files", file);
 
-      const response = await fetch(`${apiBase}/posts/${postId}/media`, {
+      const response = await apiFetch(`${apiBase}/posts/${postId}/media`, {
         method: "PUT",
         credentials: "include",
         body: formData,
@@ -987,7 +997,7 @@ export default function DashboardPage({
     onProgress: (pct: number) => void,
   ): Promise<void> => {
     // 1. Initialize upload session
-    const initRes = await fetch(`${apiBase}/posts/${postId}/video`, {
+    const initRes = await apiFetch(`${apiBase}/posts/${postId}/video`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -1023,7 +1033,7 @@ export default function DashboardPage({
     const deadline = Date.now() + 60_000;
     while (Date.now() < deadline) {
       await new Promise<void>((r) => setTimeout(r, 2000));
-      const statusRes = await fetch(`${apiBase}/posts/${postId}/video/status`, {
+      const statusRes = await apiFetch(`${apiBase}/posts/${postId}/video/status`, {
         credentials: "include",
       });
       const statusJson = (await statusRes.json()) as VideoUploadStatusResponse;
@@ -1071,7 +1081,7 @@ export default function DashboardPage({
     postId: string,
     content: string,
   ): Promise<UpdatePostResponse> => {
-    const response = await fetch(`${apiBase}/posts/${postId}`, {
+    const response = await apiFetch(`${apiBase}/posts/${postId}`, {
       method: "PATCH",
       credentials: "include",
       headers: {
@@ -1095,7 +1105,7 @@ export default function DashboardPage({
   };
 
   const publishPost = async (postId: string): Promise<PublishPostResponse> => {
-    const response = await fetch(`${apiBase}/posts/${postId}/publish`, {
+    const response = await apiFetch(`${apiBase}/posts/${postId}/publish`, {
       method: "POST",
       credentials: "include",
     });
@@ -1118,7 +1128,7 @@ export default function DashboardPage({
     postId: string,
     scheduledTime: string,
   ): Promise<SchedulePostResponse> => {
-    const response = await fetch(`${apiBase}/posts/${postId}/schedule`, {
+    const response = await apiFetch(`${apiBase}/posts/${postId}/schedule`, {
       method: "POST",
       credentials: "include",
       headers: {
@@ -1161,7 +1171,7 @@ export default function DashboardPage({
       stylePreset: payload.stylePreset,
     };
 
-    const response = await fetch(`${apiBase}/posts/${selectedAccountId}/draft`, {
+    const response = await apiFetch(`${apiBase}/posts/${selectedAccountId}/draft`, {
       method: "POST",
       credentials: "include",
       headers: {
@@ -1206,7 +1216,7 @@ export default function DashboardPage({
   };
 
   const handleGetDraftStatus = async (draftId: string): Promise<DraftStatusResponse> => {
-    const response = await fetch(`${apiBase}/posts/${draftId}/status`, {
+    const response = await apiFetch(`${apiBase}/posts/${draftId}/status`, {
       credentials: "include",
     });
 
@@ -1225,7 +1235,7 @@ export default function DashboardPage({
   };
 
   const handleGetDraftById = useCallback(async (draftId: string): Promise<PostDetailResponse> => {
-    const response = await fetch(`${apiBase}/posts/${draftId}`, {
+    const response = await apiFetch(`${apiBase}/posts/${draftId}`, {
       credentials: "include",
     });
 
@@ -1246,7 +1256,7 @@ export default function DashboardPage({
   const handleGetLinkedinImageByUrn = useCallback(async (
     urn: string,
   ): Promise<LinkedinImageDetailsResponse> => {
-    const response = await fetch(`${apiBase}/posts/linkedin/image/${encodeURIComponent(urn)}`, {
+    const response = await apiFetch(`${apiBase}/posts/linkedin/image/${encodeURIComponent(urn)}`, {
       credentials: "include",
     });
 
@@ -1789,7 +1799,10 @@ export default function DashboardPage({
         isConnectingLinkedIn={isConnectingLinkedIn}
         subscription={subscription}
       />
-      <BugReportModal isOpen={isMobileBugModalOpen} onClose={() => setIsMobileBugModalOpen(false)} />
+      {isMobileBugModalOpen && (
+        <BugReportModal isOpen onClose={() => setIsMobileBugModalOpen(false)} />
+      )}
+      {newPostModalState.isOpen && (
       <NewPostModal
         isOpen={newPostModalState.isOpen}
         mode={newPostModalState.mode}
@@ -1811,6 +1824,7 @@ export default function DashboardPage({
         onGetDraftById={handleGetDraftById}
         onGetLinkedinImageByUrn={handleGetLinkedinImageByUrn}
       />
+      )}
       <ConnectOrgModal
         isOpen={isOrgModalOpen}
         onClose={() => setIsOrgModalOpen(false)}

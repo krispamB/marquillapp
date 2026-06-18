@@ -2,10 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, LayoutDashboard, PenSquare, CalendarClock, TrendingUp, Sparkles, Receipt, Check, Download } from "lucide-react";
+import { apiFetch } from "../lib/api";
 import Link from "next/link";
 import Sidebar from "../dashboard/Sidebar";
 import { ConnectOrgModal, MobileAccountSwitcherSheet, MobileBottomNav, MobileSidebar } from "../dashboard/components";
-import BugReportModal from "../dashboard/BugReportModal";
+import dynamic from "next/dynamic";
+const BugReportModal = dynamic(() => import("../dashboard/BugReportModal"), {
+  ssr: false,
+});
 import type { UserProfile, ConnectedAccount, Tier } from "../lib/types";
 
 type Invoice = {
@@ -95,8 +99,8 @@ export default function BillingClient({
                 const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
 
                 const [tiersRes, invoicesRes] = await Promise.all([
-                    fetch(`${apiBase}/tiers/active`, { credentials: "include" }),
-                    fetch(`${apiBase}/payment/invoices`, { credentials: "include" }).catch(() => null),
+                    apiFetch(`${apiBase}/tiers/active`, { credentials: "include" }),
+                    apiFetch(`${apiBase}/payment/invoices`, { credentials: "include" }).catch(() => null),
                 ]);
 
                 if (tiersRes.ok) {
@@ -354,7 +358,9 @@ export default function BillingClient({
                 onOpenBugReport={() => { setIsMobileSidebarOpen(false); setIsMobileBugModalOpen(true); }}
                 onConnectLinkedInOrg={() => { setIsMobileSidebarOpen(false); handleOpenOrgModal(); }}
             />
-            <BugReportModal isOpen={isMobileBugModalOpen} onClose={() => setIsMobileBugModalOpen(false)} />
+            {isMobileBugModalOpen && (
+              <BugReportModal isOpen onClose={() => setIsMobileBugModalOpen(false)} />
+            )}
             <ConnectOrgModal
                 isOpen={isOrgModalOpen}
                 onClose={() => setIsOrgModalOpen(false)}
