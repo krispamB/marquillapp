@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { apiFetch } from "../lib/api";
 import {
   CalendarClock,
   CalendarDays,
@@ -422,7 +423,7 @@ export default function PostsClient({
           month: selectedMonth,
         });
 
-        const response = await fetch(`${apiBase}/posts?${query.toString()}`, {
+        const response = await apiFetch(`${apiBase}/posts?${query.toString()}`, {
           credentials: "include",
           signal,
         });
@@ -614,7 +615,7 @@ export default function PostsClient({
     try {
       popup.document.title = "Connecting to LinkedIn";
 
-      const response = await fetch(`${apiBase}/auth/linkedin`, {
+      const response = await apiFetch(`${apiBase}/auth/linkedin`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -679,7 +680,7 @@ export default function PostsClient({
       const formData = new FormData();
       formData.append("files", file);
 
-      const response = await fetch(`${apiBase}/posts/${postId}/media`, {
+      const response = await apiFetch(`${apiBase}/posts/${postId}/media`, {
         method: "PUT",
         credentials: "include",
         body: formData,
@@ -732,7 +733,7 @@ export default function PostsClient({
     postId: string,
     content: string,
   ): Promise<UpdatePostResponse> => {
-    const response = await fetch(`${apiBase}/posts/${postId}`, {
+    const response = await apiFetch(`${apiBase}/posts/${postId}`, {
       method: "PATCH",
       credentials: "include",
       headers: {
@@ -756,7 +757,7 @@ export default function PostsClient({
   };
 
   const publishPost = async (postId: string): Promise<PublishPostResponse> => {
-    const response = await fetch(`${apiBase}/posts/${postId}/publish`, {
+    const response = await apiFetch(`${apiBase}/posts/${postId}/publish`, {
       method: "POST",
       credentials: "include",
     });
@@ -779,7 +780,7 @@ export default function PostsClient({
     postId: string,
     scheduledTime: string,
   ): Promise<SchedulePostResponse> => {
-    const response = await fetch(`${apiBase}/posts/${postId}/schedule`, {
+    const response = await apiFetch(`${apiBase}/posts/${postId}/schedule`, {
       method: "POST",
       credentials: "include",
       headers: {
@@ -904,7 +905,7 @@ export default function PostsClient({
       stylePreset: payload.stylePreset,
     };
 
-    const response = await fetch(`${apiBase}/posts/${selectedAccountId}/draft`, {
+    const response = await apiFetch(`${apiBase}/posts/${selectedAccountId}/draft`, {
       method: "POST",
       credentials: "include",
       headers: {
@@ -951,7 +952,7 @@ export default function PostsClient({
   };
 
   const handleGetDraftStatus = async (draftId: string): Promise<DraftStatusResponse> => {
-    const response = await fetch(`${apiBase}/posts/${draftId}/status`, {
+    const response = await apiFetch(`${apiBase}/posts/${draftId}/status`, {
       credentials: "include",
     });
 
@@ -971,7 +972,7 @@ export default function PostsClient({
 
   const handleGetDraftById = useCallback(
     async (draftId: string): Promise<PostDetailResponse> => {
-      const response = await fetch(`${apiBase}/posts/${draftId}`, {
+      const response = await apiFetch(`${apiBase}/posts/${draftId}`, {
         credentials: "include",
       });
 
@@ -993,7 +994,7 @@ export default function PostsClient({
 
   const handleGetLinkedinImageByUrn = useCallback(
     async (urn: string): Promise<LinkedinImageDetailsResponse> => {
-      const response = await fetch(`${apiBase}/posts/linkedin/image/${encodeURIComponent(urn)}`, {
+      const response = await apiFetch(`${apiBase}/posts/linkedin/image/${encodeURIComponent(urn)}`, {
         credentials: "include",
       });
 
@@ -1019,7 +1020,7 @@ export default function PostsClient({
 
     setIsDeleting(true);
     try {
-      const response = await fetch(`${apiBase}/posts/${postId}`, {
+      const response = await apiFetch(`${apiBase}/posts/${postId}`, {
         method: "DELETE",
         credentials: "include",
       });
@@ -1051,7 +1052,7 @@ export default function PostsClient({
 
     setIsRescheduling(true);
     try {
-      const response = await fetch(`${apiBase}/posts/${postId}/schedule`, {
+      const response = await apiFetch(`${apiBase}/posts/${postId}/schedule`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scheduledTime, timezone }),

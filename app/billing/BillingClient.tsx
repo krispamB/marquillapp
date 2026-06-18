@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, LayoutDashboard, PenSquare, CalendarClock, TrendingUp, Sparkles, Receipt, Check, Download } from "lucide-react";
+import { apiFetch } from "../lib/api";
 import Link from "next/link";
 import Sidebar from "../dashboard/Sidebar";
 import { ConnectOrgModal, MobileAccountSwitcherSheet, MobileBottomNav, MobileSidebar } from "../dashboard/components";
@@ -98,8 +99,8 @@ export default function BillingClient({
                 const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
 
                 const [tiersRes, invoicesRes] = await Promise.all([
-                    fetch(`${apiBase}/tiers/active`, { credentials: "include" }),
-                    fetch(`${apiBase}/payment/invoices`, { credentials: "include" }).catch(() => null),
+                    apiFetch(`${apiBase}/tiers/active`, { credentials: "include" }),
+                    apiFetch(`${apiBase}/payment/invoices`, { credentials: "include" }).catch(() => null),
                 ]);
 
                 if (tiersRes.ok) {
