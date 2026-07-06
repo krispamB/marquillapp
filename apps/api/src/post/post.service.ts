@@ -26,9 +26,7 @@ import { EncryptionService } from 'src/encryption/encryption.service';
 import { IContent, ILinkedInPost, IVideoInitResponse } from './post.interface';
 import { delay, formatLinkedinContent } from 'src/common/HelperFn';
 import { FeatureGatingService } from '../feature-gating/feature-gating.service';
-import { createReadStream } from 'fs';
-import { unlink } from 'fs/promises';
-import { Readable } from 'stream';
+import { open, readFile, unlink } from 'fs/promises';
 
 interface PostFilters {
   availableMonths: string[];
@@ -545,8 +543,7 @@ export class PostService {
           'LinkedIn-Version': '202601',
           Authorization: `Bearer ${accessToken}`,
         },
-        body: Readable.toWeb(createReadStream(file.path)) as any,
-        ...({ duplex: 'half' } as any),
+        body: await readFile(file.path),
       });
 
       return initializeUploadRequest.data.value.image;
@@ -601,26 +598,28 @@ export class PostService {
     } = initRes.data.value;
 
     const eTags: string[] = [];
-    for (const instruction of uploadInstructions) {
-      const chunk = Readable.toWeb(
-        createReadStream(file.path, {
-          start: instruction.firstByte,
-          end: instruction.lastByte,
-        }),
-      );
-      const { response } = await apiFetch<void>(instruction.uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/octet-stream' },
-        body: chunk as any,
-        ...({ duplex: 'half' } as any),
-      });
-      const etag = response.headers.get('etag') ?? response.headers.get('ETag');
-      if (!etag) {
-        throw new InternalServerErrorException(
-          'LinkedIn video chunk upload did not return an ETag',
-        );
+    const fileHandle = await open(file.path, 'r');
+    try {
+      for (const instruction of uploadInstructions) {
+        const chunkLength = instruction.lastByte - instruction.firstByte + 1;
+        const chunk = Buffer.alloc(chunkLength);
+        await fileHandle.read(chunk, 0, chunkLength, instruction.firstByte);
+        const { response } = await apiFetch<void>(instruction.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: chunk,
+        });
+        const etag =
+          response.headers.get('etag') ?? response.headers.get('ETag');
+        if (!etag) {
+          throw new InternalServerErrorException(
+            'LinkedIn video chunk upload did not return an ETag',
+          );
+        }
+        eTags.push(etag.replaceAll('"', ''));
       }
-      eTags.push(etag);
+    } finally {
+      await fileHandle.close();
     }
 
     await apiFetch(`${this.LINKEDIN_API_BASE}/videos?action=finalizeUpload`, {
