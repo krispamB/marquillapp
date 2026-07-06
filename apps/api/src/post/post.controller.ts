@@ -48,6 +48,7 @@ export class PostController {
     };
   }
 
+  @HttpCode(HttpStatus.ACCEPTED)
   @Put(':id/media')
   @UseInterceptors(
     FilesInterceptor('files', 20, {
@@ -67,10 +68,10 @@ export class PostController {
     @Param('id') id: string,
     @UploadedFiles() files: Express.Multer.File[],
   ): Promise<IAppResponse> {
-    await this.postService.addLinkedinMedia(user, id, files);
     return {
-      statusCode: HttpStatus.OK,
-      message: 'Media uploaded successfully',
+      statusCode: HttpStatus.ACCEPTED,
+      message: 'Media upload started',
+      data: await this.postService.addLinkedinMedia(user, id, files),
     };
   }
 

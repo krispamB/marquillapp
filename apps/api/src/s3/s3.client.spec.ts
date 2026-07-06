@@ -28,6 +28,7 @@ import {
 import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   uploadFile,
+  getFile,
   deleteFile,
   getSignedUrl,
   __resetClient,
@@ -115,6 +116,39 @@ describe('S3 client', () => {
       await expect(
         uploadFile('key', Buffer.from(''), 'text/plain'),
       ).rejects.toThrow('upload failed');
+    });
+  });
+
+  describe('getFile', () => {
+    it('should send GetObjectCommand and return the object body as a Buffer', async () => {
+      const key = 'media-uploads/post1/media-1';
+      mockSend.mockResolvedValueOnce({
+        Body: {
+          transformToByteArray: jest
+            .fn()
+            .mockResolvedValue(new Uint8Array([1, 2, 3])),
+        },
+      });
+
+      const result = await getFile(key);
+
+      expect(GetObjectCommand).toHaveBeenCalledWith({
+        Bucket: BUCKET,
+        Key: key,
+      });
+      expect(result).toEqual(Buffer.from([1, 2, 3]));
+    });
+
+    it('should throw when the object has no body', async () => {
+      mockSend.mockResolvedValueOnce({ Body: undefined });
+      await expect(getFile('some/key')).rejects.toThrow(
+        'R2 object "some/key" has no body',
+      );
+    });
+
+    it('should propagate errors from the S3 send call', async () => {
+      mockSend.mockRejectedValueOnce(new Error('get failed'));
+      await expect(getFile('some/key')).rejects.toThrow('get failed');
     });
   });
 

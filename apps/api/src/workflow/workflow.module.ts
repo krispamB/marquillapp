@@ -4,6 +4,7 @@ import { WorkflowQueue } from './workflow.queue';
 import { ScheduleQueue } from './schedule.queue';
 import { LinkedinAvatarRefreshQueue } from './linkedin-avatar-refresh.queue';
 import { EmailQueue } from './email.queue';
+import { MediaUploadQueue } from './media-upload.queue';
 
 @Module({
   controllers: [WorkflowController],
@@ -12,12 +13,14 @@ import { EmailQueue } from './email.queue';
     ScheduleQueue,
     LinkedinAvatarRefreshQueue,
     EmailQueue,
+    MediaUploadQueue,
   ],
   exports: [
     WorkflowQueue,
     ScheduleQueue,
     LinkedinAvatarRefreshQueue,
     EmailQueue,
+    MediaUploadQueue,
   ],
 })
 export class WorkflowModule {}

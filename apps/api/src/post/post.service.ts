@@ -9,6 +9,10 @@ import {
 } from '@nestjs/common';
 import { WorkflowQueue } from '../workflow/workflow.queue';
 import { ScheduleQueue } from '../workflow/schedule.queue';
+import {
+  MediaUploadJobItem,
+  MediaUploadQueue,
+} from '../workflow/media-upload.queue';
 import { InputDto } from '../agent/dto';
 import { UpdatePostDto, SchedulePostDto } from './dto';
 import {
@@ -23,10 +27,12 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ApiError, apiFetch } from 'src/common/HelperFn/apiFetch.helper';
 import { EncryptionService } from 'src/encryption/encryption.service';
-import { IContent, ILinkedInPost, IVideoInitResponse } from './post.interface';
-import { delay, formatLinkedinContent } from 'src/common/HelperFn';
+import { IContent, ILinkedInPost } from './post.interface';
+import { formatLinkedinContent } from 'src/common/HelperFn';
 import { FeatureGatingService } from '../feature-gating/feature-gating.service';
-import { open, readFile, unlink } from 'fs/promises';
+import { readFile, unlink } from 'fs/promises';
+import { randomUUID } from 'crypto';
+import { deleteFile, uploadFile } from 'src/s3';
 
 interface PostFilters {
   availableMonths: string[];
@@ -46,6 +52,7 @@ export class PostService {
   constructor(
     private readonly workflowQueue: WorkflowQueue,
     private readonly scheduleQueue: ScheduleQueue,
+    private readonly mediaUploadQueue: MediaUploadQueue,
     @InjectModel(PostDraft.name)
     private readonly postDraftModel: Model<PostDraft>,
     @InjectModel(ConnectedAccount.name)
@@ -273,9 +280,18 @@ export class PostService {
       connectedAccount.accessToken!,
     );
 
+    if ((post.media ?? []).some((m) => m.status === 'UPLOADING')) {
+      throw new ConflictException(
+        'Media uploads are still in progress. Try again shortly.',
+      );
+    }
+
     const url = `${this.LINKEDIN_API_BASE}/posts`;
-    const images = (post.media ?? []).filter((m) => m.type === 'IMAGE');
-    const videos = (post.media ?? []).filter((m) => m.type === 'VIDEO');
+    const usableMedia = (post.media ?? []).filter(
+      (m) => !m.status || m.status === 'READY',
+    );
+    const images = usableMedia.filter((m) => m.type === 'IMAGE');
+    const videos = usableMedia.filter((m) => m.type === 'VIDEO');
 
     let content: IContent | undefined;
     if (videos.length === 1) {
@@ -457,6 +473,12 @@ export class PostService {
         }
       }
 
+      if ((post.media ?? []).some((m) => m.status === 'UPLOADING')) {
+        throw new ConflictException(
+          'A media upload is already in progress for this post',
+        );
+      }
+
       const connectedAccount =
         await this.getOwnedUsableLinkedinConnectedAccount(
           user._id.toString(),
@@ -464,213 +486,51 @@ export class PostService {
           'upload media',
         );
 
-      const accessToken = await this.encryptionService.decrypt(
-        connectedAccount.accessToken!,
-      );
-
       const ownerUrn = this.resolveLinkedinAuthorUrn(connectedAccount);
-      const newMediaItems: NonNullable<typeof post.media> = [];
+      const isVideo = videoFiles.length === 1;
+      const filesToUpload = isVideo ? videoFiles : imageFiles;
 
-      if (videoFiles.length === 1) {
-        const urn = await this.uploadLinkedinVideo(
-          ownerUrn,
-          accessToken,
-          videoFiles[0],
-        );
-        newMediaItems.push({
-          id: urn,
-          type: 'VIDEO',
-          title: videoFiles[0].originalname,
-        });
-      } else {
-        for (const file of imageFiles) {
-          const urn = await this.uploadLinkedinImage(
-            ownerUrn,
-            accessToken,
-            file,
-          );
+      const newMediaItems: NonNullable<typeof post.media> = [];
+      const jobItems: MediaUploadJobItem[] = [];
+      try {
+        for (const file of filesToUpload) {
+          const mediaId = randomUUID();
+          const r2Key = `media-uploads/${postId}/${mediaId}`;
+          await uploadFile(r2Key, await readFile(file.path), file.mimetype);
+          jobItems.push({
+            mediaId,
+            r2Key,
+            mediaType: isVideo ? 'VIDEO' : 'IMAGE',
+          });
           newMediaItems.push({
-            id: urn,
-            type: 'IMAGE',
+            id: mediaId,
+            type: isVideo ? 'VIDEO' : 'IMAGE',
             title: file.originalname,
-            altText: file.originalname,
+            altText: isVideo ? undefined : file.originalname,
+            status: 'UPLOADING',
           });
         }
+      } catch (error) {
+        await Promise.allSettled(
+          jobItems.map((item) => deleteFile(item.r2Key)),
+        );
+        throw error;
       }
 
       post.media = [...(post.media ?? []), ...newMediaItems];
       await post.save();
+
+      await this.mediaUploadQueue.addMediaUploadJob({
+        postId,
+        connectedAccountId: post.connectedAccount.toString(),
+        ownerUrn,
+        items: jobItems,
+      });
+
+      return newMediaItems;
     } finally {
       await Promise.allSettled(files.map((f) => unlink(f.path)));
     }
-  }
-
-  private async uploadLinkedinImage(
-    urn: string,
-    accessToken: string,
-    file: Express.Multer.File,
-  ) {
-    interface IResponse {
-      value: {
-        uploadUrlExpiresAt: number;
-        uploadUrl: string;
-        image: string;
-      };
-    }
-    try {
-      const initializeUploadRequest = await apiFetch<IResponse>(
-        `${this.LINKEDIN_API_BASE}/images?action=initializeUpload`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Restli-Protocol-Version': '2.0.0',
-            'LinkedIn-Version': '202601',
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            initializeUploadRequest: {
-              owner: urn,
-            },
-          }),
-        },
-      );
-
-      await apiFetch(initializeUploadRequest.data.value.uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/octet-stream',
-          'LinkedIn-Version': '202601',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: await readFile(file.path),
-      });
-
-      return initializeUploadRequest.data.value.image;
-    } catch (error) {
-      if (
-        error instanceof ApiError &&
-        error.statusCode === 400 &&
-        typeof error.data?.message === 'string' &&
-        error.data.message.includes('Organization permissions must be used')
-      ) {
-        throw new BadRequestException(
-          'Your LinkedIn account needs to be reconnected to enable company page posting. Please disconnect and reconnect your LinkedIn account.',
-        );
-      }
-      throw error;
-    }
-  }
-
-  private async uploadLinkedinVideo(
-    ownerUrn: string,
-    accessToken: string,
-    file: Express.Multer.File,
-  ): Promise<string> {
-    const CHUNK_SIZE = 4_194_304;
-    const linkedinHeaders = {
-      'Content-Type': 'application/json',
-      'X-Restli-Protocol-Version': '2.0.0',
-      'LinkedIn-Version': '202601',
-      Authorization: `Bearer ${accessToken}`,
-    };
-
-    const initRes = await apiFetch<IVideoInitResponse>(
-      `${this.LINKEDIN_API_BASE}/videos?action=initializeUpload`,
-      {
-        method: 'POST',
-        headers: linkedinHeaders,
-        body: JSON.stringify({
-          initializeUploadRequest: {
-            owner: ownerUrn,
-            fileSizeBytes: file.size,
-            uploadCaptions: false,
-            uploadThumbnail: false,
-          },
-        }),
-      },
-    );
-
-    const {
-      video: videoUrn,
-      uploadToken,
-      uploadInstructions,
-    } = initRes.data.value;
-
-    const eTags: string[] = [];
-    const fileHandle = await open(file.path, 'r');
-    try {
-      for (const instruction of uploadInstructions) {
-        const chunkLength = instruction.lastByte - instruction.firstByte + 1;
-        const chunk = Buffer.alloc(chunkLength);
-        await fileHandle.read(chunk, 0, chunkLength, instruction.firstByte);
-        const { response } = await apiFetch<void>(instruction.uploadUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/octet-stream' },
-          body: chunk,
-        });
-        const etag =
-          response.headers.get('etag') ?? response.headers.get('ETag');
-        if (!etag) {
-          throw new InternalServerErrorException(
-            'LinkedIn video chunk upload did not return an ETag',
-          );
-        }
-        eTags.push(etag.replaceAll('"', ''));
-      }
-    } finally {
-      await fileHandle.close();
-    }
-
-    await apiFetch(`${this.LINKEDIN_API_BASE}/videos?action=finalizeUpload`, {
-      method: 'POST',
-      headers: linkedinHeaders,
-      body: JSON.stringify({
-        finalizeUploadRequest: {
-          video: videoUrn,
-          uploadToken,
-          uploadedPartIds: eTags,
-        },
-      }),
-    });
-
-    await this.waitForVideoAvailable(videoUrn, accessToken);
-    return videoUrn;
-  }
-
-  private async waitForVideoAvailable(
-    videoUrn: string,
-    accessToken: string,
-    timeoutMs = 60_000,
-  ): Promise<void> {
-    const encodedUrn = encodeURIComponent(videoUrn);
-    const deadline = Date.now() + timeoutMs;
-
-    while (Date.now() < deadline) {
-      await delay(3000);
-      const { data } = await apiFetch<{ status: string }>(
-        `${this.LINKEDIN_API_BASE}/videos/${encodedUrn}`,
-        {
-          method: 'GET',
-          headers: {
-            'X-Restli-Protocol-Version': '2.0.0',
-            'LinkedIn-Version': '202601',
-            Authorization: `Bearer ${accessToken}`,
-          },
-        },
-      );
-
-      if (data.status === 'AVAILABLE') return;
-      if (data.status === 'PROCESSING_FAILED') {
-        throw new InternalServerErrorException(
-          'LinkedIn video processing failed',
-        );
-      }
-    }
-
-    throw new InternalServerErrorException(
-      'Timed out waiting for LinkedIn video to become available',
-    );
   }
 
   async getLinkedinImage(user: User, urn: string) {

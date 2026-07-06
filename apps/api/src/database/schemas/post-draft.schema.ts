@@ -51,6 +51,11 @@ export class PostDraft extends Document {
         type: { type: String, enum: ['IMAGE', 'VIDEO'], required: true },
         title: { type: String },
         altText: { type: String },
+        status: {
+          type: String,
+          enum: ['UPLOADING', 'READY', 'FAILED'],
+          default: 'READY',
+        },
       },
     ]),
   )
@@ -59,6 +64,7 @@ export class PostDraft extends Document {
     type: 'IMAGE' | 'VIDEO';
     title?: string;
     altText?: string;
+    status?: 'UPLOADING' | 'READY' | 'FAILED';
   }[];
 
   @Prop({ type: Array<object> })

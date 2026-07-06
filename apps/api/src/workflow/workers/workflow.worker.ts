@@ -2,6 +2,7 @@ import { Job, Worker } from 'bullmq';
 import {
   EMAIL_QUEUE_NAME,
   LINKEDIN_AVATAR_REFRESH_QUEUE_NAME,
+  MEDIA_UPLOAD_QUEUE_NAME,
   QUEUE_NAME,
   SCHEDULE_QUEUE_NAME,
 } from '../workflow.constants';
@@ -20,6 +21,12 @@ import { AuthService } from '../../auth/auth.service';
 import { MailService } from '../../mail';
 import { EmailQueue } from '../email.queue';
 import { processEmailJob } from './email.worker.handler';
+import { LinkedinMediaService } from '../../post/linkedin-media.service';
+import { MediaUploadJobData } from '../media-upload.queue';
+import {
+  handleMediaUploadJobExhausted,
+  processMediaUploadJob,
+} from './media-upload.worker.handler';
 
 async function bootstrapWorker() {
   const logger = new Logger(
@@ -34,6 +41,7 @@ async function bootstrapWorker() {
   const authService = app.get(AuthService);
   const mailService = app.get(MailService);
   const emailQueue = app.get(EmailQueue);
+  const linkedinMediaService = app.get(LinkedinMediaService);
   const userModel = app.get<Model<User>>(getModelToken(User.name));
 
   logger.log('NestJs context ready');
@@ -109,11 +117,15 @@ async function bootstrapWorker() {
       try {
         const connectedAccountId = job.data?.connectedAccountId;
         if (!connectedAccountId) {
-          logger.warn(`Skipping avatar refresh job ${job.id}; missing account id`);
+          logger.warn(
+            `Skipping avatar refresh job ${job.id}; missing account id`,
+          );
           return;
         }
 
-        logger.log(`Processing LinkedIn avatar refresh for ${connectedAccountId}`);
+        logger.log(
+          `Processing LinkedIn avatar refresh for ${connectedAccountId}`,
+        );
         await authService.refreshLinkedinAvatarForAccount(connectedAccountId);
       } catch (error) {
         logger.error(error);
@@ -147,5 +159,37 @@ async function bootstrapWorker() {
       },
     },
   );
+
+  const mediaUploadWorker = new Worker(
+    MEDIA_UPLOAD_QUEUE_NAME,
+    async (job: Job<MediaUploadJobData>) => {
+      try {
+        await processMediaUploadJob(job, logger, linkedinMediaService);
+      } catch (error) {
+        logger.error(error);
+        throw error;
+      }
+    },
+    {
+      connection: {
+        url: process.env.REDIS_URL!,
+        maxRetriesPerRequest: null,
+        enableReadyCheck: false,
+      },
+    },
+  );
+
+  mediaUploadWorker.on('failed', (job, error) => {
+    if (!job) return;
+    if (job.attemptsMade >= (job.opts.attempts ?? 1)) {
+      handleMediaUploadJobExhausted(job, logger, linkedinMediaService).catch(
+        (err) => logger.error(err),
+      );
+    } else {
+      logger.warn(
+        `Media upload job ${job.id} failed (attempt ${job.attemptsMade}/${job.opts.attempts ?? 1}): ${error.message}`,
+      );
+    }
+  });
 }
 bootstrapWorker();

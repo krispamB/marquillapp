@@ -34,8 +34,22 @@ jest.mock(
   () => ({ FeatureGatingService: class FeatureGatingService {} }),
   { virtual: true },
 );
+jest.mock(
+  'src/s3',
+  () => ({
+    uploadFile: jest.fn(),
+    deleteFile: jest.fn(),
+  }),
+  { virtual: true },
+);
+jest.mock('fs/promises', () => ({
+  readFile: jest.fn().mockResolvedValue(Buffer.from('file-bytes')),
+  unlink: jest.fn().mockResolvedValue(undefined),
+}));
 
 import { PostService } from './post.service';
+import { deleteFile, uploadFile } from 'src/s3';
+import { unlink } from 'fs/promises';
 import { apiFetch } from 'src/common/HelperFn/apiFetch.helper';
 import { formatLinkedinContent } from 'src/common/HelperFn';
 
@@ -92,9 +106,7 @@ describe('PostService.getPosts', () => {
     );
 
     expect(mocks.find).toHaveBeenCalledTimes(1);
-    expect(mocks.select).toHaveBeenCalledWith(
-      '-userIntent -compressionResult -youtubeResearch',
-    );
+    expect(mocks.select).toHaveBeenCalledWith('-userIntent -compressionResult');
     expect(mocks.lean).toHaveBeenCalledTimes(1);
     const filter = mocks.find.mock.calls[0][0];
     expect(filter.user).toEqual(userId);
@@ -692,6 +704,75 @@ describe('PostService.publishOnLinkedIn', () => {
     expect(body.commentary).toBe('text only');
   });
 
+  it('should reject publishing when media uploads are still in progress', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const post = {
+      _id: postId,
+      user: userId,
+      connectedAccount: new Types.ObjectId(),
+      status: 'DRAFT',
+      content: 'with media',
+      media: [{ id: 'media-1', type: 'IMAGE', status: 'UPLOADING' }],
+      save: mocks.save,
+    } as any;
+    mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+      accountType: 'PERSON',
+      impersonatorUrn: 'urn:li:person:abc',
+      profileMetadata: {},
+    });
+
+    await expect(
+      service.publishOnLinkedIn({ _id: userId } as any, postId.toString()),
+    ).rejects.toThrow('Media uploads are still in progress');
+    expect(mocks.mockedApiFetch).not.toHaveBeenCalled();
+  });
+
+  it('should exclude failed media from the publish payload', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const post = {
+      _id: postId,
+      user: userId,
+      connectedAccount: new Types.ObjectId(),
+      status: 'DRAFT',
+      content: 'with media',
+      media: [
+        { id: 'urn:li:image:1', title: 'ok', type: 'IMAGE', status: 'READY' },
+        { id: 'media-2', title: 'broken', type: 'IMAGE', status: 'FAILED' },
+      ],
+      save: mocks.save,
+    } as any;
+    mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+      accountType: 'PERSON',
+      impersonatorUrn: 'urn:li:person:abc',
+      profileMetadata: {},
+    });
+
+    await service.publishOnLinkedIn({ _id: userId } as any, postId.toString());
+
+    const request = mocks.mockedApiFetch.mock.calls[0][1];
+    const body = JSON.parse(request.body);
+    expect(body.content).toEqual({
+      media: {
+        id: 'urn:li:image:1',
+        title: 'ok',
+      },
+    });
+  });
+
   it('includes media payload when media exists', async () => {
     const { service, mocks } = createService();
     const userId = new Types.ObjectId();
@@ -936,5 +1017,157 @@ describe('PostService.deletePost', () => {
       'Reconnect account to delete published posts from LinkedIn safely.',
     );
     expect(mocks.deleteOne).not.toHaveBeenCalled();
+  });
+});
+
+describe('PostService.addLinkedinMedia', () => {
+  const createService = () => {
+    const service = Object.create(PostService.prototype) as PostService;
+    const findById = jest.fn();
+    const save = jest.fn().mockResolvedValue(undefined);
+    const findConnectedAccountById = jest.fn();
+    const addMediaUploadJob = jest.fn().mockResolvedValue(undefined);
+
+    (service as any).postDraftModel = { findById };
+    (service as any).connectedAccountModel = {
+      findById: findConnectedAccountById,
+    };
+    (service as any).mediaUploadQueue = { addMediaUploadJob };
+
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const connectedAccountId = new Types.ObjectId();
+    const post = {
+      _id: postId,
+      user: userId,
+      connectedAccount: connectedAccountId,
+      status: 'DRAFT',
+      media: [],
+      save,
+    } as any;
+    const connectedAccount = {
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+      accountType: 'PERSON',
+      profileMetadata: { sub: 'abc' },
+    };
+
+    return {
+      service,
+      mocks: { findById, save, findConnectedAccountById, addMediaUploadJob },
+      fixtures: { userId, postId, connectedAccountId, post, connectedAccount },
+    };
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const imageFile = (name: string) =>
+    ({
+      path: `/tmp/${name}`,
+      mimetype: 'image/jpeg',
+      originalname: name,
+    }) as any;
+
+  it('should upload files to R2, append UPLOADING media, and enqueue a job when files are valid', async () => {
+    const { service, mocks, fixtures } = createService();
+    mocks.findById.mockResolvedValue(fixtures.post);
+    mocks.findConnectedAccountById.mockResolvedValue(fixtures.connectedAccount);
+    (uploadFile as jest.Mock).mockResolvedValue('https://r2/url');
+
+    const result = await service.addLinkedinMedia(
+      { _id: fixtures.userId } as any,
+      fixtures.postId.toString(),
+      [imageFile('a.jpg')],
+    );
+
+    expect(uploadFile).toHaveBeenCalledTimes(1);
+    const [r2Key, body, mimeType] = (uploadFile as jest.Mock).mock.calls[0];
+    expect(r2Key).toMatch(
+      new RegExp(`^media-uploads/${fixtures.postId.toString()}/`),
+    );
+    expect(body).toEqual(Buffer.from('file-bytes'));
+    expect(mimeType).toBe('image/jpeg');
+
+    expect(mocks.addMediaUploadJob).toHaveBeenCalledWith({
+      postId: fixtures.postId.toString(),
+      connectedAccountId: fixtures.connectedAccountId.toString(),
+      ownerUrn: 'urn:li:person:abc',
+      items: [expect.objectContaining({ r2Key, mediaType: 'IMAGE' })],
+    });
+
+    expect(fixtures.post.media).toHaveLength(1);
+    expect(fixtures.post.media[0]).toMatchObject({
+      type: 'IMAGE',
+      title: 'a.jpg',
+      status: 'UPLOADING',
+    });
+    expect(mocks.save).toHaveBeenCalledTimes(1);
+    expect(unlink).toHaveBeenCalledWith('/tmp/a.jpg');
+    expect(result).toEqual(fixtures.post.media);
+  });
+
+  it('should reject when a media upload is already in progress', async () => {
+    const { service, mocks, fixtures } = createService();
+    fixtures.post.media = [
+      { id: 'media-1', type: 'IMAGE', status: 'UPLOADING' },
+    ];
+    mocks.findById.mockResolvedValue(fixtures.post);
+
+    await expect(
+      service.addLinkedinMedia(
+        { _id: fixtures.userId } as any,
+        fixtures.postId.toString(),
+        [imageFile('a.jpg')],
+      ),
+    ).rejects.toThrow('A media upload is already in progress for this post');
+    expect(uploadFile).not.toHaveBeenCalled();
+    expect(mocks.addMediaUploadJob).not.toHaveBeenCalled();
+  });
+
+  it('should reject when images and videos are mixed', async () => {
+    const { service, mocks, fixtures } = createService();
+    mocks.findById.mockResolvedValue(fixtures.post);
+
+    await expect(
+      service.addLinkedinMedia(
+        { _id: fixtures.userId } as any,
+        fixtures.postId.toString(),
+        [
+          imageFile('a.jpg'),
+          {
+            path: '/tmp/b.mp4',
+            mimetype: 'video/mp4',
+            originalname: 'b.mp4',
+          } as any,
+        ],
+      ),
+    ).rejects.toThrow('Cannot mix images and videos in one post');
+    expect(uploadFile).not.toHaveBeenCalled();
+  });
+
+  it('should delete already-uploaded R2 objects when a later upload fails', async () => {
+    const { service, mocks, fixtures } = createService();
+    mocks.findById.mockResolvedValue(fixtures.post);
+    mocks.findConnectedAccountById.mockResolvedValue(fixtures.connectedAccount);
+    (uploadFile as jest.Mock)
+      .mockResolvedValueOnce('https://r2/url')
+      .mockRejectedValueOnce(new Error('R2 unavailable'));
+
+    await expect(
+      service.addLinkedinMedia(
+        { _id: fixtures.userId } as any,
+        fixtures.postId.toString(),
+        [imageFile('a.jpg'), imageFile('b.jpg')],
+      ),
+    ).rejects.toThrow('R2 unavailable');
+
+    const firstKey = (uploadFile as jest.Mock).mock.calls[0][0];
+    expect(deleteFile).toHaveBeenCalledWith(firstKey);
+    expect(mocks.addMediaUploadJob).not.toHaveBeenCalled();
+    expect(mocks.save).not.toHaveBeenCalled();
   });
 });

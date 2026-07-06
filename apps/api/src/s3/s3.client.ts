@@ -65,6 +65,19 @@ export async function uploadFile(
   return `https://${bucket}.${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${key}`;
 }
 
+export async function getFile(key: string): Promise<Buffer> {
+  const { client, bucket } = getClient();
+  const response = await client.send(
+    new GetObjectCommand({ Bucket: bucket, Key: key }),
+  );
+
+  if (!response.Body) {
+    throw new Error(`R2 object "${key}" has no body`);
+  }
+
+  return Buffer.from(await response.Body.transformToByteArray());
+}
+
 export async function deleteFile(key: string): Promise<void> {
   const { client, bucket } = getClient();
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
