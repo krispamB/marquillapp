@@ -2,6 +2,7 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { promises as fs } from 'node:fs';
@@ -24,16 +25,21 @@ export interface SendTemplateInput<TTemplate extends MailTemplateKey> {
 export type SendResult = CreateEmailResponse;
 
 @Injectable()
-export class MailService {
+export class MailService implements OnModuleInit {
   private readonly logger = new Logger(MailService.name);
   private readonly templatesDir = join(process.cwd(), 'assets/mail/templates');
+  private resend: Resend;
 
   constructor(private readonly configService: ConfigService) {}
+
+  onModuleInit() {
+    const apiKey = this.getRequiredEnv('RESEND_API_KEY');
+    this.resend = new Resend(apiKey);
+  }
 
   async sendTemplate<TTemplate extends MailTemplateKey>(
     input: SendTemplateInput<TTemplate>,
   ): Promise<SendResult> {
-    const apiKey = this.getRequiredEnv('RESEND_API_KEY');
     const defaultFrom = this.getRequiredEnv('MAIL_FROM');
     const from = input.from ?? defaultFrom;
     const template = mailTemplates[input.template];
@@ -45,8 +51,7 @@ export class MailService {
         : Promise.resolve(undefined),
     ]);
 
-    const client = this.createResendClient(apiKey);
-    const result = await client.emails.send({
+    const result = await this.resend.emails.send({
       from: `"Marquill" <${from}>`,
       to: input.to,
       subject: template.subject(input.data),
@@ -62,10 +67,6 @@ export class MailService {
     }
 
     return result;
-  }
-
-  protected createResendClient(apiKey: string): Resend {
-    return new Resend(apiKey);
   }
 
   private getRequiredEnv(key: 'RESEND_API_KEY' | 'MAIL_FROM'): string {

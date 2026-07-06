@@ -1,9 +1,13 @@
 import { HttpStatus } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 
-jest.mock('../common/guards', () => ({
-  JwtAuthGuard: class JwtAuthGuard {},
-}));
+jest.mock(
+  '../auth/clerk',
+  () => ({
+    ClerkAuthGuard: class ClerkAuthGuard {},
+  }),
+  { virtual: true },
+);
 jest.mock(
   '../common/decorators',
   () => ({
@@ -19,7 +23,7 @@ jest.mock(
   { virtual: true },
 );
 
-import { JwtAuthGuard } from '../common/guards';
+import { ClerkAuthGuard } from '../auth/clerk';
 import { FeedbackController } from './feedback.controller';
 import { FeedbackIssueType } from './dto';
 
@@ -73,8 +77,8 @@ describe('FeedbackController', () => {
     });
   });
 
-  it('is guarded by JwtAuthGuard', () => {
+  it('is guarded by ClerkAuthGuard', () => {
     const guards = Reflect.getMetadata(GUARDS_METADATA, FeedbackController);
-    expect(guards).toEqual(expect.arrayContaining([JwtAuthGuard]));
+    expect(guards).toEqual(expect.arrayContaining([ClerkAuthGuard]));
   });
 });

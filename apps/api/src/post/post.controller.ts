@@ -17,7 +17,8 @@ import {
 import { PostService } from './post.service';
 import { InputDto } from '../agent/dto';
 import { UpdatePostDto, SchedulePostDto } from './dto';
-import { JwtAuthGuard, SubscriptionAccessGuard } from '../common/guards';
+import { SubscriptionAccessGuard } from '../common/guards';
+import { ClerkAuthGuard } from '../auth/clerk';
 import { IAppResponse } from 'src/common/interfaces';
 import { GetUser } from 'src/common/decorators';
 import { User } from 'src/database/schemas';
@@ -27,7 +28,7 @@ import { tmpdir } from 'os';
 import { extname } from 'path';
 import type { GetPostsResult } from './post.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(ClerkAuthGuard)
 @Controller('posts')
 export class PostController {
   constructor(private readonly postService: PostService) {}

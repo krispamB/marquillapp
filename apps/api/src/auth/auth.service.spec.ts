@@ -783,6 +783,104 @@ describe('AuthService.getConnectedAccounts', () => {
       linkedinAvatarRefreshQueue.addAvatarRefreshJob,
     ).not.toHaveBeenCalled();
   });
+
+  it('does not queue refresh when AUTH_EXPIRED failure is recorded', async () => {
+    const userId = new Types.ObjectId().toString();
+    const account = {
+      _id: new Types.ObjectId(),
+      provider: AccountProvider.LINKEDIN,
+      accountType: LinkedinAccountType.PERSON,
+      avatarUrl: null,
+      avatarUrlExpiresAt: null,
+      profileMetadata: {
+        displayImageUrn: 'urn:li:digitalmediaAsset:test',
+        avatarRefreshFailureReason: 'AUTH_EXPIRED',
+      },
+      toObject() {
+        return { ...this };
+      },
+    };
+
+    const { service, linkedinAvatarRefreshQueue } = makeService([account]);
+    await service.getConnectedAccounts(userId);
+
+    expect(
+      linkedinAvatarRefreshQueue.addAvatarRefreshJob,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('does not queue refresh when DECRYPT_FAILED failure is recorded', async () => {
+    const userId = new Types.ObjectId().toString();
+    const account = {
+      _id: new Types.ObjectId(),
+      provider: AccountProvider.LINKEDIN,
+      accountType: LinkedinAccountType.PERSON,
+      avatarUrl: null,
+      avatarUrlExpiresAt: null,
+      profileMetadata: {
+        displayImageUrn: 'urn:li:digitalmediaAsset:test',
+        avatarRefreshFailureReason: 'DECRYPT_FAILED',
+      },
+      toObject() {
+        return { ...this };
+      },
+    };
+
+    const { service, linkedinAvatarRefreshQueue } = makeService([account]);
+    await service.getConnectedAccounts(userId);
+
+    expect(
+      linkedinAvatarRefreshQueue.addAvatarRefreshJob,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('queues refresh when failure reason is cleared (reconnect path)', async () => {
+    const userId = new Types.ObjectId().toString();
+    const account = {
+      _id: new Types.ObjectId(),
+      provider: AccountProvider.LINKEDIN,
+      accountType: LinkedinAccountType.PERSON,
+      avatarUrl: null,
+      avatarUrlExpiresAt: null,
+      profileMetadata: {
+        displayImageUrn: 'urn:li:digitalmediaAsset:test',
+      },
+      toObject() {
+        return { ...this };
+      },
+    };
+
+    const { service, linkedinAvatarRefreshQueue } = makeService([account]);
+    await service.getConnectedAccounts(userId);
+
+    expect(
+      linkedinAvatarRefreshQueue.addAvatarRefreshJob,
+    ).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not queue refresh when avatarUrl is set but avatarUrlExpiresAt is null', async () => {
+    const userId = new Types.ObjectId().toString();
+    const account = {
+      _id: new Types.ObjectId(),
+      provider: AccountProvider.LINKEDIN,
+      accountType: LinkedinAccountType.PERSON,
+      avatarUrl: 'https://cdn.example.com/avatar.jpg',
+      avatarUrlExpiresAt: null,
+      profileMetadata: {
+        displayImageUrn: 'urn:li:digitalmediaAsset:test',
+      },
+      toObject() {
+        return { ...this };
+      },
+    };
+
+    const { service, linkedinAvatarRefreshQueue } = makeService([account]);
+    await service.getConnectedAccounts(userId);
+
+    expect(
+      linkedinAvatarRefreshQueue.addAvatarRefreshJob,
+    ).not.toHaveBeenCalled();
+  });
 });
 
 describe('AuthService.refreshLinkedinAvatarForAccount', () => {

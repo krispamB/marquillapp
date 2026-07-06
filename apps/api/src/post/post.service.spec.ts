@@ -44,7 +44,8 @@ describe('PostService.getPosts', () => {
     const service = Object.create(PostService.prototype) as PostService;
 
     const exec = jest.fn();
-    const sort = jest.fn().mockReturnValue({ exec });
+    const lean = jest.fn().mockReturnValue({ exec });
+    const sort = jest.fn().mockReturnValue({ lean });
     const select = jest.fn().mockReturnValue({ sort });
     const find = jest.fn().mockReturnValue({ select });
     const aggregate = jest.fn();
@@ -62,6 +63,7 @@ describe('PostService.getPosts', () => {
         find,
         select,
         sort,
+        lean,
         exec,
         aggregate,
         distinct,
@@ -90,6 +92,10 @@ describe('PostService.getPosts', () => {
     );
 
     expect(mocks.find).toHaveBeenCalledTimes(1);
+    expect(mocks.select).toHaveBeenCalledWith(
+      '-userIntent -compressionResult -youtubeResearch',
+    );
+    expect(mocks.lean).toHaveBeenCalledTimes(1);
     const filter = mocks.find.mock.calls[0][0];
     expect(filter.user).toEqual(userId);
     expect(filter.status).toBe('DRAFT');

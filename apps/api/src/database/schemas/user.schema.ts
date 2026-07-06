@@ -13,6 +13,9 @@ export class User extends Document {
   @Prop({ unique: true })
   googleId?: string;
 
+  @Prop({ unique: true, sparse: true })
+  clerkId?: string;
+
   @Prop()
   avatar?: string;
 
