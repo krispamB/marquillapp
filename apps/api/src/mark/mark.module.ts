@@ -1,31 +1,13 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
-import { MongooseModule } from '@nestjs/mongoose';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { User, UserSchema } from '../database/schemas';
-import { MarkSessionService } from './mark-session.service';
-import { MarkAgentService } from './mark-agent.service';
 import { ArtifactService } from './artifact.service';
-import { MarkGateway } from './mark.gateway';
 
-// RedisModule and ConfigModule are @Global() — no explicit import needed
+// The Mark agent (orchestrator, websocket gateway, provider abstraction and
+// token calculator) was removed. What remains is a dormant toolkit: artifact
+// persistence plus the html/pdf/validation utils and the searchWeb helper.
+// The Artifact model is registered globally by DatabaseModule, so no imports
+// are needed here.
 @Module({
-  imports: [
-    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET'),
-      }),
-      inject: [ConfigService],
-    }),
-  ],
-  providers: [
-    MarkGateway,
-    MarkSessionService,
-    ArtifactService,
-    MarkAgentService,
-  ],
-  exports: [MarkSessionService, ArtifactService, MarkAgentService],
+  providers: [ArtifactService],
+  exports: [ArtifactService],
 })
 export class MarkModule {}

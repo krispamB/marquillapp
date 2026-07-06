@@ -240,7 +240,12 @@ describe('FeatureGatingService', () => {
     const tier = {
       _id: tierId,
       name: 'Starter',
-      limits: { ai_drafts: 5, connected_accounts: 1, scheduled_posts: 3 },
+      limits: {
+        ai_drafts: 5,
+        connected_accounts: 1,
+        scheduled_posts: 3,
+        mark_tokens: 100000,
+      },
     };
 
     mocks.subscriptionModel.findOne.mockReturnValue({
@@ -269,6 +274,7 @@ describe('FeatureGatingService', () => {
         lean: jest.fn().mockResolvedValue([
           { feature: 'ai_drafts', count: 2 },
           { feature: 'scheduled_posts', count: 1 },
+          { feature: 'mark_tokens', count: 5000 },
         ]),
       }),
     });
@@ -286,6 +292,7 @@ describe('FeatureGatingService', () => {
         connected_accounts: { used: 1, limit: 1, remaining: 0 },
         ai_drafts: { used: 2, limit: 5, remaining: 3 },
         scheduled_posts: { used: 1, limit: 3, remaining: 2 },
+        mark_tokens: { used: 5000, limit: 100000, remaining: 95000 },
       },
     });
     jest.useRealTimers();
@@ -307,7 +314,12 @@ describe('FeatureGatingService', () => {
       lean: jest.fn().mockResolvedValue({
         _id: defaultTierId,
         name: 'Free',
-        limits: { ai_drafts: 2, connected_accounts: 1, scheduled_posts: 0 },
+        limits: {
+          ai_drafts: 2,
+          connected_accounts: 1,
+          scheduled_posts: 0,
+          mark_tokens: -1,
+        },
       }),
     });
     mocks.connectedAccountModel.countDocuments.mockResolvedValue(3);
@@ -328,6 +340,7 @@ describe('FeatureGatingService', () => {
       connected_accounts: { used: 3, limit: 1, remaining: 0 },
       ai_drafts: { used: 7, limit: 2, remaining: 0 },
       scheduled_posts: { used: 0, limit: 0, remaining: 0 },
+      mark_tokens: { used: 0, limit: -1, remaining: -1 },
     });
     jest.useRealTimers();
   });
@@ -421,5 +434,156 @@ describe('FeatureGatingService', () => {
 
     expect(resolveSpy).not.toHaveBeenCalled();
     expect(mocks.connectedAccountModel.countDocuments).not.toHaveBeenCalled();
+  });
+
+  describe('assertMarkTokenQuota', () => {
+    const setup = (limit: number, currentUsage: number) => {
+      const { service, mocks } = makeService();
+      const userId = new Types.ObjectId().toString();
+      const tier = {
+        _id: new Types.ObjectId(),
+        name: 'Starter',
+        limits: { mark_tokens: limit },
+      } as any;
+      jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
+      jest
+        .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
+        .mockResolvedValue(new Date('2026-03-01T00:00:00.000Z'));
+      mocks.usageModel.findOne.mockReturnValue({
+        lean: jest.fn().mockResolvedValue({ count: currentUsage }),
+      });
+      return { service, userId };
+    };
+
+    it('blocks when the estimate would not fit the remaining budget', async () => {
+      const { service, userId } = setup(1000, 800);
+
+      await expect(
+        service.assertMarkTokenQuota(userId, 300),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'FEATURE_LIMIT_EXCEEDED',
+          feature: 'mark_tokens',
+          limit: 1000,
+          currentUsage: 800,
+        },
+        status: 403,
+      });
+    });
+
+    it('allows when the estimate fits within the remaining budget', async () => {
+      const { service, userId } = setup(1000, 800);
+      await expect(
+        service.assertMarkTokenQuota(userId, 200),
+      ).resolves.toBeUndefined();
+    });
+
+    it('short-circuits as unlimited when the limit is -1', async () => {
+      const { service, userId } = setup(-1, 9_999_999);
+      await expect(
+        service.assertMarkTokenQuota(userId, 1_000_000),
+      ).resolves.toBeUndefined();
+    });
+
+    it('signals plan-not-available hint when the limit is 0', async () => {
+      const { service, userId } = setup(0, 0);
+      await expect(
+        service.assertMarkTokenQuota(userId, 100),
+      ).rejects.toMatchObject({
+        response: {
+          feature: 'mark_tokens',
+          limit: 0,
+          upgradeHint: expect.stringContaining('not available'),
+        },
+      });
+    });
+  });
+
+  describe('incrementMarkTokenUsage', () => {
+    it('increments mark_tokens usage by the actual amount with upsert', async () => {
+      const { service, mocks } = makeService();
+      const userId = new Types.ObjectId().toString();
+      const periodStart = new Date('2026-03-01T00:00:00.000Z');
+      jest
+        .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
+        .mockResolvedValue(periodStart);
+      mocks.usageModel.updateOne.mockResolvedValue({ acknowledged: true });
+
+      await service.incrementMarkTokenUsage(userId, 1234);
+
+      expect(mocks.usageModel.updateOne).toHaveBeenCalledWith(
+        {
+          user_id: new Types.ObjectId(userId),
+          feature: 'mark_tokens',
+          periodStart,
+        },
+        {
+          $inc: { count: 1234 },
+          $setOnInsert: {
+            user_id: new Types.ObjectId(userId),
+            feature: 'mark_tokens',
+            periodStart,
+          },
+        },
+        { upsert: true },
+      );
+    });
+
+    it('is a no-op when the amount is zero or negative', async () => {
+      const { service, mocks } = makeService();
+      const userId = new Types.ObjectId().toString();
+
+      await service.incrementMarkTokenUsage(userId, 0);
+
+      expect(mocks.usageModel.updateOne).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getMarkTokenBudget', () => {
+    it('returns used/limit/remaining for a metered tier', async () => {
+      const { service, mocks } = makeService();
+      const userId = new Types.ObjectId().toString();
+      const tier = {
+        _id: new Types.ObjectId(),
+        name: 'Starter',
+        limits: { mark_tokens: 1000 },
+      } as any;
+      jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
+      jest
+        .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
+        .mockResolvedValue(new Date('2026-03-01T00:00:00.000Z'));
+      mocks.usageModel.findOne.mockReturnValue({
+        lean: jest.fn().mockResolvedValue({ count: 300 }),
+      });
+
+      await expect(service.getMarkTokenBudget(userId)).resolves.toEqual({
+        used: 300,
+        limit: 1000,
+        remaining: 700,
+      });
+    });
+
+    it('reports remaining as -1 for an unlimited tier', async () => {
+      const { service, mocks } = makeService();
+      const userId = new Types.ObjectId().toString();
+      const tier = {
+        _id: new Types.ObjectId(),
+        name: 'Pro',
+        limits: { mark_tokens: -1 },
+      } as any;
+      jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
+      jest
+        .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
+        .mockResolvedValue(new Date('2026-03-01T00:00:00.000Z'));
+      mocks.usageModel.findOne.mockReturnValue({
+        lean: jest.fn().mockResolvedValue({ count: 5000 }),
+      });
+
+      await expect(service.getMarkTokenBudget(userId)).resolves.toEqual({
+        used: 5000,
+        limit: -1,
+        remaining: -1,
+      });
+    });
   });
 });

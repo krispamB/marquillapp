@@ -26,7 +26,12 @@ import {
   GetObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { uploadFile, deleteFile, getSignedUrl, __resetClient } from './s3.client';
+import {
+  uploadFile,
+  deleteFile,
+  getSignedUrl,
+  __resetClient,
+} from './s3.client';
 
 const ACCOUNT_ID = 'test-account-id';
 const BUCKET = 'test-bucket';
@@ -92,7 +97,9 @@ describe('S3 client', () => {
       delete process.env.R2_BUCKET_NAME;
       await expect(
         uploadFile('key', Buffer.from(''), 'text/plain'),
-      ).rejects.toThrow('R2 storage is not configured. Missing env vars: R2_BUCKET_NAME');
+      ).rejects.toThrow(
+        'R2 storage is not configured. Missing env vars: R2_BUCKET_NAME',
+      );
     });
 
     it('should throw listing all missing env vars', async () => {
@@ -142,12 +149,17 @@ describe('S3 client', () => {
 
   describe('getSignedUrl', () => {
     it('should call awsGetSignedUrl with a GetObjectCommand', async () => {
-      (awsGetSignedUrl as jest.Mock).mockResolvedValueOnce('https://signed-url');
+      (awsGetSignedUrl as jest.Mock).mockResolvedValueOnce(
+        'https://signed-url',
+      );
       const key = 'invoices/file.pdf';
 
       await getSignedUrl(key);
 
-      expect(GetObjectCommand).toHaveBeenCalledWith({ Bucket: BUCKET, Key: key });
+      expect(GetObjectCommand).toHaveBeenCalledWith({
+        Bucket: BUCKET,
+        Key: key,
+      });
       expect(awsGetSignedUrl).toHaveBeenCalledWith(
         expect.anything(),
         expect.any(Object),
@@ -156,7 +168,9 @@ describe('S3 client', () => {
     });
 
     it('should default expiresIn to 3600 seconds', async () => {
-      (awsGetSignedUrl as jest.Mock).mockResolvedValueOnce('https://signed-url');
+      (awsGetSignedUrl as jest.Mock).mockResolvedValueOnce(
+        'https://signed-url',
+      );
       await getSignedUrl('some/key');
       expect(awsGetSignedUrl).toHaveBeenCalledWith(
         expect.anything(),
@@ -166,7 +180,9 @@ describe('S3 client', () => {
     });
 
     it('should use a custom expiresIn when provided', async () => {
-      (awsGetSignedUrl as jest.Mock).mockResolvedValueOnce('https://signed-url');
+      (awsGetSignedUrl as jest.Mock).mockResolvedValueOnce(
+        'https://signed-url',
+      );
       await getSignedUrl('some/key', 900);
       expect(awsGetSignedUrl).toHaveBeenCalledWith(
         expect.anything(),
