@@ -54,7 +54,10 @@ export class PostController {
       storage: diskStorage({
         destination: tmpdir(),
         filename: (_req, file, cb) =>
-          cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${extname(file.originalname)}`),
+          cb(
+            null,
+            `${Date.now()}-${Math.round(Math.random() * 1e9)}${extname(file.originalname)}`,
+          ),
       }),
       limits: { fileSize: 200 * 1024 * 1024 },
     }),

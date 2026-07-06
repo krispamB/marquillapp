@@ -129,7 +129,10 @@ export class PaymentService {
       return { processed: true, duplicate: false, eventId };
     } catch (error) {
       // Remove dedup key so Paddle's retries can still succeed
-      await this.redisService.getClient().del(key).catch(() => {});
+      await this.redisService
+        .getClient()
+        .del(key)
+        .catch(() => {});
       const message =
         error instanceof Error ? error.message : 'Unknown processing error';
       this.logger.error(

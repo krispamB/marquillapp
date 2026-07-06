@@ -5,11 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import {
-  OnboardingProfile,
-  User,
-  UserType,
-} from '../database/schemas';
+import { OnboardingProfile, User, UserType } from '../database/schemas';
 import { InitOnboardingDto, UpdateOnboardingDto } from './dto';
 
 @Injectable()

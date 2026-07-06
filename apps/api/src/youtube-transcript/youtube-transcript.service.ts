@@ -26,7 +26,9 @@ export class TranscriptVideoUnavailableError extends Error {
 
 export class TranscriptRateLimitError extends Error {
   constructor(input: string) {
-    super(`YouTube rate limit exceeded while fetching transcript for: ${input}`);
+    super(
+      `YouTube rate limit exceeded while fetching transcript for: ${input}`,
+    );
     this.name = 'TranscriptRateLimitError';
   }
 }

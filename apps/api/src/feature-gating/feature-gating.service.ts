@@ -202,6 +202,107 @@ export class FeatureGatingService {
     }
   }
 
+  // Gate a Mark run against the per-period token budget. `estimatedTokens` is the
+  // worst-case pre-run estimate (input + reserved output + every charged tool once).
+  // Blocks only when the estimate would not fit the remaining budget; the run that
+  // is allowed may still overshoot at settlement, which next run's gate catches.
+  async assertMarkTokenQuota(
+    userId: string,
+    estimatedTokens: number,
+  ): Promise<void> {
+    const tier = await this.resolveEntitlementTier(userId);
+    const limit = this.getLimitFromTier(tier, FEATURE_KEYS.MARK_TOKENS);
+
+    if (limit === -1) return; // unlimited
+
+    const periodStart = await this.resolveUsagePeriodStart(userId);
+    const currentUsage = await this.getUsageCount(
+      userId,
+      FEATURE_KEYS.MARK_TOKENS,
+      periodStart,
+    );
+
+    if (currentUsage + estimatedTokens > limit) {
+      throw new FeatureGateForbiddenException({
+        code: FEATURE_GATE_ERROR_CODE,
+        feature: FEATURE_KEYS.MARK_TOKENS,
+        limit,
+        currentUsage,
+        tier: {
+          id: tier._id.toString(),
+          name: tier.name,
+        },
+        upgradeHint:
+          limit === 0
+            ? 'Mark is not available on your plan. Upgrade to start using Mark.'
+            : 'You have used your Mark token budget for this period. Upgrade for more.',
+      });
+    }
+  }
+
+  // Settle a finished run by adding its actual token cost (LLM tokens + tool
+  // surcharges) to the period aggregate. Increment amount is variable, unlike the
+  // single-unit features, so callers pass the resolved total.
+  async incrementMarkTokenUsage(
+    userId: string,
+    actualTokens: number,
+  ): Promise<void> {
+    if (actualTokens <= 0) return;
+
+    const periodStart = await this.resolveUsagePeriodStart(userId);
+    const userObjectId = new Types.ObjectId(userId);
+
+    const query = {
+      user_id: userObjectId,
+      feature: FEATURE_KEYS.MARK_TOKENS,
+      periodStart,
+    };
+
+    const update = {
+      $inc: { count: actualTokens },
+      $setOnInsert: {
+        user_id: userObjectId,
+        feature: FEATURE_KEYS.MARK_TOKENS,
+        periodStart,
+      },
+    };
+
+    try {
+      await this.usageModel.updateOne(query, update, { upsert: true });
+    } catch (error: any) {
+      if (error?.code === 11000) {
+        await this.usageModel.updateOne(query, {
+          $inc: { count: actualTokens },
+        });
+        return;
+      }
+      throw error;
+    }
+  }
+
+  // Current Mark token budget for a user, for live display in the Mark UI.
+  // `remaining` is -1 when the tier grants unlimited tokens (limit === -1).
+  async getMarkTokenBudget(userId: string): Promise<{
+    used: number;
+    limit: number;
+    remaining: number;
+  }> {
+    const tier = await this.resolveEntitlementTier(userId);
+    const limit = this.getLimitFromTier(tier, FEATURE_KEYS.MARK_TOKENS);
+    const periodStart = await this.resolveUsagePeriodStart(userId);
+    const used = await this.getUsageCount(
+      userId,
+      FEATURE_KEYS.MARK_TOKENS,
+      periodStart,
+    );
+
+    return {
+      used,
+      limit,
+      remaining: limit === -1 ? -1 : this.calculateRemaining(used, limit),
+    };
+  }
+
   async assertConnectedAccountCapacity(params: {
     userId: string;
     isReconnect: boolean;
@@ -246,8 +347,7 @@ export class FeatureGatingService {
           id: tier._id.toString(),
           name: tier.name,
         },
-        upgradeHint:
-          'Upgrade to Pro Writer to connect LinkedIn company pages.',
+        upgradeHint: 'Upgrade to Pro Writer to connect LinkedIn company pages.',
       });
     }
   }
@@ -263,6 +363,7 @@ export class FeatureGatingService {
       connected_accounts: { used: number; limit: number; remaining: number };
       ai_drafts: { used: number; limit: number; remaining: number };
       scheduled_posts: { used: number; limit: number; remaining: number };
+      mark_tokens: { used: number; limit: number; remaining: number };
     };
   }> {
     const entitlement = await this.resolveEntitlement(userId);
@@ -280,7 +381,11 @@ export class FeatureGatingService {
       }),
       this.getUsageCountsForFeatures(
         userId,
-        [FEATURE_KEYS.AI_DRAFTS, FEATURE_KEYS.SCHEDULED_POSTS],
+        [
+          FEATURE_KEYS.AI_DRAFTS,
+          FEATURE_KEYS.SCHEDULED_POSTS,
+          FEATURE_KEYS.MARK_TOKENS,
+        ],
         usagePeriod.periodStart,
       ),
     ]);
@@ -298,6 +403,11 @@ export class FeatureGatingService {
     const aiDraftsUsed = meteredUsageCounts[FEATURE_KEYS.AI_DRAFTS] ?? 0;
     const scheduledPostsUsed =
       meteredUsageCounts[FEATURE_KEYS.SCHEDULED_POSTS] ?? 0;
+    const markTokensUsed = meteredUsageCounts[FEATURE_KEYS.MARK_TOKENS] ?? 0;
+    const markTokensLimit = this.getLimitFromTier(
+      tier,
+      FEATURE_KEYS.MARK_TOKENS,
+    );
 
     return {
       tier: {
@@ -330,6 +440,14 @@ export class FeatureGatingService {
             scheduledPostsUsed,
             scheduledPostsLimit,
           ),
+        },
+        mark_tokens: {
+          used: markTokensUsed,
+          limit: markTokensLimit,
+          remaining:
+            markTokensLimit === -1
+              ? -1
+              : this.calculateRemaining(markTokensUsed, markTokensLimit),
         },
       },
     };

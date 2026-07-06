@@ -53,7 +53,9 @@ describe('AgentService.generateSearchKeywords', () => {
 
   it('normalizes a malformed multi-query response into one simple query', async () => {
     const { service, generateCompletions } = createService();
-    generateCompletions.mockResolvedValue(` "product led growth"  |  "overview" `);
+    generateCompletions.mockResolvedValue(
+      ` "product led growth"  |  "overview" `,
+    );
 
     const query = await service.generateSearchKeywords(userIntent);
 
@@ -63,7 +65,9 @@ describe('AgentService.generateSearchKeywords', () => {
 
   it('returns an already simple query unchanged except whitespace normalization', async () => {
     const { service, generateCompletions } = createService();
-    generateCompletions.mockResolvedValue('  product   led   growth explained  ');
+    generateCompletions.mockResolvedValue(
+      '  product   led   growth explained  ',
+    );
 
     const query = await service.generateSearchKeywords(userIntent);
 

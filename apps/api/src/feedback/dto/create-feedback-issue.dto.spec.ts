@@ -1,7 +1,10 @@
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { CreateFeedbackIssueDto, FeedbackIssueType } from './create-feedback-issue.dto';
+import {
+  CreateFeedbackIssueDto,
+  FeedbackIssueType,
+} from './create-feedback-issue.dto';
 
 describe('CreateFeedbackIssueDto', () => {
   const validPayload = {

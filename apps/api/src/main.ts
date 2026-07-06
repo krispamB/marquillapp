@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import compression from "compression"
+import compression from 'compression';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 
@@ -14,7 +14,14 @@ async function bootstrap() {
     credentials: true,
   });
 
-  app.use(compression())
+  app.use(
+    compression({
+      filter: (req, res) => {
+        if (req.path.endsWith('/mark/chat')) return false;
+        return compression.filter(req, res);
+      },
+    }),
+  );
 
   app.setGlobalPrefix('api/v1');
 

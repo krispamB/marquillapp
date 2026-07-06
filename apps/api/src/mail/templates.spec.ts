@@ -33,7 +33,9 @@ describe('mailTemplates', () => {
       expect(subject).toBeTruthy();
       expect(template.htmlFile.endsWith('.hbs')).toBe(true);
       expect(
-        existsSync(join(process.cwd(), 'assets/mail/templates', template.htmlFile)),
+        existsSync(
+          join(process.cwd(), 'assets/mail/templates', template.htmlFile),
+        ),
       ).toBe(true);
 
       if (template.textFile) {

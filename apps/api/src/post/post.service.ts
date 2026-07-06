@@ -199,7 +199,8 @@ export class PostService {
       user._id.toString(),
       post.connectedAccount.toString(),
     );
-    const canUseLinkedinAccount = this.isLinkedinAccountUsable(connectedAccount);
+    const canUseLinkedinAccount =
+      this.isLinkedinAccountUsable(connectedAccount);
     if (post.status === PostDraftStatus.PUBLISHED && !canUseLinkedinAccount) {
       throw new ConflictException(
         'Reconnect account to delete published posts from LinkedIn safely.',
@@ -282,9 +283,19 @@ export class PostService {
     if (videos.length === 1) {
       content = { media: { id: videos[0].id, title: videos[0].title } };
     } else if (images.length === 1) {
-      content = { media: { id: images[0].id, title: images[0].title, altText: images[0].altText } };
+      content = {
+        media: {
+          id: images[0].id,
+          title: images[0].title,
+          altText: images[0].altText,
+        },
+      };
     } else if (images.length > 1) {
-      content = { multiImage: { images: images.map((m) => ({ id: m.id, altText: m.altText })) } };
+      content = {
+        multiImage: {
+          images: images.map((m) => ({ id: m.id, altText: m.altText })),
+        },
+      };
     }
 
     const data: ILinkedInPost = {
@@ -418,7 +429,9 @@ export class PostService {
       }
 
       if (post.user.toString() !== user._id.toString()) {
-        throw new ForbiddenException('You are not authorized to edit this post');
+        throw new ForbiddenException(
+          'You are not authorized to edit this post',
+        );
       }
 
       if (post.status === PostDraftStatus.PUBLISHED) {
@@ -429,7 +442,9 @@ export class PostService {
       const videoFiles = files.filter((f) => f.mimetype.startsWith('video/'));
 
       if (imageFiles.length > 0 && videoFiles.length > 0) {
-        throw new BadRequestException('Cannot mix images and videos in one post');
+        throw new BadRequestException(
+          'Cannot mix images and videos in one post',
+        );
       }
       if (videoFiles.length > 1) {
         throw new BadRequestException('Only one video per post is allowed');
@@ -444,11 +459,12 @@ export class PostService {
         }
       }
 
-      const connectedAccount = await this.getOwnedUsableLinkedinConnectedAccount(
-        user._id.toString(),
-        post.connectedAccount.toString(),
-        'upload media',
-      );
+      const connectedAccount =
+        await this.getOwnedUsableLinkedinConnectedAccount(
+          user._id.toString(),
+          post.connectedAccount.toString(),
+          'upload media',
+        );
 
       const accessToken = await this.encryptionService.decrypt(
         connectedAccount.accessToken!,
@@ -458,11 +474,23 @@ export class PostService {
       const newMediaItems: NonNullable<typeof post.media> = [];
 
       if (videoFiles.length === 1) {
-        const urn = await this.uploadLinkedinVideo(ownerUrn, accessToken, videoFiles[0]);
-        newMediaItems.push({ id: urn, type: 'VIDEO', title: videoFiles[0].originalname });
+        const urn = await this.uploadLinkedinVideo(
+          ownerUrn,
+          accessToken,
+          videoFiles[0],
+        );
+        newMediaItems.push({
+          id: urn,
+          type: 'VIDEO',
+          title: videoFiles[0].originalname,
+        });
       } else {
         for (const file of imageFiles) {
-          const urn = await this.uploadLinkedinImage(ownerUrn, accessToken, file);
+          const urn = await this.uploadLinkedinImage(
+            ownerUrn,
+            accessToken,
+            file,
+          );
           newMediaItems.push({
             id: urn,
             type: 'IMAGE',
@@ -566,13 +594,19 @@ export class PostService {
       },
     );
 
-    const { video: videoUrn, uploadToken, uploadInstructions } =
-      initRes.data.value;
+    const {
+      video: videoUrn,
+      uploadToken,
+      uploadInstructions,
+    } = initRes.data.value;
 
     const eTags: string[] = [];
     for (const instruction of uploadInstructions) {
       const chunk = Readable.toWeb(
-        createReadStream(file.path, { start: instruction.firstByte, end: instruction.lastByte }),
+        createReadStream(file.path, {
+          start: instruction.firstByte,
+          end: instruction.lastByte,
+        }),
       );
       const { response } = await apiFetch<void>(instruction.uploadUrl, {
         method: 'PUT',

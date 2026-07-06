@@ -30,7 +30,11 @@ export class FeedbackService {
     }
 
     const label = this.mapLabel(dto.type);
-    const issueBody = this.buildIssueBody(user, dto.description, dto.deviceReport);
+    const issueBody = this.buildIssueBody(
+      user,
+      dto.description,
+      dto.deviceReport,
+    );
 
     let payload: GithubIssueResponse;
     try {
@@ -56,13 +60,16 @@ export class FeedbackService {
     } catch (err) {
       if (err instanceof ApiError) {
         const message =
-          (err.data as GithubIssueResponse)?.message ?? 'Failed to create GitHub issue';
+          (err.data as GithubIssueResponse)?.message ??
+          'Failed to create GitHub issue';
         if (err.statusCode === 400 || err.statusCode === 422) {
           throw new BadRequestException(message);
         }
         throw new InternalServerErrorException(message);
       }
-      throw new InternalServerErrorException('Failed to connect to GitHub issue API');
+      throw new InternalServerErrorException(
+        'Failed to connect to GitHub issue API',
+      );
     }
 
     return {

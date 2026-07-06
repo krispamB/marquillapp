@@ -19,6 +19,8 @@ import {
   UsageSchema,
   OnboardingProfile,
   OnboardingProfileSchema,
+  Artifact,
+  ArtifactSchema,
 } from './schemas';
 
 @Global()
@@ -42,7 +44,8 @@ import {
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: BillingCustomer.name, schema: BillingCustomerSchema },
       { name: Usage.name, schema: UsageSchema },
-      { name: OnboardingProfile.name, schema: OnboardingProfileSchema }
+      { name: OnboardingProfile.name, schema: OnboardingProfileSchema },
+      { name: Artifact.name, schema: ArtifactSchema },
     ]),
   ],
   exports: [MongooseModule],
@@ -52,7 +55,7 @@ export class DatabaseModule implements OnModuleInit, OnModuleDestroy {
   private readonly onConnected = () => this.logger.log('Database connected successfully');
   private readonly onError = (err: unknown) => this.logger.error(`Database connection error: ${err}`);
 
-  constructor(@InjectConnection() private readonly connection: Connection) { }
+  constructor(@InjectConnection() private readonly connection: Connection) {}
 
   onModuleInit() {
     if (this.connection.readyState === 1) {

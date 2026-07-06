@@ -338,7 +338,10 @@ export class AuthService {
     if (!personalConnectedAccount) {
       throw new NotFoundException('LinkedIn account not connected');
     }
-    if (!personalConnectedAccount.isActive || !personalConnectedAccount.accessToken) {
+    if (
+      !personalConnectedAccount.isActive ||
+      !personalConnectedAccount.accessToken
+    ) {
       throw new BadRequestException(
         'Reconnect your LinkedIn account before connecting organizations',
       );
@@ -680,7 +683,10 @@ export class AuthService {
       this.logger.warn(
         `Avatar refresh decrypt failed for account ${connectedAccountId}`,
       );
-      await this.markAvatarRefreshAuthFailure(connectedAccountId, 'DECRYPT_FAILED');
+      await this.markAvatarRefreshAuthFailure(
+        connectedAccountId,
+        'DECRYPT_FAILED',
+      );
       return;
     }
 
@@ -779,7 +785,9 @@ export class AuthService {
       | { _id?: Types.ObjectId | string }
       | undefined;
     const ownerId =
-      connectedUser && typeof connectedUser === 'object' && '_id' in connectedUser
+      connectedUser &&
+      typeof connectedUser === 'object' &&
+      '_id' in connectedUser
         ? connectedUser._id?.toString()
         : connectedUser?.toString();
 
@@ -894,7 +902,8 @@ export class AuthService {
   private isLinkedinPersonalAccount(account: ConnectedAccount): boolean {
     return (
       account.provider === AccountProvider.LINKEDIN &&
-      (!account.accountType || account.accountType === LinkedinAccountType.PERSON)
+      (!account.accountType ||
+        account.accountType === LinkedinAccountType.PERSON)
     );
   }
 
@@ -921,7 +930,8 @@ export class AuthService {
     connectedAccountId: string,
     reason: 'AUTH_EXPIRED' | 'DECRYPT_FAILED',
   ) {
-    const account = await this.connectedAccountModel.findById(connectedAccountId);
+    const account =
+      await this.connectedAccountModel.findById(connectedAccountId);
     if (!account) {
       return;
     }
@@ -982,9 +992,12 @@ export class AuthService {
       }>;
     }>,
   ): { url: string; expiresAt?: Date } | null {
-    let smallest:
-      | { url: string; area: number; index: number; expiresAt?: Date }
-      | null = null;
+    let smallest: {
+      url: string;
+      area: number;
+      index: number;
+      expiresAt?: Date;
+    } | null = null;
 
     for (const [index, element] of elements.entries()) {
       const stillImage =
@@ -1028,9 +1041,7 @@ export class AuthService {
     };
   }
 
-  private parseLinkedinImageExpiry(
-    value?: string | number,
-  ): Date | undefined {
+  private parseLinkedinImageExpiry(value?: string | number): Date | undefined {
     if (value === undefined || value === null) {
       return undefined;
     }

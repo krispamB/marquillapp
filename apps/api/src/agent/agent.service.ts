@@ -166,8 +166,7 @@ export class AgentService {
   ): Promise<TranscriptResult | null> {
     const url = `https://www.youtube.com/watch?v=${video.videoId}`;
     try {
-      const transcript =
-        await this.youtubeTranscriptService.getTranscript(url);
+      const transcript = await this.youtubeTranscriptService.getTranscript(url);
       return { title: video.title, transcript };
     } catch (err) {
       this.logger.error(err);

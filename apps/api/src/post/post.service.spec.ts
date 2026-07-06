@@ -591,7 +591,9 @@ describe('PostService.publishOnLinkedIn', () => {
         },
       },
     });
-    (formatLinkedinContent as jest.Mock).mockImplementation((text: string) => text);
+    (formatLinkedinContent as jest.Mock).mockImplementation(
+      (text: string) => text,
+    );
 
     (service as any).postDraftModel = {
       findById,

@@ -134,9 +134,9 @@ describe('YoutubeTranscriptService', () => {
       sdkError('YoutubeTranscriptDisabledError'),
     );
 
-    await expect(
-      service.getTranscript('uWfgMi2_Slc'),
-    ).rejects.toBeInstanceOf(TranscriptDisabledError);
+    await expect(service.getTranscript('uWfgMi2_Slc')).rejects.toBeInstanceOf(
+      TranscriptDisabledError,
+    );
   });
 
   it('throws TranscriptVideoUnavailableError when video is unavailable', async () => {
@@ -144,9 +144,9 @@ describe('YoutubeTranscriptService', () => {
       sdkError('YoutubeTranscriptVideoUnavailableError'),
     );
 
-    await expect(
-      service.getTranscript('uWfgMi2_Slc'),
-    ).rejects.toBeInstanceOf(TranscriptVideoUnavailableError);
+    await expect(service.getTranscript('uWfgMi2_Slc')).rejects.toBeInstanceOf(
+      TranscriptVideoUnavailableError,
+    );
   });
 
   it('throws TranscriptRateLimitError when rate-limited', async () => {
@@ -154,9 +154,9 @@ describe('YoutubeTranscriptService', () => {
       sdkError('YoutubeTranscriptTooManyRequestError'),
     );
 
-    await expect(
-      service.getTranscript('uWfgMi2_Slc'),
-    ).rejects.toBeInstanceOf(TranscriptRateLimitError);
+    await expect(service.getTranscript('uWfgMi2_Slc')).rejects.toBeInstanceOf(
+      TranscriptRateLimitError,
+    );
   });
 
   it('throws TranscriptNotAvailableError when no transcript exists', async () => {
@@ -164,9 +164,9 @@ describe('YoutubeTranscriptService', () => {
       sdkError('YoutubeTranscriptNotAvailableError'),
     );
 
-    await expect(
-      service.getTranscript('uWfgMi2_Slc'),
-    ).rejects.toBeInstanceOf(TranscriptNotAvailableError);
+    await expect(service.getTranscript('uWfgMi2_Slc')).rejects.toBeInstanceOf(
+      TranscriptNotAvailableError,
+    );
   });
 
   it('throws TranscriptLanguageNotAvailableError when lang is missing', async () => {

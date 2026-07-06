@@ -43,8 +43,8 @@ async function processScheduledPostPublishedEmailJob(
   logger: Logger,
   mailService: MailService,
 ) {
-  const { email, name, postId } =
-    (job.data ?? {}) as ScheduledPostPublishedEmailJobData;
+  const { email, name, postId } = (job.data ??
+    {}) as ScheduledPostPublishedEmailJobData;
   if (!email || !name || !postId) {
     logger.warn(
       `Skipping scheduled post published email job ${job.id}; missing email, name or postId`,

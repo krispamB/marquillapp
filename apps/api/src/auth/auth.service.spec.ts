@@ -375,13 +375,13 @@ describe('AuthService.linkedinCallback', () => {
       profileMetadata: { sub: 'linkedin-sub' },
     });
 
-    await expect(service.linkedinCallback('code', userId)).rejects.toMatchObject(
-      {
-        response: {
-          code: 'LINKEDIN_ACCOUNT_ALREADY_CONNECTED',
-        },
+    await expect(
+      service.linkedinCallback('code', userId),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'LINKEDIN_ACCOUNT_ALREADY_CONNECTED',
       },
-    );
+    });
     expect(
       mocks.featureGatingService.assertConnectedAccountCapacity,
     ).not.toHaveBeenCalled();
@@ -739,9 +739,9 @@ describe('AuthService.getConnectedAccounts', () => {
       user: new Types.ObjectId(userId),
       isActive: true,
     });
-    expect(linkedinAvatarRefreshQueue.addAvatarRefreshJob).toHaveBeenCalledTimes(
-      2,
-    );
+    expect(
+      linkedinAvatarRefreshQueue.addAvatarRefreshJob,
+    ).toHaveBeenCalledTimes(2);
     expect(result[1].avatarUrl).toBeNull();
   });
 

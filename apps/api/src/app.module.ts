@@ -27,6 +27,7 @@ import { MailModule } from './mail';
 import { FeedbackModule } from './feedback/feedback.module';
 import { OnboardingModule } from './onboarding';
 import { DiagnosticsModule } from './diagnostics/diagnostics.module';
+import { MarkModule } from './mark';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { DiagnosticsModule } from './diagnostics/diagnostics.module';
     YoutubeTranscriptModule,
     OnboardingModule,
     DiagnosticsModule,
+    MarkModule,
   ],
   controllers: [AppController],
   providers: [AppService],
