@@ -1,6 +1,7 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -65,6 +66,19 @@ export async function uploadFile(
   return `https://${bucket}.${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${key}`;
 }
 
+export async function getFile(key: string): Promise<Buffer> {
+  const { client, bucket } = getClient();
+  const response = await client.send(
+    new GetObjectCommand({ Bucket: bucket, Key: key }),
+  );
+
+  if (!response.Body) {
+    throw new Error(`R2 object "${key}" has no body`);
+  }
+
+  return Buffer.from(await response.Body.transformToByteArray());
+}
+
 export async function deleteFile(key: string): Promise<void> {
   const { client, bucket } = getClient();
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
@@ -77,4 +91,45 @@ export async function getSignedUrl(
   const { client, bucket } = getClient();
   const command = new GetObjectCommand({ Bucket: bucket, Key: key });
   return awsGetSignedUrl(client, command, { expiresIn });
+}
+
+export async function getSignedUploadUrl(
+  key: string,
+  mimeType: string,
+  sizeBytes: number,
+  expiresIn = 1800,
+): Promise<string> {
+  const { client, bucket } = getClient();
+  // ContentType/ContentLength become signed headers, so R2 rejects a PUT
+  // whose actual type or size differ from what was declared here.
+  const command = new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    ContentType: mimeType,
+    ContentLength: sizeBytes,
+  });
+  return awsGetSignedUrl(client, command, { expiresIn });
+}
+
+export async function headFile(
+  key: string,
+): Promise<{ sizeBytes: number; mimeType?: string } | null> {
+  const { client, bucket } = getClient();
+  try {
+    const response = await client.send(
+      new HeadObjectCommand({ Bucket: bucket, Key: key }),
+    );
+    return {
+      sizeBytes: response.ContentLength ?? 0,
+      mimeType: response.ContentType,
+    };
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.name === 'NotFound' || error.name === 'NoSuchKey')
+    ) {
+      return null;
+    }
+    throw error;
+  }
 }

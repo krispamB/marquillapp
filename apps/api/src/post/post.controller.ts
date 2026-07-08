@@ -16,7 +16,12 @@ import {
 } from '@nestjs/common';
 import { PostService } from './post.service';
 import { InputDto } from '../agent/dto';
-import { UpdatePostDto, SchedulePostDto } from './dto';
+import {
+  UpdatePostDto,
+  SchedulePostDto,
+  InitiateMediaUploadDto,
+  CompleteMediaUploadDto,
+} from './dto';
 import { SubscriptionAccessGuard } from '../common/guards';
 import { ClerkAuthGuard } from '../auth/clerk';
 import { IAppResponse } from 'src/common/interfaces';
@@ -48,6 +53,7 @@ export class PostController {
     };
   }
 
+  @HttpCode(HttpStatus.ACCEPTED)
   @Put(':id/media')
   @UseInterceptors(
     FilesInterceptor('files', 20, {
@@ -67,10 +73,38 @@ export class PostController {
     @Param('id') id: string,
     @UploadedFiles() files: Express.Multer.File[],
   ): Promise<IAppResponse> {
-    await this.postService.addLinkedinMedia(user, id, files);
     return {
-      statusCode: HttpStatus.OK,
-      message: 'Media uploaded successfully',
+      statusCode: HttpStatus.ACCEPTED,
+      message: 'Media upload started',
+      data: await this.postService.addLinkedinMedia(user, id, files),
+    };
+  }
+
+  @HttpCode(HttpStatus.CREATED)
+  @Post(':id/media/uploads')
+  async initiateMediaUpload(
+    @GetUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: InitiateMediaUploadDto,
+  ): Promise<IAppResponse> {
+    return {
+      statusCode: HttpStatus.CREATED,
+      message: 'Upload slots created',
+      data: await this.postService.initiateMediaUpload(user, id, dto),
+    };
+  }
+
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Post(':id/media/uploads/complete')
+  async completeMediaUpload(
+    @GetUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: CompleteMediaUploadDto,
+  ): Promise<IAppResponse> {
+    return {
+      statusCode: HttpStatus.ACCEPTED,
+      message: 'Media upload started',
+      data: await this.postService.completeMediaUpload(user, id, dto),
     };
   }
 

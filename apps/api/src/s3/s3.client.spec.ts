@@ -6,6 +6,7 @@ jest.mock(
     PutObjectCommand: jest.fn(),
     DeleteObjectCommand: jest.fn(),
     GetObjectCommand: jest.fn(),
+    HeadObjectCommand: jest.fn(),
   }),
   { virtual: true },
 );
@@ -24,12 +25,16 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   uploadFile,
+  getFile,
   deleteFile,
   getSignedUrl,
+  getSignedUploadUrl,
+  headFile,
   __resetClient,
 } from './s3.client';
 
@@ -118,6 +123,39 @@ describe('S3 client', () => {
     });
   });
 
+  describe('getFile', () => {
+    it('should send GetObjectCommand and return the object body as a Buffer', async () => {
+      const key = 'media-uploads/post1/media-1';
+      mockSend.mockResolvedValueOnce({
+        Body: {
+          transformToByteArray: jest
+            .fn()
+            .mockResolvedValue(new Uint8Array([1, 2, 3])),
+        },
+      });
+
+      const result = await getFile(key);
+
+      expect(GetObjectCommand).toHaveBeenCalledWith({
+        Bucket: BUCKET,
+        Key: key,
+      });
+      expect(result).toEqual(Buffer.from([1, 2, 3]));
+    });
+
+    it('should throw when the object has no body', async () => {
+      mockSend.mockResolvedValueOnce({ Body: undefined });
+      await expect(getFile('some/key')).rejects.toThrow(
+        'R2 object "some/key" has no body',
+      );
+    });
+
+    it('should propagate errors from the S3 send call', async () => {
+      mockSend.mockRejectedValueOnce(new Error('get failed'));
+      await expect(getFile('some/key')).rejects.toThrow('get failed');
+    });
+  });
+
   describe('deleteFile', () => {
     it('should send DeleteObjectCommand with correct params', async () => {
       const key = 'invoices/file.pdf';
@@ -203,6 +241,95 @@ describe('S3 client', () => {
       await expect(getSignedUrl('some/key')).rejects.toThrow(
         'R2 storage is not configured. Missing env vars: R2_SECRET_ACCESS_KEY',
       );
+    });
+  });
+
+  describe('getSignedUploadUrl', () => {
+    it('should presign a PutObjectCommand with signed content type and length', async () => {
+      (awsGetSignedUrl as jest.Mock).mockResolvedValueOnce(
+        'https://signed-put-url',
+      );
+      const key = 'media-uploads/post1/media-1';
+
+      await getSignedUploadUrl(key, 'image/jpeg', 1024);
+
+      expect(PutObjectCommand).toHaveBeenCalledWith({
+        Bucket: BUCKET,
+        Key: key,
+        ContentType: 'image/jpeg',
+        ContentLength: 1024,
+      });
+      expect(awsGetSignedUrl).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(Object),
+        { expiresIn: 1800 },
+      );
+    });
+
+    it('should default expiresIn to 1800 seconds', async () => {
+      (awsGetSignedUrl as jest.Mock).mockResolvedValueOnce('https://url');
+      await getSignedUploadUrl('key', 'image/png', 10);
+      expect(awsGetSignedUrl).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        { expiresIn: 1800 },
+      );
+    });
+
+    it('should use a custom expiresIn when provided', async () => {
+      (awsGetSignedUrl as jest.Mock).mockResolvedValueOnce('https://url');
+      await getSignedUploadUrl('key', 'image/png', 10, 600);
+      expect(awsGetSignedUrl).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        { expiresIn: 600 },
+      );
+    });
+
+    it('should return the signed URL string', async () => {
+      const expected = 'https://presigned.example.com/put?sig=abc';
+      (awsGetSignedUrl as jest.Mock).mockResolvedValueOnce(expected);
+      await expect(getSignedUploadUrl('key', 'image/png', 10)).resolves.toBe(
+        expected,
+      );
+    });
+
+    it('should throw with a clear message when env vars are missing', async () => {
+      delete process.env.R2_BUCKET_NAME;
+      await expect(getSignedUploadUrl('key', 'image/png', 10)).rejects.toThrow(
+        'R2 storage is not configured. Missing env vars: R2_BUCKET_NAME',
+      );
+    });
+  });
+
+  describe('headFile', () => {
+    it('should send HeadObjectCommand and return size and mime type when the object exists', async () => {
+      const key = 'media-uploads/post1/media-1';
+      mockSend.mockResolvedValueOnce({
+        ContentLength: 2048,
+        ContentType: 'image/jpeg',
+      });
+
+      const result = await headFile(key);
+
+      expect(HeadObjectCommand).toHaveBeenCalledWith({
+        Bucket: BUCKET,
+        Key: key,
+      });
+      expect(result).toEqual({ sizeBytes: 2048, mimeType: 'image/jpeg' });
+    });
+
+    it('should return null when the object does not exist', async () => {
+      const notFound = new Error('not found');
+      notFound.name = 'NotFound';
+      mockSend.mockRejectedValueOnce(notFound);
+
+      await expect(headFile('missing/key')).resolves.toBeNull();
+    });
+
+    it('should propagate non-NotFound errors from the S3 send call', async () => {
+      mockSend.mockRejectedValueOnce(new Error('access denied'));
+      await expect(headFile('some/key')).rejects.toThrow('access denied');
     });
   });
 
