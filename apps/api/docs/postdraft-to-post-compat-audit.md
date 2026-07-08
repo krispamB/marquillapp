@@ -20,6 +20,38 @@ beyond the document itself.
 
 ---
 
+## 0. Resolution (2026-07-08, product owner)
+
+These decisions collapse most of this audit: **this is a product relaunch with no
+real existing users yet, so a complete write-over is authorized** — no data
+backfill, no `_id` preservation, no coexistence window, no versioned endpoints.
+
+1. **No data to migrate.** `postdrafts` can be dropped and rewritten outright.
+   Flush Redis (queues) and R2 on cutover. The *data-migration* hazards below —
+   **H1** (in-flight jobs), **H4** (stranded media), **H6** (orphaned R2 objects),
+   **H9** (aggregations), **H10** (backfill) — become **moot**. They survive only
+   as design notes, not backward-compat risks. §7's new-collection-vs-rename
+   question is likewise moot: build the new `posts` + `artifacts` schemas clean.
+2. **Legacy engine is absorbed, not preserved.** `quickPostLinkedin` and
+   `insightPostLinkedin` fold into the single artifact-build flow as a
+   **"research / no research" toggle the user picks before the build starts**
+   (research-on ≈ today's insight post; research-off ≈ today's quick post — the two
+   `ContentType`s already map exactly onto that split). ⚠️ **This reverses charter
+   decision #3** ("the existing engine and `quickPostLinkedin`/`insightPostLinkedin`
+   stay untouched") **and the map's out-of-scope line** ("Migrating
+   `quickPostLinkedin`/`insightPostLinkedin` onto the new engine"). The old engine
+   can now be **deleted**, not just left alone.
+3. **No versioned endpoints.** The `api/v1/posts/**` surface is reshaped in place;
+   **H5** needs no read-adapter.
+
+**Residual work** (engineering, not compat risk): **H2** (rename the `'PostDraft'`
+DI string token in `auth.service`), **H3** (redesign the `type` field), **H7**
+(re-home usage triggers → credits per map #8), **H8** (keep the account-disconnect
+cancel logic working against the new status model). The rest of this document is
+the original audit, retained for the design of the new schema.
+
+---
+
 ## 1. Blast radius — everything that reads or writes `PostDraft`
 
 | Location | Access | What it does |
@@ -230,6 +262,10 @@ Ranked most-severe first. "Preserve `_id`" resolves several at once.
 ---
 
 ## 9. Open decisions handed to the human
+
+> **Resolved 2026-07-08 — see §0 Resolution at the top.** Complete write-over
+> (relaunch, no users); legacy engine absorbed as a research toggle; no versioned
+> endpoints. Retained below for context.
 
 1. **Legacy flow fate (blocks the migration model).** Does
    `quickPostLinkedin`/`insightPostLinkedin` keep writing `PostDraft` (→ true
