@@ -62,7 +62,6 @@ import type {
   DashboardPost,
   DashboardPostsResponse,
   DraftStatusResponse,
-  ImageUploadResponse,
   LinkedinAuthUrlResponse,
   LinkedinImageDetailsResponse,
   PostDetailResponse,
@@ -675,60 +674,11 @@ export default function PostsClient({
     setRefreshKey((value) => value + 1);
   };
 
-  const uploadMediaForPost = async (postId: string, files: File[]): Promise<void> => {
-    for (const file of files) {
-      const formData = new FormData();
-      formData.append("files", file);
-
-      const response = await apiFetch(`${apiBase}/posts/${postId}/media`, {
-        method: "PUT",
-        credentials: "include",
-        body: formData,
-      });
-
-      let parsedResponse: ImageUploadResponse | null = null;
-      try {
-        parsedResponse = (await response.json()) as ImageUploadResponse;
-      } catch {
-        parsedResponse = null;
-      }
-
-      if (!response.ok) {
-        throw new Error(parsedResponse?.message || "Image upload failed.");
-      }
-    }
-    setConnectFeedback("Media uploaded successfully.");
-  };
-
-  const buildFileFromRemoteImage = async (
-    imageUrl: string,
-    fallbackName: string,
-    fallbackMimeType?: string,
-  ): Promise<File> => {
-    const response = await fetch(imageUrl);
-    if (!response.ok) {
-      throw new Error("Unable to fetch selected stock image.");
-    }
-
-    const blob = await response.blob();
-    const buffer = await blob.arrayBuffer();
-    const contentTypeHeader = response.headers.get("Content-Type")?.split(";")[0]?.trim();
-    const mimeType = blob.type || contentTypeHeader || fallbackMimeType || "image/jpeg";
-
-    const extensionByMimeType: Record<string, string> = {
-      "image/jpeg": "jpg",
-      "image/jpg": "jpg",
-      "image/png": "png",
-      "image/webp": "webp",
-      "image/gif": "gif",
-      "image/avif": "avif",
-    };
-    const extension = extensionByMimeType[mimeType.toLowerCase()] || "jpg";
-    const fileName = `${fallbackName}.${extension}`;
-
-    return new File([buffer], fileName, { type: mimeType });
-  };
-
+  // Uploads all images in a single PUT and returns the number of media entries
+  // the server accepted. The upload is now asynchronous (HTTP 202): the files
+  // are stored and a background worker performs the LinkedIn upload. Every file
+  // for a post must go in ONE request — a second PUT while the first batch is
+  // still UPLOADING is rejected with 409 (handoff §6).
   const updatePostContent = async (
     postId: string,
     content: string,
@@ -770,6 +720,13 @@ export default function PostsClient({
     }
 
     if (!response.ok) {
+      // Media still uploading — retryable, not a hard failure (handoff §5).
+      if (response.status === 409) {
+        throw new Error(
+          parsedResponse?.message ||
+            "Media uploads are still in progress. Try again shortly.",
+        );
+      }
       throw new Error(parsedResponse?.message || "Unable to publish post.");
     }
 
@@ -797,6 +754,13 @@ export default function PostsClient({
     }
 
     if (!response.ok) {
+      // Media still uploading — retryable, not a hard failure (handoff §5).
+      if (response.status === 409) {
+        throw new Error(
+          parsedResponse?.message ||
+            "Media uploads are still in progress. Try again shortly.",
+        );
+      }
       throw new Error(parsedResponse?.message || "Unable to schedule post.");
     }
 
@@ -828,40 +792,21 @@ export default function PostsClient({
       return;
     }
 
-    // Step 2: Upload media if new images/video were attached (PUT)
-    const hasDeviceMedia = payload.mediaFiles && payload.mediaFiles.length > 0;
-    const hasStockMedia = payload.mediaUrls && payload.mediaUrls.length > 0;
-    const hasAnyMedia = hasDeviceMedia || hasStockMedia;
+    // Step 2: Images upload straight to R2 the moment they're attached (handled
+    // inside the composer), so there is no submit-time media upload here.
+    // PostsClient has no video path.
 
-    if (hasAnyMedia) {
-      try {
-        if (hasDeviceMedia) {
-          await uploadMediaForPost(payload.postId, payload.mediaFiles!);
-        }
-        if (hasStockMedia) {
-          const remoteFiles = await Promise.all(
-            payload.mediaUrls!.map((url, i) =>
-              buildFileFromRemoteImage(url, `${payload.mediaSource ?? "stock"}-image-${i}`),
-            ),
-          );
-          await uploadMediaForPost(payload.postId, remoteFiles);
-        }
-      } catch (error) {
-        setConnectFeedback(
-          error instanceof Error ? error.message : "Media upload failed.",
-        );
-        return;
-      }
-    }
-
-    // Step 3: If save-only, we're done
+    // Step 3: If save-only, we're done. On-attach image uploads have already
+    // been awaited to READY in the composer before this point.
     if (kind === "draft") {
-      setConnectFeedback("Post saved successfully.");
+      setConnectFeedback("Post saved.");
       setRefreshKey((value) => value + 1);
       return;
     }
 
-    // Step 4: Publish or schedule
+    // Step 4: Publish or schedule. The composer keeps Publish/Schedule disabled
+    // until media settles; the 409 handling in publishPost/schedulePost is a
+    // safety net for any race (handoff §7).
     if (kind === "publish") {
       try {
         const response = await publishPost(payload.postId);

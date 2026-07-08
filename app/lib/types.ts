@@ -259,9 +259,53 @@ export type SchedulePostResponse = {
   data?: PostDetailData;
 };
 
+// `PENDING` = an upload slot was issued but the client's PUT + confirm hasn't
+// landed yet (treat like UPLOADING in the UI). Absent status = legacy = READY.
+export type MediaUploadStatus = "PENDING" | "UPLOADING" | "READY" | "FAILED";
+
 export type ImageUploadResponse = {
   statusCode?: number;
   message?: string;
+  // Async upload (HTTP 202) returns the pending media entries. Each `id` is a
+  // temporary UUID until the background LinkedIn upload finishes, at which point
+  // it is replaced server-side by the real URN.
+  data?: PostMediaItem[];
+};
+
+// ─── Presigned direct-to-R2 media upload (handoff §2/§4) ─────────────────────
+
+// One declared file in the initiate request. `sizeBytes`/`mimeType` are baked
+// into the presigned URL signature, so they must be exact (File.size/File.type).
+export type MediaUploadDeclaration = {
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+
+// One presigned upload slot returned by initiate. `mediaId` is a temporary UUID
+// that also appears in `post.media[]` as a PENDING entry until the LinkedIn
+// upload finishes (then swapped for the real URN).
+export type MediaUploadSlot = {
+  mediaId: string;
+  uploadUrl: string;
+  requiredHeaders: Record<string, string>;
+};
+
+// `POST /posts/:id/media/uploads` → 201
+export type InitiateMediaUploadsResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: {
+    expiresAt?: string;
+    uploads?: MediaUploadSlot[];
+  };
+};
+
+// `POST /posts/:id/media/uploads/complete` → 202, same shape as the old endpoint
+export type CompleteMediaUploadsResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: PostMediaItem[];
 };
 
 export type PostMediaItem = {
@@ -269,6 +313,9 @@ export type PostMediaItem = {
   title?: string;
   altText?: string;
   _id?: string;
+  type?: "IMAGE" | "VIDEO";
+  // Absent on entries that predate async uploads — treat absent as "READY".
+  status?: MediaUploadStatus;
 };
 
 export type LinkedinImageDetailsData = {
