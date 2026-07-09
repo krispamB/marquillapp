@@ -58,6 +58,9 @@ each slide is rendered by a **slide-type** variant. A document has **one theme**
 and an ordered list of typed slides:
 
 ```ts
+// Terminology: "theme" in prose = a StylePreset value, stored as document.templateId.
+// Both identifiers are #102's fixed contract (§6 create input / §4 content field);
+// this doc does not mint a third name.
 type StylePreset = 'bold' | 'minimal' | 'editorial' | 'gradient';   // = theme id (§5)
 type SlideType   = 'cover' | 'content' | 'list' | 'quote' | 'cta';
 
@@ -229,10 +232,15 @@ export const slidesSchema = z.array(slideSchema).min(2).max(15);
   before launch (and would surface any pagination regression as a page-count
   mismatch or blank page). Caps are only trustworthy because the fixtures
   prove them.
-- **A Zod failure is a terminal generation error.** #104 §8 gives `generate()`
+- **A Zod failure never renders a broken deck.** #104 §8 gives `generate()`
   one inline repair retry (re-prompt with the validation error); if the output
-  is still invalid the run fails per #103 §7 rather than rendering a broken
-  deck. In practice the prompt caps make this rare.
+  is still invalid the step throws and the version ends `FAILED` — never a
+  half-valid deck. *Interlock note for #110:* the siblings disagree on the
+  classification of that throw — #103 §7 lists "Zod-invalid LLM output after a
+  step's own internal retries" as **terminal**, while #104 §8 says "still
+  invalid → throw `retryable`" (a fresh attempt re-samples cheaply, research
+  cached). #108 doesn't own that seam; #110 must reconcile it. In practice the
+  prompt caps make the case rare either way.
 - **Slide count 2–15 for launch.** LinkedIn allows ≤300 pages (#101), but a
   good carousel is short; 2–15 bounds UX, render time, and worst-case LLM
   output size. `pageCount = slides.length` — true by construction of the §2
@@ -300,7 +308,7 @@ decks), varied enough to cover common voices:
 
 ## 6. Rendering pipeline
 
-A single `CarouselRenderer` owns assembly + render; the engine's `RENDER_PDF`
+A single `CarouselRendererService` owns assembly + render; the engine's `RENDER_PDF`
 step calls it.
 
 **At module init (boot), not per render:** the registry (§8) loads and
@@ -335,6 +343,14 @@ An unknown `slide.type` or `templateId` at assembly is a **terminal** error
 (should never occur — Zod validated the content at generation), not a retry:
 re-running cannot fix invalid input.
 
+**`RENDER_PDF` emits no `step.progress` for launch.** #107's boundaries table
+assigns render-progress signals to #108, floating a per-page `pageRendered`
+example — but the render is a single atomic `htmlToPdf` call with nothing
+observable between request and buffer, so there is no honest per-page signal
+to emit. The core's `step.started`/`step.completed` (#103 §5) bracket it;
+`step.progress` for render stays empty until a streaming render path exists.
+This supersedes #107's speculative example.
+
 ## 7. PDF storage in R2 — store the key, sign on read
 
 - **Key:** `artifacts/${artifactId}/${version}/document.pdf` (#102 §8) —
@@ -351,9 +367,12 @@ re-running cannot fix invalid input.
   - **Publish** (#106) fetches the buffer server-side via `getFile(key)` to
     upload to LinkedIn — which needs the key anyway, and is exactly how
     `linkedin-media.service.ts` already handles media.
-  - *Interlock note for #110:* this renames #102 §4's `pdfUrl?` field to
-    `pdfKey?` — same slot, same READY-gating semantics, corrected to what a
-    private bucket can actually serve. (The key is also derivable from
+  - *Interlock note for #110:* this renames `pdfUrl` → `pdfKey` everywhere the
+    siblings mention it — #102 §4's `pdfUrl?` content field, #103 §2/§3
+    (`render: { pdfUrl, pageCount }` in `RunState` and "writes the R2
+    `pdfUrl`"), #106's publish source ("the artifact version's R2 `pdfUrl`"),
+    and #107's READY note. Same slot, same READY-gating semantics, corrected to
+    what a private bucket can actually serve. (The key is also derivable from
     `(artifactId, version)`; storing it keeps reads convention-free.)
 - **Overwrite-on-retry is safe.** A whole-job retry (#103 §7–8) targets the
   *same* `(artifactId, version)`, so re-rendering PUTs the same key —
@@ -361,7 +380,8 @@ re-running cannot fix invalid input.
 - **`pdfKey` gates `READY`.** Until the upload returns and `pdfKey` is
   written, the version stays `GENERATING` (#102 §2). The rendered PDF *is* the
   preview; no separate thumbnail asset for launch.
-- **Cleanup** stays a later background sweep (#102 §8/§11), not inline — a
+- **Cleanup** stays a later background sweep (#102 §8, and its §9 boundaries
+  table), not inline — a
   soft-deleted or superseded version's PDF is reclaimed by that sweep, not by
   the renderer.
 
@@ -380,19 +400,23 @@ assets/carousel/
     gradient/   …
 
 src/carousel/
+  index.ts                           # barrel (repo rule: every folder exposes one)
   carousel.module.ts
-  carousel-renderer.service.ts       # assembleHtml + render + store (§6)
+  carousel-renderer.service.ts       # CarouselRendererService — assembleHtml + render + store (§6)
   carousel-renderer.service.spec.ts  # CLAUDE.md: every service ships a spec
   templates.ts                       # registry (below) + boot-time compile/validation
   schemas.ts                         # slideFieldSchemas / slideSchema / slidesSchema (§3)
-  utils/html-to-pdf.util.ts          # moved from src/mark (§11), renamed to kebab-case
+  utils/
+    index.ts
+    html-to-pdf.util.ts              # moved from src/mark (§11), renamed to kebab-case
 ```
 
 ```ts
-// schemas are per slide type (§3) — the registry maps theme × type to markup only
+// schemas are per slide type (§3) — the registry maps theme × type to the
+// template filename only (resolved under assets/carousel/templates/<theme>/)
 export const carouselTemplates: Record<
   StylePreset,
-  Record<SlideType, { hbs: `${string}.hbs` }>
+  Record<SlideType, `${string}.hbs`>
 > = { … };
 ```
 
@@ -439,7 +463,7 @@ Every slide field is **LLM-generated**, i.e. untrusted text flowing into HTML.
 | `DOCUMENT` artifact/version schema, READY gate, R2 key convention (with the §7 `pdfKey` rename) | #102 |
 | Signed-URL exchange on GET/list responses | #102 |
 | Credit surcharge for a Browserless render | #105 |
-| `step.progress` during render, if surfaced | #107 |
+| `step.progress` transport/framing (render emits none for launch — §6) | #107 |
 | Fetching the PDF and uploading it as a LinkedIn document on publish | #106 |
 | Future: `image` slide type; per-slide PNG thumbnails; background R2 cleanup; re-render on manual slide `PATCH` mechanics | future |
 
