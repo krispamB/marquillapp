@@ -1,18 +1,7 @@
 import type { Metadata } from "next";
-import { Sora, Sofia_Sans } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
-
-const sora = Sora({
-  variable: "--font-sora",
-  subsets: ["latin"],
-});
-
-const sofiaSans = Sofia_Sans({
-  variable: "--font-sofia-sans",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: 'Marquill - AI-Powered LinkedIn Content Platform',
@@ -40,7 +29,7 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
-        <body suppressHydrationWarning className={`${sora.variable} ${sofiaSans.variable} antialiased`}>
+        <body suppressHydrationWarning className="antialiased">
           {children}
           <Analytics />
         </body>
