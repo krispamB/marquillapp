@@ -5,6 +5,8 @@ import Link from "next/link";
 import { CalendarClock, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Plus, Search, Send, Trash2 } from "lucide-react";
 import RedesignShell from "./Shell";
 import { API_BASE, jsonRequest, readApi } from "./api";
+import DeleteConfirmModal from "./DeleteConfirmModal";
+import SchedulePicker, { getDefaultScheduleDate, localDateTimeValue } from "./SchedulePicker";
 import { formatRelativeDate, formatScheduledDate, getPostTitle, normalizeStatus, parseDate, toYearMonth } from "./types";
 import type { ConnectedAccount, DashboardPost, DashboardPostsResponse, UserProfile } from "../lib/types";
 
@@ -47,6 +49,7 @@ export default function PostsRedesignClient({
   const [actionId, setActionId] = useState<string | null>(null);
   const [schedulePostId, setSchedulePostId] = useState<string | null>(null);
   const [scheduleValue, setScheduleValue] = useState("");
+  const [deletePostId, setDeletePostId] = useState<string | null>(null);
 
   const loadPosts = useCallback(async () => {
     if (!selectedAccountId) {
@@ -98,8 +101,10 @@ export default function PostsRedesignClient({
       );
       setActionMessage(action === "publish" ? "Post published." : "Post deleted.");
       await loadPosts();
+      return true;
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : `Unable to ${action} post.`);
+      return false;
     } finally {
       setActionId(null);
     }
@@ -107,9 +112,18 @@ export default function PostsRedesignClient({
 
   async function schedulePost() {
     if (!schedulePostId || !scheduleValue) return;
+    const scheduledDate = new Date(scheduleValue);
+    if (Number.isNaN(scheduledDate.getTime())) {
+      setError("Pick a valid date and time before scheduling.");
+      return;
+    }
+    if (scheduledDate.getTime() < Date.now() + 5 * 60 * 1000) {
+      setError("Choose a time at least 5 minutes in the future.");
+      return;
+    }
     setActionId(schedulePostId);
     try {
-      await readApi(`${API_BASE}/posts/${schedulePostId}/schedule`, jsonRequest({ scheduledTime: new Date(scheduleValue).toISOString() }, { method: "POST" }));
+      await readApi(`${API_BASE}/posts/${schedulePostId}/schedule`, jsonRequest({ scheduledTime: scheduledDate.toISOString() }, { method: "POST" }));
       setActionMessage("Post scheduled.");
       setSchedulePostId(null);
       setScheduleValue("");
@@ -174,14 +188,14 @@ export default function PostsRedesignClient({
               <div className="mq-post-row-status"><span className={`mq-status mq-status-${status.toLowerCase()}`}><i />{status[0] + status.slice(1).toLowerCase()}</span><span className="mq-mono">{dateLabel}</span></div>
               <div className="mq-post-row-actions">
                 {status === "DRAFT" ? <Link href={`/posts/${post._id}/edit`} className="mq-icon-button" title="Edit post"><Pencil size={15} /></Link> : null}
-                {status === "SCHEDULED" ? <button type="button" className="mq-icon-button" title="Schedule post" onClick={() => { setSchedulePostId(post._id); setScheduleValue(""); }}><CalendarClock size={15} /></button> : null}
+                {status === "SCHEDULED" ? <button type="button" className="mq-icon-button" title="Schedule post" onClick={() => { setSchedulePostId(post._id); setScheduleValue(localDateTimeValue(parseDate(post.scheduledAt) ?? getDefaultScheduleDate())); }}><CalendarClock size={15} /></button> : null}
                 {status !== "PUBLISHED" ? <button type="button" className="mq-icon-button" title="Publish now" disabled={actionId === post._id} onClick={() => void runAction(post._id, "publish")}><Send size={15} /></button> : null}
-                <button type="button" className="mq-icon-button mq-icon-danger" title="Delete post" disabled={actionId === post._id} onClick={() => void runAction(post._id, "delete")}><Trash2 size={15} /></button>
+                <button type="button" className="mq-icon-button mq-icon-danger" title="Delete post" disabled={actionId === post._id} onClick={() => setDeletePostId(post._id)}><Trash2 size={15} /></button>
                 <button type="button" className="mq-icon-button mq-more-button" aria-label="More actions"><MoreHorizontal size={16} /></button>
               </div>
               {schedulePostId === post._id ? (
                 <div className="mq-inline-schedule">
-                  <label>Move to <input type="datetime-local" value={scheduleValue} onChange={(event) => setScheduleValue(event.target.value)} /></label>
+                  <SchedulePicker value={scheduleValue} onChange={setScheduleValue} disabled={actionId === post._id} label="Move to" />
                   <button type="button" className="mq-primary-button mq-button-small" onClick={() => void schedulePost()} disabled={!scheduleValue || actionId === post._id}>Save time</button>
                   <button type="button" className="mq-ghost-button" onClick={() => setSchedulePostId(null)}>Cancel</button>
                 </div>
@@ -191,6 +205,13 @@ export default function PostsRedesignClient({
         })}
         <div className="mq-list-footer"><span>Showing {visiblePosts.length} of {posts.length}</span><span className="mq-pagination"><button type="button" disabled><ChevronLeft size={14} /></button><b>1</b><button type="button" disabled><ChevronRight size={14} /></button></span></div>
       </div>
+      <DeleteConfirmModal
+        isOpen={Boolean(deletePostId)}
+        isPublished={normalizeStatus(posts.find((post) => post._id === deletePostId)?.status) === "PUBLISHED"}
+        isDeleting={actionId === deletePostId}
+        onClose={() => { if (!actionId) setDeletePostId(null); }}
+        onConfirm={() => { if (deletePostId) void runAction(deletePostId, "delete").then((deleted) => { if (deleted) setDeletePostId(null); }); }}
+      />
     </RedesignShell>
   );
 }

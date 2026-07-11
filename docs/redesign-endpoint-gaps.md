@@ -20,6 +20,7 @@ This document records the backend coverage reviewed while implementing the redes
 | Generate with Mark | `POST /posts/:accountId/draft`, `GET /posts/:id/status`, `GET /posts/:id` | Implemented with polling. |
 | Publish/schedule/delete | `POST /posts/:id/publish`, `POST /posts/:id/schedule`, `DELETE /posts/:id` | Implemented. Calendar drag-and-drop rescheduling uses the schedule endpoint. |
 | Media upload | `PUT /posts/:id/media` with `files` form data | Implemented after a draft ID exists. |
+| Bug reports and feature requests | `POST /feedback/issues` | Implemented in the redesigned shell feedback dialog with browser/device metadata. |
 | Billing | `GET /tiers/active`, `GET /payment/usage`, `GET /payment/invoices` | Implemented. |
 | Connected accounts | `GET /auth/connected-accounts`, `DELETE /auth/connected-accounts/:id` | Implemented in the shared shell/settings route. |
 
@@ -39,6 +40,12 @@ These are real gaps or contract mismatches, not mocked values hidden as working 
 | Account connection from Settings | The working frontend starts OAuth from `POST /auth/linkedin`; the design/spec names `POST /auth/linkedin/connect`. | Settings links to the existing onboarding connection flow. |
 | Global notification center/search | The handoff shows a notification bell and desktop search field but no notification or global-search endpoint. | Search filters the currently loaded page data; the bell is visual only. |
 | Analytics destination | The old navigation contains a disabled Analytics item, but there is no analytics route or endpoint. | It is not added as a fake page in the redesign. |
+
+## LinkedIn preview behavior
+
+LinkedIn officially documents a 3,000-character maximum for regular posts, but it does not publish a fixed `See more` character cutoff. The redesign therefore models the feed as a visual fold: the preview collapses after three rendered lines, with line wrapping affected by the preview width, font, whitespace, and device. That corresponds to the commonly observed mobile fold of roughly 140 characters, rather than cutting at an arbitrary fixed substring. The preview exposes an interactive `…see more` control when the rendered content overflows.
+
+Source: [LinkedIn Help — Post and share updates](https://www.linkedin.com/help/linkedin/answer/a528176/).
 
 ## API naming differences to reconcile
 

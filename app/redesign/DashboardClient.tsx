@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, FileText, Search, Send, Sparkles } from "lucide-react";
 import RedesignShell from "./Shell";
+import MarquillMark from "../../components/brand/MarquillMark";
 import { API_BASE, readApi } from "./api";
 import {
   formatRelativeDate,
@@ -134,7 +135,7 @@ export default function DashboardRedesignClient({
       </div>
 
       <Link href="/posts/new" className="mq-ask-card">
-        <span className="mq-ask-mark">mq</span>
+        <MarquillMark size={34} theme="light" className="mq-ask-mark-svg" title="" />
         <span className="mq-ask-placeholder">Ask Mark to write a post about our Series A…<span className="mq-caret" /></span>
         <span className="mq-chip"><Sparkles size={13} /> Quick</span>
         <span className="mq-chip mq-chip-desktop"><Send size={13} /> Insight</span>

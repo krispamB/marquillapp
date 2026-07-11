@@ -6,6 +6,9 @@ import { ArrowLeft, CalendarClock, FileText, ImagePlus, Paperclip, RefreshCw, Se
 import { useRouter } from "next/navigation";
 import RedesignShell from "./Shell";
 import { API_BASE, jsonRequest, readApi, sleep } from "./api";
+import LinkedInPreview from "./LinkedInPreview";
+import SchedulePicker, { getDefaultScheduleDate, localDateTimeValue } from "./SchedulePicker";
+import MarquillMark from "../../components/brand/MarquillMark";
 import { StylePreset } from "../lib/types";
 import type { ConnectedAccount, CreateDraftRequest, CreateDraftResponse, DraftStatusResponse, PostDetailResponse, UserProfile } from "../lib/types";
 
@@ -13,11 +16,6 @@ type ComposerMode = "create" | "edit";
 type Action = "draft" | "publish" | "schedule";
 
 const draftBodyPlaceholder = "Give Mark a direction and he will turn it into a post in your voice.";
-
-function localDateTimeValue(date = new Date()) {
-  const offset = date.getTimezoneOffset();
-  return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 16);
-}
 
 function statusLabel(state?: string) {
   const value = String(state ?? "").toLowerCase();
@@ -47,7 +45,8 @@ export default function ComposerRedesignClient({
   const [prompt, setPrompt] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [content, setContent] = useState("");
-  const [scheduleValue, setScheduleValue] = useState(localDateTimeValue());
+  const [scheduleValue, setScheduleValue] = useState(localDateTimeValue(getDefaultScheduleDate()));
+  const [scheduleMode, setScheduleMode] = useState<"now" | "schedule">("now");
   const [isLoadingPost, setIsLoadingPost] = useState(mode === "edit");
   const [pendingAction, setPendingAction] = useState<Action | "generate" | "upload" | null>(null);
   const [statusText, setStatusText] = useState(mode === "edit" ? "Loading saved draft…" : "Draft · not started");
@@ -139,7 +138,10 @@ export default function ComposerRedesignClient({
         await readApi(`${API_BASE}/posts/${postId}/publish`, { method: "POST" });
       }
       if (action === "schedule") {
-        await readApi(`${API_BASE}/posts/${postId}/schedule`, jsonRequest({ scheduledTime: new Date(scheduleValue).toISOString() }, { method: "POST" }));
+        const scheduledDate = new Date(scheduleValue);
+        if (Number.isNaN(scheduledDate.getTime())) throw new Error("Pick a valid date and time before scheduling.");
+        if (scheduledDate.getTime() < Date.now() + 5 * 60 * 1000) throw new Error("Choose a time at least 5 minutes in the future.");
+        await readApi(`${API_BASE}/posts/${postId}/schedule`, jsonRequest({ scheduledTime: scheduledDate.toISOString() }, { method: "POST" }));
       }
       router.push("/posts");
       router.refresh();
@@ -197,7 +199,7 @@ export default function ComposerRedesignClient({
           </div>
 
           <div className="mq-card mq-chat-card">
-            <div className="mq-chat-label"><span className="mq-ask-mark mq-ask-mark-small">mq</span><span className="mq-mono">mark · conversation</span></div>
+            <div className="mq-chat-label"><MarquillMark size={22} theme="light" className="mq-ask-mark-small-svg" title="" /><span className="mq-mono">mark · conversation</span></div>
             <textarea className="mq-chat-input" value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Turn our Series A closing into an insight post. Keep my voice." rows={3} />
             <div className="mq-research-row"><input className="mq-input" value={youtubeUrl} onChange={(event) => setYoutubeUrl(event.target.value)} placeholder="Add a YouTube link for research (optional)" /><button type="button" className="mq-chip-button" onClick={() => void generateDraft()} disabled={pendingAction !== null}><Sparkles size={14} /> {pendingAction === "generate" ? "Mark is drafting…" : "Generate"}</button></div>
             <div className="mq-chat-status"><span className="mq-live-dot" /> {statusText}</div>
@@ -212,22 +214,19 @@ export default function ComposerRedesignClient({
 
         <aside className="mq-composer-preview">
           <span className="mq-mono">_ linkedin preview</span>
-          <div className="mq-linkedin-card">
-            <div className="mq-linkedin-header"><span className="mq-post-avatar">{account?.displayName?.slice(0, 2).toUpperCase() ?? "AO"}</span><span><strong>{account?.displayName ?? user.name}</strong><small>{account?.headline ?? "Creator on LinkedIn"}</small><small>Now · ◉</small></span><MoreDots /></div>
-            <div className="mq-linkedin-content">{content || <span className="mq-preview-placeholder">Your post preview will appear here.</span>}</div>
-            <div className="mq-linkedin-see-more">…see more</div>
-            <div className="mq-preview-media">{mediaName ? mediaName : "1200 × 627 · Mark designed"}</div>
-            <div className="mq-linkedin-stats"><span>👍 Liked by 240 others</span><span>38 comments</span></div>
-            <div className="mq-linkedin-actions"><span>Like</span><span>Comment</span><span>Repost</span><span>Send</span></div>
-          </div>
+          <LinkedInPreview user={user} account={account} content={content} mediaName={mediaName} />
 
-          <div className="mq-card mq-schedule-card"><h2>When should Mark publish?</h2><div className="mq-segmented mq-segmented-small"><button type="button" className="is-active">Publish now</button><button type="button">Schedule</button></div><label className="mq-label">Schedule time<input className="mq-input" type="datetime-local" value={scheduleValue} onChange={(event) => setScheduleValue(event.target.value)} /></label><p><CalendarClock size={14} /> Mark suggests <strong>{new Date(scheduleValue).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</strong> based on your audience.</p></div>
+          <div className="mq-card mq-schedule-card">
+            <h2>When should Mark publish?</h2>
+            <div className="mq-segmented mq-segmented-small">
+              <button type="button" className={scheduleMode === "now" ? "is-active" : ""} onClick={() => setScheduleMode("now")}>Publish now</button>
+              <button type="button" className={scheduleMode === "schedule" ? "is-active" : ""} onClick={() => setScheduleMode("schedule")}>Schedule</button>
+            </div>
+            <SchedulePicker value={scheduleValue} onChange={setScheduleValue} disabled={pendingAction !== null} />
+            <p className="mq-schedule-card-note">Pick a date and time in your local timezone, then use Schedule above. Mark suggests a weekday morning for your audience.</p>
+          </div>
         </aside>
       </div>
     </RedesignShell>
   );
-}
-
-function MoreDots() {
-  return <span className="mq-more-dots" aria-label="More options">···</span>;
 }

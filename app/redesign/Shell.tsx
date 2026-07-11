@@ -1,17 +1,20 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   CalendarDays,
   CreditCard,
   Bell,
   Home,
+  LifeBuoy,
   PenLine,
   Settings,
   Sparkles,
 } from "lucide-react";
 import type { ConnectedAccount, UserProfile } from "../lib/types";
+import MarquillLockup from "../../components/brand/MarquillLockup";
+import FeedbackModal from "./FeedbackModal";
 import { getInitials } from "./types";
 import type { WorkspacePage } from "./types";
 
@@ -59,6 +62,7 @@ export default function RedesignShell({
   topbarExtra?: ReactNode;
   children: ReactNode;
 }) {
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId);
   const initials = getInitials(user.name, user.email);
 
@@ -66,8 +70,7 @@ export default function RedesignShell({
     <div className="mq-shell">
       <aside className="mq-sidebar">
         <Link href="/dashboard" className="mq-brand" aria-label="Marquill dashboard">
-          <span className="mq-brand-mark">mq_</span>
-          <span>marquill</span>
+          <MarquillLockup size={29} theme="light" className="mq-brand-lockup" />
         </Link>
         <Link href="/posts/new" className="mq-new-post">
           <Sparkles size={16} />
@@ -119,6 +122,11 @@ export default function RedesignShell({
           )}
         </div>
 
+        <button type="button" className="mq-sidebar-help" onClick={() => setIsFeedbackOpen(true)}>
+          <LifeBuoy size={16} />
+          <span>Help & feedback</span>
+        </button>
+
         <div className="mq-sidebar-user">
           <span className="mq-avatar mq-avatar-md mq-avatar-accent">{initials}</span>
           <span className="mq-account-copy">
@@ -134,6 +142,7 @@ export default function RedesignShell({
           <div className="mq-topbar-title">{title}</div>
           <div className="mq-topbar-actions">
             {topbarExtra}
+            <button type="button" className="mq-feedback-topbar" onClick={() => setIsFeedbackOpen(true)} aria-label="Help and feedback"><LifeBuoy size={17} /></button>
             <span className="mq-notification" aria-label="Notifications">
               <span className="mq-live-dot" />
               <Bell className="mq-notification-icon" size={18} />
@@ -178,6 +187,7 @@ export default function RedesignShell({
       </nav>
 
       <span className="mq-selected-account-name" aria-hidden="true">{selectedAccount?.displayName}</span>
+      <FeedbackModal key={isFeedbackOpen ? "open" : "closed"} isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
     </div>
   );
 }
