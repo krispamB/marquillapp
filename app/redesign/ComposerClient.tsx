@@ -182,7 +182,7 @@ export default function ComposerRedesignClient({
     >
       <div className="mq-composer-heading">
         <div><span className="mq-eyebrow">{mode === "edit" ? "Edit post" : "New post"}</span><h1>Chat with Mark <span>→ draft → preview → publish</span></h1><p>{statusText}</p></div>
-        <div className="mq-composer-actions"><button type="button" className="mq-secondary-button" disabled={!postId || pendingAction !== null} onClick={() => void runAction("draft")}>Save draft</button><button type="button" className="mq-secondary-button" disabled={!postId || pendingAction !== null} onClick={() => void runAction("schedule")}><CalendarClock size={15} /> Schedule</button><button type="button" className="mq-primary-button" disabled={!postId || pendingAction !== null} onClick={() => void runAction("publish")}><Send size={15} /> Publish now</button></div>
+        <div className="mq-composer-actions"><button type="button" className="mq-secondary-button" disabled={!postId || pendingAction !== null} onClick={() => void runAction("draft")}>Save draft</button><button type="button" className="mq-secondary-button" disabled={!postId || pendingAction !== null} onClick={() => { setScheduleMode("schedule"); void runAction("schedule"); }}><CalendarClock size={15} /> Schedule</button><button type="button" className="mq-primary-button" disabled={!postId || pendingAction !== null} onClick={() => void runAction("publish")}><Send size={15} /> Publish now</button></div>
       </div>
 
       {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}
@@ -222,8 +222,10 @@ export default function ComposerRedesignClient({
               <button type="button" className={scheduleMode === "now" ? "is-active" : ""} onClick={() => setScheduleMode("now")}>Publish now</button>
               <button type="button" className={scheduleMode === "schedule" ? "is-active" : ""} onClick={() => setScheduleMode("schedule")}>Schedule</button>
             </div>
-            <SchedulePicker value={scheduleValue} onChange={setScheduleValue} disabled={pendingAction !== null} />
-            <p className="mq-schedule-card-note">Pick a date and time in your local timezone, then use Schedule above. Mark suggests a weekday morning for your audience.</p>
+            {scheduleMode === "schedule" ? <>
+              <SchedulePicker value={scheduleValue} onChange={setScheduleValue} disabled={pendingAction !== null} />
+              <p className="mq-schedule-card-note">Pick a date and time in your local timezone, then use Schedule above. Mark suggests a weekday morning for your audience.</p>
+            </> : <p className="mq-publish-now-note"><Send size={14} /> Ready to publish as soon as you click Publish now.</p>}
           </div>
         </aside>
       </div>

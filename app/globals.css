@@ -359,6 +359,7 @@ body {
 .mq-schedule-card .mq-input { width: 100%; }
 .mq-schedule-card p { display: flex; align-items: flex-start; gap: 6px; margin: 10px 0 0; color: var(--ink-500); font-size: 11px; line-height: 1.4; }
 .mq-schedule-card-note { display: block !important; }
+.mq-publish-now-note { align-items: center !important; padding: 10px 11px; border: 1px solid var(--line-faint); border-radius: var(--r-md); background: var(--surface-2); }
 .mq-calendar-top-controls { display: flex; align-items: center; gap: 8px; }
 .mq-calendar-top-controls strong { min-width: 110px; color: var(--ink-900); font-size: 15px; text-align: center; }
 .mq-calendar-toolbar { margin-bottom: 12px; }
