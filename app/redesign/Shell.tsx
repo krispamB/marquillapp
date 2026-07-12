@@ -15,6 +15,7 @@ import {
 import type { ConnectedAccount, UserProfile } from "../lib/types";
 import MarquillLockup from "../../components/brand/MarquillLockup";
 import FeedbackModal from "./FeedbackModal";
+import ThemeToggle from "./ThemeToggle";
 import { getInitials } from "./types";
 import type { WorkspacePage } from "./types";
 
@@ -25,6 +26,7 @@ const navItems: Array<{ key: WorkspacePage; label: string; href: string; icon: R
   { key: "billing", label: "Billing", href: "/billing", icon: <CreditCard size={18} /> },
   { key: "settings", label: "Settings", href: "/settings", icon: <Settings size={18} /> },
 ];
+const mobileNavItems = navItems.filter((item) => item.key !== "billing");
 
 function AccountAvatar({ account, size = "md" }: { account?: ConnectedAccount; size?: "sm" | "md" }) {
   const initials = getInitials(
@@ -70,7 +72,7 @@ export default function RedesignShell({
     <div className="mq-shell">
       <aside className="mq-sidebar">
         <Link href="/dashboard" className="mq-brand" aria-label="Marquill dashboard">
-          <MarquillLockup size={29} theme="light" className="mq-brand-lockup" />
+          <MarquillLockup size={29} theme="auto" className="mq-brand-lockup" />
         </Link>
         <Link href="/posts/new" className="mq-new-post">
           <Sparkles size={16} />
@@ -142,6 +144,7 @@ export default function RedesignShell({
           <div className="mq-topbar-title">{title}</div>
           <div className="mq-topbar-actions">
             {topbarExtra}
+            <ThemeToggle compact />
             <button type="button" className="mq-feedback-topbar" onClick={() => setIsFeedbackOpen(true)} aria-label="Help and feedback"><LifeBuoy size={17} /></button>
             <span className="mq-notification" aria-label="Notifications">
               <span className="mq-live-dot" />
@@ -171,14 +174,14 @@ export default function RedesignShell({
       </div>
 
       <nav className="mq-mobile-tabbar" aria-label="Mobile navigation">
-        {navItems.slice(0, 3).map((item) => (
+        {mobileNavItems.slice(0, 2).map((item) => (
           <Link key={item.key} href={item.href} className={item.key === active ? "is-active" : ""}>
             {item.icon}
             <span>{item.key === "dashboard" ? "Home" : item.label}</span>
           </Link>
         ))}
         <Link href="/posts/new" className="mq-mobile-fab" aria-label="New post"><span>+</span></Link>
-        {navItems.slice(3).map((item) => (
+        {mobileNavItems.slice(2).map((item) => (
           <Link key={item.key} href={item.href} className={item.key === active ? "is-active" : ""}>
             {item.icon}
             <span>{item.label}</span>
