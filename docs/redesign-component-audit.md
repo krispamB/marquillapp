@@ -27,12 +27,12 @@ This is the component-level follow-up to `redesign-endpoint-gaps.md`. The handof
 | `app/dashboard/components.tsx` | Legacy primitives such as `CustomSelect`, old mobile navigation, and old avatar/sidebar helpers are not used by the active workspace routes. | Retained only for legacy component dependencies; cleanup candidate once the old dashboard/post clients are deleted. |
 | `app/dashboard/DashboardClient.tsx` | The original dashboard included more legacy-specific interactions and data states than the handoff screen. | Replaced by the redesigned dashboard route. Any feature not listed in the active route coverage or endpoint-gap document needs a product decision before porting. |
 
-## Routes outside the authenticated-app handoff
+## Related active routes
 
-These were not missing from implementation; they were outside the primary `Marquill App.dc.html` target and remain intentionally separate:
+These routes remain active alongside the redesigned workspace:
 
+- `/billing`: plan selection and Paddle checkout now live in the authenticated workspace; the standalone `/pricing` route was removed.
 - `/onboarding`: six-step signup/connect flow remains active.
-- `/pricing`: checkout/pricing flow remains active; its payment contract is documented in the endpoint-gap report.
 - `/sign-in`, `/sign-up`, `/`: auth and marketing surfaces remain outside the authenticated workspace redesign.
 - `app/not-found.tsx`: global fallback surface remains unchanged.
 
