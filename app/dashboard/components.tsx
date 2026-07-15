@@ -755,7 +755,7 @@ export function MobileSidebar({
             <div className="mx-2 h-px bg-gray-100 my-1" />
             <div className="flex flex-col gap-0.5 mt-1.5">
               <Link
-                href="/pricing"
+                href="/billing#change-plan"
                 className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-colors hover:bg-gray-50 text-[var(--color-text-primary)]"
                 onClick={() => { setIsSettingsOpen(false); onClose(); }}
               >

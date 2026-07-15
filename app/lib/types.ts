@@ -6,6 +6,7 @@ export type TierLimits = {
 
 export type TierMetadata = {
   description?: string;
+  features?: string[];
   limits?: TierLimits;
 };
 
@@ -16,6 +17,7 @@ export type Tier = {
   yearlyPrice: number;
   isDefault: boolean;
   isActive: boolean;
+  paddleMonthlyPriceId?: string;
   metadata?: TierMetadata;
   createdAt?: string;
   updatedAt?: string;

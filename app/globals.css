@@ -563,14 +563,14 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-tier-card.is-current { border: 1.5px solid var(--ink-900); }
 .mq-tier-heading { display: flex; align-items: center; justify-content: space-between; min-height: 22px; }
 .mq-tier-heading h3 { margin: 0; font-size: 14px; }
-.mq-current-badge { background: var(--ink-900); }
+.mq-current-badge { background: var(--ink-900); color: var(--surface); }
 .mq-tier-price { display: flex; align-items: baseline; gap: 3px; font-size: 28px; font-weight: 700; letter-spacing: -.03em; }
 .mq-tier-price small { color: var(--ink-500); font-size: 12px; font-weight: 400; }
 .mq-tier-card p { min-height: 38px; margin: 0; color: var(--ink-500); font-size: 12px; line-height: 1.4; }
 .mq-tier-card ul { display: flex; flex: 1; flex-direction: column; gap: 8px; margin: 0; padding: 12px 0 0; border-top: 1px solid var(--line-faint); list-style: none; }
 .mq-tier-card li { display: flex; align-items: flex-start; gap: 8px; color: var(--ink-700); font-size: 12px; }
 .mq-tier-card li svg { flex: none; color: var(--accent); }
-.mq-disabled-button { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; border-radius: var(--r-md); background: var(--canvas-sub); color: var(--ink-500); font-size: 12px; font-weight: 600; text-decoration: none; }
+.mq-disabled-button { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; border: 0; border-radius: var(--r-md); background: var(--canvas-sub); color: var(--ink-700); font-size: 12px; font-weight: 600; text-decoration: none; cursor: not-allowed; }
 .mq-invoice-card { overflow: hidden; }
 .mq-invoice-row { display: grid; grid-template-columns: 120px 1fr 90px 90px 80px; align-items: center; gap: 16px; min-height: 50px; padding: 0 20px; border-bottom: 1px solid var(--line-faint); color: var(--ink-500); font-size: 12px; }
 .mq-invoice-row strong { color: var(--ink-900); text-align: right; }

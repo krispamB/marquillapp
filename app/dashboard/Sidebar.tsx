@@ -380,7 +380,7 @@ export default function Sidebar({
               <span
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.location.href = '/pricing';
+                  window.location.href = '/billing#change-plan';
                 }}
                 className="rounded-full border border-[var(--color-border)] bg-white px-2.5 py-1 text-[11px] font-medium text-[var(--color-text-primary)] shadow-sm transition hover:bg-gray-50 shrink-0"
               >
@@ -415,7 +415,7 @@ export default function Sidebar({
           </div>
           <div className="mx-2 h-[1px] bg-gray-100 my-1"></div>
           <div className="flex flex-col gap-0.5 mt-1.5">
-            <Link href="/pricing" className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-colors hover:bg-gray-50 text-[var(--color-text-primary)]" onClick={() => setIsSettingsOpen(false)}>
+            <Link href="/billing#change-plan" className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-colors hover:bg-gray-50 text-[var(--color-text-primary)]" onClick={() => setIsSettingsOpen(false)}>
               <Sparkles className="h-[18px] w-[18px] text-[var(--color-text-secondary)] shrink-0" />
               Upgrade plan
             </Link>

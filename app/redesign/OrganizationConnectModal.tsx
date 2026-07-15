@@ -192,7 +192,7 @@ export default function OrganizationConnectModal({
             <p>{limitDetails.message || "Your current plan does not include LinkedIn company pages."}</p>
             <div className="mq-org-actions">
               <button type="button" className="mq-secondary-button" onClick={closeModal}>Not now</button>
-              <Link href="/pricing" className="mq-org-submit" onClick={closeModal}>View upgrade options</Link>
+              <Link href="/billing#change-plan" className="mq-org-submit" onClick={closeModal}>View upgrade options</Link>
             </div>
           </div>
         ) : null}
