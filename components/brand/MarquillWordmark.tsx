@@ -45,7 +45,13 @@ export default function MarquillWordmark({
       aria-label="marquill"
     >
       marquill
-      <span className="animate-mq-blink" aria-hidden="true">
+      <span
+        aria-hidden="true"
+        style={{
+          display: 'inline-block',
+          animation: 'mqBlink 1.05s step-end infinite',
+        }}
+      >
         _
       </span>
     </span>

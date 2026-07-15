@@ -74,6 +74,7 @@ export type ConnectedAccountsResponse = {
   data?: Array<{
     _id: string;
     provider: ConnectedAccountProvider;
+    accountType?: ConnectedAccountType;
     accessTokenExpiresAt?: string;
     displayName?: string;
     avatarUrl?: string;

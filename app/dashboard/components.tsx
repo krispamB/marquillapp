@@ -3,6 +3,7 @@ import type { MouseEventHandler, ReactNode } from "react";
 import { useClerk } from "@clerk/nextjs";
 import { apiFetch } from "../lib/api";
 import Link from "next/link";
+import MarquillSelect, { type MarquillSelectOption } from "../../components/ui/MarquillSelect";
 import { CalendarClock, CheckCheck, PenLine, Plug, ChevronDown, Check, X, AlertTriangle, Building2, Trash2, Info, RefreshCw, Plus, Menu, Sparkles, CreditCard, Settings, Bug, LogOut } from "lucide-react";
 import type {
   ConnectedAccount,
@@ -1326,11 +1327,7 @@ export function DisconnectAccountModal({
 // ─── Trash2 re-export for Sidebar use ────────────────────────────────────────
 export { Trash2 };
 
-export type SelectOption = {
-  value: string;
-  label: string;
-  disabled?: boolean;
-};
+export type SelectOption = MarquillSelectOption;
 
 export function CustomSelect({
   value,
@@ -1355,79 +1352,7 @@ export function CustomSelect({
   dropdownPosition?: "top" | "bottom";
   dropdownHeader?: string;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target as Node | null;
-      if (!target || !containerRef.current?.contains(target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [isOpen]);
-
-  const selectedOption = options.find((opt) => opt.value === value);
-  const positionClass = dropdownPosition === "top" ? "bottom-[calc(100%+8px)]" : "top-[calc(100%+8px)]";
-
   return (
-    <div className={`relative ${className}`} ref={containerRef}>
-      {icon ? (
-        <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]">
-          {icon}
-        </div>
-      ) : null}
-      <button
-        type="button"
-        disabled={disabled}
-        aria-label={ariaLabel}
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex h-10 w-full items-center justify-between rounded-full border border-[var(--color-border)] bg-white/90 px-4 text-sm font-semibold text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/15 disabled:cursor-not-allowed disabled:opacity-60 ${
-          icon ? "pl-9" : ""
-        }`}
-      >
-        <span className="truncate pr-2">
-          {selectedOption ? selectedOption.label : placeholder}
-        </span>
-        <ChevronDown
-          className={`h-4 w-4 shrink-0 text-[var(--color-text-secondary)] transition-transform ${
-            isOpen ? "rotate-180" : ""
-          }`}
-        />
-      </button>
-
-      {isOpen && (
-        <div className={`absolute left-0 z-50 min-w-full rounded-2xl border border-[var(--color-border)] bg-white p-2 shadow-[0_12px_40px_-15px_rgba(15,23,42,0.3)] ${positionClass}`}>
-          <div className="flex max-h-60 flex-col overflow-y-auto">
-            {dropdownHeader ? (
-              <div className="mb-1 px-3 pb-1 pt-1 text-xs font-semibold text-[var(--color-text-secondary)]">
-                {dropdownHeader}
-              </div>
-            ) : null}
-            {options.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                disabled={opt.disabled}
-                onClick={() => {
-                  onChange(opt.value);
-                  setIsOpen(false);
-                }}
-                className={`w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                  value === opt.value
-                    ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
-                    : "text-[var(--color-text-secondary)] hover:bg-slate-50"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+    <MarquillSelect value={value} onChange={onChange} options={options} placeholder={placeholder} icon={icon} className={className} disabled={disabled} ariaLabel={ariaLabel} dropdownPosition={dropdownPosition} dropdownHeader={dropdownHeader} />
   );
 }

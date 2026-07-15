@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, FileText, Search, Send, Sparkles } from "lucide-react";
+import { ArrowUpRight, FileText, PenLine, Search, Video } from "lucide-react";
 import RedesignShell from "./Shell";
 import MarquillMark from "../../components/brand/MarquillMark";
+import LinkedInConnectButton from "./LinkedInConnectButton";
 import { API_BASE, readApi } from "./api";
 import {
   formatRelativeDate,
@@ -137,15 +138,15 @@ export default function DashboardRedesignClient({
       <Link href="/posts/new" className="mq-ask-card">
         <MarquillMark size={34} theme="light" className="mq-ask-mark-svg" title="" />
         <span className="mq-ask-placeholder">Ask Mark to write a post about our Series A…<span className="mq-caret" /></span>
-        <span className="mq-chip"><Sparkles size={13} /> Quick</span>
-        <span className="mq-chip mq-chip-desktop"><Send size={13} /> Insight</span>
+        <span className="mq-chip"><PenLine size={13} /> Quick</span>
+        <span className="mq-chip mq-chip-desktop"><Video size={13} /> Insight</span>
         <span className="mq-primary-icon"><ArrowUpRight size={18} /></span>
       </Link>
 
       {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}
       {!connectedAccounts.length ? (
         <div className="mq-alert">
-          Connect a LinkedIn account to start drafting and publishing with Mark. <Link href="/onboarding">Connect account</Link>
+          Connect a LinkedIn account to start drafting and publishing with Mark. <LinkedInConnectButton className="mq-inline-connect">Connect account</LinkedInConnectButton>
         </div>
       ) : null}
 

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, X, XCircle } from "lucide-react";
+import { Bug, Check, Lightbulb, X, XCircle } from "lucide-react";
 import { API_BASE, jsonRequest, readApi } from "./api";
+import MarquillSelect, { type MarquillSelectOption } from "../../components/ui/MarquillSelect";
 
 type FeedbackKind = "BUG" | "FEATURE_REQUEST";
 type ModalState = "form" | "submitting" | "success" | "error";
@@ -10,6 +11,11 @@ type ModalState = "form" | "submitting" | "success" | "error";
 type FeedbackResponse = {
   data?: { issueUrl?: string };
 };
+
+const feedbackKinds: MarquillSelectOption[] = [
+  { value: "BUG", label: "Report a bug", icon: <Bug size={15} /> },
+  { value: "FEATURE_REQUEST", label: "Suggest a feature", icon: <Lightbulb size={15} /> },
+];
 
 type NavigatorReport = Navigator & {
   userAgentData?: {
@@ -72,14 +78,28 @@ export default function FeedbackModal({ isOpen, onClose }: { isOpen: boolean; on
         <button type="button" className="mq-feedback-close" onClick={onClose} aria-label="Close feedback dialog"><X size={17} /></button>
         {modalState === "form" || modalState === "submitting" ? (
           <>
-            <span className="mq-eyebrow">Help & feedback</span>
-            <h2 id="feedback-title">Tell us what happened</h2>
-            <p className="mq-feedback-intro">Report a bug or suggest a feature. We&apos;ll include the browser and viewport details that help us reproduce it.</p>
+            <header className="mq-feedback-header">
+              <span className="mq-feedback-type-icon" aria-hidden="true">{kind === "BUG" ? <Bug size={19} /> : <Lightbulb size={19} />}</span>
+              <div>
+                <span className="mq-eyebrow">Help & feedback</span>
+                <h2 id="feedback-title">Tell us what happened</h2>
+                <p className="mq-feedback-intro">A few clear details help Mark&apos;s team find the right fix faster.</p>
+              </div>
+            </header>
             <form onSubmit={submit} className="mq-feedback-form">
-              <label>I would like to<select value={kind} onChange={(event) => setKind(event.target.value as FeedbackKind)}><option value="BUG">Report a bug</option><option value="FEATURE_REQUEST">Request a feature</option></select></label>
-              <label>Title<input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Short summary" /></label>
-              <label>Description<textarea required value={description} onChange={(event) => setDescription(event.target.value)} rows={5} placeholder="What did you expect, and what happened instead?" /></label>
-              <button type="submit" className="mq-primary-button" disabled={modalState === "submitting" || !title.trim() || !description.trim()}>{modalState === "submitting" ? "Sending…" : "Send report"}</button>
+              <div className="mq-feedback-field">
+                <label htmlFor="feedback-kind">I would like to</label>
+                <MarquillSelect id="feedback-kind" value={kind} onChange={(value) => setKind(value as FeedbackKind)} options={feedbackKinds} />
+              </div>
+              <div className="mq-feedback-field">
+                <label htmlFor="feedback-title-input">Title</label>
+                <input id="feedback-title-input" required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="A short, specific summary" />
+              </div>
+              <div className="mq-feedback-field">
+                <label htmlFor="feedback-description">Description</label>
+                <textarea id="feedback-description" required value={description} onChange={(event) => setDescription(event.target.value)} rows={5} placeholder="What were you trying to do? What did you expect, and what happened instead?" />
+              </div>
+              <footer className="mq-feedback-actions"><span>Browser and viewport details are added automatically.</span><button type="submit" className="mq-primary-button" disabled={modalState === "submitting" || !title.trim() || !description.trim()}>{modalState === "submitting" ? "Sending…" : "Send report"}</button></footer>
             </form>
           </>
         ) : null}

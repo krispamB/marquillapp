@@ -4,20 +4,18 @@ interface MarquillMarkProps {
   /** Rendered width/height in px (the mark is square). */
   size?: number;
   /**
-   * 'auto' follows the page theme via CSS vars; 'light'/'dark' force the
-   * palette regardless of theme (light = dark tile, dark = light tile).
+   * `light` uses the dark-tile asset; `dark` uses the light-tile asset.
+   * `auto` follows the page's `data-theme` attribute.
    */
   theme?: Theme;
   className?: string;
   title?: string;
 }
 
-/** tile = background square · glyph = the lettermark · dot stays LinkedIn blue */
-function palette(theme: Theme) {
-  if (theme === 'light') return { tile: '#0a0a0a', glyph: '#ffffff' };
-  if (theme === 'dark') return { tile: '#ffffff', glyph: '#0a0a0a' };
-  return { tile: 'var(--mq-tile)', glyph: 'var(--mq-glyph)' };
-}
+const ICON_SOURCE: Record<Exclude<Theme, 'auto'>, string> = {
+  light: '/icon-light.svg',
+  dark: '/icon-dark.svg',
+};
 
 /**
  * MarquillMark — the standalone icon. Use anywhere the lettermark is needed
@@ -29,33 +27,29 @@ export default function MarquillMark({
   className = '',
   title = 'Marquill',
 }: MarquillMarkProps) {
-  const { tile, glyph } = palette(theme);
-  const dot = theme === 'auto' ? 'var(--mq-dot)' : '#0a66c2';
+  if (theme !== 'auto') {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={ICON_SOURCE[theme]}
+        width={size}
+        height={size}
+        alt={title}
+        className={className}
+      />
+    );
+  }
 
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 50 51"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      role="img"
-      aria-label={title}
+    <span
+      className={`mq-mark-auto ${className}`}
+      style={{ width: size, height: size }}
+      {...(title ? { role: 'img', 'aria-label': title } : { 'aria-hidden': true })}
     >
-      <title>{title}</title>
-      <path
-        d="M0 5C0 2.23858 2.23858 0 5 0H45C47.7614 0 50 2.23858 50 5V45C50 47.7614 47.7614 50 45 50H5C2.23858 50 0 47.7614 0 45V5Z"
-        fill={tile}
-      />
-      <path
-        d="M35.73 42.54C36.3367 42.54 36.79 42.6967 37.09 43.01C37.39 43.3167 37.54 43.8167 37.54 44.51V48H36.67V44.55C36.67 44.13 36.58 43.8133 36.4 43.6C36.2267 43.3867 35.9533 43.28 35.58 43.28C35.06 43.28 34.6867 43.43 34.46 43.73C34.24 44.03 34.13 44.4667 34.13 45.04V48H33.26V44.55C33.26 44.27 33.22 44.0367 33.14 43.85C33.06 43.6567 32.94 43.5133 32.78 43.42C32.62 43.3267 32.4133 43.28 32.16 43.28C31.8 43.28 31.5167 43.3567 31.31 43.51C31.1033 43.6567 30.9533 43.8733 30.86 44.16C30.7733 44.4467 30.73 44.8 30.73 45.22V48H29.85V42.64H30.56L30.69 43.37H30.74C30.8533 43.1833 30.99 43.03 31.15 42.91C31.3167 42.7833 31.5 42.69 31.7 42.63C31.9 42.57 32.1067 42.54 32.32 42.54C32.7333 42.54 33.0767 42.6133 33.35 42.76C33.63 42.9067 33.8333 43.1333 33.96 43.44H34.01C34.19 43.1333 34.4333 42.9067 34.74 42.76C35.0533 42.6133 35.3833 42.54 35.73 42.54ZM42.7657 48.11C42.7657 47.99 42.769 47.85 42.7757 47.69C42.7824 47.53 42.7957 47.3933 42.8157 47.28H42.7557C42.6024 47.5067 42.389 47.7 42.1157 47.86C41.849 48.02 41.5024 48.1 41.0757 48.1C40.429 48.1 39.9024 47.87 39.4957 47.41C39.0957 46.9433 38.8957 46.25 38.8957 45.33C38.8957 44.7167 38.989 44.2033 39.1757 43.79C39.3624 43.3767 39.6224 43.0667 39.9557 42.86C40.289 42.6467 40.6724 42.54 41.1057 42.54C41.5257 42.54 41.869 42.62 42.1357 42.78C42.4024 42.94 42.6157 43.1367 42.7757 43.37H42.8157L42.9457 42.64H43.6457V50.4H42.7657V48.11ZM41.2457 47.37C41.6124 47.37 41.9057 47.3033 42.1257 47.17C42.3524 47.0367 42.5157 46.8333 42.6157 46.56C42.7157 46.28 42.769 45.9333 42.7757 45.52V45.34C42.7757 44.66 42.6624 44.1467 42.4357 43.8C42.209 43.4467 41.8057 43.27 41.2257 43.27C40.7457 43.27 40.389 43.46 40.1557 43.84C39.9224 44.2133 39.8057 44.7167 39.8057 45.35C39.8057 45.9833 39.9224 46.48 40.1557 46.84C40.3957 47.1933 40.759 47.37 41.2457 47.37Z"
-        fill={glyph}
-      />
-      <path
-        d="M46.4121 47.458C46.4121 47.6403 46.3519 47.7982 46.2314 47.9316C46.1143 48.0651 45.9515 48.1318 45.7432 48.1318C45.5381 48.1318 45.3753 48.0651 45.2549 47.9316C45.1344 47.7982 45.0742 47.6403 45.0742 47.458C45.0742 47.279 45.1344 47.1227 45.2549 46.9893C45.3753 46.8558 45.5381 46.7891 45.7432 46.7891C45.9515 46.7891 46.1143 46.8558 46.2314 46.9893C46.3519 47.1227 46.4121 47.279 46.4121 47.458Z"
-        fill={dot}
-      />
-    </svg>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img className="mq-mark-auto-light" src={ICON_SOURCE.light} alt="" />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img className="mq-mark-auto-dark" src={ICON_SOURCE.dark} alt="" />
+    </span>
   );
 }

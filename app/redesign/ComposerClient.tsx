@@ -2,13 +2,16 @@
 
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarClock, FileText, ImagePlus, Paperclip, RefreshCw, Send, Sparkles, Upload } from "lucide-react";
+import Image from "next/image";
+import { ArrowLeft, CalendarClock, ImagePlus, PenLine, RefreshCw, Send, Sparkles, Upload, Video } from "lucide-react";
 import { useRouter } from "next/navigation";
 import RedesignShell from "./Shell";
 import { API_BASE, jsonRequest, readApi, sleep } from "./api";
 import LinkedInPreview from "./LinkedInPreview";
 import SchedulePicker, { getDefaultScheduleDate, localDateTimeValue } from "./SchedulePicker";
+import StockImagePicker from "./StockImagePicker";
 import MarquillMark from "../../components/brand/MarquillMark";
+import MarquillSelect from "../../components/ui/MarquillSelect";
 import { StylePreset } from "../lib/types";
 import type { ConnectedAccount, CreateDraftRequest, CreateDraftResponse, DraftStatusResponse, PostDetailResponse, UserProfile } from "../lib/types";
 
@@ -52,6 +55,9 @@ export default function ComposerRedesignClient({
   const [statusText, setStatusText] = useState(mode === "edit" ? "Loading saved draft…" : "Draft · not started");
   const [error, setError] = useState<string | null>(null);
   const [mediaName, setMediaName] = useState<string | null>(null);
+  const [mediaPreviewUrl, setMediaPreviewUrl] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
+  const [stockProvider, setStockProvider] = useState<"pexels" | "unsplash" | null>(null);
 
   const account = useMemo(
     () => connectedAccounts.find((item) => item.id === selectedAccountId) ?? connectedAccounts[0],
@@ -75,6 +81,10 @@ export default function ComposerRedesignClient({
       .finally(() => setIsLoadingPost(false));
     return () => controller.abort();
   }, [initialPostId]);
+
+  useEffect(() => () => {
+    if (mediaPreviewUrl) URL.revokeObjectURL(mediaPreviewUrl);
+  }, [mediaPreviewUrl]);
 
   async function generateDraft() {
     if (!selectedAccountId) {
@@ -152,9 +162,8 @@ export default function ComposerRedesignClient({
     }
   }
 
-  async function uploadFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file || !postId) return;
+  async function uploadMedia(file: File) {
+    if (!postId) throw new Error("Generate a draft before adding media.");
     setPendingAction("upload");
     setError(null);
     try {
@@ -162,11 +171,34 @@ export default function ComposerRedesignClient({
       body.append("files", file);
       await readApi(`${API_BASE}/posts/${postId}/media`, { method: "PUT", body });
       setMediaName(file.name);
+      setMediaPreviewUrl(URL.createObjectURL(file));
+      setMediaType(file.type.startsWith("video/") ? "video" : "image");
       setStatusText("Media attached");
+      return true;
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Image upload failed.");
+      return false;
     } finally {
       setPendingAction(null);
+    }
+  }
+
+  async function uploadFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await uploadMedia(file);
+  }
+
+  async function selectStockImage(image: { downloadUrl: string; alt: string }) {
+    try {
+      const response = await fetch(image.downloadUrl);
+      if (!response.ok) throw new Error("Unable to download the selected stock image.");
+      const imageBlob = await response.blob();
+      if (await uploadMedia(new File([imageBlob], "stock-image.jpg", { type: imageBlob.type || "image/jpeg" }))) {
+        setStockProvider(null);
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to add the selected image.");
     }
   }
 
@@ -192,10 +224,10 @@ export default function ComposerRedesignClient({
         <section className="mq-composer-editor">
           <div className="mq-composer-controls">
             <div className="mq-segmented mq-segmented-small">
-              <button type="button" className={postType === "quickPostLinkedin" ? "is-active" : ""} onClick={() => setPostType("quickPostLinkedin")}><Sparkles size={14} /> Quick</button>
-              <button type="button" className={postType === "insightPostLinkedin" ? "is-active" : ""} onClick={() => setPostType("insightPostLinkedin")}><FileText size={14} /> Insight</button>
+              <button type="button" className={postType === "quickPostLinkedin" ? "is-active" : ""} onClick={() => setPostType("quickPostLinkedin")}><PenLine size={14} /> Quick</button>
+              <button type="button" className={postType === "insightPostLinkedin" ? "is-active" : ""} onClick={() => setPostType("insightPostLinkedin")}><Video size={14} /> Insight</button>
             </div>
-            <select className="mq-select" value={stylePreset} onChange={(event) => setStylePreset(event.target.value as StylePreset)} aria-label="Writing style"><option value={StylePreset.PROFESSIONAL}>Tone: Professional</option><option value={StylePreset.STORYTELLING}>Tone: Storytelling</option><option value={StylePreset.EDUCATIONAL}>Tone: Educational</option><option value={StylePreset.BOLD}>Tone: Bold</option><option value={StylePreset.FOUNDER}>Tone: Founder</option></select>
+            <MarquillSelect className="mq-composer-select" value={stylePreset} onChange={(value) => setStylePreset(value as StylePreset)} ariaLabel="Writing style" options={[{ value: StylePreset.PROFESSIONAL, label: "Tone: Professional" }, { value: StylePreset.STORYTELLING, label: "Tone: Storytelling" }, { value: StylePreset.EDUCATIONAL, label: "Tone: Educational" }, { value: StylePreset.BOLD, label: "Tone: Bold" }, { value: StylePreset.FOUNDER, label: "Tone: Founder" }]} />
           </div>
 
           <div className="mq-card mq-chat-card">
@@ -208,13 +240,13 @@ export default function ComposerRedesignClient({
           <div className="mq-card mq-editor-card">
             <div className="mq-editor-toolbar"><strong>Draft</strong><button type="button" className="mq-chip-button" onClick={() => void generateDraft()} disabled={pendingAction !== null || !prompt.trim()}><RefreshCw size={12} /> Regenerate</button><span className="mq-mono mq-counter">{content.length} / 3000</span></div>
             <textarea className="mq-post-editor" value={content} onChange={(event) => setContent(event.target.value)} placeholder={draftBodyPlaceholder} aria-label="Post draft" />
-            <div className="mq-media-row"><div className="mq-media-placeholder"><ImagePlus size={18} /><span>{mediaName ?? "Add media"}</span></div><label className="mq-chip-button"><Upload size={14} /> Upload<input type="file" accept="image/*,video/*" onChange={uploadFile} hidden disabled={!postId || pendingAction !== null} /></label><button type="button" className="mq-chip-button" disabled title="Search provider endpoint is not configured"><Paperclip size={14} /> Pexels</button><button type="button" className="mq-chip-button" disabled title="Search provider endpoint is not configured"><Paperclip size={14} /> Unsplash</button></div>
+            <div className="mq-media-row"><div className="mq-media-placeholder"><ImagePlus size={18} /><span>{mediaName ?? "Add media"}</span></div><label className="mq-chip-button"><Upload size={14} /> Upload<input type="file" accept="image/*,video/*" onChange={uploadFile} hidden disabled={!postId || pendingAction !== null} /></label><button type="button" className="mq-chip-button mq-stock-button" onClick={() => setStockProvider("pexels")} disabled={!postId || pendingAction !== null}><Image src="/pexels.svg" alt="" width={15} height={15} /> Pexels</button><button type="button" className="mq-chip-button mq-stock-button" onClick={() => setStockProvider("unsplash")} disabled={!postId || pendingAction !== null}><Image src="/unsplash.svg" alt="" width={15} height={15} /> Unsplash</button></div>
           </div>
         </section>
 
         <aside className="mq-composer-preview">
           <span className="mq-mono">_ linkedin preview</span>
-          <LinkedInPreview user={user} account={account} content={content} mediaName={mediaName} />
+          <LinkedInPreview user={user} account={account} content={content} mediaName={mediaName} mediaPreviewUrl={mediaPreviewUrl} mediaType={mediaType} />
 
           <div className="mq-card mq-schedule-card">
             <h2>When should Mark publish?</h2>
@@ -229,6 +261,7 @@ export default function ComposerRedesignClient({
           </div>
         </aside>
       </div>
+      {stockProvider ? <StockImagePicker provider={stockProvider} onClose={() => setStockProvider(null)} onSelect={(image) => void selectStockImage(image)} /> : null}
     </RedesignShell>
   );
 }

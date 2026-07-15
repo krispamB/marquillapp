@@ -6,6 +6,8 @@ import Link from "next/link";
 import { ChevronLeft, Info, Plus, RefreshCw, Settings, LogOut, Sparkles, CreditCard, Bug } from "lucide-react";
 import { useClerk } from "@clerk/nextjs";
 import dynamic from "next/dynamic";
+import MarquillLockup from "../../components/brand/MarquillLockup";
+import MarquillMark from "../../components/brand/MarquillMark";
 const BugReportModal = dynamic(() => import("./BugReportModal"), {
   ssr: false,
 });
@@ -196,12 +198,11 @@ export default function Sidebar({
       >
         <div className="flex w-full items-center justify-between">
           <div className={`${collapsed ? "w-full" : ""}`}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={collapsed ? "/marquill-icon.svg" : "/marquill-logo.svg"}
-              alt="Marquill"
-              className={`${collapsed ? "mx-auto h-10 w-10" : "h-8 w-auto"}`}
-            />
+            {collapsed ? (
+              <MarquillMark size={40} theme="light" className="mx-auto" />
+            ) : (
+              <MarquillLockup size={32} theme="light" />
+            )}
           </div>
           {showChrome && onToggle ? (
             <button

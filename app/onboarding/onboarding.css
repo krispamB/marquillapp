@@ -7,7 +7,7 @@
   --inverse-bg: #111110; --inverse-fg: #f4f4f1; --inverse-fg-2: #a0a09a; --inverse-line: #2c2c29;
   --accent: #ee5d4f; --accent-ink: #c8402f; --pos: #1f9d55; --pos-bg: #e7f5ec;
   --sh-xs: 0 1px 2px rgba(16,16,15,.04); --sh-sm: 0 1px 2px rgba(16,16,15,.05),0 1px 3px rgba(16,16,15,.04); --sh-lg: 0 8px 24px rgba(16,16,15,.1),0 2px 6px rgba(16,16,15,.05);
-  min-height: 100vh; padding: 32px; display: grid; place-items: center; background: var(--canvas); color: var(--ink-900); font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  min-height: 100vh; padding: 32px; display: grid; place-items: center; background: var(--canvas); color: var(--ink-900); font-family: var(--font-inter), sans-serif;
 }
 html[data-theme="dark"] .ob-page {
   --canvas:#0c0c0b;--canvas-sub:#181816;--surface:#161614;--surface-2:#1e1e1b;--ink-900:#f4f4f1;--ink-800:#e4e4df;--ink-700:#c6c6bf;--ink-500:#8f8f88;--ink-400:#6d6d66;--line:#262624;--line-strong:#34342f;--line-faint:#1d1d1a;--inverse-bg:#f4f4f1;--inverse-fg:#0a0a0a;--inverse-fg-2:#57574f;--inverse-line:#d8d8d2;--accent:#f5715f;--accent-ink:#f5715f;--pos:#46c07d;--pos-bg:#14271c;
@@ -27,14 +27,14 @@ html[data-theme="dark"] .ob-page {
 .ob-rail-steps b, .ob-rail-steps small { display: block; line-height: 1.35; }
 .ob-rail-steps b { color: var(--inverse-fg); font-size: 13.5px; }
 .ob-rail-steps small { margin-top: 2px; color: var(--inverse-fg-2); font-size: 11.5px; }
-.ob-rail-count { margin-top: auto; color: var(--inverse-fg-2); font: 11.5px ui-monospace, Menlo, monospace; }
+.ob-rail-count { margin-top: auto; color: var(--inverse-fg-2); font: 11.5px var(--font-jetbrains-mono); }
 .ob-workspace { min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 38px 44px; background: var(--canvas); }
 .ob-workspace > .progress { width: min(520px, 100%); margin-bottom: 18px; }
 .ob-mobile-brand { display: none; }
 .ob-wrap { width: min(520px, 100%); }
 .ob-card { max-height: 590px; overflow-y: auto; padding: 28px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--sh-sm); }
 .ob-step-head { margin-bottom: 22px; }
-.ob-eyebrow { margin-bottom: 9px; color: var(--ink-400); font: 11px ui-monospace, Menlo, monospace; text-transform: lowercase; }
+.ob-eyebrow { margin-bottom: 9px; color: var(--ink-400); font: 11px var(--font-jetbrains-mono); text-transform: lowercase; }
 .ob-eyebrow::before { content: "_ "; }
 .ob-title { margin: 0; color: var(--ink-900); font-size: 29px; line-height: 1.08; letter-spacing: -.03em; }
 .ob-sub { margin: 9px 0 0; color: var(--ink-500); font-size: 13.5px; line-height: 1.5; }
@@ -80,7 +80,7 @@ html[data-theme="dark"] .ob-page {
 .assurance .ic { display: grid; width: 21px; height: 21px; place-items: center; border-radius: 50%; background: var(--pos-bg); color: var(--pos); }
 .multi-hint { display: flex; align-items: center; gap: 9px; margin-top: 12px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--ink-700); font-size: 12px; }
 .progress { display: flex; align-items: center; gap: 12px; }
-.progress-steps { color: var(--ink-500); font: 11px ui-monospace, Menlo, monospace; white-space: nowrap; }
+.progress-steps { color: var(--ink-500); font: 11px var(--font-jetbrains-mono); white-space: nowrap; }
 .progress-bar { flex: 1; height: 4px; overflow: hidden; border-radius: 99px; background: var(--canvas-sub); }
 .progress-bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .3s ease; }
 .ob-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 18px; }

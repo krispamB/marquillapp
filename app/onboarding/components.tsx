@@ -32,6 +32,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import MarquillLockup from "../../components/brand/MarquillLockup";
 
 // ── Icon map from design name → lucide component ──
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; strokeWidth?: number; color?: string; className?: string }>> = {
@@ -92,16 +93,13 @@ export function LocalOrbs() {
 }
 
 // ── Brand row ──
-const BRAND_WORDMARK = "/marquill-logo.svg";
-
 interface BrandRowProps {
   right?: React.ReactNode;
 }
 export function BrandRow({ right }: BrandRowProps) {
   return (
     <div className="ob-brand">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img className="word" src={BRAND_WORDMARK} alt="Marquill" />
+      <MarquillLockup size={30} theme="light" />
       {right && <div className="ob-brand-right">{right}</div>}
     </div>
   );

@@ -110,6 +110,7 @@ export async function getConnectedAccounts(
       payload?.data?.map((account) => ({
         id: account._id,
         provider: account.provider,
+        accountType: account.accountType,
         accessTokenExpiresAt: account.accessTokenExpiresAt,
         displayName: account.displayName,
         avatarUrl: account.avatarUrl,

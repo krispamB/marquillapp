@@ -1,23 +1,31 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   CalendarDays,
   CreditCard,
   Bell,
   Home,
+  Info,
   LifeBuoy,
   PenLine,
+  Plus,
+  RefreshCw,
   Settings,
   Sparkles,
 } from "lucide-react";
 import type { ConnectedAccount, UserProfile } from "../lib/types";
 import MarquillLockup from "../../components/brand/MarquillLockup";
+import LinkedInIcon from "../../components/brand/LinkedInIcon";
 import FeedbackModal from "./FeedbackModal";
+import LinkedInConnectButton from "./LinkedInConnectButton";
+import OrganizationConnectModal from "./OrganizationConnectModal";
 import ThemeToggle from "./ThemeToggle";
 import { getInitials } from "./types";
 import type { WorkspacePage } from "./types";
+import MarquillSelect from "../../components/ui/MarquillSelect";
 
 const navItems: Array<{ key: WorkspacePage; label: string; href: string; icon: ReactNode }> = [
   { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: <Home size={18} /> },
@@ -33,16 +41,26 @@ function AccountAvatar({ account, size = "md" }: { account?: ConnectedAccount; s
     account?.displayName ?? account?.profile?.localizedFirstName ?? "",
     account?.vanityName,
   );
-  return account?.avatarUrl ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={account.avatarUrl}
-      alt=""
-      className={`mq-avatar mq-avatar-${size}`}
-    />
-  ) : (
-    <span className={`mq-avatar mq-avatar-${size}`}>{initials || "—"}</span>
+  return (
+    <span className="mq-account-avatar-wrap">
+      {account?.avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={account.avatarUrl} alt="" className={`mq-avatar mq-avatar-${size}`} />
+      ) : (
+        <span className={`mq-avatar mq-avatar-${size}`}>{initials || "—"}</span>
+      )}
+      {account ? <span className="mq-avatar-provider"><LinkedInIcon size={size === "sm" ? 11 : 14} /></span> : null}
+    </span>
   );
+}
+
+function accessExpiryLabel(expiresAt?: string) {
+  if (!expiresAt) return null;
+  const timestamp = new Date(expiresAt).getTime();
+  if (Number.isNaN(timestamp)) return null;
+  const days = Math.ceil((timestamp - Date.now()) / 86_400_000);
+  if (days <= 0) return { text: "Access expired", isUrgent: true };
+  return { text: `Access ends in ${days} day${days === 1 ? "" : "s"}`, isUrgent: days <= 7 };
 }
 
 export default function RedesignShell({
@@ -64,9 +82,20 @@ export default function RedesignShell({
   topbarExtra?: ReactNode;
   children: ReactNode;
 }) {
+  const router = useRouter();
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [isOrganizationModalOpen, setIsOrganizationModalOpen] = useState(false);
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId);
   const initials = getInitials(user.name, user.email);
+  const hasPersonalAccount = accounts.some((account) => account.accountType !== "ORGANIZATION");
+  const connectedOrganizationIds = useMemo(
+    () => accounts.filter((account) => account.accountType === "ORGANIZATION").map((account) => account.id),
+    [accounts],
+  );
+  const sharedExpiry = accessExpiryLabel(
+    accounts.find((account) => account.accountType !== "ORGANIZATION" && account.accessTokenExpiresAt)?.accessTokenExpiresAt
+      ?? accounts.find((account) => account.accessTokenExpiresAt)?.accessTokenExpiresAt,
+  );
 
   return (
     <div className="mq-shell">
@@ -99,7 +128,22 @@ export default function RedesignShell({
         <div className="mq-sidebar-section mq-connected">
           <div className="mq-sidebar-section-heading">
             <span className="mq-eyebrow">Connected</span>
-            <span className="mq-plus">+</span>
+            <div className="mq-account-actions">
+              <button type="button" className="mq-account-action" title="Connected LinkedIn accounts and organization pages" aria-label="Information about connected accounts"><Info size={16} /></button>
+              <LinkedInConnectButton className="mq-account-action" title="Reconnect LinkedIn account" aria-label="Reconnect LinkedIn account">
+                <RefreshCw size={16} />
+              </LinkedInConnectButton>
+              <button
+                type="button"
+                className="mq-account-action"
+                title={hasPersonalAccount ? "Connect an organization page" : "Connect a personal LinkedIn account first"}
+                aria-label="Connect an organization page"
+                disabled={!hasPersonalAccount}
+                onClick={() => setIsOrganizationModalOpen(true)}
+              >
+                <Plus size={16} />
+              </button>
+            </div>
           </div>
           {accounts.length ? (
             accounts.map((account) => (
@@ -112,16 +156,16 @@ export default function RedesignShell({
                 <AccountAvatar account={account} />
                 <span className="mq-account-copy">
                   <strong>{account.displayName ?? "LinkedIn account"}</strong>
-                  <small>{account.accountType === "ORGANIZATION" ? "Company page" : "Personal"}</small>
+                  <small className={sharedExpiry?.isUrgent ? "is-urgent" : ""}>{sharedExpiry?.text ?? (account.accountType === "ORGANIZATION" ? "Company page" : "Personal")}</small>
                 </span>
-                <span className="mq-provider-badge">in</span>
               </button>
             ))
           ) : (
-            <Link href="/onboarding" className="mq-empty-account">
+            <LinkedInConnectButton className="mq-empty-account">
               Connect LinkedIn to publish
-            </Link>
+            </LinkedInConnectButton>
           )}
+          <Link href="/settings" className="mq-manage-accounts">Manage accounts</Link>
         </div>
 
         <button type="button" className="mq-sidebar-help" onClick={() => setIsFeedbackOpen(true)}>
@@ -151,22 +195,13 @@ export default function RedesignShell({
               <Bell className="mq-notification-icon" size={18} />
             </span>
             <span className="mq-avatar mq-avatar-md mq-avatar-accent">{initials}</span>
-            <select
+            <MarquillSelect
               className="mq-account-select"
               value={selectedAccountId ?? ""}
-              onChange={(event) => onSelectAccount?.(event.target.value)}
-              aria-label="Connected account"
-            >
-              {accounts.length ? (
-                accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.displayName ?? "LinkedIn account"}
-                  </option>
-                ))
-              ) : (
-                <option value="">No account connected</option>
-              )}
-            </select>
+              onChange={(value) => onSelectAccount?.(value)}
+              ariaLabel="Connected account"
+              options={accounts.length ? accounts.map((account) => ({ value: account.id, label: account.displayName ?? "LinkedIn account", icon: <AccountAvatar account={account} size="sm" /> })) : [{ value: "", label: "No account connected", disabled: true }]}
+            />
           </div>
         </header>
 
@@ -191,6 +226,12 @@ export default function RedesignShell({
 
       <span className="mq-selected-account-name" aria-hidden="true">{selectedAccount?.displayName}</span>
       <FeedbackModal key={isFeedbackOpen ? "open" : "closed"} isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
+      <OrganizationConnectModal
+        isOpen={isOrganizationModalOpen}
+        connectedOrganizationIds={connectedOrganizationIds}
+        onClose={() => setIsOrganizationModalOpen(false)}
+        onConnected={() => router.refresh()}
+      />
     </div>
   );
 }

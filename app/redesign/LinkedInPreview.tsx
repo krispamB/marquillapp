@@ -9,17 +9,22 @@ export default function LinkedInPreview({
   account,
   content,
   mediaName,
+  mediaPreviewUrl,
+  mediaType,
 }: {
   user: UserProfile;
   account?: ConnectedAccount;
   content: string;
   mediaName: string | null;
+  mediaPreviewUrl: string | null;
+  mediaType: "image" | "video" | null;
 }) {
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [canExpand, setCanExpand] = useState(false);
   const displayName = account?.displayName ?? user.name;
   const initials = displayName.slice(0, 2).toUpperCase() || "AO";
+  const profileImageUrl = account?.avatarUrl ?? account?.profile?.picture;
 
   useEffect(() => {
     const element = contentRef.current;
@@ -47,7 +52,10 @@ export default function LinkedInPreview({
   return (
     <div className="mq-linkedin-card">
       <div className="mq-linkedin-header">
-        <span className="mq-post-avatar">{initials}</span>
+        {profileImageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={profileImageUrl} alt="" className="mq-post-avatar mq-linkedin-avatar" />
+        ) : <span className="mq-post-avatar">{initials}</span>}
         <span>
           <strong>{displayName}</strong>
           <small>{account?.headline ?? "Creator on LinkedIn"}</small>
@@ -71,7 +79,16 @@ export default function LinkedInPreview({
           {isExpanded ? "Show less" : "…see more"}
         </button>
       ) : null}
-      <div className="mq-preview-media">{mediaName ? mediaName : "1200 × 627 · Mark designed"}</div>
+      {mediaPreviewUrl ? (
+        <div className="mq-preview-media">
+          {mediaType === "video" ? (
+            <video src={mediaPreviewUrl} controls aria-label={mediaName ?? "Attached video"} />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={mediaPreviewUrl} alt={mediaName ?? "Attached image"} />
+          )}
+        </div>
+      ) : null}
       <div className="mq-linkedin-stats"><span>👍 Liked by 240 others</span><span>38 comments</span></div>
       <div className="mq-linkedin-actions"><span>Like</span><span>Comment</span><span>Repost</span><span>Send</span></div>
       <p className="mq-preview-cutoff-note">Mobile fold: 3 lines · approximately 140 characters</p>
