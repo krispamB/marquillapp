@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "../lib/api";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import "./onboarding.css";
 import { revalidateUserCache } from "../lib/actions";
 import type { OnboardingProfile } from "../lib/onboarding";
@@ -254,23 +254,13 @@ export default function OnboardingClient({ initialProfile }: { initialProfile: O
     <>
       <div className="ob-page">
         <ThemeToggle compact className="ob-theme-toggle" />
-        <div className="ob-frame">
-          <aside className="ob-rail">
-            <MarquillLockup size={30} theme="inverse" className="ob-rail-brand" />
-            <div className="ob-rail-intro">
-              <h2>Let&apos;s get Mark<br />working for you.</h2>
-              <p>A few quick steps and Mark starts drafting, designing, and scheduling in your voice.</p>
-            </div>
-            <div className="ob-rail-steps">
-              <div className="is-done"><span><Check size={15} /></span><div><b>Sign up</b><small>Your Marquill account is ready</small></div></div>
-              <div className={step > 1 ? "is-done" : "is-current"}><span>{step > 1 ? <Check size={15} /> : "2"}</span><div><b>Connect LinkedIn</b><small>Personal profile or company page</small></div></div>
-              <div className={step > 1 ? "is-current" : ""}><span>3</span><div><b>Tell Mark your voice</b><small>Workspace, goals, cadence & topics</small></div></div>
-            </div>
-            <span className="ob-rail-count">step {step === 1 ? 2 : 3} of 3</span>
-          </aside>
-
+        <main className="ob-shell">
+          <header className="ob-header">
+            <MarquillLockup size={32} theme="auto" />
+            <h1>Let&apos;s get Mark working for you.</h1>
+            <p>A few quick steps and Mark starts drafting, designing, and scheduling in your voice.</p>
+          </header>
           <section className="ob-workspace">
-            <div className="ob-mobile-brand"><MarquillLockup size={27} theme="auto" /></div>
             <Progress step={step === 1 ? 2 : 3} total={3} style="steps" />
             <div className="ob-wrap">
               <div className="ob-card">
@@ -294,7 +284,7 @@ export default function OnboardingClient({ initialProfile }: { initialProfile: O
               {apiError && <p className="ob-error">{apiError}</p>}
             </div>
           </section>
-        </div>
+        </main>
       </div>
 
       {toast && <SuccessToast name={data.firstName} />}
