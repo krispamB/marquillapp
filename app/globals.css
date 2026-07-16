@@ -296,7 +296,7 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-chip-button { min-height: 34px; padding: 0 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-700); font-size: 12px; }
 .mq-primary-icon { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--r-md); background: var(--ink-900); color: var(--surface); }
 .mq-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }
-.mq-workspace-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mq-workspace-stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .mq-card { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--sh-sm); }
 .mq-stat-card { min-height: 132px; padding: 16px 17px; }
 .mq-label { display: block; color: var(--ink-500); font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; }
@@ -307,6 +307,13 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-positive { color: var(--pos); font-weight: 600; }
 .mq-progress { height: 6px; margin-top: 13px; overflow: hidden; border-radius: 999px; background: var(--canvas-sub); }
 .mq-progress span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .3s ease; }
+.mq-connected-account-summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 9px; color: var(--ink-500); font-size: 11px; }
+.mq-connected-account-avatars { display: inline-flex; flex: none; align-items: center; padding-left: 8px; }
+.mq-connected-account-avatar, .mq-connected-account-more { display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; margin-left: -8px; overflow: hidden; border: 2px solid var(--surface); border-radius: 50%; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent-ink); font-size: 10px; font-weight: 700; box-shadow: var(--sh-xs); }
+.mq-connected-account-avatar:nth-child(2) { background: var(--pos-bg); color: var(--pos); }
+.mq-connected-account-avatar:nth-child(3) { background: var(--canvas-sub); color: var(--ink-700); }
+.mq-connected-account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.mq-connected-account-more { background: var(--ink-900); color: var(--surface); }
 .mq-two-column { display: grid; grid-template-columns: 1.25fr 1fr; gap: 16px; }
 .mq-list-card { overflow: hidden; }
 .mq-card-heading { min-height: 54px; padding: 0 18px; border-bottom: 1px solid var(--line-faint); }
@@ -620,7 +627,7 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
   .mq-sidebar { width: 208px; }
   .mq-main { margin-left: 208px; }
   .mq-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .mq-workspace-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mq-workspace-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .mq-two-column, .mq-billing-top, .mq-settings-grid { grid-template-columns: 1fr; }
   .mq-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .mq-composer-grid { grid-template-columns: 1fr; }
