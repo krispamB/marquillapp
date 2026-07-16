@@ -97,12 +97,12 @@ export default function CheckoutContent() {
   if (status === 'error') {
     return (
       <div className="flex flex-col items-center text-center py-8">
-        <div className="rounded-2xl border border-red-100 bg-red-50 p-8 max-w-sm w-full">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-8 max-w-sm w-full">
           <p className="text-sm font-semibold text-red-600 mb-2">Something went wrong</p>
           <p className="text-sm text-red-500 mb-6">{errorMsg}</p>
           <Link
             href="/#pricing"
-            className="inline-block rounded-full bg-[#1B1C2A] px-5 py-2.5 text-sm font-semibold text-white"
+            className="inline-flex min-h-11 items-center rounded-[10px] bg-ink-900 px-5 text-sm font-semibold text-surface transition-opacity hover:opacity-90"
           >
             ← Back to pricing
           </Link>
@@ -114,17 +114,15 @@ export default function CheckoutContent() {
   return (
     <>
       {/* Plan summary card */}
-      <div className="mb-8 rounded-2xl border border-[#E0E2FF] bg-[#F5F5FF] px-6 py-5 flex items-center justify-between">
+      <div className="mb-8 flex items-center justify-between rounded-2xl border border-line bg-accent-soft px-6 py-5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#5B5CF6]">
-            Selected plan
-          </p>
-          <p className="mt-1 text-xl font-semibold text-text-primary">{tierName}</p>
+          <p className="ff-mono text-xs font-medium text-accent">selected plan</p>
+          <p className="mt-1 text-xl font-semibold text-ink-900">{tierName}</p>
         </div>
         {monthlyPrice && (
           <div className="text-right">
-            <span className="text-3xl font-semibold text-text-primary">${monthlyPrice}</span>
-            <span className="text-sm text-text-secondary"> /mo</span>
+            <span className="text-3xl font-bold tabular-nums text-ink-900">${monthlyPrice}</span>
+            <span className="text-sm text-ink-500"> /mo</span>
           </div>
         )}
       </div>
@@ -132,8 +130,8 @@ export default function CheckoutContent() {
       {/* Loading spinner — visible while Paddle iframe initialises */}
       {status === 'loading' && (
         <div className="flex items-center justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#5B5CF6] border-t-transparent" />
-          <span className="ml-3 text-sm text-text-secondary">Loading checkout…</span>
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent" />
+          <span className="ml-3 text-sm text-ink-500">Loading checkout…</span>
         </div>
       )}
 

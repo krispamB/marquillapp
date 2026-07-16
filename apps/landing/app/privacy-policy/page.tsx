@@ -11,8 +11,8 @@ export const metadata: Metadata = {
 
 export default function PrivacyPolicyPage() {
   return (
-    <article className="min-h-screen bg-white">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16">
+    <article className="min-h-screen bg-canvas">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-16">
         <h1 className="text-4xl font-bold text-text-primary mb-4">Privacy Policy</h1>
         <p className="text-sm text-text-secondary mb-12">Last Updated: 29 April 2026</p>
 
@@ -141,7 +141,7 @@ export default function PrivacyPolicyPage() {
                 href="https://developers.google.com/youtube/terms/api-services-terms-of-service"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[#5B5CF6] underline hover:text-[#4a4bc4]"
+                className="text-accent underline hover:text-accent-ink"
               >
                 YouTube API Services
               </a>{' '}
@@ -153,7 +153,7 @@ export default function PrivacyPolicyPage() {
                 href="https://www.youtube.com/t/terms"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[#5B5CF6] underline hover:text-[#4a4bc4]"
+                className="text-accent underline hover:text-accent-ink"
               >
                 YouTube Terms of Service
               </a>
@@ -165,7 +165,7 @@ export default function PrivacyPolicyPage() {
                 href="https://policies.google.com/privacy"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[#5B5CF6] underline hover:text-[#4a4bc4]"
+                className="text-accent underline hover:text-accent-ink"
               >
                 Google&apos;s Privacy Policy
               </a>
@@ -177,7 +177,7 @@ export default function PrivacyPolicyPage() {
                 href="https://security.google.com/settings/security/permissions"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[#5B5CF6] underline hover:text-[#4a4bc4]"
+                className="text-accent underline hover:text-accent-ink"
               >
                 Google&apos;s security settings
               </a>
@@ -243,9 +243,9 @@ export default function PrivacyPolicyPage() {
             <p className="text-text-secondary leading-relaxed mb-4">
               For questions or concerns, contact us at:
             </p>
-            <div className="bg-surface p-6 rounded-lg mt-4">
+            <div className="bg-canvas-sub border border-line p-6 rounded-xl mt-4">
               <p className="text-text-secondary mb-2">
-                <strong>Email:</strong> hello@marquill.com
+                <strong className="text-text-primary">Email:</strong> hello@marquill.com
               </p>
             </div>
           </section>
