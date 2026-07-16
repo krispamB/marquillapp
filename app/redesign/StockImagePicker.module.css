@@ -62,7 +62,7 @@
   color: #686b70;
 }
 
-.searchField:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(238, 93, 79, .14); }
+.searchField:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
 .searchField input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #2d2f33; font: inherit; font-size: 14px; }
 .searchField > button { display: grid; width: 24px; height: 24px; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #73767a; cursor: pointer; }
 .searchField > button:hover { background: #f0f1f1; color: #25272a; }
@@ -70,7 +70,7 @@
 .searchButton {
   min-height: 38px;
   padding: 0 17px;
-  border: 1px solid #d94f43;
+  border: 1px solid var(--accent);
   border-radius: 7px;
   background: var(--accent);
   color: #fff;
