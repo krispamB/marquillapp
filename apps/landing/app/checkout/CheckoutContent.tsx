@@ -8,13 +8,11 @@ import { normalizeAppUrl } from '@/config/urls';
 
 // ---------------------------------------------------------------------------
 // CheckoutContent — reads query params, initialises Paddle, opens inline widget
-// URL contract: /checkout?transactionId=txn_xxx&tierName=Creator&monthlyPrice=19.99
+// URL contract: /checkout?transactionId=txn_xxx
 // ---------------------------------------------------------------------------
 export default function CheckoutContent() {
   const params = useSearchParams();
   const transactionId = params.get('transactionId') ?? '';
-  const tierName = params.get('tierName') ?? 'Your plan';
-  const monthlyPrice = params.get('monthlyPrice') ?? '';
 
   const [paddle, setPaddle] = useState<Paddle | undefined>();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -90,20 +88,6 @@ export default function CheckoutContent() {
 
   return (
     <>
-      {/* Plan summary card */}
-      <div className="mb-8 flex items-center justify-between rounded-2xl border border-line bg-accent-soft px-6 py-5">
-        <div>
-          <p className="ff-mono text-xs font-medium text-accent">selected plan</p>
-          <p className="mt-1 text-xl font-semibold text-ink-900">{tierName}</p>
-        </div>
-        {monthlyPrice && (
-          <div className="text-right">
-            <span className="text-3xl font-bold tabular-nums text-ink-900">${monthlyPrice}</span>
-            <span className="text-sm text-ink-500"> /mo</span>
-          </div>
-        )}
-      </div>
-
       {/* Loading spinner — visible while Paddle iframe initialises */}
       {status === 'loading' && (
         <div className="flex items-center justify-center py-12">
