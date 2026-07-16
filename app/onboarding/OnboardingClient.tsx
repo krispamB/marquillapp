@@ -6,6 +6,7 @@ import { apiFetch } from "../lib/api";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import "./onboarding.css";
 import { revalidateUserCache } from "../lib/actions";
+import type { OnboardingProfile } from "../lib/onboarding";
 import { Progress, SuccessToast } from "./components";
 import MarquillLockup from "../../components/brand/MarquillLockup";
 import ThemeToggle from "../redesign/ThemeToggle";
@@ -194,10 +195,7 @@ function restoreData(serverData: Record<string, any>): Partial<OnboardingData> {
 
 // ── Component ──
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type OnboardingSession = { userType?: string; currentStep?: number; isComplete?: boolean; data?: Record<string, any> };
-
-export default function OnboardingClient({ initialSession }: { initialSession: OnboardingSession | null }) {
+export default function OnboardingClient({ initialSession }: { initialSession: OnboardingProfile | null }) {
   const router = useRouter();
   const [data, setData] = useState<OnboardingData>(() => {
     if (!initialSession) return INITIAL_DATA;

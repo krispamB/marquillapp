@@ -1,12 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import OnboardingClient from "./OnboardingClient";
-import { getServerAuth, authHeaders } from "../lib/session";
-
-const API = process.env.BACKEND_API_URL ?? "http://localhost:3500/api/v1";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type OnboardingSession = { userType?: string; currentStep?: number; isComplete?: boolean; data?: Record<string, any> };
+import { getServerAuth } from "../lib/session";
+import { getOnboardingState } from "../lib/onboarding";
 
 export default async function OnboardingPage() {
   const { userId } = await auth();
@@ -15,20 +11,10 @@ export default async function OnboardingPage() {
   }
 
   const serverAuth = await getServerAuth();
+  const onboarding = await getOnboardingState(serverAuth);
+  const session = onboarding.kind === "profile" ? onboarding.profile : null;
 
-  let session: OnboardingSession | null = null;
-  try {
-    const res = await fetch(`${API}/onboarding`, {
-      headers: authHeaders(serverAuth),
-      cache: "no-store",
-    });
-    if (res.ok) {
-      const body = await res.json();
-      session = body.data ?? null;
-    }
-  } catch {}
-
-  if (session?.isComplete) redirect("/dashboard");
+  if (session?.isComplete === true) redirect("/dashboard");
 
   return <OnboardingClient initialSession={session} />;
 }

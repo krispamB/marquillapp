@@ -7,6 +7,7 @@ import {
   getConnectedAccounts,
   getServerAuth,
 } from "../lib/session";
+import { getOnboardingState } from "../lib/onboarding";
 
 export async function getWorkspaceProps() {
   const { userId, sessionId } = await auth();
@@ -14,10 +15,18 @@ export async function getWorkspaceProps() {
 
   const serverAuth = await getServerAuth();
   const cacheKey = sessionId ?? userId;
-  const [apiUser, subscription] = await Promise.all([
+  const [onboarding, apiUser, subscription] = await Promise.all([
+    getOnboardingState(serverAuth),
     getCachedUser(serverAuth, cacheKey),
     getCachedSubscription(serverAuth, cacheKey),
   ]);
+
+  if (
+    onboarding.kind === "missing" ||
+    onboarding.profile.isComplete !== true
+  ) {
+    redirect("/onboarding");
+  }
 
   const name = apiUser?.name?.trim();
   const email = apiUser?.email?.trim();
