@@ -65,6 +65,9 @@ body {
 .mq-mark-auto-dark { display: none !important; }
 html[data-theme="dark"] .mq-mark-auto-light { display: none; }
 html[data-theme="dark"] .mq-mark-auto-dark { display: block !important; }
+.mq-lockup-inverse-dark { display: none; }
+html[data-theme="dark"] .mq-lockup-inverse-light { display: none; }
+html[data-theme="dark"] .mq-lockup-inverse-dark { display: inline-flex; }
 
 /* Marquill workspace redesign ------------------------------------------------
    The handoff uses a quiet editorial surface: warm canvas, hairline borders,

@@ -195,16 +195,16 @@ function restoreData(serverData: Record<string, any>): Partial<OnboardingData> {
 
 // ── Component ──
 
-export default function OnboardingClient({ initialSession }: { initialSession: OnboardingProfile | null }) {
+export default function OnboardingClient({ initialProfile }: { initialProfile: OnboardingProfile | null }) {
   const router = useRouter();
   const [data, setData] = useState<OnboardingData>(() => {
-    if (!initialSession) return INITIAL_DATA;
-    const serverPayload = { userType: initialSession.userType, ...(initialSession.data ?? {}) };
+    if (!initialProfile) return INITIAL_DATA;
+    const serverPayload = { userType: initialProfile.userType, ...(initialProfile.data ?? {}) };
     return { ...INITIAL_DATA, ...restoreData(serverPayload) };
   });
   const [step, setStep] = useState(() => {
-    if (!initialSession?.userType) return 1;
-    return Math.min((initialSession.currentStep ?? 1) + 1, TOTAL_STEPS);
+    if (!initialProfile?.userType) return 1;
+    return Math.min((initialProfile.currentStep ?? 1) + 1, TOTAL_STEPS);
   });
   const [toast, setToast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -256,12 +256,7 @@ export default function OnboardingClient({ initialSession }: { initialSession: O
         <ThemeToggle compact className="ob-theme-toggle" />
         <div className="ob-frame">
           <aside className="ob-rail">
-            <span className="ob-rail-brand ob-rail-brand-on-dark">
-              <MarquillLockup size={30} theme="dark" />
-            </span>
-            <span className="ob-rail-brand ob-rail-brand-on-light">
-              <MarquillLockup size={30} theme="light" />
-            </span>
+            <MarquillLockup size={30} theme="inverse" className="ob-rail-brand" />
             <div className="ob-rail-intro">
               <h2>Let&apos;s get Mark<br />working for you.</h2>
               <p>A few quick steps and Mark starts drafting, designing, and scheduling in your voice.</p>

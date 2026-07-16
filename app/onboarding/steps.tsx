@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { User, Briefcase, PlusCircle, CheckCircle2, ArrowRight, ShieldCheck, EyeOff, Settings2 } from "lucide-react";
 import { apiFetch } from "../lib/api";
-import { RadioTile, GoalTile, Chip, Icon } from "./components";
+import { RadioTile, GoalTile, Chip } from "./components";
 import type { OnboardingData } from "./OnboardingClient";
 import { CADENCE_DEFAULTS } from "./OnboardingClient";
 import { DayOfWeek } from "./types";

@@ -12,9 +12,9 @@ export default async function OnboardingPage() {
 
   const serverAuth = await getServerAuth();
   const onboarding = await getOnboardingState(serverAuth);
-  const session = onboarding.kind === "profile" ? onboarding.profile : null;
+  const profile = onboarding.kind === "profile" ? onboarding.profile : null;
 
-  if (session?.isComplete === true) redirect("/dashboard");
+  if (profile?.isComplete === true) redirect("/dashboard");
 
-  return <OnboardingClient initialSession={session} />;
+  return <OnboardingClient initialProfile={profile} />;
 }

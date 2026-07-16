@@ -30,7 +30,9 @@ export async function getWorkspaceProps() {
 
   const name = apiUser?.name?.trim();
   const email = apiUser?.email?.trim();
-  if (!name || !email) redirect("/onboarding");
+  if (!name || !email) {
+    throw new Error("Unable to load the completed user's profile");
+  }
 
   const user: UserProfile = {
     name,

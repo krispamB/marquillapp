@@ -1,7 +1,7 @@
 import MarquillMark from './MarquillMark';
 import MarquillWordmark, { type WordmarkFont } from './MarquillWordmark';
 
-type Theme = 'auto' | 'light' | 'dark';
+type Theme = 'auto' | 'inverse' | 'light' | 'dark';
 
 interface MarquillLockupProps {
   /** Icon height in px; the wordmark + gap scale from this. */
@@ -25,6 +25,19 @@ export default function MarquillLockup({
 }: MarquillLockupProps) {
   const gap = Math.round(size * 0.3);
   const word = Math.round(size * 0.72);
+
+  if (theme === 'inverse') {
+    return (
+      <span className={`inline-flex items-center ${className}`} aria-label="Marquill">
+        <span className="mq-lockup-inverse-light" aria-hidden="true">
+          <MarquillLockup size={size} theme="dark" font={font} />
+        </span>
+        <span className="mq-lockup-inverse-dark" aria-hidden="true">
+          <MarquillLockup size={size} theme="light" font={font} />
+        </span>
+      </span>
+    );
+  }
 
   return (
     <span

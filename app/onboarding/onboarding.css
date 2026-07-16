@@ -16,9 +16,6 @@ html[data-theme="dark"] .ob-page {
 .ob-frame { width: min(1180px, 100%); min-height: min(800px, calc(100vh - 64px)); display: grid; grid-template-columns: 390px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--sh-lg); }
 .ob-rail { display: flex; flex-direction: column; padding: 38px 40px; background: var(--inverse-bg); color: var(--inverse-fg); }
 .ob-rail-brand { align-self: flex-start; }
-.ob-rail-brand-on-light { display: none; }
-html[data-theme="dark"] .ob-rail-brand-on-dark { display: none; }
-html[data-theme="dark"] .ob-rail-brand-on-light { display: inline-flex; }
 .ob-rail-intro { margin-top: 52px; }
 .ob-rail-intro h2 { margin: 0; font-size: 30px; line-height: 1.1; letter-spacing: -.03em; }
 .ob-rail-intro p { max-width: 290px; margin: 14px 0 0; color: var(--inverse-fg-2); font-size: 14px; line-height: 1.55; }
