@@ -25,7 +25,6 @@ import {
   Send,
   Settings2,
   ShieldCheck,
-  Sparkles,
   Target,
   TrendingUp,
   User,
@@ -38,7 +37,6 @@ import MarquillLockup from "../../components/brand/MarquillLockup";
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; strokeWidth?: number; color?: string; className?: string }>> = {
   user: User,
   "pen-line": PenLine,
-  sparkles: Sparkles,
   "trending-up": TrendingUp,
   "badge-check": BadgeCheck,
   megaphone: Megaphone,

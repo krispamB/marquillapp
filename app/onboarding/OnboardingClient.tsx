@@ -256,7 +256,12 @@ export default function OnboardingClient({ initialSession }: { initialSession: O
         <ThemeToggle compact className="ob-theme-toggle" />
         <div className="ob-frame">
           <aside className="ob-rail">
-            <MarquillLockup size={30} theme="dark" />
+            <span className="ob-rail-brand ob-rail-brand-on-dark">
+              <MarquillLockup size={30} theme="dark" />
+            </span>
+            <span className="ob-rail-brand ob-rail-brand-on-light">
+              <MarquillLockup size={30} theme="light" />
+            </span>
             <div className="ob-rail-intro">
               <h2>Let&apos;s get Mark<br />working for you.</h2>
               <p>A few quick steps and Mark starts drafting, designing, and scheduling in your voice.</p>
@@ -270,7 +275,7 @@ export default function OnboardingClient({ initialSession }: { initialSession: O
           </aside>
 
           <section className="ob-workspace">
-            <div className="ob-mobile-brand"><MarquillLockup size={27} theme="light" /></div>
+            <div className="ob-mobile-brand"><MarquillLockup size={27} theme="auto" /></div>
             <Progress step={step === 1 ? 2 : 3} total={3} style="steps" />
             <div className="ob-wrap">
               <div className="ob-card">
