@@ -215,27 +215,16 @@ export default function DashboardRedesignClient({
               <span className="mq-stat-note mq-positive">↗ 12 vs last month</span>
             </div>
             <div className="mq-card mq-stat-card mq-connected-account-card">
-              <span className="mq-label">Connected accounts</span>
+              <span className="mq-label">Connected Accounts</span>
               <div className="mq-stat-value-row"><strong>{connectedAccounts.length}</strong></div>
               <div className="mq-connected-account-summary">
-                <span>{connectedAccounts.length === 1 ? "LinkedIn account" : "LinkedIn accounts"}</span>
+                <span>LinkedIn Pages</span>
                 {visibleWorkspaceAccounts.length ? (
                   <span className="mq-connected-account-avatars" aria-label={`${connectedAccounts.length} connected LinkedIn ${connectedAccounts.length === 1 ? "account" : "accounts"}`}>
                     {visibleWorkspaceAccounts.map((account) => (
-                      account.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          className="mq-avatar mq-connected-account-avatar"
-                          key={account.id}
-                          src={account.avatarUrl}
-                          alt={account.displayName ?? "LinkedIn account"}
-                          title={account.displayName ?? "LinkedIn account"}
-                        />
-                      ) : (
-                        <span className="mq-avatar mq-avatar-accent mq-connected-account-avatar" key={account.id} title={account.displayName ?? "LinkedIn account"}>
-                          {getInitials(account.displayName ?? account.profile?.localizedFirstName ?? "LinkedIn", account.vanityName)}
-                        </span>
-                      )
+                      <span className="mq-connected-account-avatar" key={account.id} title={account.displayName ?? "LinkedIn account"}>
+                        {getInitials(account.displayName ?? account.profile?.localizedFirstName ?? "LinkedIn", account.vanityName)}
+                      </span>
                     ))}
                     {hiddenWorkspaceAccountCount ? <span className="mq-connected-account-more">+{hiddenWorkspaceAccountCount}</span> : null}
                   </span>

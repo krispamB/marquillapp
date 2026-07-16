@@ -306,10 +306,12 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-positive { color: var(--pos); font-weight: 600; }
 .mq-progress { height: 6px; margin-top: 13px; overflow: hidden; border-radius: 999px; background: var(--canvas-sub); }
 .mq-progress span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .3s ease; }
-.mq-connected-account-summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 9px; color: var(--ink-500); font-size: 11px; }
-.mq-connected-account-avatars { display: inline-flex; flex: none; align-items: center; padding-left: 8px; }
-.mq-connected-account-avatar, .mq-connected-account-more { display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; margin-left: -8px; overflow: hidden; border: 2px solid var(--surface); border-radius: 50%; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent-ink); font-size: 10px; font-weight: 700; box-shadow: var(--sh-xs); }
-.mq-connected-account-avatar:nth-child(2) { background: var(--pos-bg); color: var(--pos); }
+.mq-connected-account-card { display: flex; flex-direction: column; }
+.mq-connected-account-card .mq-stat-value-row { margin-top: 10px; }
+.mq-connected-account-summary { display: flex; min-height: 34px; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; color: var(--ink-700); font-size: 11px; font-weight: 500; }
+.mq-connected-account-avatars { display: inline-flex; flex: none; align-items: center; padding-left: 9px; }
+.mq-connected-account-avatar, .mq-connected-account-more { display: inline-flex; width: 34px; height: 34px; align-items: center; justify-content: center; margin-left: -9px; overflow: hidden; border: 2px solid var(--surface); border-radius: 50%; background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--accent-ink); font-size: 11px; font-weight: 700; box-shadow: var(--sh-xs); }
+.mq-connected-account-avatar:nth-child(2) { background: color-mix(in srgb, var(--pos) 14%, var(--surface)); color: var(--pos); }
 .mq-connected-account-avatar:nth-child(3) { background: var(--canvas-sub); color: var(--ink-700); }
 .mq-connected-account-more { background: var(--ink-900); color: var(--surface); }
 .mq-two-column { display: grid; grid-template-columns: 1.25fr 1fr; gap: 16px; }
