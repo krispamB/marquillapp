@@ -4,39 +4,17 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { initializePaddle, Paddle, Environments } from '@paddle/paddle-js';
 import Link from 'next/link';
-
-// ---------------------------------------------------------------------------
-// Cookie helper — reads the `user` cookie set by beta.marquill.com
-// Shape: { _id, name, email, googleId, avatar, tier, ... }
-// ---------------------------------------------------------------------------
-function getUserFromCookie(): { name?: string; email?: string } {
-  if (typeof document === 'undefined') return {};
-  const raw = document.cookie
-    .split('; ')
-    .find((row) => row.startsWith('user='))
-    ?.split('=')[1];
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(decodeURIComponent(raw));
-    return {
-      name: typeof parsed.name === 'string' ? parsed.name : undefined,
-      email: typeof parsed.email === 'string' ? parsed.email : undefined,
-    };
-  } catch {
-    return {};
-  }
-}
+import { normalizeAppUrl } from '@/config/urls';
 
 // ---------------------------------------------------------------------------
 // CheckoutContent — reads query params, initialises Paddle, opens inline widget
-// URL contract: /checkout?priceId=pri_xxx&tierName=Creator&monthlyPrice=19.99
+// URL contract: /checkout?transactionId=txn_xxx&tierName=Creator&monthlyPrice=19.99
 // ---------------------------------------------------------------------------
 export default function CheckoutContent() {
   const params = useSearchParams();
-  const priceId = params.get('priceId') ?? '';
+  const transactionId = params.get('transactionId') ?? '';
   const tierName = params.get('tierName') ?? 'Your plan';
   const monthlyPrice = params.get('monthlyPrice') ?? '';
-  const userId = params.get('userId') ?? '';
 
   const [paddle, setPaddle] = useState<Paddle | undefined>();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -44,8 +22,8 @@ export default function CheckoutContent() {
 
   // Step 1 — initialise Paddle SDK
   useEffect(() => {
-    if (!priceId) {
-      setErrorMsg('No price selected. Please go back and choose a plan.');
+    if (!transactionId) {
+      setErrorMsg('No transaction provided. Please go back and choose a plan.');
       setStatus('error');
       return;
     }
@@ -57,7 +35,13 @@ export default function CheckoutContent() {
       token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN!,
       eventCallback(event) {
         if (event.name === 'checkout.completed') {
-          window.location.href = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`;
+          const appUrl = normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL);
+          if (appUrl === '#') {
+            setErrorMsg('Checkout completed, but the billing page could not be opened.');
+            setStatus('error');
+            return;
+          }
+          window.location.href = new URL('/billing', appUrl).toString();
         }
       },
     })
@@ -66,21 +50,14 @@ export default function CheckoutContent() {
         setErrorMsg('Failed to load checkout. Please refresh and try again.');
         setStatus('error');
       });
-  }, [priceId]);
+  }, [transactionId]);
 
   // Step 2 — open inline checkout once SDK is ready
   useEffect(() => {
-    if (!paddle || !priceId) return;
-
-    const { name, email } = getUserFromCookie();
+    if (!paddle || !transactionId) return;
 
     paddle.Checkout.open({
-      items: [{ priceId, quantity: 1 }],
-      customer: email ? { email } : undefined,
-      customData: {
-        ...(name ? { name } : {}),
-        ...(userId ? { userId } : {}),
-      },
+      transactionId,
       settings: {
         displayMode: 'inline',
         frameTarget: 'paddle-checkout',  // matches className on container div below
@@ -91,7 +68,7 @@ export default function CheckoutContent() {
     });
 
     setStatus('ready');
-  }, [paddle, priceId]);
+  }, [paddle, transactionId]);
 
   // ── Error state ────────────────────────────────────────────────────────────
   if (status === 'error') {
