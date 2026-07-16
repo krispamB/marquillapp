@@ -36,6 +36,8 @@ const navItems: Array<{ key: WorkspacePage; label: string; href: string; icon: R
 ];
 const mobileNavItems = navItems.filter((item) => item.key !== "billing");
 
+export const WORKSPACE_SELECTOR_VALUE = "__marquill_workspace__";
+
 function AccountAvatar({ account, size = "md" }: { account?: ConnectedAccount; size?: "sm" | "md" }) {
   const initials = getInitials(
     account?.displayName ?? account?.profile?.localizedFirstName ?? "",
@@ -71,6 +73,7 @@ export default function RedesignShell({
   active,
   title,
   topbarExtra,
+  includeWorkspaceOption = false,
   children,
 }: {
   user: UserProfile;
@@ -80,6 +83,7 @@ export default function RedesignShell({
   active: WorkspacePage;
   title: string;
   topbarExtra?: ReactNode;
+  includeWorkspaceOption?: boolean;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -199,8 +203,20 @@ export default function RedesignShell({
               className="mq-account-select"
               value={selectedAccountId ?? ""}
               onChange={(value) => onSelectAccount?.(value)}
-              ariaLabel="Connected account"
-              options={accounts.length ? accounts.map((account) => ({ value: account.id, label: account.displayName ?? "LinkedIn account", icon: <AccountAvatar account={account} size="sm" /> })) : [{ value: "", label: "No account connected", disabled: true }]}
+              ariaLabel={includeWorkspaceOption ? "Dashboard scope" : "Connected account"}
+              options={[
+                ...(includeWorkspaceOption
+                  ? [{ value: WORKSPACE_SELECTOR_VALUE, label: "Workspace" }]
+                  : []),
+                ...accounts.map((account) => ({
+                  value: account.id,
+                  label: account.displayName ?? "LinkedIn account",
+                  icon: <AccountAvatar account={account} size="sm" />,
+                })),
+                ...(!includeWorkspaceOption && !accounts.length
+                  ? [{ value: "", label: "No account connected", disabled: true }]
+                  : []),
+              ]}
             />
           </div>
         </header>

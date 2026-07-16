@@ -296,6 +296,7 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-chip-button { min-height: 34px; padding: 0 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-700); font-size: 12px; }
 .mq-primary-icon { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--r-md); background: var(--ink-900); color: var(--surface); }
 .mq-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }
+.mq-workspace-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .mq-card { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--sh-sm); }
 .mq-stat-card { min-height: 132px; padding: 16px 17px; }
 .mq-label { display: block; color: var(--ink-500); font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; }
@@ -313,6 +314,12 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-card-heading a { display: inline-flex; align-items: center; gap: 4px; color: var(--ink-500); font-size: 12px; text-decoration: none; }
 .mq-list-row, .mq-schedule-row, .mq-agenda-row, .mq-setting-row { display: flex; align-items: flex-start; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line-faint); color: inherit; text-decoration: none; }
 .mq-list-row:hover, .mq-schedule-row:hover { background: var(--surface-2); }
+.mq-quick-action-row { display: flex; width: 100%; align-items: center; gap: 12px; padding: 14px 18px; border: 0; border-bottom: 1px solid var(--line-faint); background: transparent; color: inherit; font: inherit; text-align: left; text-decoration: none; }
+.mq-quick-action-row[href]:hover { background: var(--surface-2); }
+.mq-quick-action-row:disabled { cursor: not-allowed; }
+.mq-quick-action-row:disabled .mq-row-icon, .mq-quick-action-row:disabled .mq-row-copy { opacity: .58; }
+.mq-coming-soon { flex: none; padding: 4px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent-ink); font-size: 10px; font-weight: 600; }
+.mq-workspace-panels .mq-schedule-row:hover { background: transparent; }
 .mq-row-icon { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9px; background: var(--canvas-sub); color: var(--ink-700); }
 .mq-row-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 6px; }
 .mq-row-copy strong { overflow: hidden; color: var(--ink-800); font-size: 13.5px; font-weight: 500; line-height: 1.4; text-overflow: ellipsis; }
@@ -613,6 +620,7 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
   .mq-sidebar { width: 208px; }
   .mq-main { margin-left: 208px; }
   .mq-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mq-workspace-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .mq-two-column, .mq-billing-top, .mq-settings-grid { grid-template-columns: 1fr; }
   .mq-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .mq-composer-grid { grid-template-columns: 1fr; }
@@ -640,6 +648,7 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
   .mq-chip, .mq-chip-desktop { display: none; }
   .mq-primary-icon { width: 34px; height: 34px; }
   .mq-stat-card { min-height: 112px; padding: 13px 14px; }
+  .mq-workspace-stat-grid { grid-template-columns: 1fr; }
   .mq-stat-value-row strong { font-size: 22px; }
   .mq-stat-note { margin-top: 9px; font-size: 10px; }
   .mq-two-column { gap: 12px; }

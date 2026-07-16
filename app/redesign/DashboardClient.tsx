@@ -2,8 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, FileText, PenLine, Search, Video } from "lucide-react";
-import RedesignShell from "./Shell";
+import {
+  ArrowUpRight,
+  BarChart3,
+  FileText,
+  GalleryHorizontal,
+  PenLine,
+  Search,
+  Video,
+} from "lucide-react";
+import RedesignShell, { WORKSPACE_SELECTOR_VALUE } from "./Shell";
 import MarquillMark from "../../components/brand/MarquillMark";
 import LinkedInConnectButton from "./LinkedInConnectButton";
 import { API_BASE, readApi } from "./api";
@@ -36,25 +44,53 @@ function postTypeLabel(post: DashboardPost) {
   return post.type?.toLowerCase().includes("insight") ? "Insight" : "Post";
 }
 
+const workspaceSchedule = [
+  {
+    month: "Jul",
+    day: "18",
+    title: "The one onboarding change that cut our churn by 18% — a short thread.",
+    meta: "5:30pm · Ada Obi",
+  },
+  {
+    month: "Jul",
+    day: "21",
+    title: "Case study carousel: how Northwind shipped in 6 weeks with Marquill.",
+    meta: "9:00am · Lumen Studio",
+  },
+  {
+    month: "Jul",
+    day: "24",
+    title: "Poll — which growth channel are you doubling down on this quarter?",
+    meta: "8:15am · Ada Obi",
+  },
+];
+
 export default function DashboardRedesignClient({
   user,
   connectedAccounts,
-  primaryAccountId,
 }: {
   user: UserProfile;
   connectedAccounts: ConnectedAccount[];
   primaryAccountId?: string;
 }) {
-  const [selectedAccountId, setSelectedAccountId] = useState(primaryAccountId ?? connectedAccounts[0]?.id);
+  const [selectedAccountId, setSelectedAccountId] = useState(WORKSPACE_SELECTOR_VALUE);
   const [posts, setPosts] = useState<DashboardPost[]>([]);
   const [usage, setUsage] = useState<PaymentUsageResponse["data"] | null>(null);
   const [metrics, setMetrics] = useState<PostMetricsResponse["data"] | null>(null);
-  const [isLoading, setIsLoading] = useState(Boolean(selectedAccountId));
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const isWorkspace = selectedAccountId === WORKSPACE_SELECTOR_VALUE;
 
   const loadDashboard = useCallback(async (signal: AbortSignal) => {
-    if (!selectedAccountId) return;
+    if (!selectedAccountId || selectedAccountId === WORKSPACE_SELECTOR_VALUE) {
+      setPosts([]);
+      setUsage(null);
+      setMetrics(null);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
     const month = new Date().toISOString().slice(0, 7);
     setIsLoading(true);
     setError(null);
@@ -116,32 +152,39 @@ export default function DashboardRedesignClient({
       accounts={connectedAccounts}
       selectedAccountId={selectedAccountId}
       onSelectAccount={setSelectedAccountId}
+      includeWorkspaceOption
       active="dashboard"
       title="Dashboard"
-      topbarExtra={
+      topbarExtra={!isWorkspace ? (
         <label className="mq-search-field mq-search-desktop">
           <Search size={15} />
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search posts…" />
         </label>
-      }
+      ) : null}
     >
       <div className="mq-page-heading">
         <div>
           <h1>Good morning, {getFirstName(user.name)}.</h1>
-          <p>
-            Here&apos;s what Mark has queued. You have <strong>{drafts.length} drafts</strong> waiting for review.
-          </p>
+          {isWorkspace ? (
+            <p>Here&apos;s what&apos;s happening across your workspace.</p>
+          ) : (
+            <p>
+              Here&apos;s what Mark has queued. You have <strong>{drafts.length} drafts</strong> waiting for review.
+            </p>
+          )}
         </div>
         <time className="mq-mono">{new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date())}</time>
       </div>
 
-      <Link href="/posts/new" className="mq-ask-card">
-        <MarquillMark size={34} theme="light" className="mq-ask-mark-svg" title="" />
-        <span className="mq-ask-placeholder">Ask Mark to write a post about our Series A…<span className="mq-caret" /></span>
-        <span className="mq-chip"><PenLine size={13} /> Quick</span>
-        <span className="mq-chip mq-chip-desktop"><Video size={13} /> Insight</span>
-        <span className="mq-primary-icon"><ArrowUpRight size={18} /></span>
-      </Link>
+      {!isWorkspace ? (
+        <Link href="/posts/new" className="mq-ask-card">
+          <MarquillMark size={34} theme="light" className="mq-ask-mark-svg" title="" />
+          <span className="mq-ask-placeholder">Ask Mark to write a post about our Series A…<span className="mq-caret" /></span>
+          <span className="mq-chip"><PenLine size={13} /> Quick</span>
+          <span className="mq-chip mq-chip-desktop"><Video size={13} /> Insight</span>
+          <span className="mq-primary-icon"><ArrowUpRight size={18} /></span>
+        </Link>
+      ) : null}
 
       {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}
       {!connectedAccounts.length ? (
@@ -150,63 +193,118 @@ export default function DashboardRedesignClient({
         </div>
       ) : null}
 
-      <section className="mq-stat-grid" aria-label="Overview metrics">
-        <div className="mq-card mq-stat-card">
-          <span className="mq-label">AI posts this month</span>
-          <div className="mq-stat-value-row"><strong>{aiUsage?.used ?? (isLoading ? "…" : currentMonthCount)}</strong><span>/ {aiUsage?.limit ?? "—"}</span></div>
-          <div className="mq-progress"><span style={{ width: `${aiUsage?.limit ? Math.min(100, (aiUsage.used / aiUsage.limit) * 100) : 0}%` }} /></div>
-        </div>
-        <div className="mq-card mq-stat-card">
-          <span className="mq-label">Scheduled</span>
-          <div className="mq-stat-value-row"><strong>{isLoading ? "…" : scheduled.length}</strong><span>queued</span></div>
-          <span className="mq-stat-note">{firstScheduled ? `Next: ${formatScheduledDate(firstScheduled.scheduledAt)}` : "Nothing queued yet"}</span>
-        </div>
-        <div className="mq-card mq-stat-card">
-          <span className="mq-label">Published</span>
-          <div className="mq-stat-value-row"><strong>{isLoading ? "…" : published.length}</strong><span>this month</span></div>
-          <span className="mq-stat-note mq-positive">↗ Live post count</span>
-        </div>
-        <div className="mq-card mq-stat-card">
-          <span className="mq-label">Avg. engagement</span>
-          <div className="mq-stat-value-row"><strong>—</strong></div>
-          <span className="mq-stat-note">Analytics endpoint not connected</span>
-        </div>
-      </section>
+      {isWorkspace ? (
+        <>
+          <section className="mq-stat-grid mq-workspace-stat-grid" aria-label="Workspace metrics">
+            <div className="mq-card mq-stat-card">
+              <span className="mq-label">Credits left</span>
+              <div className="mq-stat-value-row"><strong>1,240</strong><span>/ 2,000</span></div>
+              <div className="mq-progress"><span style={{ width: "62%" }} /></div>
+            </div>
+            <div className="mq-card mq-stat-card">
+              <span className="mq-label">Artifacts ready</span>
+              <div className="mq-stat-value-row"><strong>3</strong><span>to attach</span></div>
+              <span className="mq-stat-note">1 post · 1 carousel · 1 poll</span>
+            </div>
+            <div className="mq-card mq-stat-card">
+              <span className="mq-label">Published</span>
+              <div className="mq-stat-value-row"><strong>38</strong><span>this month</span></div>
+              <span className="mq-stat-note mq-positive">↗ 12 vs last month</span>
+            </div>
+          </section>
 
-      <section className="mq-two-column">
-        <div className="mq-card mq-list-card">
-          <div className="mq-card-heading"><span className="mq-title">Recent drafts</span><Link href="/posts?status=DRAFT">View all <ArrowUpRight size={14} /></Link></div>
-          {isLoading ? <p className="mq-empty">Loading drafts…</p> : null}
-          {!isLoading && !filteredDrafts.length ? <p className="mq-empty">No drafts found for this account.</p> : null}
-          {filteredDrafts.slice(0, 3).map((post) => (
-            <Link href={`/posts/${post._id}/edit`} className="mq-list-row" key={post._id}>
-              <span className="mq-row-icon"><FileText size={16} /></span>
-              <span className="mq-row-copy"><strong>{getPostTitle(post.content)}</strong><small><span className="mq-tag">{postTypeLabel(post)}</span>{formatRelativeDate(post.updatedAt ?? post.createdAt)}</small></span>
-              <ArrowUpRight className="mq-row-arrow" size={16} />
-            </Link>
-          ))}
-        </div>
-
-        <div className="mq-card mq-list-card">
-          <div className="mq-card-heading"><span className="mq-title">Up next</span><Link href="/calendar">Calendar <ArrowUpRight size={14} /></Link></div>
-          {!isLoading && !scheduled.length ? <p className="mq-empty">No upcoming posts.</p> : null}
-          {scheduled.slice(0, 3).map((post) => {
-            const date = parseDate(post.scheduledAt);
-            return (
-              <Link href={`/posts/${post._id}/edit`} className="mq-schedule-row" key={post._id}>
-                <span className="mq-date-block"><b>{date?.toLocaleDateString(undefined, { month: "short" }) ?? "—"}</b><strong>{date?.getDate() ?? "—"}</strong></span>
-                <span className="mq-row-copy"><strong>{getPostTitle(post.content)}</strong><small><span className="mq-live-dot" />{formatScheduledDate(post.scheduledAt)}</small></span>
+          <section className="mq-two-column mq-workspace-panels">
+            <div className="mq-card mq-list-card">
+              <div className="mq-card-heading"><span className="mq-title">Quick actions</span></div>
+              <Link href="/posts/new" className="mq-quick-action-row">
+                <span className="mq-row-icon"><FileText size={17} /></span>
+                <span className="mq-row-copy"><strong>Post</strong><small>Create a LinkedIn post with Mark</small></span>
+                <ArrowUpRight className="mq-row-arrow" size={16} />
               </Link>
-            );
-          })}
-        </div>
-      </section>
+              <button type="button" className="mq-quick-action-row" disabled>
+                <span className="mq-row-icon"><BarChart3 size={17} /></span>
+                <span className="mq-row-copy"><strong>Poll</strong><small>Create a poll for your audience</small></span>
+                <span className="mq-coming-soon">Coming soon</span>
+              </button>
+              <button type="button" className="mq-quick-action-row" disabled>
+                <span className="mq-row-icon"><GalleryHorizontal size={17} /></span>
+                <span className="mq-row-copy"><strong>Carousel</strong><small>Turn an idea into a slide deck</small></span>
+                <span className="mq-coming-soon">Coming soon</span>
+              </button>
+            </div>
 
-      <section className="mq-card mq-footnote-card">
-        <div><span className="mq-eyebrow">This workspace</span><h2>{titleCase(usage?.tier?.name ?? user.tier?.name ?? "Free")} plan</h2></div>
-        <p>{aiUsage ? `${aiUsage.remaining} AI posts remaining this cycle.` : "Usage data will appear here when the billing service responds."}</p>
-        <Link href="/billing" className="mq-secondary-button">View billing <ArrowUpRight size={15} /></Link>
-      </section>
+            <div className="mq-card mq-list-card">
+              <div className="mq-card-heading"><span className="mq-title">Up next</span><Link href="/calendar">Calendar <ArrowUpRight size={14} /></Link></div>
+              {workspaceSchedule.map((item) => (
+                <div className="mq-schedule-row" key={`${item.month}-${item.day}`}>
+                  <span className="mq-date-block"><b>{item.month}</b><strong>{item.day}</strong></span>
+                  <span className="mq-row-copy"><strong>{item.title}</strong><small><span className="mq-live-dot" />{item.meta}</small></span>
+                </div>
+              ))}
+            </div>
+          </section>
+        </>
+      ) : (
+        <>
+          <section className="mq-stat-grid" aria-label="Overview metrics">
+            <div className="mq-card mq-stat-card">
+              <span className="mq-label">AI posts this month</span>
+              <div className="mq-stat-value-row"><strong>{aiUsage?.used ?? (isLoading ? "…" : currentMonthCount)}</strong><span>/ {aiUsage?.limit ?? "—"}</span></div>
+              <div className="mq-progress"><span style={{ width: `${aiUsage?.limit ? Math.min(100, (aiUsage.used / aiUsage.limit) * 100) : 0}%` }} /></div>
+            </div>
+            <div className="mq-card mq-stat-card">
+              <span className="mq-label">Scheduled</span>
+              <div className="mq-stat-value-row"><strong>{isLoading ? "…" : scheduled.length}</strong><span>queued</span></div>
+              <span className="mq-stat-note">{firstScheduled ? `Next: ${formatScheduledDate(firstScheduled.scheduledAt)}` : "Nothing queued yet"}</span>
+            </div>
+            <div className="mq-card mq-stat-card">
+              <span className="mq-label">Published</span>
+              <div className="mq-stat-value-row"><strong>{isLoading ? "…" : published.length}</strong><span>this month</span></div>
+              <span className="mq-stat-note mq-positive">↗ Live post count</span>
+            </div>
+            <div className="mq-card mq-stat-card">
+              <span className="mq-label">Avg. engagement</span>
+              <div className="mq-stat-value-row"><strong>—</strong></div>
+              <span className="mq-stat-note">Analytics endpoint not connected</span>
+            </div>
+          </section>
+
+          <section className="mq-two-column">
+            <div className="mq-card mq-list-card">
+              <div className="mq-card-heading"><span className="mq-title">Recent drafts</span><Link href="/posts?status=DRAFT">View all <ArrowUpRight size={14} /></Link></div>
+              {isLoading ? <p className="mq-empty">Loading drafts…</p> : null}
+              {!isLoading && !filteredDrafts.length ? <p className="mq-empty">No drafts found for this account.</p> : null}
+              {filteredDrafts.slice(0, 3).map((post) => (
+                <Link href={`/posts/${post._id}/edit`} className="mq-list-row" key={post._id}>
+                  <span className="mq-row-icon"><FileText size={16} /></span>
+                  <span className="mq-row-copy"><strong>{getPostTitle(post.content)}</strong><small><span className="mq-tag">{postTypeLabel(post)}</span>{formatRelativeDate(post.updatedAt ?? post.createdAt)}</small></span>
+                  <ArrowUpRight className="mq-row-arrow" size={16} />
+                </Link>
+              ))}
+            </div>
+
+            <div className="mq-card mq-list-card">
+              <div className="mq-card-heading"><span className="mq-title">Up next</span><Link href="/calendar">Calendar <ArrowUpRight size={14} /></Link></div>
+              {!isLoading && !scheduled.length ? <p className="mq-empty">No upcoming posts.</p> : null}
+              {scheduled.slice(0, 3).map((post) => {
+                const date = parseDate(post.scheduledAt);
+                return (
+                  <Link href={`/posts/${post._id}/edit`} className="mq-schedule-row" key={post._id}>
+                    <span className="mq-date-block"><b>{date?.toLocaleDateString(undefined, { month: "short" }) ?? "—"}</b><strong>{date?.getDate() ?? "—"}</strong></span>
+                    <span className="mq-row-copy"><strong>{getPostTitle(post.content)}</strong><small><span className="mq-live-dot" />{formatScheduledDate(post.scheduledAt)}</small></span>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="mq-card mq-footnote-card">
+            <div><span className="mq-eyebrow">This workspace</span><h2>{titleCase(usage?.tier?.name ?? user.tier?.name ?? "Free")} plan</h2></div>
+            <p>{aiUsage ? `${aiUsage.remaining} AI posts remaining this cycle.` : "Usage data will appear here when the billing service responds."}</p>
+            <Link href="/billing" className="mq-secondary-button">View billing <ArrowUpRight size={15} /></Link>
+          </section>
+        </>
+      )}
     </RedesignShell>
   );
 }
