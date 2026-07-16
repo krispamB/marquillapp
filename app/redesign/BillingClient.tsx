@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, CreditCard, ExternalLink } from "lucide-react";
 import RedesignShell from "./Shell";
-import { API_BASE, readApi } from "./api";
+import { API_BASE, jsonRequest, readApi } from "./api";
 import { titleCase } from "./types";
 import type { ConnectedAccount, PaymentUsageResponse, Tier, UserProfile } from "../lib/types";
 
 type Invoice = { id?: string; date?: string; plan?: string; amount?: string | number; status?: string; customer?: string };
+type CheckoutResponse = { transactionId?: string };
 
 function unwrapList<T>(value: unknown): T[] {
   if (Array.isArray(value)) return value as T[];
@@ -34,6 +35,7 @@ export default function BillingRedesignClient({
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [usage, setUsage] = useState<PaymentUsageResponse["data"] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [checkoutTierId, setCheckoutTierId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -54,20 +56,32 @@ export default function BillingRedesignClient({
   const planName = subscription?.name ?? usage?.tier?.name ?? user.tier?.name ?? "Free";
   const activeTier = useMemo(() => tiers.find((tier) => tier.name.toLowerCase() === planName.toLowerCase()), [planName, tiers]);
 
-  const handleCheckout = (tier: Tier) => {
+  const handleCheckout = async (tier: Tier) => {
     if (!tier.paddleMonthlyPriceId) {
       setError("This plan is not available for purchase through Paddle right now.");
       return;
     }
 
-    const params = new URLSearchParams({
-      priceId: tier.paddleMonthlyPriceId,
-      tierName: tier.name,
-      monthlyPrice: String(tier.monthlyPrice),
-      ...(user.id ? { userId: user.id } : {}),
-    });
-    const landingUrl = process.env.NEXT_PUBLIC_LANDING ?? "http://localhost:3001";
-    window.location.href = `${landingUrl}/checkout?${params.toString()}`;
+    setCheckoutTierId(tier._id);
+    setError(null);
+
+    try {
+      const response = await readApi<CheckoutResponse>(
+        `${API_BASE}/payment/checkout`,
+        jsonRequest({ priceId: tier.paddleMonthlyPriceId }, { method: "POST" }),
+      );
+      if (!response.transactionId) {
+        throw new Error("The payment service did not return a transaction ID.");
+      }
+
+      const landingUrl = process.env.NEXT_PUBLIC_LANDING ?? "http://localhost:3001";
+      const checkoutUrl = new URL("/checkout", landingUrl);
+      checkoutUrl.searchParams.set("transactionId", response.transactionId);
+      window.location.href = checkoutUrl.toString();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to start checkout.");
+      setCheckoutTierId(null);
+    }
   };
 
   return (
@@ -81,7 +95,7 @@ export default function BillingRedesignClient({
         <div className="mq-card mq-usage-card"><div className="mq-card-heading"><span className="mq-title">Usage this month</span><span className="mq-mono">{usage?.billingCycle?.end ? `resets ${new Date(usage.billingCycle.end).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : "cycle unavailable"}</span></div><div className="mq-usage-list">{usage?.usage && Object.entries(usage.usage).length ? Object.entries(usage.usage).map(([key, metric]) => { const percent = metric.limit > 0 ? Math.min(100, metric.used / metric.limit * 100) : 0; return <div key={key} className="mq-usage-item"><div><span>{titleCase(key)}</span><strong>{metric.used} / {metric.limit > 0 ? metric.limit : "∞"}</strong></div><div className="mq-progress"><span style={{ width: `${percent}%` }} /></div></div>; }) : <p className="mq-empty">No usage data found.</p>}</div></div>
       </section>
 
-        <section id="change-plan"><div className="mq-section-heading"><h2>Change plan</h2><span>Plans returned by Paddle</span></div><div className="mq-plan-grid">{tiers.length ? tiers.map((tier) => { const current = tier.name.toLowerCase() === planName.toLowerCase(); const features = tier.metadata?.features ?? ["LinkedIn account", "AI drafting", "Post scheduling"]; return <div key={tier._id} className={`mq-card mq-tier-card ${current ? "is-current" : ""}`}><div className="mq-tier-heading"><h3>{tier.name}</h3>{current ? <span className="mq-current-badge">Current</span> : null}</div><div className="mq-tier-price">${tier.monthlyPrice}<small>/mo</small></div><p>{tier.metadata?.description ?? "Marquill essentials."}</p><ul>{features.slice(0, 4).map((feature) => <li key={feature}><Check size={14} />{feature}</li>)}</ul><button type="button" className={current ? "mq-disabled-button" : "mq-primary-button"} disabled={current} onClick={() => handleCheckout(tier)}>{current ? "Current plan" : "View plan"}</button></div>; }) : <div className="mq-card mq-empty">No plans available right now.</div>}</div></section>
+        <section id="change-plan"><div className="mq-section-heading"><h2>Change plan</h2><span>Plans returned by Paddle</span></div><div className="mq-plan-grid">{tiers.length ? tiers.map((tier) => { const current = tier.name.toLowerCase() === planName.toLowerCase(); const isStartingCheckout = checkoutTierId === tier._id; const features = tier.metadata?.features ?? ["LinkedIn account", "AI drafting", "Post scheduling"]; return <div key={tier._id} className={`mq-card mq-tier-card ${current ? "is-current" : ""}`}><div className="mq-tier-heading"><h3>{tier.name}</h3>{current ? <span className="mq-current-badge">Current</span> : null}</div><div className="mq-tier-price">${tier.monthlyPrice}<small>/mo</small></div><p>{tier.metadata?.description ?? "Marquill essentials."}</p><ul>{features.slice(0, 4).map((feature) => <li key={feature}><Check size={14} />{feature}</li>)}</ul><button type="button" className={current ? "mq-disabled-button" : "mq-primary-button"} disabled={current || checkoutTierId !== null} onClick={() => void handleCheckout(tier)}>{current ? "Current plan" : isStartingCheckout ? "Redirecting…" : "View plan"}</button></div>; }) : <div className="mq-card mq-empty">No plans available right now.</div>}</div></section>
 
       <section className="mq-card mq-invoice-card"><div className="mq-card-heading"><span className="mq-title">Payment history</span><span className="mq-mono">Powered by Paddle</span></div>{invoices.length ? invoices.map((invoice, index) => <div className="mq-invoice-row" key={invoice.id ?? `${invoice.date}-${index}`}><span>{invoice.date ? new Date(invoice.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}</span><span>{invoice.plan ?? planName}</span><strong>{typeof invoice.amount === "number" ? `$${(invoice.amount / 100).toFixed(2)}` : invoice.amount ?? "—"}</strong><span className="mq-status mq-status-published"><i />{invoice.status ?? "Paid"}</span><button type="button" disabled title="Receipt endpoint is not connected"><ExternalLink size={13} /> Receipt</button></div>) : <p className="mq-empty">No invoices found.</p>}</section>
       <p className="mq-missing-note">Manage payment, cancel subscription, and receipt downloads are visible in the handoff but have no matching frontend endpoint in this repository.</p>
