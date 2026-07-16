@@ -262,7 +262,7 @@ export default function OnboardingClient({ initialProfile }: { initialProfile: O
               <p>A few quick steps and Mark starts drafting, designing, and scheduling in your voice.</p>
             </div>
             <div className="ob-rail-steps">
-              <div className="is-done"><span><Check size={15} /></span><div><b>Sign up with Google</b><small>Your Marquill account is ready</small></div></div>
+              <div className="is-done"><span><Check size={15} /></span><div><b>Sign up</b><small>Your Marquill account is ready</small></div></div>
               <div className={step > 1 ? "is-done" : "is-current"}><span>{step > 1 ? <Check size={15} /> : "2"}</span><div><b>Connect LinkedIn</b><small>Personal profile or company page</small></div></div>
               <div className={step > 1 ? "is-current" : ""}><span>3</span><div><b>Tell Mark your voice</b><small>Workspace, goals, cadence & topics</small></div></div>
             </div>

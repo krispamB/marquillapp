@@ -443,8 +443,8 @@ export function StepConnect({ data, update }: StepConnectProps) {
         type="button"
         className="connect-card"
         style={{
-          borderColor: data.connected ? "var(--color-primary)" : "var(--color-border)",
-          boxShadow: data.connected ? "0 0 0 4px rgba(91,92,246,0.10)" : "none",
+          borderColor: data.connected ? "var(--accent)" : "var(--color-border)",
+          boxShadow: data.connected ? "0 0 0 4px var(--accent-soft)" : "none",
           opacity: isConnecting ? 0.7 : 1,
           cursor: data.connected || isConnecting ? "default" : "pointer",
         }}
@@ -460,7 +460,7 @@ export function StepConnect({ data, update }: StepConnectProps) {
           <span className="c-sub">{subLine[data.persona] ?? subLine.creator}</span>
         </span>
         {data.connected
-          ? <CheckCircle2 size={22} color="#5B5CF6" />
+          ? <CheckCircle2 size={22} color="var(--accent)" />
           : <ArrowRight size={18} />}
       </button>
 
@@ -472,7 +472,7 @@ export function StepConnect({ data, update }: StepConnectProps) {
 
       {isWriter && data.connected && (
         <div className="multi-hint">
-          <PlusCircle size={16} color="#5B5CF6" />
+          <PlusCircle size={16} color="var(--accent)" />
           <span>Add more clients from the dashboard — each gets its own workspace, voice, and schedule.</span>
         </div>
       )}

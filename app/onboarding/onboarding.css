@@ -5,12 +5,12 @@
   --ink-900: #0a0a0a; --ink-800: #1a1a19; --ink-700: #3a3a38; --ink-500: #76766f; --ink-400: #9a9a93;
   --line: #e7e7e3; --line-strong: #dcdcd6; --line-faint: #f0f0ec;
   --inverse-bg: #111110; --inverse-fg: #f4f4f1; --inverse-fg-2: #a0a09a; --inverse-line: #2c2c29;
-  --accent: var(--brand-accent); --accent-ink: var(--brand-accent-ink); --pos: #1f9d55; --pos-bg: #e7f5ec;
+  --accent: var(--brand-accent); --accent-ink: var(--brand-accent-ink); --accent-soft: color-mix(in srgb, var(--accent) 11%, transparent);
   --sh-xs: 0 1px 2px rgba(16,16,15,.04); --sh-sm: 0 1px 2px rgba(16,16,15,.05),0 1px 3px rgba(16,16,15,.04); --sh-lg: 0 8px 24px rgba(16,16,15,.1),0 2px 6px rgba(16,16,15,.05);
   min-height: 100vh; padding: 32px; display: grid; place-items: center; background: var(--canvas); color: var(--ink-900); font-family: var(--font-inter), sans-serif;
 }
 html[data-theme="dark"] .ob-page {
-  --canvas:#0c0c0b;--canvas-sub:#181816;--surface:#161614;--surface-2:#1e1e1b;--ink-900:#f4f4f1;--ink-800:#e4e4df;--ink-700:#c6c6bf;--ink-500:#8f8f88;--ink-400:#6d6d66;--line:#262624;--line-strong:#34342f;--line-faint:#1d1d1a;--inverse-bg:#f4f4f1;--inverse-fg:#0a0a0a;--inverse-fg-2:#57574f;--inverse-line:#d8d8d2;--accent:var(--brand-accent);--accent-ink:var(--brand-accent-ink);--pos:#46c07d;--pos-bg:#14271c;
+  --canvas:#0c0c0b;--canvas-sub:#181816;--surface:#161614;--surface-2:#1e1e1b;--ink-900:#f4f4f1;--ink-800:#e4e4df;--ink-700:#c6c6bf;--ink-500:#8f8f88;--ink-400:#6d6d66;--line:#262624;--line-strong:#34342f;--line-faint:#1d1d1a;--inverse-bg:#f4f4f1;--inverse-fg:#0a0a0a;--inverse-fg-2:#57574f;--inverse-line:#d8d8d2;--accent:var(--brand-accent);--accent-ink:var(--brand-accent-ink);--accent-soft:color-mix(in srgb,var(--accent) 16%,transparent);
 }
 .ob-theme-toggle { position: fixed; top: 18px; right: 20px; z-index: 20; }
 .ob-frame { width: min(1180px, 100%); min-height: min(800px, calc(100vh - 64px)); display: grid; grid-template-columns: 390px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--sh-lg); }
@@ -24,7 +24,7 @@ html[data-theme="dark"] .ob-page {
 .ob-rail-steps > div.is-current, .ob-rail-steps > div.is-done { opacity: 1; }
 .ob-rail-steps > div > span { display: grid; flex: 0 0 30px; width: 30px; height: 30px; place-items: center; border: 1.5px solid var(--inverse-line); border-radius: 50%; color: var(--inverse-fg-2); font-size: 13px; font-weight: 700; }
 .ob-rail-steps .is-current > span { border-color: var(--accent); background: var(--accent); color: #fff; }
-.ob-rail-steps .is-done > span { border-color: var(--pos); background: var(--pos); color: #fff; }
+.ob-rail-steps .is-done > span { border-color: var(--accent); background: var(--accent); color: #fff; }
 .ob-rail-steps b, .ob-rail-steps small { display: block; line-height: 1.35; }
 .ob-rail-steps b { color: var(--inverse-fg); font-size: 13.5px; }
 .ob-rail-steps small { margin-top: 2px; color: var(--inverse-fg-2); font-size: 11.5px; }
@@ -78,7 +78,7 @@ html[data-theme="dark"] .ob-page {
 .connect-card .c-sub { margin-top: 2px; color: var(--ink-500); font-size: 11.5px; }
 .assurances { display: flex; flex-direction: column; gap: 9px; margin-top: 15px; }
 .assurance { display: flex; align-items: center; gap: 9px; color: var(--ink-500); font-size: 12px; }
-.assurance .ic { display: grid; width: 21px; height: 21px; place-items: center; border-radius: 50%; background: var(--pos-bg); color: var(--pos); }
+.assurance .ic { display: grid; width: 21px; height: 21px; place-items: center; border-radius: 50%; background: var(--accent-soft); color: var(--accent); }
 .multi-hint { display: flex; align-items: center; gap: 9px; margin-top: 12px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--ink-700); font-size: 12px; }
 .progress { display: flex; align-items: center; gap: 12px; }
 .progress-steps { color: var(--ink-500); font: 11px var(--font-jetbrains-mono); white-space: nowrap; }
@@ -93,7 +93,7 @@ html[data-theme="dark"] .ob-page {
 .btn.ghost:hover { color: var(--ink-900); }
 .ob-error { margin: 12px 0 0; color: #d34e54; font-size: 12px; text-align: center; }
 .ob-toast { position: fixed; bottom: 28px; left: 50%; z-index: 50; display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-radius: 999px; background: var(--inverse-bg); color: var(--inverse-fg); box-shadow: var(--sh-lg); transform: translateX(-50%); font-size: 13px; font-weight: 600; }
-.ob-toast .check { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; background: var(--pos); color: #fff; }
+.ob-toast .check { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; background: var(--accent); color: #fff; }
 
 @media (max-width: 760px) {
   .ob-page { display: block; padding: 0; background: var(--surface); }
