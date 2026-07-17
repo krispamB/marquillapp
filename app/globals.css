@@ -266,9 +266,18 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-credit-meta a:hover { text-decoration: underline; }
 .mq-sidebar-user { display: flex; align-items: center; gap: 9px; padding: 8px; border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-xs); }
 .mq-upgrade-link { color: var(--accent-ink); font-size: 10px; font-weight: 600; text-decoration: none; }
-.mq-topbar { display: flex; align-items: center; justify-content: space-between; min-height: 62px; padding: 0 28px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.mq-topbar { position: sticky; top: 0; z-index: 15; display: flex; align-items: center; justify-content: space-between; min-height: 62px; padding: 0 28px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 96%, transparent); backdrop-filter: blur(12px); }
+.mq-topbar-leading { display: flex; min-width: 0; flex: 1; align-items: center; gap: 12px; }
+.mq-topbar-copy { min-width: 0; }
+.mq-topbar-back { display: inline-flex; width: 38px; height: 38px; flex: none; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink-700); box-shadow: var(--sh-xs); }
+.mq-topbar-back:hover { border-color: var(--line-strong); color: var(--ink-900); }
 .mq-topbar-title { font-size: 15px; font-weight: 600; letter-spacing: -.02em; }
-.mq-topbar-actions { display: flex; align-items: center; gap: 10px; }
+.mq-topbar-subtitle { margin-top: 2px; color: var(--ink-400); font-size: 10.5px; }
+.mq-topbar-actions { display: flex; flex: none; align-items: center; gap: 10px; }
+.mq-topbar-credits { display: inline-flex; min-height: 36px; align-items: center; gap: 6px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink-700); font-size: 12px; text-decoration: none; box-shadow: var(--sh-xs); white-space: nowrap; }
+.mq-topbar-credits:hover { border-color: var(--line-strong); color: var(--ink-900); }
+.mq-topbar-credits svg { color: var(--accent); fill: color-mix(in srgb, var(--accent) 13%, transparent); }
+.mq-topbar-credits strong { color: var(--ink-900); font-size: 12.5px; }
 .mq-search-field, .mq-filter-select { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-400); }
 .mq-search-field { width: 230px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--canvas); }
 .mq-search-field input, .mq-filter-select input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--ink-800); font: inherit; }
@@ -552,16 +561,11 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-artifact-type-selection:hover .mq-artifact-selection-icon, .mq-artifact-type-selection:focus-visible .mq-artifact-selection-icon { background: var(--accent); color: var(--surface); }
 .mq-artifact-type-selection > strong { font: inherit; }
 .mq-artifact-studio-note { margin: 18px 0 0; color: var(--ink-400); font: 10.5px/1.5 var(--font-jetbrains-mono); text-align: center; }
-.mq-artifact-submit.is-loading svg, .mq-studio-refine button svg, .mq-studio-connecting svg, .mq-studio-thread-loading svg, .mq-studio-step-icon .lucide-loader-circle { animation: mq-studio-spin .8s linear infinite; }
+.mq-artifact-submit.is-loading svg, .mq-studio-refine button .lucide-loader-circle, .mq-studio-connecting svg, .mq-studio-thread-loading svg, .mq-studio-step-icon .lucide-loader-circle { animation: mq-studio-spin .8s linear infinite; }
 .mq-artifact-create-error { margin-top: 13px; padding: 10px 13px; border: 1px solid color-mix(in srgb, var(--neg) 28%, var(--line)); border-radius: 11px; background: color-mix(in srgb, var(--neg) 7%, var(--surface)); color: var(--neg); font-size: 12px; line-height: 1.45; }
 
 /* Artifact Studio conversation ----------------------------------------- */
-.mq-studio-conversation { width: min(100%, 880px); min-height: calc(100vh - 140px); margin: 0 auto; padding: 8px 0 44px; }
-.mq-studio-conversation-head { display: flex; align-items: center; gap: 13px; padding: 8px 0 22px; border-bottom: 1px solid var(--line-faint); }
-.mq-studio-conversation-head > a { display: inline-flex; width: 38px; height: 38px; flex: none; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink-700); box-shadow: var(--sh-xs); }
-.mq-studio-conversation-head > a:hover { border-color: var(--line-strong); color: var(--ink-900); }
-.mq-studio-conversation-head h1 { margin: 0; color: var(--ink-900); font-size: 18px; font-weight: 680; letter-spacing: -.025em; }
-.mq-studio-conversation-head p { margin: 3px 0 0; color: var(--ink-400); font-size: 11px; }
+.mq-studio-conversation { width: min(100%, 760px); min-height: calc(100vh - 140px); margin: 0 auto; padding: 8px 0 44px; }
 .mq-studio-thread { display: flex; min-height: 390px; flex-direction: column; gap: 22px; padding: 34px 0 30px; }
 .mq-studio-user-message { max-width: min(78%, 650px); align-self: flex-end; padding: 13px 17px; border-radius: 18px 18px 4px 18px; background: var(--ink-900); color: var(--surface); font-size: 14px; line-height: 1.55; white-space: pre-wrap; box-shadow: var(--sh-sm); }
 .mq-studio-assistant-message, .mq-studio-run { display: grid; width: 100%; grid-template-columns: 34px minmax(0, 1fr); align-items: flex-start; gap: 12px; }
@@ -912,7 +916,13 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
   .mq-main { margin-left: 0; padding-bottom: 64px; }
   .mq-topbar { min-height: 56px; padding: 0 16px; }
   .mq-topbar-title { font-size: 16px; }
+  .mq-topbar-copy { overflow: hidden; }
+  .mq-topbar-title, .mq-topbar-subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mq-topbar-back { width: 35px; height: 35px; border-radius: 10px; }
   .mq-topbar-actions { gap: 7px; }
+  .mq-topbar-credits { min-height: 34px; padding: 0 10px; }
+  .mq-topbar-credits span { display: none; }
+  .mq-topbar-with-credits .mq-theme-toggle, .mq-topbar-with-credits .mq-feedback-topbar, .mq-topbar-with-credits .mq-notification, .mq-topbar-with-credits .mq-topbar-actions > .mq-avatar { display: none; }
   .mq-search-desktop, .mq-account-select { display: none; }
   .mq-feedback-topbar { display: inline-flex; }
   .mq-notification { width: 28px; }
@@ -986,9 +996,6 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
   .mq-artifact-type-options button { min-height: 54px; }
   .mq-artifact-studio-note { max-width: 290px; }
   .mq-studio-conversation { min-height: calc(100vh - 120px); padding: 0 0 24px; }
-  .mq-studio-conversation-head { padding: 0 0 16px; }
-  .mq-studio-conversation-head > a { width: 35px; height: 35px; border-radius: 10px; }
-  .mq-studio-conversation-head h1 { overflow: hidden; max-width: 240px; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
   .mq-studio-thread { min-height: 330px; gap: 19px; padding: 24px 0; }
   .mq-studio-user-message { max-width: 88%; padding: 11px 14px; font-size: 13px; }
   .mq-studio-assistant-message, .mq-studio-run { grid-template-columns: 29px minmax(0, 1fr); gap: 8px; }

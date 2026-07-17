@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -11,7 +10,6 @@ import {
   type FormEvent,
 } from "react";
 import {
-  ArrowLeft,
   LoaderCircle,
   RefreshCw,
   Sparkles,
@@ -229,18 +227,15 @@ export default function ArtifactConversationClient({
       selectedAccountId={primaryAccountId}
       subscription={subscription}
       active="artifacts"
-      title="Artifact Studio"
+      title={artifactTitle}
+      topbarBackHref="/artifacts"
+      topbarBackLabel="Back to artifacts"
+      topbarSubtitle={artifactType ? `${artifactTypeLabels[artifactType]} · Created with Mark` : "Creating with Mark"}
+      showTopbarCredits
+      creditRefreshKey={activeRunId}
       showAccountSelector={false}
     >
       <section className="mq-studio-conversation" aria-label="Artifact conversation">
-        <header className="mq-studio-conversation-head">
-          <Link href="/artifacts" aria-label="Back to artifacts"><ArrowLeft size={18} /></Link>
-          <div>
-            <h1>{artifactTitle}</h1>
-            <p>{artifactType ? `${artifactTypeLabels[artifactType]} · Created with Mark` : "Creating with Mark"}</p>
-          </div>
-        </header>
-
         <div className="mq-studio-thread">
           {loadError ? (
             <div className="mq-studio-load-error" role="alert">
@@ -287,7 +282,7 @@ export default function ArtifactConversationClient({
                   setFeedback(event.target.value);
                   if (refineError) setRefineError(null);
                 }}
-                placeholder="Reply to refine — anything you say rebuilds the artifact…"
+                placeholder="Tell Mark what to change…"
                 maxLength={2000}
                 rows={2}
                 disabled={!canRefine}

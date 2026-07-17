@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   CalendarDays,
   ChevronDown,
   Coins,
@@ -17,6 +18,7 @@ import {
   Plus,
   RefreshCw,
   Settings,
+  Zap,
 } from "lucide-react";
 import type {
   ConnectedAccount,
@@ -85,6 +87,11 @@ export default function RedesignShell({
   active,
   title,
   topbarExtra,
+  topbarBackHref,
+  topbarBackLabel = "Back",
+  topbarSubtitle,
+  showTopbarCredits = false,
+  creditRefreshKey,
   showAccountSelector = true,
   includeWorkspaceOption = false,
   subscription,
@@ -98,6 +105,11 @@ export default function RedesignShell({
   active: WorkspacePage;
   title: string;
   topbarExtra?: ReactNode;
+  topbarBackHref?: string;
+  topbarBackLabel?: string;
+  topbarSubtitle?: string;
+  showTopbarCredits?: boolean;
+  creditRefreshKey?: string;
   showAccountSelector?: boolean;
   includeWorkspaceOption?: boolean;
   subscription?: SubscriptionTier | null;
@@ -130,7 +142,7 @@ export default function RedesignShell({
   );
 
   useEffect(() => {
-    if (initialUsage) return;
+    if (initialUsage && creditRefreshKey === undefined) return;
     const controller = new AbortController();
     readApi<PaymentUsageResponse>(`${API_BASE}/payment/usage`, { signal: controller.signal })
       .then((response) => setFetchedCreditUsage(response?.data?.usage.credits ?? null))
@@ -140,9 +152,9 @@ export default function RedesignShell({
         }
       });
     return () => controller.abort();
-  }, [initialUsage]);
+  }, [creditRefreshKey, initialUsage]);
 
-  const creditUsage = initialUsage?.usage.credits ?? fetchedCreditUsage;
+  const creditUsage = fetchedCreditUsage ?? initialUsage?.usage.credits;
   const creditLimit = creditUsage?.limit ?? 0;
   const creditsRemaining = creditUsage
     ? Math.max(0, creditUsage.remaining ?? creditLimit - creditUsage.used)
@@ -264,10 +276,27 @@ export default function RedesignShell({
       </aside>
 
       <div className="mq-main">
-        <header className="mq-topbar">
-          <div className="mq-topbar-title">{title}</div>
+        <header className={`mq-topbar${showTopbarCredits ? " mq-topbar-with-credits" : ""}`}>
+          <div className="mq-topbar-leading">
+            {topbarBackHref ? (
+              <Link href={topbarBackHref} className="mq-topbar-back" aria-label={topbarBackLabel}>
+                <ArrowLeft size={18} />
+              </Link>
+            ) : null}
+            <div className="mq-topbar-copy">
+              <div className="mq-topbar-title">{title}</div>
+              {topbarSubtitle ? <div className="mq-topbar-subtitle">{topbarSubtitle}</div> : null}
+            </div>
+          </div>
           <div className="mq-topbar-actions">
             {topbarExtra}
+            {showTopbarCredits ? (
+              <Link href="/billing" className="mq-topbar-credits" aria-label="View monthly credit usage">
+                <Zap size={16} />
+                <strong>{creditsRemaining === null ? "—" : numberFormatter.format(creditsRemaining)}</strong>
+                <span>credits</span>
+              </Link>
+            ) : null}
             <ThemeToggle compact />
             <button type="button" className="mq-feedback-topbar" onClick={() => setIsFeedbackOpen(true)} aria-label="Help and feedback"><LifeBuoy size={17} /></button>
             <span className="mq-notification" aria-label="Notifications">
