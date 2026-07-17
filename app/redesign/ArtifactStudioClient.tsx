@@ -22,6 +22,7 @@ import type {
   UserProfile,
 } from "../lib/types";
 import type { ArtifactType, CreateArtifactResponse } from "./artifactTypes";
+import { readArtifactPrompt, storeArtifactPrompt } from "./artifactStudioStorage";
 import { API_BASE, jsonRequest, readApi } from "./api";
 import RedesignShell from "./Shell";
 
@@ -81,7 +82,7 @@ export default function ArtifactStudioClient({
 
   useEffect(() => {
     if (!restoreKey) return;
-    const restoredPrompt = window.sessionStorage.getItem(`marquill:artifact:${restoreKey}:prompt`);
+    const restoredPrompt = readArtifactPrompt(restoreKey);
     if (restoredPrompt) setPrompt(restoredPrompt.slice(0, 2000));
   }, [restoreKey]);
 
@@ -106,8 +107,7 @@ export default function ArtifactStudioClient({
       if (!response?.artifactId || !response.runId) {
         throw new Error("The artifact run could not be started.");
       }
-      window.sessionStorage.setItem(`marquill:artifact:${response.artifactId}:prompt`, trimmedPrompt);
-      window.sessionStorage.setItem(`marquill:artifact:${response.artifactId}:type`, type);
+      storeArtifactPrompt(response.artifactId, trimmedPrompt);
       router.push(`/artifacts/${encodeURIComponent(response.artifactId)}?run=${encodeURIComponent(response.runId)}`);
     } catch (reason) {
       setCreationError(

@@ -12,16 +12,7 @@ import {
 } from "react";
 import {
   ArrowLeft,
-  ArrowUp,
-  BarChart3,
-  Check,
-  Circle,
-  Coins,
-  ExternalLink,
-  FileText,
-  GalleryHorizontal,
   LoaderCircle,
-  Pencil,
   RefreshCw,
   Sparkles,
   XCircle,
@@ -35,240 +26,19 @@ import type {
 import type {
   ArtifactDetailData,
   ArtifactDetailResponse,
-  ArtifactRunKind,
   ArtifactType,
   RefineArtifactResponse,
-  RunCompletedEvent,
-  RunFailedEvent,
-  RunProgressEvent,
-  RunStartedEvent,
-  RunStepEvent,
-  RunStepFailedEvent,
-  RunUsageEvent,
-  WorkflowStep,
 } from "./artifactTypes";
+import ArtifactResponse, { artifactTypeLabels } from "./ArtifactResponse";
+import ArtifactRunProgress from "./ArtifactRunProgress";
+import { readArtifactPrompt } from "./artifactStudioStorage";
 import { API_BASE, jsonRequest, readApi } from "./api";
 import RedesignShell from "./Shell";
-
-type StepStatus = "pending" | "active" | "completed" | "retrying" | "failed";
-
-type ProgressStep = {
-  step: WorkflowStep;
-  status: StepStatus;
-  message?: string;
-};
-
-type RunState = {
-  status: "connecting" | "running" | "reconnecting" | "loading-result" | "failed";
-  kind?: ArtifactRunKind;
-  type?: ArtifactType;
-  steps: ProgressStep[];
-  credits: number;
-  sourcesFound?: number;
-  usageKind?: RunUsageEvent["kind"];
-  failureReason?: string;
-  failureAction?: "retry-create" | "retry-load";
-  retryVersion?: number;
-};
+import { useArtifactRun } from "./useArtifactRun";
 
 type ConversationEntry =
   | { id: string; role: "user"; text: string }
   | { id: string; role: "assistant"; artifact: ArtifactDetailData; credits?: number };
-
-const typeLabels: Record<ArtifactType, string> = {
-  POST: "Post",
-  POLL: "Poll",
-  DOCUMENT: "Carousel",
-};
-
-const stepLabels: Record<WorkflowStep, string> = {
-  RESOLVE_INPUT: "Understanding your brief",
-  RESEARCH: "Researching sources",
-  GENERATE: "Generating your artifact",
-  RENDER_PDF: "Rendering the carousel PDF",
-  PERSIST_VERSION: "Saving your artifact",
-};
-
-function generationStepLabel(type?: ArtifactType) {
-  if (type === "POST") return "Writing your post";
-  if (type === "POLL") return "Shaping your poll";
-  if (type === "DOCUMENT") return "Building your carousel";
-  return stepLabels.GENERATE;
-}
-
-function updateStep(
-  steps: ProgressStep[],
-  step: WorkflowStep,
-  patch: Partial<ProgressStep>,
-) {
-  return steps.map((candidate) => candidate.step === step ? { ...candidate, ...patch } : candidate);
-}
-
-function RunStepIcon({ status }: { status: StepStatus }) {
-  if (status === "completed") return <Check size={14} />;
-  if (status === "active" || status === "retrying") return <LoaderCircle size={15} />;
-  if (status === "failed") return <XCircle size={15} />;
-  return <Circle size={14} />;
-}
-
-function ArtifactResponse({
-  artifact,
-  credits,
-}: {
-  artifact: ArtifactDetailData;
-  credits?: number;
-}) {
-  const isEditableType = artifact.type === "POST" || artifact.type === "POLL";
-  const commentary = artifact.content.commentary?.trim();
-  const poll = artifact.content.poll;
-  const document = artifact.content.document;
-  const TypeIcon = artifact.type === "POST"
-    ? FileText
-    : artifact.type === "POLL"
-      ? BarChart3
-      : GalleryHorizontal;
-
-  return (
-    <article className="mq-studio-response">
-      <header className="mq-studio-response-head">
-        <div className="mq-studio-response-labels">
-          <span className={`mq-artifact-type mq-artifact-type-${artifact.type.toLowerCase()}`}>
-            <TypeIcon size={13} /> {typeLabels[artifact.type]}
-          </span>
-          <span className="mq-studio-version">v{artifact.version}</span>
-        </div>
-        {isEditableType ? (
-          <button type="button" className="mq-studio-edit" disabled title="Artifact editing is coming next">
-            <Pencil size={14} /> Edit
-          </button>
-        ) : null}
-      </header>
-
-      <div className="mq-studio-response-body">
-        {artifact.type === "POST" ? (
-          <div className="mq-studio-post-copy">{commentary || "No post copy was returned."}</div>
-        ) : null}
-
-        {artifact.type === "POLL" ? (
-          <div className="mq-studio-poll-copy">
-            {commentary ? <p>{commentary}</p> : null}
-            <label>
-              <span>Question</span>
-              <textarea value={poll?.question ?? ""} readOnly rows={2} aria-label="Poll question" />
-            </label>
-            <div className="mq-studio-poll-options">
-              {(poll?.options ?? []).map((option, index) => (
-                <label key={`${option}-${index}`}>
-                  <span>Option {index + 1}</span>
-                  <input value={option} readOnly aria-label={`Poll option ${index + 1}`} />
-                </label>
-              ))}
-            </div>
-            {poll ? (
-              <small>Open for {poll.durationDays} day{poll.durationDays === 1 ? "" : "s"}</small>
-            ) : null}
-          </div>
-        ) : null}
-
-        {artifact.type === "DOCUMENT" ? (
-          <div className="mq-studio-document-copy">
-            <div className="mq-studio-document-icon"><FileText size={22} /></div>
-            <div>
-              <strong>{artifact.title?.trim() || "Your carousel is ready"}</strong>
-              {commentary ? <p>{commentary}</p> : null}
-              <span>{document?.pageCount ?? document?.slides.length ?? 0} pages</span>
-            </div>
-            {document?.pdfUrl ? (
-              <a href={document.pdfUrl} target="_blank" rel="noreferrer">
-                Open PDF <ExternalLink size={14} />
-              </a>
-            ) : (
-              <span className="mq-studio-pdf-pending">PDF link unavailable</span>
-            )}
-          </div>
-        ) : null}
-      </div>
-
-      <footer className="mq-studio-response-foot">
-        <span>Created by Mark</span>
-        {typeof credits === "number" && credits > 0 ? <span><Coins size={13} /> {credits} credits</span> : null}
-      </footer>
-    </article>
-  );
-}
-
-function RunProgress({
-  run,
-  artifactType,
-  artifactId,
-  onRetryLoad,
-}: {
-  run: RunState;
-  artifactType?: ArtifactType;
-  artifactId: string;
-  onRetryLoad: () => void;
-}) {
-  const type = run.type ?? artifactType;
-  const retryHref = `/artifacts/new?${new URLSearchParams({
-    ...(type ? { type } : {}),
-    restore: artifactId,
-  }).toString()}`;
-
-  return (
-    <div className={`mq-studio-run${run.status === "failed" ? " is-failed" : ""}`} aria-live="polite">
-      <div className="mq-studio-mark"><MarquillMark size={30} theme="auto" title="Mark" /></div>
-      <div className="mq-studio-run-content">
-        <div className="mq-studio-run-heading">
-          <strong>
-            {run.status === "failed"
-              ? run.kind === "REFINE" ? "Mark couldn't complete that refinement" : "Mark couldn't build this artifact"
-              : run.status === "loading-result"
-                ? "Preparing your response"
-                : run.kind === "REFINE"
-                  ? "Mark is refining your artifact"
-                  : `Mark is building your ${type ? typeLabels[type].toLowerCase() : "artifact"}`}
-          </strong>
-          {run.credits > 0 ? <span><Coins size={13} /> {run.credits} credits</span> : null}
-        </div>
-
-        {run.status === "connecting" && !run.steps.length ? (
-          <div className="mq-studio-connecting"><LoaderCircle size={15} /> Connecting to the run…</div>
-        ) : null}
-
-        {run.steps.length ? (
-          <ol className="mq-studio-run-steps">
-            {run.steps.map(({ step, status, message }) => (
-              <li key={step} className={`is-${status}`}>
-                <span className="mq-studio-step-icon"><RunStepIcon status={status} /></span>
-                <span>
-                  <strong>{step === "GENERATE" ? generationStepLabel(type) : stepLabels[step]}</strong>
-                  {step === "RESEARCH" && typeof run.sourcesFound === "number" ? (
-                    <small>{run.sourcesFound} source{run.sourcesFound === 1 ? "" : "s"} found</small>
-                  ) : null}
-                  {message ? <small>{status === "retrying" ? `Retrying — ${message}` : message}</small> : null}
-                </span>
-              </li>
-            ))}
-          </ol>
-        ) : null}
-
-        {run.status === "reconnecting" ? (
-          <div className="mq-studio-reconnecting"><RefreshCw size={13} /> Connection interrupted. Reconnecting…</div>
-        ) : null}
-
-        {run.status === "failed" ? (
-          <div className="mq-studio-run-failure">
-            <p>{run.failureReason || "The run stopped before the artifact was ready."}</p>
-            {run.failureAction === "retry-create" ? <Link href={retryHref}>Try again <ArrowUp size={14} /></Link> : null}
-            {run.failureAction === "retry-load" ? (
-              <button type="button" onClick={onRetryLoad}><RefreshCw size={13} /> Load response again</button>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
 
 export default function ArtifactConversationClient({
   user,
@@ -286,24 +56,16 @@ export default function ArtifactConversationClient({
   initialRunId?: string;
 }) {
   const router = useRouter();
+  const initialRunIdRef = useRef(initialRunId);
   const [entries, setEntries] = useState<ConversationEntry[]>([]);
   const [artifactType, setArtifactType] = useState<ArtifactType>();
   const [artifactTitle, setArtifactTitle] = useState("Artifact Studio");
   const [activeRunId, setActiveRunId] = useState(initialRunId);
-  const [run, setRun] = useState<RunState | null>(initialRunId ? {
-    status: "connecting",
-    steps: [],
-    credits: 0,
-  } : null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
   const [isStartingRefine, setIsStartingRefine] = useState(false);
   const [refineError, setRefineError] = useState<string | null>(null);
-  const lastSeqRef = useRef(0);
-  const runCreditsRef = useRef(0);
-  const terminalRef = useRef(false);
-
   const cleanArtifactUrl = `/artifacts/${encodeURIComponent(artifactId)}`;
 
   const appendUser = useCallback((text: string, id: string) => {
@@ -338,12 +100,43 @@ export default function ArtifactConversationClient({
     return response.data;
   }, [artifactId]);
 
+  const handleArtifactReady = useCallback(async (version: number, credits: number) => {
+    try {
+      const artifact = await readArtifact(version);
+      appendArtifact(artifact, credits);
+      setLoadError(null);
+    } finally {
+      setActiveRunId(undefined);
+      router.replace(cleanArtifactUrl);
+    }
+  }, [appendArtifact, cleanArtifactUrl, readArtifact, router]);
+
+  const handleTerminalFailure = useCallback(() => {
+    // Keep ?run= in the URL so refresh can replay the retained terminal reason.
+    setActiveRunId(undefined);
+  }, []);
+
+  const {
+    run,
+    beginRun,
+    clearRun,
+    retryCompletedVersion,
+    showDurableFailure,
+  } = useArtifactRun({
+    runId: activeRunId,
+    enabled: isHydrated,
+    initialType: artifactType,
+    onType: setArtifactType,
+    onArtifactReady: handleArtifactReady,
+    onTerminalFailure: handleTerminalFailure,
+  });
+
   useEffect(() => {
     let cancelled = false;
 
     async function hydrateConversation() {
       setLoadError(null);
-      const storedPrompt = window.sessionStorage.getItem(`marquill:artifact:${artifactId}:prompt`);
+      const storedPrompt = readArtifactPrompt(artifactId);
       if (storedPrompt) appendUser(storedPrompt, "initial-prompt");
 
       try {
@@ -355,31 +148,25 @@ export default function ArtifactConversationClient({
         if (detail.status === "READY") {
           appendArtifact(detail);
           setActiveRunId(undefined);
-          setRun(null);
-          if (initialRunId) router.replace(cleanArtifactUrl);
-        } else {
-          const readyVersions = (detail.versions ?? [])
-            .filter((version) => version.status === "READY")
-            .sort((left, right) => right.version - left.version);
-          if (readyVersions[0]) {
-            const previous = await readArtifact(readyVersions[0].version);
-            if (!cancelled) appendArtifact(previous);
-          }
-          const currentVersion = detail.versions?.find((version) => version.version === detail.currentVersion);
-          if (currentVersion?.refineFeedback) {
-            appendUser(currentVersion.refineFeedback, `feedback-${detail.currentVersion}`);
-          }
-          if (!initialRunId && detail.status === "FAILED") {
-            setRun({
-              status: "failed",
-              kind: readyVersions.length ? "REFINE" : "INITIAL",
-              type: detail.type,
-              steps: [],
-              credits: 0,
-              failureReason: "This artifact run failed before completion.",
-              failureAction: readyVersions.length ? undefined : "retry-create",
-            });
-          }
+          clearRun();
+          if (initialRunIdRef.current) router.replace(cleanArtifactUrl);
+          return;
+        }
+
+        const readyVersions = (detail.versions ?? [])
+          .filter((version) => version.status === "READY")
+          .sort((left, right) => right.version - left.version);
+        if (readyVersions[0]) {
+          const previous = await readArtifact(readyVersions[0].version);
+          if (!cancelled) appendArtifact(previous);
+        }
+
+        const currentVersion = detail.versions?.find((version) => version.version === detail.currentVersion);
+        if (currentVersion?.refineFeedback) {
+          appendUser(currentVersion.refineFeedback, `feedback-${detail.currentVersion}`);
+        }
+        if (!initialRunIdRef.current && detail.status === "FAILED") {
+          showDurableFailure(detail.type, readyVersions.length ? "REFINE" : "INITIAL");
         }
       } catch (reason) {
         if (!cancelled) {
@@ -392,197 +179,22 @@ export default function ArtifactConversationClient({
 
     void hydrateConversation();
     return () => { cancelled = true; };
-  }, [appendArtifact, appendUser, artifactId, cleanArtifactUrl, initialRunId, readArtifact, router]);
-
-  useEffect(() => {
-    if (!isHydrated || !activeRunId) return;
-
-    lastSeqRef.current = 0;
-    runCreditsRef.current = 0;
-    terminalRef.current = false;
-    const events = new EventSource(
-      `${API_BASE}/runs/${encodeURIComponent(activeRunId)}/events`,
-      { withCredentials: true },
-    );
-
-    const accept = <T extends { seq: number }>(event: MessageEvent<string>): T | null => {
-      try {
-        const data = JSON.parse(event.data) as T;
-        if (!Number.isFinite(data.seq) || data.seq <= lastSeqRef.current) return null;
-        lastSeqRef.current = data.seq;
-        return data;
-      } catch {
-        return null;
-      }
-    };
-
-    events.onopen = () => {
-      setRun((current) => current ? { ...current, status: "running" } : {
-        status: "running",
-        steps: [],
-        credits: 0,
-      });
-    };
-
-    const onStarted = (event: Event) => {
-      const data = accept<RunStartedEvent>(event as MessageEvent<string>);
-      if (!data) return;
-      setArtifactType(data.type);
-      setRun({
-        status: "running",
-        kind: data.kind,
-        type: data.type,
-        steps: data.steps.map((step) => ({ step, status: "pending" })),
-        credits: 0,
-      });
-      runCreditsRef.current = 0;
-    };
-
-    const onStepStarted = (event: Event) => {
-      const data = accept<RunStepEvent>(event as MessageEvent<string>);
-      if (!data) return;
-      setRun((current) => current ? {
-        ...current,
-        status: "running",
-        steps: updateStep(current.steps, data.step, { status: "active", message: undefined }),
-      } : current);
-    };
-
-    const onStepCompleted = (event: Event) => {
-      const data = accept<RunStepEvent>(event as MessageEvent<string>);
-      if (!data) return;
-      setRun((current) => current ? {
-        ...current,
-        steps: updateStep(current.steps, data.step, { status: "completed", message: undefined }),
-      } : current);
-    };
-
-    const onStepProgress = (event: Event) => {
-      const data = accept<RunProgressEvent>(event as MessageEvent<string>);
-      if (!data) return;
-      if (data.step === "RESEARCH" && typeof data.sourcesFound === "number") {
-        setRun((current) => current ? { ...current, sourcesFound: data.sourcesFound } : current);
-      }
-    };
-
-    const onUsage = (event: Event) => {
-      const data = accept<RunUsageEvent>(event as MessageEvent<string>);
-      if (!data) return;
-      runCreditsRef.current = data.totalCredits;
-      setRun((current) => current ? {
-        ...current,
-        credits: data.totalCredits,
-        usageKind: data.kind,
-      } : current);
-    };
-
-    const onStepFailed = (event: Event) => {
-      const data = accept<RunStepFailedEvent>(event as MessageEvent<string>);
-      if (!data) return;
-      setRun((current) => current ? {
-        ...current,
-        steps: updateStep(current.steps, data.step, {
-          status: data.retryable ? "retrying" : "failed",
-          message: data.message,
-        }),
-      } : current);
-    };
-
-    const onCompleted = (event: Event) => {
-      const data = accept<RunCompletedEvent>(event as MessageEvent<string>);
-      if (!data) return;
-      terminalRef.current = true;
-      events.close();
-      setRun((current) => current ? { ...current, status: "loading-result" } : current);
-      void readArtifact(data.version)
-        .then((artifact) => {
-          appendArtifact(artifact, runCreditsRef.current);
-          setLoadError(null);
-          setRun(null);
-          setActiveRunId(undefined);
-          router.replace(cleanArtifactUrl);
-        })
-        .catch((reason) => {
-          setRun((current) => ({
-            status: "failed",
-            kind: current?.kind,
-            type: current?.type,
-            steps: current?.steps ?? [],
-            credits: current?.credits ?? 0,
-            failureReason: reason instanceof Error
-              ? `The artifact finished, but its response could not be loaded: ${reason.message}`
-              : "The artifact finished, but its response could not be loaded.",
-            failureAction: "retry-load",
-            retryVersion: data.version,
-          }));
-          setActiveRunId(undefined);
-          router.replace(cleanArtifactUrl);
-        });
-    };
-
-    const onFailed = (event: Event) => {
-      const data = accept<RunFailedEvent>(event as MessageEvent<string>);
-      if (!data) return;
-      terminalRef.current = true;
-      events.close();
-      setRun((current) => ({
-        status: "failed",
-        kind: current?.kind,
-        type: current?.type,
-        steps: current?.steps ?? [],
-        credits: current?.credits ?? 0,
-        failureReason: data.failureReason,
-        failureAction: current?.kind === "REFINE" ? undefined : "retry-create",
-      }));
-      setActiveRunId(undefined);
-      router.replace(cleanArtifactUrl);
-    };
-
-    events.addEventListener("run.started", onStarted);
-    events.addEventListener("step.started", onStepStarted);
-    events.addEventListener("step.completed", onStepCompleted);
-    events.addEventListener("step.progress", onStepProgress);
-    events.addEventListener("usage.tick", onUsage);
-    events.addEventListener("step.failed", onStepFailed);
-    events.addEventListener("run.completed", onCompleted);
-    events.addEventListener("run.failed", onFailed);
-    events.onerror = () => {
-      if (!terminalRef.current) {
-        setRun((current) => current ? { ...current, status: "reconnecting" } : current);
-      }
-    };
-
-    return () => events.close();
-  }, [activeRunId, appendArtifact, cleanArtifactUrl, isHydrated, readArtifact, router]);
+  }, [
+    appendArtifact,
+    appendUser,
+    artifactId,
+    cleanArtifactUrl,
+    clearRun,
+    readArtifact,
+    router,
+    showDurableFailure,
+  ]);
 
   const responses = useMemo(
     () => entries.filter((entry): entry is Extract<ConversationEntry, { role: "assistant" }> => entry.role === "assistant"),
     [entries],
   );
   const canRefine = responses.length > 0 && !activeRunId && !isStartingRefine;
-
-  async function retryCompletedArtifact() {
-    if (!run?.retryVersion) return;
-    const retryVersion = run.retryVersion;
-    const previousRun = run;
-    setRun({ ...run, status: "loading-result", failureReason: undefined, failureAction: undefined });
-    try {
-      const artifact = await readArtifact(retryVersion);
-      appendArtifact(artifact, previousRun.credits);
-      setLoadError(null);
-      setRun(null);
-    } catch (reason) {
-      setRun({
-        ...previousRun,
-        status: "failed",
-        failureReason: reason instanceof Error
-          ? `The artifact is ready, but its response still could not be loaded: ${reason.message}`
-          : "The artifact is ready, but its response still could not be loaded.",
-        failureAction: "retry-load",
-        retryVersion,
-      });
-    }
-  }
 
   async function startRefinement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -600,7 +212,7 @@ export default function ArtifactConversationClient({
       }
       appendUser(trimmedFeedback, `feedback-${response.version}`);
       setFeedback("");
-      setRun({ status: "connecting", kind: "REFINE", type: artifactType, steps: [], credits: 0 });
+      beginRun("REFINE", artifactType);
       setActiveRunId(response.runId);
       router.replace(`${cleanArtifactUrl}?run=${encodeURIComponent(response.runId)}`);
     } catch (reason) {
@@ -625,7 +237,7 @@ export default function ArtifactConversationClient({
           <Link href="/artifacts" aria-label="Back to artifacts"><ArrowLeft size={18} /></Link>
           <div>
             <h1>{artifactTitle}</h1>
-            <p>{artifactType ? `${typeLabels[artifactType]} · Created with Mark` : "Creating with Mark"}</p>
+            <p>{artifactType ? `${artifactTypeLabels[artifactType]} · Created with Mark` : "Creating with Mark"}</p>
           </div>
         </header>
 
@@ -655,11 +267,11 @@ export default function ArtifactConversationClient({
           ))}
 
           {run ? (
-            <RunProgress
+            <ArtifactRunProgress
               run={run}
               artifactType={artifactType}
               artifactId={artifactId}
-              onRetryLoad={() => { void retryCompletedArtifact(); }}
+              onRetryLoad={retryCompletedVersion}
             />
           ) : null}
         </div>
