@@ -539,12 +539,10 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-artifact-type-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 16px 0 0; padding: 0; border: 0; }
 .mq-artifact-type-options button { display: flex; min-width: 0; min-height: 61px; align-items: center; gap: 10px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 16px; background: color-mix(in srgb, var(--surface) 74%, transparent); color: var(--ink-500); text-align: left; cursor: pointer; transition: border-color .18s ease, background-color .18s ease, color .18s ease, transform .18s ease; }
 .mq-artifact-type-options button:hover { border-color: var(--line-strong); background: var(--surface); color: var(--ink-800); transform: translateY(-1px); }
-.mq-artifact-type-options button.is-selected { border-color: color-mix(in srgb, var(--accent) 42%, var(--line)); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); color: var(--accent-ink); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent); }
 .mq-artifact-type-options button > svg { flex: none; }
 .mq-artifact-type-options button > span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
 .mq-artifact-type-options strong { color: currentColor; font-size: 12.5px; font-weight: 650; }
 .mq-artifact-type-options small { overflow: hidden; color: var(--ink-400); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.mq-artifact-type-options button.is-selected small { color: color-mix(in srgb, var(--accent-ink) 70%, var(--ink-500)); }
 .mq-artifact-type-selection { display: inline-flex; width: fit-content; min-height: 34px; align-items: center; gap: 6px; padding: 3px 10px 3px 5px; border: 1px solid transparent; border-radius: 999px; background: transparent; color: var(--accent-ink); font: 600 11.5px var(--font-inter); cursor: pointer; transition: background-color .18s ease; }
 .mq-artifact-type-selection:hover, .mq-artifact-type-selection:focus-visible { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 .mq-artifact-type-selection > .mq-artifact-selection-icon { display: inline-flex; width: 24px; height: 24px; flex: none; align-items: center; justify-content: center; border-radius: 50%; }
