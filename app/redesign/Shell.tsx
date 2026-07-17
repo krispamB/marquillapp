@@ -11,6 +11,7 @@ import {
   Bell,
   Home,
   Info,
+  Layers3,
   LifeBuoy,
   PenLine,
   Plus,
@@ -37,12 +38,15 @@ import { API_BASE, readApi } from "./api";
 
 const navItems: Array<{ key: WorkspacePage; label: string; href: string; icon: ReactNode }> = [
   { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: <Home size={18} /> },
+  { key: "artifacts", label: "Artifacts", href: "/artifacts", icon: <Layers3 size={18} /> },
   { key: "posts", label: "Posts", href: "/posts", icon: <PenLine size={18} /> },
   { key: "calendar", label: "Calendar", href: "/calendar", icon: <CalendarDays size={18} /> },
   { key: "billing", label: "Billing", href: "/billing", icon: <CreditCard size={18} /> },
   { key: "settings", label: "Settings", href: "/settings", icon: <Settings size={18} /> },
 ];
-const mobileNavItems = navItems.filter((item) => item.key !== "billing");
+const mobileNavItems = navItems.filter((item) =>
+  ["dashboard", "artifacts", "posts", "settings"].includes(item.key),
+);
 
 export const WORKSPACE_SELECTOR_VALUE = "__marquill_workspace__";
 
@@ -81,6 +85,7 @@ export default function RedesignShell({
   active,
   title,
   topbarExtra,
+  showAccountSelector = true,
   includeWorkspaceOption = false,
   subscription,
   initialUsage,
@@ -93,6 +98,7 @@ export default function RedesignShell({
   active: WorkspacePage;
   title: string;
   topbarExtra?: ReactNode;
+  showAccountSelector?: boolean;
   includeWorkspaceOption?: boolean;
   subscription?: SubscriptionTier | null;
   initialUsage?: PaymentUsageResponse["data"] | null;
@@ -269,25 +275,27 @@ export default function RedesignShell({
               <Bell className="mq-notification-icon" size={18} />
             </span>
             <span className="mq-avatar mq-avatar-md mq-avatar-accent">{initials}</span>
-            <MarquillSelect
-              className="mq-account-select"
-              value={selectedAccountId ?? ""}
-              onChange={(value) => onSelectAccount?.(value)}
-              ariaLabel={includeWorkspaceOption ? "Dashboard scope" : "Connected account"}
-              options={[
-                ...(includeWorkspaceOption
-                  ? [{ value: WORKSPACE_SELECTOR_VALUE, label: "Workspace" }]
-                  : []),
-                ...accounts.map((account) => ({
-                  value: account.id,
-                  label: account.displayName ?? "LinkedIn account",
-                  icon: <AccountAvatar account={account} size="sm" />,
-                })),
-                ...(!includeWorkspaceOption && !accounts.length
-                  ? [{ value: "", label: "No account connected", disabled: true }]
-                  : []),
-              ]}
-            />
+            {showAccountSelector ? (
+              <MarquillSelect
+                className="mq-account-select"
+                value={selectedAccountId ?? ""}
+                onChange={(value) => onSelectAccount?.(value)}
+                ariaLabel={includeWorkspaceOption ? "Dashboard scope" : "Connected account"}
+                options={[
+                  ...(includeWorkspaceOption
+                    ? [{ value: WORKSPACE_SELECTOR_VALUE, label: "Workspace" }]
+                    : []),
+                  ...accounts.map((account) => ({
+                    value: account.id,
+                    label: account.displayName ?? "LinkedIn account",
+                    icon: <AccountAvatar account={account} size="sm" />,
+                  })),
+                  ...(!includeWorkspaceOption && !accounts.length
+                    ? [{ value: "", label: "No account connected", disabled: true }]
+                    : []),
+                ]}
+              />
+            ) : null}
           </div>
         </header>
 

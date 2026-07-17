@@ -2,7 +2,7 @@ import type { DashboardPost, UserProfile } from "../lib/types";
 
 export type WorkspaceUser = UserProfile;
 
-export type WorkspacePage = "dashboard" | "posts" | "calendar" | "billing" | "settings";
+export type WorkspacePage = "dashboard" | "artifacts" | "posts" | "calendar" | "billing" | "settings";
 
 export function getInitials(name: string, email = "") {
   const parts = name.trim().split(/\s+/).filter(Boolean);

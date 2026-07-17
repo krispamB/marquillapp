@@ -3,6 +3,7 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 // Authenticated areas of the app.
 const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
+  "/artifacts(.*)",
   "/posts(.*)",
   "/billing(.*)",
   "/calendar(.*)",
