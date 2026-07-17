@@ -9,8 +9,9 @@ import {
   GalleryHorizontal,
   LoaderCircle,
   Palette,
+  PenLine,
   Search,
-  Sparkles,
+  X,
 } from "lucide-react";
 import MarquillLockup from "../../components/brand/MarquillLockup";
 import MarquillSelect from "../../components/ui/MarquillSelect";
@@ -79,6 +80,7 @@ export default function ArtifactStudioClient({
   const [isCreating, setIsCreating] = useState(false);
   const [creationError, setCreationError] = useState<string | null>(null);
   const isReady = Boolean(type && prompt.trim());
+  const selectedArtifact = artifactOptions.find((option) => option.type === type);
 
   useEffect(() => {
     if (!restoreKey) return;
@@ -100,7 +102,7 @@ export default function ArtifactStudioClient({
           type,
           prompt: trimmedPrompt,
           withResearch,
-          stylePreset,
+          ...(type === "POST" ? { stylePreset } : {}),
           ...(type === "DOCUMENT" ? { theme } : {}),
         }, { method: "POST" }),
       );
@@ -181,16 +183,18 @@ export default function ArtifactStudioClient({
                     </label>
                   ) : null}
 
-                  <label className="mq-artifact-studio-select">
-                    <Sparkles size={14} />
-                    <span className="sr-only">Writing style</span>
-                    <MarquillSelect
-                      value={stylePreset}
-                      onChange={(value) => setStylePreset(value as StylePreset)}
-                      options={styleOptions}
-                      ariaLabel="Writing style"
-                    />
-                  </label>
+                  {type === "POST" ? (
+                    <label className="mq-artifact-studio-select">
+                      <PenLine size={14} />
+                      <span className="sr-only">Writing style</span>
+                      <MarquillSelect
+                        value={stylePreset}
+                        onChange={(value) => setStylePreset(value as StylePreset)}
+                        options={styleOptions}
+                        ariaLabel="Writing style"
+                      />
+                    </label>
+                  ) : null}
 
                   <button
                     type="submit"
@@ -205,23 +209,35 @@ export default function ArtifactStudioClient({
               </div>
             </div>
 
-            <fieldset className="mq-artifact-type-options">
+            <fieldset className={`mq-artifact-type-options${selectedArtifact ? " is-collapsed" : ""}`}>
               <legend className="sr-only">Choose one artifact type</legend>
-              {artifactOptions.map(({ type: optionType, label, description, Icon }) => {
-                const isSelected = type === optionType;
-                return (
+              {selectedArtifact ? (
+                <button
+                  type="button"
+                  className="mq-artifact-type-selection"
+                  onClick={() => setType(undefined)}
+                  aria-label={`Cancel ${selectedArtifact.label} selection`}
+                  title={`Cancel ${selectedArtifact.label} selection`}
+                >
+                  <span className="mq-artifact-selection-icon" aria-hidden="true">
+                    <selectedArtifact.Icon className="mq-artifact-selection-type-icon" size={16} />
+                    <X className="mq-artifact-selection-cancel-icon" size={14} />
+                  </span>
+                  <strong>{selectedArtifact.label}</strong>
+                </button>
+              ) : (
+                artifactOptions.map(({ type: optionType, label, description, Icon }) => (
                   <button
                     key={optionType}
                     type="button"
-                    aria-pressed={isSelected}
-                    className={isSelected ? "is-selected" : ""}
+                    aria-pressed="false"
                     onClick={() => setType(optionType)}
                   >
                     <Icon size={16} />
                     <span><strong>{label}</strong><small>{description}</small></span>
                   </button>
-                );
-              })}
+                ))
+              )}
             </fieldset>
 
             {creationError ? (
