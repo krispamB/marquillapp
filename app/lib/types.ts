@@ -114,6 +114,11 @@ export type PaymentUsageData = {
     source: string;
   };
   usage: Record<string, PaymentUsageMetric>;
+  artifactsCreated: {
+    posts: number;
+    polls: number;
+    documents: number;
+  };
 };
 
 export type PaymentUsageResponse = {
@@ -139,6 +144,7 @@ export type PostMetricsResponse = {
 export type DashboardPost = {
   _id: string;
   connectedAccount?: string;
+  connectedAccountName?: string;
   status?: string;
   type?: "quickPostLinkedin" | "insightPostLinkedin" | string;
   content?: string;
@@ -150,6 +156,7 @@ export type DashboardPost = {
     publishedAt?: string;
   }>;
   scheduledAt?: string;
+  publishedAt?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -162,6 +169,26 @@ export type DashboardPostsResponse = {
     availableMonths?: string[];
     connectedAccountIds?: string[];
   };
+};
+
+export type PostComparisonData = {
+  current: { month: string; count: number };
+  previous: { month: string; count: number };
+  difference: number;
+  percentageChange: number | null;
+};
+
+export type PostComparisonResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: PostComparisonData;
+};
+
+export type DashboardInitialData = {
+  usage: PaymentUsageData | null;
+  comparison: PostComparisonData | null;
+  scheduledPosts: DashboardPost[];
+  errors: string[];
 };
 
 export type PostStatus = "DRAFT" | "SCHEDULED" | "PUBLISHED";
@@ -242,6 +269,26 @@ export type PostDetailData = {
   media?: PostMediaItem[];
   createdAt?: string;
   updatedAt?: string;
+  connectedAccount?: {
+    _id?: string;
+    displayName?: string;
+    accountType?: "PERSON" | "ORGANIZATION";
+  };
+  artifacts?: Array<{
+    artifact?: {
+      _id?: string;
+      type?: string;
+      title?: string;
+    };
+    version?: {
+      version?: number;
+      status?: string;
+      content?: {
+        commentary?: string;
+      };
+      createdAt?: string;
+    };
+  }>;
 };
 
 export type PostDetailResponse = {

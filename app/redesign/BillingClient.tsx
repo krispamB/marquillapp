@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, CreditCard, ExternalLink } from "lucide-react";
+import { Check, CreditCard, ExternalLink, Plus } from "lucide-react";
 import RedesignShell from "./Shell";
 import { API_BASE, jsonRequest, readApi } from "./api";
-import { titleCase } from "./types";
 import type { ConnectedAccount, PaymentUsageResponse, SubscriptionTier, Tier, UserProfile } from "../lib/types";
 
 type Invoice = { id?: string; date?: string; plan?: string; amount?: string | number; status?: string; customer?: string };
@@ -55,6 +54,18 @@ export default function BillingRedesignClient({
 
   const planName = subscription?.name ?? usage?.tier?.name ?? user.tier?.name ?? "Free";
   const activeTier = useMemo(() => tiers.find((tier) => tier.name.toLowerCase() === planName.toLowerCase()), [planName, tiers]);
+  const creditUsage = usage?.usage?.credits;
+  const creditLimit = creditUsage?.limit ?? 0;
+  const creditsRemaining = creditUsage?.remaining ?? 0;
+  const creditsUsed = creditUsage?.used ?? 0;
+  const creditPercent = creditLimit > 0 ? Math.min(100, Math.max(0, creditsRemaining / creditLimit * 100)) : 0;
+  const artifactUsage = usage?.artifactsCreated
+    ? [
+        { label: "Posts", count: usage.artifactsCreated.posts },
+        { label: "Carousels", count: usage.artifactsCreated.documents },
+        { label: "Polls", count: usage.artifactsCreated.polls },
+      ]
+    : [];
 
   const handleCheckout = async (tier: Tier) => {
     if (!tier.paddleMonthlyPriceId) {
@@ -92,7 +103,44 @@ export default function BillingRedesignClient({
 
       <section className="mq-billing-top">
         <div className="mq-plan-card"><div className="mq-plan-card-header"><span className="mq-mono">_ current plan</span><span className="mq-active-badge">Active</span></div><div className="mq-plan-name">{planName}<span>{activeTier?.monthlyPrice ? `$${activeTier.monthlyPrice} / mo` : ""}</span></div><p>{activeTier?.metadata?.description ?? "Your current Marquill plan and publishing limits."}</p><div className="mq-plan-actions"><a href="#change-plan" className="mq-light-button">Change plan</a><button type="button" className="mq-dark-outline-button" disabled title="Payment-management endpoint is not connected"><CreditCard size={14} /> Manage payment</button></div></div>
-        <div className="mq-card mq-usage-card"><div className="mq-card-heading"><span className="mq-title">Usage this month</span><span className="mq-mono">{usage?.billingCycle?.end ? `resets ${new Date(usage.billingCycle.end).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : "cycle unavailable"}</span></div><div className="mq-usage-list">{usage?.usage && Object.entries(usage.usage).length ? Object.entries(usage.usage).map(([key, metric]) => { const percent = metric.limit > 0 ? Math.min(100, metric.used / metric.limit * 100) : 0; return <div key={key} className="mq-usage-item"><div><span>{titleCase(key)}</span><strong>{metric.used} / {metric.limit > 0 ? metric.limit : "∞"}</strong></div><div className="mq-progress"><span style={{ width: `${percent}%` }} /></div></div>; }) : <p className="mq-empty">No usage data found.</p>}</div></div>
+        <div className="mq-card mq-usage-card">
+          <div className="mq-usage-heading">
+            <span className="mq-title">Credit balance</span>
+            <span className="mq-mono">{usage?.billingCycle?.end ? `resets ${new Date(usage.billingCycle.end).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : "cycle unavailable"}</span>
+          </div>
+          {creditUsage ? (
+            <>
+              <div className="mq-credit-balance">
+                <strong>{creditsRemaining.toLocaleString()}</strong>
+                <span>credits left of {creditLimit.toLocaleString()}</span>
+              </div>
+              <div
+                className="mq-credit-balance-progress"
+                role="progressbar"
+                aria-label="Credits remaining"
+                aria-valuemin={0}
+                aria-valuemax={creditLimit}
+                aria-valuenow={creditsRemaining}
+              >
+                <span style={{ width: `${creditPercent}%` }} />
+              </div>
+              <div className="mq-credit-breakdown">
+                <strong>Where credits went this month <span>· {creditsUsed.toLocaleString()} used</span></strong>
+                <div className="mq-credit-artifacts">
+                  {artifactUsage.map((artifact) => (
+                    <div className="mq-credit-artifact" key={artifact.label}>
+                      <i aria-hidden="true" />
+                      <span>{artifact.label} <small>· {artifact.count.toLocaleString()} generated</small></span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <button type="button" className="mq-add-credits-button" disabled title="Additional credit purchases are not available yet">
+                <Plus size={18} /> Add more credits
+              </button>
+            </>
+          ) : <p className="mq-empty">No usage data found.</p>}
+        </div>
       </section>
 
         <section id="change-plan"><div className="mq-section-heading"><h2>Change plan</h2><span>Plans returned by Paddle</span></div><div className="mq-plan-grid">{tiers.length ? tiers.map((tier) => { const current = tier.name.toLowerCase() === planName.toLowerCase(); const isStartingCheckout = checkoutTierId === tier._id; const features = tier.metadata?.features ?? ["LinkedIn account", "AI drafting", "Post scheduling"]; return <div key={tier._id} className={`mq-card mq-tier-card ${current ? "is-current" : ""}`}><div className="mq-tier-heading"><h3>{tier.name}</h3>{current ? <span className="mq-current-badge">Current</span> : null}</div><div className="mq-tier-price">${tier.monthlyPrice}<small>/mo</small></div><p>{tier.metadata?.description ?? "Marquill essentials."}</p><ul>{features.slice(0, 4).map((feature) => <li key={feature}><Check size={14} />{feature}</li>)}</ul><button type="button" className={current ? "mq-disabled-button" : "mq-primary-button"} disabled={current || checkoutTierId !== null} onClick={() => void handleCheckout(tier)}>{current ? "Current plan" : isStartingCheckout ? "Redirecting…" : "View plan"}</button></div>; }) : <div className="mq-card mq-empty">No plans available right now.</div>}</div></section>

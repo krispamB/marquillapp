@@ -1,9 +1,19 @@
 import { unstable_cache } from "next/cache";
 import { cookies } from "next/headers";
 import { auth } from "@clerk/nextjs/server";
+import {
+  enrichDashboardPost,
+  readAllPostPages,
+  sortScheduledPosts,
+} from "./dashboard";
 import type {
   ConnectedAccount,
   ConnectedAccountsResponse,
+  DashboardInitialData,
+  DashboardPostsResponse,
+  PaymentUsageResponse,
+  PostComparisonResponse,
+  PostDetailResponse,
   UserApiResponse,
 } from "./types";
 
@@ -46,6 +56,73 @@ export function authHeaders({ token, cookie }: ServerAuth): HeadersInit {
   if (cookie) headers.Cookie = cookie;
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
+}
+
+async function readServerApi<T>(path: string, serverAuth: ServerAuth): Promise<T> {
+  const response = await fetch(`${apiBase}${path}`, {
+    cache: "no-store",
+    headers: authHeaders(serverAuth),
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || `Dashboard request failed with ${response.status}.`);
+  }
+  return (await response.json()) as T;
+}
+
+function previousUtcMonth(month: string) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const date = new Date(Date.UTC(year, monthNumber - 2, 1));
+  return date.toISOString().slice(0, 7);
+}
+
+export async function getDashboardInitialData(
+  serverAuth: ServerAuth,
+): Promise<DashboardInitialData> {
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const previousMonth = previousUtcMonth(currentMonth);
+  const comparisonQuery = new URLSearchParams({ currentMonth, previousMonth });
+
+  const [usageResult, comparisonResult, postsResult] = await Promise.allSettled([
+    readServerApi<PaymentUsageResponse>("/payment/usage", serverAuth),
+    readServerApi<PostComparisonResponse>(
+      `/posts/comparison?${comparisonQuery.toString()}`,
+      serverAuth,
+    ),
+    readAllPostPages((page) =>
+      readServerApi<DashboardPostsResponse>(
+        `/posts?status=SCHEDULED&page=${page}`,
+        serverAuth,
+      )),
+  ]);
+
+  const errors: string[] = [];
+  if (usageResult.status === "rejected") errors.push("usage");
+  if (comparisonResult.status === "rejected") errors.push("post comparison");
+  if (postsResult.status === "rejected") errors.push("scheduled posts");
+
+  const scheduledPosts = postsResult.status === "fulfilled"
+    ? sortScheduledPosts(postsResult.value).slice(0, 3)
+    : [];
+
+  const details = await Promise.all(
+    scheduledPosts.map(async (post) => {
+      try {
+        return await readServerApi<PostDetailResponse>(`/posts/${post._id}`, serverAuth);
+      } catch {
+        return undefined;
+      }
+    }),
+  );
+
+  return {
+    usage: usageResult.status === "fulfilled" ? usageResult.value.data ?? null : null,
+    comparison:
+      comparisonResult.status === "fulfilled" ? comparisonResult.value.data ?? null : null,
+    scheduledPosts: scheduledPosts.map((post, index) =>
+      enrichDashboardPost(post, details[index]?.data)),
+    errors,
+  };
 }
 
 export function getCachedUser(serverAuth: ServerAuth, cacheKey: string) {
@@ -113,9 +190,10 @@ export async function getConnectedAccounts(
         accountType: account.accountType,
         accessTokenExpiresAt: account.accessTokenExpiresAt,
         displayName: account.displayName,
-        avatarUrl: account.avatarUrl,
+        avatarUrl: account.avatarUrl ?? account.profileMetadata?.picture,
         vanityName: account.vanityName ?? account.profileMetadata?.vanityName,
         headline: account.profileMetadata?.localizedHeadline,
+        profile: account.profileMetadata,
         isActive: account.isActive,
       })) ?? []
     );

@@ -16,138 +16,187 @@ import MarquillMark from "../../components/brand/MarquillMark";
 import LinkedInConnectButton from "./LinkedInConnectButton";
 import { API_BASE, readApi } from "./api";
 import {
+  enrichDashboardPost,
+  readAllPostPages,
+  sortScheduledPosts,
+} from "../lib/dashboard";
+import {
   formatRelativeDate,
   formatScheduledDate,
   getFirstName,
   getInitials,
   getPostTitle,
-  normalizeStatus,
   parseDate,
   titleCase,
 } from "./types";
 import type {
   ConnectedAccount,
+  DashboardInitialData,
   DashboardPost,
   DashboardPostsResponse,
   PaymentUsageResponse,
+  PostDetailResponse,
   PostMetricsResponse,
   SubscriptionTier,
   UserProfile,
 } from "../lib/types";
 
-function findMetric(usage: PaymentUsageResponse["data"] | null, names: string[]) {
-  if (!usage?.usage) return null;
-  const expected = new Set(names.map((name) => name.replace(/[_-]/g, "").toLowerCase()));
-  const entry = Object.entries(usage.usage).find(([key]) => expected.has(key.replace(/[_-]/g, "").toLowerCase()));
-  return entry?.[1] ?? null;
-}
-
 function postTypeLabel(post: DashboardPost) {
   return post.type?.toLowerCase().includes("insight") ? "Insight" : "Post";
 }
-
-const workspaceSchedule = [
-  {
-    month: "Jul",
-    day: "18",
-    title: "The one onboarding change that cut our churn by 18% — a short thread.",
-    meta: "5:30pm · Ada Obi",
-  },
-  {
-    month: "Jul",
-    day: "21",
-    title: "Case study carousel: how Northwind shipped in 6 weeks with Marquill.",
-    meta: "9:00am · Lumen Studio",
-  },
-  {
-    month: "Jul",
-    day: "24",
-    title: "Poll — which growth channel are you doubling down on this quarter?",
-    meta: "8:15am · Ada Obi",
-  },
-];
 
 export default function DashboardRedesignClient({
   user,
   connectedAccounts,
   subscription,
+  initialDashboardData,
 }: {
   user: UserProfile;
   connectedAccounts: ConnectedAccount[];
   primaryAccountId?: string;
   subscription?: SubscriptionTier | null;
+  initialDashboardData?: DashboardInitialData;
 }) {
   const [selectedAccountId, setSelectedAccountId] = useState(WORKSPACE_SELECTOR_VALUE);
-  const [posts, setPosts] = useState<DashboardPost[]>([]);
-  const [usage, setUsage] = useState<PaymentUsageResponse["data"] | null>(null);
+  const [posts, setPosts] = useState<DashboardPost[]>(initialDashboardData?.scheduledPosts ?? []);
+  const [upcomingPosts, setUpcomingPosts] = useState<DashboardPost[]>(
+    initialDashboardData?.scheduledPosts ?? [],
+  );
+  const [usage, setUsage] = useState<PaymentUsageResponse["data"] | null>(initialDashboardData?.usage ?? null);
   const [metrics, setMetrics] = useState<PostMetricsResponse["data"] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    initialDashboardData?.errors.length
+      ? `Some dashboard data could not be loaded: ${initialDashboardData.errors.join(", ")}.`
+      : null,
+  );
   const [search, setSearch] = useState("");
   const isWorkspace = selectedAccountId === WORKSPACE_SELECTOR_VALUE;
 
   const loadDashboard = useCallback(async (signal: AbortSignal) => {
+    if (signal.aborted) return;
     if (!selectedAccountId || selectedAccountId === WORKSPACE_SELECTOR_VALUE) {
-      setPosts([]);
-      setUsage(null);
+      setPosts(initialDashboardData?.scheduledPosts ?? []);
+      setUpcomingPosts(initialDashboardData?.scheduledPosts ?? []);
+      setUsage(initialDashboardData?.usage ?? null);
       setMetrics(null);
-      setError(null);
+      setError(initialDashboardData?.errors.length
+        ? `Some dashboard data could not be loaded: ${initialDashboardData.errors.join(", ")}.`
+        : null);
       setIsLoading(false);
       return;
     }
     const month = new Date().toISOString().slice(0, 7);
     setIsLoading(true);
+    setPosts([]);
+    setUpcomingPosts([]);
+    setMetrics(null);
     setError(null);
 
-    try {
-      const [postsResponse, usageResponse, metricsResponse] = await Promise.all([
-      readApi<DashboardPostsResponse>(
-        `${API_BASE}/posts?accountConnected=${encodeURIComponent(selectedAccountId)}&month=${month}`,
+    const accountQuery = `connectedAccount=${encodeURIComponent(selectedAccountId)}`;
+    const detailRequests = new Map<string, Promise<PostDetailResponse>>();
+    const readPostDetail = (postId: string) => {
+      const existing = detailRequests.get(postId);
+      if (existing) return existing;
+      const request = readApi<PostDetailResponse>(`${API_BASE}/posts/${postId}`, { signal });
+      detailRequests.set(postId, request);
+      return request;
+    };
+    const enrichVisiblePosts = async (listedPosts: DashboardPost[], visibleIds: string[]) => {
+      const details = await Promise.allSettled(visibleIds.map(readPostDetail));
+      const detailsById = new Map(
+        details.flatMap((result) =>
+          result.status === "fulfilled" && result.value?.data?._id
+            ? [[result.value.data._id, result.value.data] as const]
+            : []),
+      );
+      return listedPosts.map((post) =>
+        enrichDashboardPost(post, detailsById.get(post._id)));
+    };
+
+    const postsRequest = readApi<DashboardPostsResponse>(
+          `${API_BASE}/posts?${accountQuery}&month=${month}&page=1`,
           { signal },
-      ),
-        readApi<PaymentUsageResponse>(`${API_BASE}/payment/usage`, { signal }),
-      readApi<PostMetricsResponse>(`${API_BASE}/posts/metrics/${encodeURIComponent(selectedAccountId)}`, {
-          signal,
-      }),
-      ]);
-      setPosts(Array.isArray(postsResponse?.data) ? postsResponse.data : []);
-      setUsage(usageResponse?.data ?? null);
-      setMetrics(metricsResponse?.data ?? null);
-    } catch (reason) {
-      if (reason instanceof DOMException && reason.name === "AbortError") return;
-      setError(reason instanceof Error ? reason.message : "Unable to load dashboard data.");
-    } finally {
-      if (!signal.aborted) setIsLoading(false);
-    }
-  }, [selectedAccountId]);
+        ).then(async (response) => {
+          const listedPosts = Array.isArray(response?.data) ? response.data : [];
+          const visibleIds = [...listedPosts]
+            .sort((left, right) =>
+              (parseDate(right.updatedAt ?? right.createdAt)?.getTime() ?? 0) -
+              (parseDate(left.updatedAt ?? left.createdAt)?.getTime() ?? 0))
+            .slice(0, 3)
+            .map((post) => post._id);
+          const enrichedPosts = await enrichVisiblePosts(listedPosts, visibleIds);
+          if (!signal.aborted) setPosts(enrichedPosts);
+        });
+
+    const scheduledRequest = readAllPostPages((page) =>
+          readApi<DashboardPostsResponse>(
+            `${API_BASE}/posts?${accountQuery}&status=SCHEDULED&page=${page}`,
+            { signal },
+          ),
+        ).then(async (responsePosts) => {
+          const listedPosts = sortScheduledPosts(responsePosts);
+          const visibleIds = listedPosts.slice(0, 3).map((post) => post._id);
+          const enrichedPosts = await enrichVisiblePosts(listedPosts, visibleIds);
+          if (!signal.aborted) setUpcomingPosts(enrichedPosts);
+        });
+
+    const metricsRequest = readApi<PostMetricsResponse>(
+      `${API_BASE}/posts/metrics/${encodeURIComponent(selectedAccountId)}`,
+      { signal },
+    ).then((response) => {
+      if (!signal.aborted) setMetrics(response?.data ?? null);
+    });
+
+    const [postsResult, scheduledResult, metricsResult] = await Promise.allSettled([
+      postsRequest,
+      scheduledRequest,
+      metricsRequest,
+    ]);
+
+    if (signal.aborted) return;
+
+    const requestErrors: string[] = [];
+    if (postsResult.status === "rejected") requestErrors.push("recent posts");
+    if (scheduledResult.status === "rejected") requestErrors.push("scheduled posts");
+    if (metricsResult.status === "rejected") requestErrors.push("post metrics");
+
+    setError(requestErrors.length
+      ? `Some dashboard data could not be loaded: ${requestErrors.join(", ")}.`
+      : null);
+    setIsLoading(false);
+  }, [initialDashboardData, selectedAccountId]);
 
   useEffect(() => {
     const controller = new AbortController();
-    void loadDashboard(controller.signal);
+    queueMicrotask(() => void loadDashboard(controller.signal));
     return () => controller.abort();
   }, [loadDashboard]);
 
-  const drafts = useMemo(
-    () => posts.filter((post) => normalizeStatus(post.status) === "DRAFT"),
+  const recentPosts = useMemo(
+    () => [...posts].sort((left, right) =>
+      (parseDate(right.updatedAt ?? right.createdAt)?.getTime() ?? 0) -
+      (parseDate(left.updatedAt ?? left.createdAt)?.getTime() ?? 0)),
     [posts],
   );
-  const scheduled = useMemo(
-    () =>
-      posts
-        .filter((post) => normalizeStatus(post.status) === "SCHEDULED")
-        .sort((a, b) => (parseDate(a.scheduledAt)?.getTime() ?? 0) - (parseDate(b.scheduledAt)?.getTime() ?? 0)),
+  const scheduled = useMemo(() => sortScheduledPosts(upcomingPosts), [upcomingPosts]);
+  const failed = useMemo(
+    () => posts.filter((post) => String(post.status).toUpperCase() === "FAILED"),
     [posts],
   );
-  const published = useMemo(
-    () => posts.filter((post) => normalizeStatus(post.status) === "PUBLISHED"),
-    [posts],
-  );
-  const filteredDrafts = useMemo(() => {
+  const filteredPosts = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return drafts.filter((post) => !query || String(post.content ?? "").toLowerCase().includes(query));
-  }, [drafts, search]);
-  const aiUsage = findMetric(usage, ["posts_generated", "aiposts", "ai_posts", "posts"]);
-  const currentMonthCount = metrics?.monthly?.at(-1)?.count ?? published.length;
+    return recentPosts.filter((post) => !query || String(post.content ?? "").toLowerCase().includes(query));
+  }, [recentPosts, search]);
+  const creditUsage = usage?.usage?.credits ?? null;
+  const artifactCounts = usage?.artifactsCreated;
+  const artifactsCreated = artifactCounts
+    ? artifactCounts.posts + artifactCounts.polls + artifactCounts.documents
+    : null;
+  const comparison = initialDashboardData?.comparison ?? null;
+  const currentMonthCount = metrics
+    ? metrics.monthly?.find((item) => item.month === new Date().toISOString().slice(0, 7))?.count ?? 0
+    : null;
   const firstScheduled = scheduled[0];
   const visibleWorkspaceAccounts = connectedAccounts.slice(0, 3);
   const hiddenWorkspaceAccountCount = Math.max(0, connectedAccounts.length - visibleWorkspaceAccounts.length);
@@ -160,6 +209,7 @@ export default function DashboardRedesignClient({
       onSelectAccount={setSelectedAccountId}
       includeWorkspaceOption
       subscription={subscription}
+      initialUsage={usage}
       active="dashboard"
       title="Dashboard"
       topbarExtra={!isWorkspace ? (
@@ -176,7 +226,7 @@ export default function DashboardRedesignClient({
             <p>Here&apos;s what&apos;s happening across your workspace.</p>
           ) : (
             <p>
-              Here&apos;s what Mark has queued. You have <strong>{drafts.length} drafts</strong> waiting for review.
+              Here&apos;s what&apos;s happening for this LinkedIn account.
             </p>
           )}
         </div>
@@ -205,18 +255,20 @@ export default function DashboardRedesignClient({
           <section className="mq-stat-grid" aria-label="Workspace metrics">
             <div className="mq-card mq-stat-card">
               <span className="mq-label">Credits left</span>
-              <div className="mq-stat-value-row"><strong>1,240</strong><span>/ 2,000</span></div>
-              <div className="mq-progress"><span style={{ width: "62%" }} /></div>
+              <div className="mq-stat-value-row"><strong>{creditUsage?.remaining.toLocaleString() ?? "—"}</strong><span>/ {creditUsage?.limit.toLocaleString() ?? "—"}</span></div>
+              <div className="mq-progress"><span style={{ width: `${creditUsage?.limit ? Math.min(100, (creditUsage.remaining / creditUsage.limit) * 100) : 0}%` }} /></div>
             </div>
             <div className="mq-card mq-stat-card">
-              <span className="mq-label">Artifacts ready</span>
-              <div className="mq-stat-value-row"><strong>3</strong><span>to attach</span></div>
-              <span className="mq-stat-note">1 post · 1 carousel · 1 poll</span>
+              <span className="mq-label">Content created</span>
+              <div className="mq-stat-value-row"><strong>{artifactsCreated ?? "—"}</strong><span>this cycle</span></div>
+              <span className="mq-stat-note">{artifactCounts ? `${artifactCounts.posts} posts · ${artifactCounts.documents} documents · ${artifactCounts.polls} polls` : "Usage unavailable"}</span>
             </div>
             <div className="mq-card mq-stat-card">
-              <span className="mq-label">Published</span>
-              <div className="mq-stat-value-row"><strong>38</strong><span>this month</span></div>
-              <span className="mq-stat-note mq-positive">↗ 12 vs last month</span>
+              <span className="mq-label">Posts created</span>
+              <div className="mq-stat-value-row"><strong>{comparison?.current.count ?? "—"}</strong><span>this month</span></div>
+              <span className={`mq-stat-note ${comparison && comparison.difference >= 0 ? "mq-positive" : ""}`}>
+                {comparison ? `${comparison.difference >= 0 ? "↗" : "↘"} ${Math.abs(comparison.difference)} vs last month${comparison.percentageChange === null ? "" : ` (${Math.abs(comparison.percentageChange)}%)`}` : "Comparison unavailable"}
+              </span>
             </div>
             <div className="mq-card mq-stat-card mq-connected-account-card">
               <span className="mq-label">Connected Accounts</span>
@@ -227,7 +279,17 @@ export default function DashboardRedesignClient({
                   <span className="mq-connected-account-avatars" aria-label={`${connectedAccounts.length} connected LinkedIn ${connectedAccounts.length === 1 ? "account" : "accounts"}`}>
                     {visibleWorkspaceAccounts.map((account) => (
                       <span className="mq-connected-account-avatar" key={account.id} title={account.displayName ?? "LinkedIn account"}>
-                        {getInitials(account.displayName ?? account.profile?.localizedFirstName ?? "LinkedIn", account.vanityName)}
+                        <span aria-hidden="true">
+                          {getInitials(account.displayName ?? account.profile?.localizedFirstName ?? "LinkedIn", account.vanityName)}
+                        </span>
+                        {account.avatarUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={account.avatarUrl}
+                            alt=""
+                            onError={(event) => event.currentTarget.remove()}
+                          />
+                        ) : null}
                       </span>
                     ))}
                     {hiddenWorkspaceAccountCount ? <span className="mq-connected-account-more">+{hiddenWorkspaceAccountCount}</span> : null}
@@ -259,12 +321,19 @@ export default function DashboardRedesignClient({
 
             <div className="mq-card mq-list-card">
               <div className="mq-card-heading"><span className="mq-title">Up next</span><Link href="/calendar">Calendar <ArrowUpRight size={14} /></Link></div>
-              {workspaceSchedule.map((item) => (
-                <div className="mq-schedule-row" key={`${item.month}-${item.day}`}>
-                  <span className="mq-date-block"><b>{item.month}</b><strong>{item.day}</strong></span>
-                  <span className="mq-row-copy"><strong>{item.title}</strong><small><span className="mq-live-dot" />{item.meta}</small></span>
-                </div>
-              ))}
+              {!scheduled.length ? <p className="mq-empty">No upcoming posts.</p> : null}
+              {scheduled.slice(0, 3).map((post) => {
+                const date = parseDate(post.scheduledAt);
+                const accountName = post.connectedAccountName
+                  ?? connectedAccounts.find((account) => account.id === post.connectedAccount)?.displayName
+                  ?? "LinkedIn account";
+                return (
+                  <Link href={`/posts/${post._id}/edit`} className="mq-schedule-row" key={post._id}>
+                    <span className="mq-date-block"><b>{date?.toLocaleDateString(undefined, { month: "short" }) ?? "—"}</b><strong>{date?.getDate() ?? "—"}</strong></span>
+                    <span className="mq-row-copy"><strong>{getPostTitle(post.content)}</strong><small><span className="mq-live-dot" />{formatScheduledDate(post.scheduledAt)} · {accountName}</small></span>
+                  </Link>
+                );
+              })}
             </div>
           </section>
         </>
@@ -272,9 +341,9 @@ export default function DashboardRedesignClient({
         <>
           <section className="mq-stat-grid" aria-label="Overview metrics">
             <div className="mq-card mq-stat-card">
-              <span className="mq-label">AI posts this month</span>
-              <div className="mq-stat-value-row"><strong>{aiUsage?.used ?? (isLoading ? "…" : currentMonthCount)}</strong><span>/ {aiUsage?.limit ?? "—"}</span></div>
-              <div className="mq-progress"><span style={{ width: `${aiUsage?.limit ? Math.min(100, (aiUsage.used / aiUsage.limit) * 100) : 0}%` }} /></div>
+              <span className="mq-label">Credits left</span>
+              <div className="mq-stat-value-row"><strong>{creditUsage?.remaining.toLocaleString() ?? "—"}</strong><span>/ {creditUsage?.limit.toLocaleString() ?? "—"}</span></div>
+              <div className="mq-progress"><span style={{ width: `${creditUsage?.limit ? Math.min(100, (creditUsage.remaining / creditUsage.limit) * 100) : 0}%` }} /></div>
             </div>
             <div className="mq-card mq-stat-card">
               <span className="mq-label">Scheduled</span>
@@ -282,26 +351,26 @@ export default function DashboardRedesignClient({
               <span className="mq-stat-note">{firstScheduled ? `Next: ${formatScheduledDate(firstScheduled.scheduledAt)}` : "Nothing queued yet"}</span>
             </div>
             <div className="mq-card mq-stat-card">
-              <span className="mq-label">Published</span>
-              <div className="mq-stat-value-row"><strong>{isLoading ? "…" : published.length}</strong><span>this month</span></div>
-              <span className="mq-stat-note mq-positive">↗ Live post count</span>
+              <span className="mq-label">Posts created</span>
+              <div className="mq-stat-value-row"><strong>{isLoading ? "…" : currentMonthCount ?? "—"}</strong><span>this month</span></div>
+              <span className="mq-stat-note">All post statuses</span>
             </div>
             <div className="mq-card mq-stat-card">
-              <span className="mq-label">Avg. engagement</span>
-              <div className="mq-stat-value-row"><strong>—</strong></div>
-              <span className="mq-stat-note">Analytics endpoint not connected</span>
+              <span className="mq-label">Failed</span>
+              <div className="mq-stat-value-row"><strong>{isLoading ? "…" : failed.length}</strong><span>this month</span></div>
+              <span className="mq-stat-note">Open Posts to retry</span>
             </div>
           </section>
 
           <section className="mq-two-column">
             <div className="mq-card mq-list-card">
-              <div className="mq-card-heading"><span className="mq-title">Recent drafts</span><Link href="/posts?status=DRAFT">View all <ArrowUpRight size={14} /></Link></div>
-              {isLoading ? <p className="mq-empty">Loading drafts…</p> : null}
-              {!isLoading && !filteredDrafts.length ? <p className="mq-empty">No drafts found for this account.</p> : null}
-              {filteredDrafts.slice(0, 3).map((post) => (
+              <div className="mq-card-heading"><span className="mq-title">Recent posts</span><Link href="/posts">View all <ArrowUpRight size={14} /></Link></div>
+              {isLoading ? <p className="mq-empty">Loading posts…</p> : null}
+              {!isLoading && !filteredPosts.length ? <p className="mq-empty">No posts found for this account.</p> : null}
+              {filteredPosts.slice(0, 3).map((post) => (
                 <Link href={`/posts/${post._id}/edit`} className="mq-list-row" key={post._id}>
                   <span className="mq-row-icon"><FileText size={16} /></span>
-                  <span className="mq-row-copy"><strong>{getPostTitle(post.content)}</strong><small><span className="mq-tag">{postTypeLabel(post)}</span>{formatRelativeDate(post.updatedAt ?? post.createdAt)}</small></span>
+                  <span className="mq-row-copy"><strong>{getPostTitle(post.content)}</strong><small><span className="mq-tag">{titleCase(post.status ?? postTypeLabel(post))}</span>{formatRelativeDate(post.updatedAt ?? post.createdAt)}</small></span>
                   <ArrowUpRight className="mq-row-arrow" size={16} />
                 </Link>
               ))}
@@ -324,7 +393,7 @@ export default function DashboardRedesignClient({
 
           <section className="mq-card mq-footnote-card">
             <div><span className="mq-eyebrow">This workspace</span><h2>{titleCase(usage?.tier?.name ?? user.tier?.name ?? "Free")} plan</h2></div>
-            <p>{aiUsage ? `${aiUsage.remaining} AI posts remaining this cycle.` : "Usage data will appear here when the billing service responds."}</p>
+            <p>{creditUsage ? `${creditUsage.remaining.toLocaleString()} credits remaining this cycle.` : "Usage data will appear here when the billing service responds."}</p>
             <Link href="/billing" className="mq-secondary-button">View billing <ArrowUpRight size={15} /></Link>
           </section>
         </>

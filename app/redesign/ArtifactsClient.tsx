@@ -1,14 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ComponentType, type KeyboardEvent } from "react";
+import Link from "next/link";
 import {
+  ArrowUpRight,
   BarChart3,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   FileText,
+  GalleryHorizontal,
   Layers3,
+  Plus,
+  type LucideProps,
 } from "lucide-react";
+import MarquillMark from "../../components/brand/MarquillMark";
 import RedesignShell from "./Shell";
 import { API_BASE, readApi } from "./api";
 import { formatRelativeDate } from "./types";
@@ -33,23 +39,84 @@ type DetailState =
   | { status: "loaded"; data: ArtifactDetailData }
   | { status: "error" };
 
-const filterLabels: Array<{ key: ArtifactFilter; label: string }> = [
-  { key: "ALL", label: "All" },
-  { key: "POST", label: "Posts" },
-  { key: "DOCUMENT", label: "Carousels" },
-  { key: "POLL", label: "Polls" },
-];
+function PostEmptyPreview() {
+  return (
+    <div className="mq-artifact-empty-preview-body mq-artifact-empty-post">
+      <span className="mq-artifact-empty-kicker">Drafted by Mark</span>
+      <strong>The best career advice I ignored for five years:</strong>
+      <p>Stop waiting to feel ready. The work that changed my trajectory started as an imperfect first draft.</p>
+      <span className="mq-artifact-empty-post-meta">2 min read · Professional</span>
+    </div>
+  );
+}
 
-const typeLabels: Record<ArtifactType, string> = {
-  POST: "Post",
-  POLL: "Poll",
-  DOCUMENT: "Carousel",
+function PollEmptyPreview() {
+  return (
+    <div className="mq-artifact-empty-preview-body mq-artifact-empty-poll">
+      <span className="mq-artifact-empty-kicker">Audience pulse</span>
+      <strong>What makes a LinkedIn post worth saving?</strong>
+      <span>One clear takeaway</span>
+      <span>A surprising point of view</span>
+      <span>A story that feels real</span>
+    </div>
+  );
+}
+
+function CarouselEmptyPreview() {
+  return (
+    <div className="mq-artifact-empty-preview-body mq-artifact-empty-carousel">
+      <div><small>01</small><strong>5 lessons from building in public</strong></div>
+      <div><small>02</small><strong>Start before the story feels finished.</strong></div>
+      <div><small>03</small><strong>Share the decision, not just the result.</strong></div>
+    </div>
+  );
+}
+
+type ArtifactFormatDefinition = {
+  label: string;
+  pluralLabel: string;
+  description: string;
+  Icon: ComponentType<LucideProps>;
+  EmptyPreview: ComponentType;
 };
 
-function artifactIcon(type: ArtifactType) {
-  if (type === "POLL") return <BarChart3 size={13} />;
-  if (type === "DOCUMENT") return <Layers3 size={13} />;
-  return <FileText size={13} />;
+const artifactFilterOrder: ArtifactType[] = ["POST", "DOCUMENT", "POLL"];
+const artifactPreviewOrder: ArtifactType[] = ["POST", "POLL", "DOCUMENT"];
+const artifactFormats: Record<ArtifactType, ArtifactFormatDefinition> = {
+  POST: {
+    label: "Post",
+    pluralLabel: "Posts",
+    description: "A sharp idea, ready for LinkedIn.",
+    Icon: FileText,
+    EmptyPreview: PostEmptyPreview,
+  },
+  DOCUMENT: {
+    label: "Carousel",
+    pluralLabel: "Carousels",
+    description: "A story people can swipe through.",
+    Icon: GalleryHorizontal,
+    EmptyPreview: CarouselEmptyPreview,
+  },
+  POLL: {
+    label: "Poll",
+    pluralLabel: "Polls",
+    description: "A question built to start a conversation.",
+    Icon: BarChart3,
+    EmptyPreview: PollEmptyPreview,
+  },
+};
+
+const filterLabels: Array<{ key: ArtifactFilter; label: string }> = [
+  { key: "ALL", label: "All" },
+  ...artifactFilterOrder.map((type) => ({ key: type, label: artifactFormats[type].pluralLabel })),
+];
+
+function CreateArtifactLink({ iconSize = 15 }: { iconSize?: number }) {
+  return (
+    <Link href="/posts/new" className="mq-primary-button mq-create-artifact-button">
+      <Plus size={iconSize} /> Create artifact
+    </Link>
+  );
 }
 
 function statusLabel(status: ArtifactStatus) {
@@ -105,6 +172,7 @@ function ArtifactCard({
 }) {
   const cardRef = useRef<HTMLElement>(null);
   const shouldEnrich = artifact.status === "READY" && artifact.type !== "POST";
+  const format = artifactFormats[artifact.type];
 
   useEffect(() => {
     if (!shouldEnrich || detailState) return;
@@ -145,7 +213,7 @@ function ArtifactCard({
     >
       <div className="mq-artifact-card-header">
         <span className={`mq-artifact-type mq-artifact-type-${artifact.type.toLowerCase()}`}>
-          {artifactIcon(artifact.type)} {typeLabels[artifact.type]}
+          <format.Icon size={13} /> {format.label}
         </span>
         <span className={`mq-artifact-state mq-artifact-state-${artifact.status.toLowerCase()}`}>
           <i /> {statusLabel(artifact.status)}
@@ -206,6 +274,94 @@ function ArtifactGridSkeleton() {
         </div>
       ))}
     </div>
+  );
+}
+
+function ArtifactEmptyState() {
+  const [previewType, setPreviewType] = useState<ArtifactType>("POST");
+  const tabRefs = useRef<Partial<Record<ArtifactType, HTMLButtonElement | null>>>({});
+  const preview = artifactFormats[previewType];
+  const Preview = preview.EmptyPreview;
+
+  function showNextFormat() {
+    const currentIndex = artifactPreviewOrder.indexOf(previewType);
+    setPreviewType(artifactPreviewOrder[(currentIndex + 1) % artifactPreviewOrder.length]);
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, type: ArtifactType) {
+    const currentIndex = artifactPreviewOrder.indexOf(type);
+    let nextIndex: number | null = null;
+
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") nextIndex = (currentIndex + 1) % artifactPreviewOrder.length;
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp") nextIndex = (currentIndex - 1 + artifactPreviewOrder.length) % artifactPreviewOrder.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = artifactPreviewOrder.length - 1;
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    const nextType = artifactPreviewOrder[nextIndex];
+    setPreviewType(nextType);
+    tabRefs.current[nextType]?.focus();
+  }
+
+  return (
+    <section className="mq-card mq-artifact-empty" aria-labelledby="mq-artifact-empty-title">
+      <div className="mq-artifact-empty-copy">
+        <div className="mq-artifact-empty-mark">
+          <MarquillMark size={34} theme="auto" title="" />
+          <span><i /> Mark is ready</span>
+        </div>
+        <span className="mq-eyebrow">Your content library starts here</span>
+        <h2 id="mq-artifact-empty-title">Turn one idea into something worth sharing.</h2>
+        <p>Draft with Mark and every finished post, poll, and carousel will stay organized here.</p>
+        <div className="mq-artifact-empty-actions">
+          <CreateArtifactLink iconSize={16} />
+          <button type="button" className="mq-artifact-empty-tour" onClick={showNextFormat}>Explore the formats <span>→</span></button>
+        </div>
+      </div>
+
+      <div className="mq-artifact-empty-showcase">
+        <div
+          id="mq-artifact-preview-panel"
+          role="tabpanel"
+          tabIndex={0}
+          aria-labelledby={`mq-artifact-preview-tab-${previewType.toLowerCase()}`}
+          className={`mq-artifact-empty-preview mq-artifact-empty-preview-${previewType.toLowerCase()}`}
+          aria-live="polite"
+        >
+          <div className="mq-artifact-empty-preview-head">
+            <span><preview.Icon size={15} /> {preview.label}</span>
+            <small>Example artifact</small>
+          </div>
+          <Preview />
+        </div>
+        <div className="mq-artifact-empty-types" role="tablist" aria-label="Preview artifact formats">
+          {artifactPreviewOrder.map((type) => {
+            const format = artifactFormats[type];
+            const isSelected = previewType === type;
+            return (
+              <button
+                key={type}
+                id={`mq-artifact-preview-tab-${type.toLowerCase()}`}
+                ref={(node) => { tabRefs.current[type] = node; }}
+                type="button"
+                role="tab"
+                aria-controls="mq-artifact-preview-panel"
+                aria-selected={isSelected}
+                tabIndex={isSelected ? 0 : -1}
+                className={isSelected ? "is-active" : ""}
+                onClick={() => setPreviewType(type)}
+                onKeyDown={(event) => handleTabKeyDown(event, type)}
+              >
+                <span><format.Icon size={15} /></span>
+                <span><strong>{format.label}</strong><small>{format.description}</small></span>
+                <ArrowUpRight size={14} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -347,29 +503,37 @@ export default function ArtifactsRedesignClient({
             </button>
           ))}
         </div>
-        <label className="mq-filter-select mq-artifact-month-filter">
-          <CalendarDays size={14} />
-          <span className="sr-only">Filter artifacts by month</span>
-          <select value={month} onChange={(event) => changeMonth(event.target.value)}>
-            <option value="">All months</option>
-            {availableMonths.map((value) => (
-              <option value={value} key={value}>
-                {new Date(`${value}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="mq-artifact-toolbar-actions">
+          <label className="mq-filter-select mq-artifact-month-filter">
+            <CalendarDays size={14} />
+            <span className="sr-only">Filter artifacts by month</span>
+            <select value={month} onChange={(event) => changeMonth(event.target.value)}>
+              <option value="">All months</option>
+              {availableMonths.map((value) => (
+                <option value={value} key={value}>
+                  {new Date(`${value}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+                </option>
+              ))}
+            </select>
+          </label>
+          {artifacts.length ? <CreateArtifactLink /> : null}
+        </div>
       </div>
 
       {error ? <div className="mq-alert mq-alert-error" role="alert">{error}</div> : null}
       {isLoading ? <ArtifactGridSkeleton /> : null}
 
       {!isLoading && !error && !artifacts.length ? (
-        <div className="mq-card mq-artifact-empty">
-          <Layers3 size={24} />
-          <h2>{filter === "ALL" && !month ? "No artifacts yet" : "No artifacts match this view"}</h2>
-          <p>{filter === "ALL" && !month ? "Generated posts, polls, and carousels will appear here." : "Try another artifact type or month."}</p>
-        </div>
+        filter === "ALL" && !month ? (
+          <ArtifactEmptyState />
+        ) : (
+          <div className="mq-card mq-artifact-filter-empty">
+            <Layers3 size={24} />
+            <h2>No artifacts match this view</h2>
+            <p>Try another artifact type or month.</p>
+            <button type="button" className="mq-secondary-button" onClick={() => { changeFilter("ALL"); changeMonth(""); }}>Clear filters</button>
+          </div>
+        )
       ) : null}
 
       {!isLoading && artifacts.length ? (
