@@ -113,7 +113,7 @@ const filterLabels: Array<{ key: ArtifactFilter; label: string }> = [
 
 function CreateArtifactLink({ iconSize = 15 }: { iconSize?: number }) {
   return (
-    <Link href="/posts/new" className="mq-primary-button mq-create-artifact-button">
+    <Link href="/artifacts/new" className="mq-primary-button mq-create-artifact-button">
       <Plus size={iconSize} /> Create artifact
     </Link>
   );

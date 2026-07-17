@@ -302,21 +302,21 @@ export default function DashboardRedesignClient({
           <section className="mq-two-column mq-workspace-panels">
             <div className="mq-card mq-list-card">
               <div className="mq-card-heading"><span className="mq-title">Quick actions</span></div>
-              <Link href="/posts/new" className="mq-quick-action-row">
+              <Link href="/artifacts/new?type=POST" className="mq-quick-action-row">
                 <span className="mq-row-icon"><FileText size={17} /></span>
                 <span className="mq-row-copy"><strong>Post</strong><small>Create a LinkedIn post with Mark</small></span>
                 <ArrowUpRight className="mq-row-arrow" size={16} />
               </Link>
-              <button type="button" className="mq-quick-action-row" disabled>
+              <Link href="/artifacts/new?type=POLL" className="mq-quick-action-row">
                 <span className="mq-row-icon"><BarChart3 size={17} /></span>
                 <span className="mq-row-copy"><strong>Poll</strong><small>Create a poll for your audience</small></span>
-                <span className="mq-coming-soon">Coming soon</span>
-              </button>
-              <button type="button" className="mq-quick-action-row" disabled>
+                <ArrowUpRight className="mq-row-arrow" size={16} />
+              </Link>
+              <Link href="/artifacts/new?type=DOCUMENT" className="mq-quick-action-row">
                 <span className="mq-row-icon"><GalleryHorizontal size={17} /></span>
                 <span className="mq-row-copy"><strong>Carousel</strong><small>Turn an idea into a slide deck</small></span>
-                <span className="mq-coming-soon">Coming soon</span>
-              </button>
+                <ArrowUpRight className="mq-row-arrow" size={16} />
+              </Link>
             </div>
 
             <div className="mq-card mq-list-card">
