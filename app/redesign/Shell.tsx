@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   CalendarDays,
+  ChevronDown,
+  Coins,
   CreditCard,
   Bell,
   Home,
@@ -14,9 +16,14 @@ import {
   Plus,
   RefreshCw,
   Settings,
-  Sparkles,
 } from "lucide-react";
-import type { ConnectedAccount, SubscriptionTier, UserProfile } from "../lib/types";
+import type {
+  ConnectedAccount,
+  PaymentUsageMetric,
+  PaymentUsageResponse,
+  SubscriptionTier,
+  UserProfile,
+} from "../lib/types";
 import MarquillLockup from "../../components/brand/MarquillLockup";
 import LinkedInIcon from "../../components/brand/LinkedInIcon";
 import FeedbackModal from "./FeedbackModal";
@@ -26,6 +33,7 @@ import ThemeToggle from "./ThemeToggle";
 import { getInitials } from "./types";
 import type { WorkspacePage } from "./types";
 import MarquillSelect from "../../components/ui/MarquillSelect";
+import { API_BASE, readApi } from "./api";
 
 const navItems: Array<{ key: WorkspacePage; label: string; href: string; icon: ReactNode }> = [
   { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: <Home size={18} /> },
@@ -75,6 +83,7 @@ export default function RedesignShell({
   topbarExtra,
   includeWorkspaceOption = false,
   subscription,
+  initialUsage,
   children,
 }: {
   user: UserProfile;
@@ -86,11 +95,14 @@ export default function RedesignShell({
   topbarExtra?: ReactNode;
   includeWorkspaceOption?: boolean;
   subscription?: SubscriptionTier | null;
+  initialUsage?: PaymentUsageResponse["data"] | null;
   children: ReactNode;
 }) {
   const router = useRouter();
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isOrganizationModalOpen, setIsOrganizationModalOpen] = useState(false);
+  const [isConnectedExpanded, setIsConnectedExpanded] = useState(false);
+  const [fetchedCreditUsage, setFetchedCreditUsage] = useState<PaymentUsageMetric | null>(null);
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId);
   const initials = getInitials(user.name, user.email);
   const tier = subscription ?? user.tier;
@@ -111,16 +123,34 @@ export default function RedesignShell({
       ?? accounts.find((account) => account.accessTokenExpiresAt)?.accessTokenExpiresAt,
   );
 
+  useEffect(() => {
+    if (initialUsage) return;
+    const controller = new AbortController();
+    readApi<PaymentUsageResponse>(`${API_BASE}/payment/usage`, { signal: controller.signal })
+      .then((response) => setFetchedCreditUsage(response?.data?.usage.credits ?? null))
+      .catch((reason) => {
+        if (!(reason instanceof DOMException && reason.name === "AbortError")) {
+          setFetchedCreditUsage(null);
+        }
+      });
+    return () => controller.abort();
+  }, [initialUsage]);
+
+  const creditUsage = initialUsage?.usage.credits ?? fetchedCreditUsage;
+  const creditLimit = creditUsage?.limit ?? 0;
+  const creditsRemaining = creditUsage
+    ? Math.max(0, creditUsage.remaining ?? creditLimit - creditUsage.used)
+    : null;
+  const creditPercent = creditLimit > 0 && creditsRemaining !== null
+    ? Math.min(100, (creditsRemaining / creditLimit) * 100)
+    : 0;
+  const numberFormatter = new Intl.NumberFormat();
+
   return (
     <div className="mq-shell">
       <aside className="mq-sidebar">
         <Link href="/dashboard" className="mq-brand" aria-label="Marquill dashboard">
           <MarquillLockup size={29} theme="auto" className="mq-brand-lockup" />
-        </Link>
-        <Link href="/posts/new" className="mq-new-post">
-          <Sparkles size={16} />
-          <span>New post</span>
-          <span className="mq-mono mq-new-post-hint">ask mark</span>
         </Link>
 
         <div className="mq-sidebar-section">
@@ -141,7 +171,16 @@ export default function RedesignShell({
 
         <div className="mq-sidebar-section mq-connected">
           <div className="mq-sidebar-section-heading">
-            <span className="mq-eyebrow">Connected</span>
+            <button
+              type="button"
+              className="mq-connected-toggle"
+              aria-expanded={isConnectedExpanded}
+              aria-controls="mq-connected-accounts"
+              onClick={() => setIsConnectedExpanded((expanded) => !expanded)}
+            >
+              <span className="mq-eyebrow">Connected</span>
+              <ChevronDown size={15} className={isConnectedExpanded ? "is-expanded" : ""} />
+            </button>
             <div className="mq-account-actions">
               <button type="button" className="mq-account-action" title="Connected LinkedIn accounts and organization pages" aria-label="Information about connected accounts"><Info size={16} /></button>
               <LinkedInConnectButton className="mq-account-action" title="Reconnect LinkedIn account" aria-label="Reconnect LinkedIn account">
@@ -159,27 +198,30 @@ export default function RedesignShell({
               </button>
             </div>
           </div>
-          {accounts.length ? (
-            accounts.map((account) => (
-              <button
-                type="button"
-                key={account.id}
-                onClick={() => onSelectAccount?.(account.id)}
-                className={`mq-account-row ${selectedAccountId === account.id ? "is-selected" : ""}`}
-              >
-                <AccountAvatar account={account} />
-                <span className="mq-account-copy">
-                  <strong>{account.displayName ?? "LinkedIn account"}</strong>
-                  <small className={sharedExpiry?.isUrgent ? "is-urgent" : ""}>{sharedExpiry?.text ?? (account.accountType === "ORGANIZATION" ? "Company page" : "Personal")}</small>
-                </span>
-              </button>
-            ))
-          ) : (
-            <LinkedInConnectButton className="mq-empty-account">
-              Connect LinkedIn to publish
-            </LinkedInConnectButton>
-          )}
-          <Link href="/settings" className="mq-manage-accounts">Manage accounts</Link>
+          {isConnectedExpanded ? (
+            <div id="mq-connected-accounts" className="mq-connected-accounts">
+              {accounts.length ? (
+                accounts.map((account) => (
+                  <button
+                    type="button"
+                    key={account.id}
+                    onClick={() => onSelectAccount?.(account.id)}
+                    className={`mq-account-row ${selectedAccountId === account.id ? "is-selected" : ""}`}
+                  >
+                    <AccountAvatar account={account} />
+                    <span className="mq-account-copy">
+                      <strong>{account.displayName ?? "LinkedIn account"}</strong>
+                      <small className={sharedExpiry?.isUrgent ? "is-urgent" : ""}>{sharedExpiry?.text ?? (account.accountType === "ORGANIZATION" ? "Company page" : "Personal")}</small>
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <LinkedInConnectButton className="mq-empty-account">
+                  Connect LinkedIn to publish
+                </LinkedInConnectButton>
+              )}
+            </div>
+          ) : null}
         </div>
 
         <button type="button" className="mq-sidebar-help" onClick={() => setIsFeedbackOpen(true)}>
@@ -187,13 +229,31 @@ export default function RedesignShell({
           <span>Help & feedback</span>
         </button>
 
-        <div className="mq-sidebar-user">
-          <span className="mq-avatar mq-avatar-md mq-avatar-accent">{initials}</span>
-          <span className="mq-account-copy">
-            <strong>{user.name}</strong>
-            <small>{tierName} plan</small>
-          </span>
-          {isFreeTier ? <Link href="/billing" className="mq-upgrade-link">Upgrade</Link> : null}
+        <div className="mq-sidebar-footer">
+          <div className="mq-credit-card" aria-label="Monthly credits">
+            <div className="mq-credit-heading">
+              <span className="mq-credit-title"><Coins size={17} /> Credits</span>
+              <span className="mq-credit-remaining">
+                {creditsRemaining === null ? "—" : numberFormatter.format(creditsRemaining)} left
+              </span>
+            </div>
+            <div className="mq-credit-progress" role="progressbar" aria-label="Credits remaining" aria-valuemin={0} aria-valuemax={creditLimit || undefined} aria-valuenow={creditsRemaining ?? undefined}>
+              <span style={{ width: `${creditPercent}%` }} />
+            </div>
+            <div className="mq-credit-meta">
+              <span>{creditLimit > 0 ? `of ${numberFormatter.format(creditLimit)} / mo` : "Monthly allowance"}</span>
+              <Link href="/billing">Buy more</Link>
+            </div>
+          </div>
+
+          <div className="mq-sidebar-user">
+            <span className="mq-avatar mq-avatar-md mq-avatar-accent">{initials}</span>
+            <span className="mq-account-copy">
+              <strong>{user.name}</strong>
+              <small>{tierName} plan</small>
+            </span>
+            {isFreeTier ? <Link href="/billing" className="mq-upgrade-link">Upgrade</Link> : null}
+          </div>
         </div>
       </aside>
 
