@@ -2,6 +2,85 @@ export type ArtifactType = "POST" | "POLL" | "DOCUMENT";
 
 export type ArtifactStatus = "GENERATING" | "READY" | "FAILED";
 
+export type WorkflowStep =
+  | "RESOLVE_INPUT"
+  | "RESEARCH"
+  | "GENERATE"
+  | "RENDER_PDF"
+  | "PERSIST_VERSION";
+
+export type ArtifactRunKind = "INITIAL" | "REFINE";
+
+export type ArtifactVersionSummary = {
+  version: number;
+  status: ArtifactStatus;
+  createdAt?: string;
+  editedAt?: string;
+  refineFeedback?: string;
+};
+
+export type CreateArtifactResponse = {
+  artifactId: string;
+  runId: string;
+};
+
+export type RefineArtifactResponse = CreateArtifactResponse & {
+  version: number;
+};
+
+export type RunStartedEvent = {
+  seq: number;
+  ts: number;
+  kind: ArtifactRunKind;
+  type: ArtifactType;
+  steps: WorkflowStep[];
+};
+
+export type RunStepEvent = {
+  seq: number;
+  ts: number;
+  step: WorkflowStep;
+  index: number;
+  total: number;
+};
+
+export type RunProgressEvent = {
+  seq: number;
+  ts: number;
+  step: WorkflowStep;
+  sourcesFound?: number;
+};
+
+export type RunUsageEvent = {
+  seq: number;
+  ts: number;
+  kind: "llm" | "web_search" | "pdf_render";
+  credits: number;
+  totalCredits: number;
+  detail?: unknown;
+};
+
+export type RunStepFailedEvent = {
+  seq: number;
+  ts: number;
+  step: WorkflowStep;
+  retryable: boolean;
+  message: string;
+};
+
+export type RunCompletedEvent = {
+  seq: number;
+  ts: number;
+  artifactId: string;
+  version: number;
+};
+
+export type RunFailedEvent = {
+  seq: number;
+  ts: number;
+  failureReason: string;
+};
+
 export type ArtifactSlide =
   | { type: "cover"; fields: { eyebrow?: string; title: string; subtitle?: string } }
   | { type: "content"; fields: { heading: string; body: string } }
@@ -56,6 +135,7 @@ export type ArtifactDetailData = {
       pdfUrl?: string;
     };
   };
+  versions?: ArtifactVersionSummary[];
 };
 
 export type ArtifactDetailResponse = {

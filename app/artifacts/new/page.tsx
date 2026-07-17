@@ -14,7 +14,7 @@ function readInitialType(value: string | string[] | undefined): ArtifactType | u
 export default async function NewArtifactPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string | string[] }>;
+  searchParams: Promise<{ type?: string | string[]; restore?: string | string[] }>;
 }) {
   const [workspace, query] = await Promise.all([
     getWorkspaceProps(),
@@ -25,6 +25,7 @@ export default async function NewArtifactPage({
     <ArtifactStudioClient
       {...workspace}
       initialType={readInitialType(query.type)}
+      restoreKey={Array.isArray(query.restore) ? query.restore[0] : query.restore}
     />
   );
 }

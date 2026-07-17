@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowUp,
   BarChart3,
   FileText,
   GalleryHorizontal,
+  LoaderCircle,
   Palette,
   Search,
   Sparkles,
@@ -13,12 +15,14 @@ import {
 import MarquillLockup from "../../components/brand/MarquillLockup";
 import MarquillSelect from "../../components/ui/MarquillSelect";
 import { StylePreset } from "../lib/types";
+import { FeatureLimitExceededError } from "../lib/types";
 import type {
   ConnectedAccount,
   SubscriptionTier,
   UserProfile,
 } from "../lib/types";
-import type { ArtifactType } from "./artifactTypes";
+import type { ArtifactType, CreateArtifactResponse } from "./artifactTypes";
+import { API_BASE, jsonRequest, readApi } from "./api";
 import RedesignShell from "./Shell";
 
 type CarouselTheme = "bold" | "minimal" | "editorial" | "gradient";
@@ -56,19 +60,66 @@ export default function ArtifactStudioClient({
   primaryAccountId,
   subscription,
   initialType,
+  restoreKey,
 }: {
   user: UserProfile;
   connectedAccounts: ConnectedAccount[];
   primaryAccountId?: string;
   subscription?: SubscriptionTier | null;
   initialType?: ArtifactType;
+  restoreKey?: string;
 }) {
+  const router = useRouter();
   const [type, setType] = useState<ArtifactType | undefined>(initialType);
   const [prompt, setPrompt] = useState("");
   const [withResearch, setWithResearch] = useState(false);
   const [stylePreset, setStylePreset] = useState<StylePreset>(StylePreset.PROFESSIONAL);
   const [theme, setTheme] = useState<CarouselTheme>("minimal");
+  const [isCreating, setIsCreating] = useState(false);
+  const [creationError, setCreationError] = useState<string | null>(null);
   const isReady = Boolean(type && prompt.trim());
+
+  useEffect(() => {
+    if (!restoreKey) return;
+    const restoredPrompt = window.sessionStorage.getItem(`marquill:artifact:${restoreKey}:prompt`);
+    if (restoredPrompt) setPrompt(restoredPrompt.slice(0, 2000));
+  }, [restoreKey]);
+
+  async function createArtifact(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedPrompt = prompt.trim();
+    if (!type || !trimmedPrompt || isCreating) return;
+
+    setCreationError(null);
+    setIsCreating(true);
+    try {
+      const response = await readApi<CreateArtifactResponse>(
+        `${API_BASE}/artifacts`,
+        jsonRequest({
+          type,
+          prompt: trimmedPrompt,
+          withResearch,
+          stylePreset,
+          ...(type === "DOCUMENT" ? { theme } : {}),
+        }, { method: "POST" }),
+      );
+      if (!response?.artifactId || !response.runId) {
+        throw new Error("The artifact run could not be started.");
+      }
+      window.sessionStorage.setItem(`marquill:artifact:${response.artifactId}:prompt`, trimmedPrompt);
+      window.sessionStorage.setItem(`marquill:artifact:${response.artifactId}:type`, type);
+      router.push(`/artifacts/${encodeURIComponent(response.artifactId)}?run=${encodeURIComponent(response.runId)}`);
+    } catch (reason) {
+      setCreationError(
+        reason instanceof FeatureLimitExceededError
+          ? reason.upgradeHint
+          : reason instanceof Error
+            ? reason.message
+            : "The artifact run could not be started.",
+      );
+      setIsCreating(false);
+    }
+  }
 
   return (
     <RedesignShell
@@ -88,13 +139,16 @@ export default function ArtifactStudioClient({
             <h1 id="mq-artifact-studio-title">What will we make today?</h1>
           </div>
 
-          <form className="mq-artifact-studio-form" onSubmit={(event) => event.preventDefault()}>
+          <form className="mq-artifact-studio-form" onSubmit={createArtifact}>
             <div className="mq-artifact-prompt-card">
               <label htmlFor="artifact-prompt" className="sr-only">Describe the artifact you want to create</label>
               <textarea
                 id="artifact-prompt"
                 value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
+                onChange={(event) => {
+                  setPrompt(event.target.value);
+                  if (creationError) setCreationError(null);
+                }}
                 placeholder="Ask Mark to create something worth sharing..."
                 maxLength={2000}
                 rows={4}
@@ -140,12 +194,12 @@ export default function ArtifactStudioClient({
 
                   <button
                     type="submit"
-                    className={`mq-artifact-submit${isReady ? " is-ready" : ""}`}
-                    disabled
+                    className={`mq-artifact-submit${isReady ? " is-ready" : ""}${isCreating ? " is-loading" : ""}`}
+                    disabled={!isReady || isCreating}
                     aria-label="Create artifact"
-                    title="Artifact generation is coming next"
+                    title={isReady ? "Create artifact" : "Choose a format and describe your idea"}
                   >
-                    <ArrowUp size={18} />
+                    {isCreating ? <LoaderCircle size={18} /> : <ArrowUp size={18} />}
                   </button>
                 </div>
               </div>
@@ -169,6 +223,10 @@ export default function ArtifactStudioClient({
                 );
               })}
             </fieldset>
+
+            {creationError ? (
+              <div className="mq-artifact-create-error" role="alert">{creationError}</div>
+            ) : null}
           </form>
 
           <p className="mq-artifact-studio-note">

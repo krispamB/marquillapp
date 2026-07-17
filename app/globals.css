@@ -545,6 +545,88 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-artifact-type-options small { overflow: hidden; color: var(--ink-400); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .mq-artifact-type-options button.is-selected small { color: color-mix(in srgb, var(--accent-ink) 70%, var(--ink-500)); }
 .mq-artifact-studio-note { margin: 18px 0 0; color: var(--ink-400); font: 10.5px/1.5 var(--font-jetbrains-mono); text-align: center; }
+.mq-artifact-submit.is-loading svg, .mq-studio-refine button svg, .mq-studio-connecting svg, .mq-studio-thread-loading svg, .mq-studio-step-icon .lucide-loader-circle { animation: mq-studio-spin .8s linear infinite; }
+.mq-artifact-create-error { margin-top: 13px; padding: 10px 13px; border: 1px solid color-mix(in srgb, var(--neg) 28%, var(--line)); border-radius: 11px; background: color-mix(in srgb, var(--neg) 7%, var(--surface)); color: var(--neg); font-size: 12px; line-height: 1.45; }
+
+/* Artifact Studio conversation ----------------------------------------- */
+.mq-studio-conversation { width: min(100%, 880px); min-height: calc(100vh - 140px); margin: 0 auto; padding: 8px 0 44px; }
+.mq-studio-conversation-head { display: flex; align-items: center; gap: 13px; padding: 8px 0 22px; border-bottom: 1px solid var(--line-faint); }
+.mq-studio-conversation-head > a { display: inline-flex; width: 38px; height: 38px; flex: none; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink-700); box-shadow: var(--sh-xs); }
+.mq-studio-conversation-head > a:hover { border-color: var(--line-strong); color: var(--ink-900); }
+.mq-studio-conversation-head h1 { margin: 0; color: var(--ink-900); font-size: 18px; font-weight: 680; letter-spacing: -.025em; }
+.mq-studio-conversation-head p { margin: 3px 0 0; color: var(--ink-400); font-size: 11px; }
+.mq-studio-thread { display: flex; min-height: 390px; flex-direction: column; gap: 22px; padding: 34px 0 30px; }
+.mq-studio-user-message { max-width: min(78%, 650px); align-self: flex-end; padding: 13px 17px; border-radius: 18px 18px 4px 18px; background: var(--ink-900); color: var(--surface); font-size: 14px; line-height: 1.55; white-space: pre-wrap; box-shadow: var(--sh-sm); }
+.mq-studio-assistant-message, .mq-studio-run { display: grid; width: 100%; grid-template-columns: 34px minmax(0, 1fr); align-items: flex-start; gap: 12px; }
+.mq-studio-mark { display: flex; align-items: center; justify-content: center; padding-top: 1px; }
+.mq-studio-assistant-content, .mq-studio-run-content { min-width: 0; }
+.mq-studio-assistant-meta { margin: 7px 0 12px; color: var(--ink-500); font-size: 11.5px; }
+.mq-studio-response { overflow: hidden; border: 1px solid var(--line-strong); border-radius: 18px; background: var(--surface); box-shadow: var(--sh-md); }
+.mq-studio-response-head { display: flex; min-height: 58px; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 15px; border-bottom: 1px solid var(--line-faint); }
+.mq-studio-response-labels { display: flex; align-items: center; gap: 8px; }
+.mq-studio-version { padding: 4px 8px; border-radius: 999px; background: var(--canvas-sub); color: var(--ink-500); font: 9.5px/1 var(--font-jetbrains-mono); }
+.mq-studio-edit { display: inline-flex; min-height: 34px; align-items: center; gap: 6px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--ink-400); font: 600 11px var(--font-inter); cursor: not-allowed; opacity: .72; }
+.mq-studio-response-body { padding: 23px 25px; }
+.mq-studio-post-copy { color: var(--ink-900); font-size: 15px; line-height: 1.72; white-space: pre-wrap; }
+.mq-studio-poll-copy { display: flex; flex-direction: column; gap: 14px; }
+.mq-studio-poll-copy > p { margin: 0 0 2px; color: var(--ink-700); font-size: 14px; line-height: 1.65; white-space: pre-wrap; }
+.mq-studio-poll-copy label { display: flex; flex-direction: column; gap: 6px; }
+.mq-studio-poll-copy label > span { color: var(--ink-400); font: 9px/1 var(--font-jetbrains-mono); letter-spacing: .05em; text-transform: uppercase; }
+.mq-studio-poll-copy input, .mq-studio-poll-copy textarea { width: 100%; resize: none; border: 1px solid var(--line); border-radius: 11px; outline: 0; background: var(--surface-2); color: var(--ink-900); font: 500 13.5px/1.45 var(--font-inter); }
+.mq-studio-poll-copy input { height: 42px; padding: 0 13px; }
+.mq-studio-poll-copy textarea { min-height: 66px; padding: 11px 13px; }
+.mq-studio-poll-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.mq-studio-poll-copy > small { color: var(--ink-400); font: 10px/1 var(--font-jetbrains-mono); }
+.mq-studio-document-copy { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 15px; }
+.mq-studio-document-icon { display: inline-flex; width: 48px; height: 58px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 11px; background: var(--canvas-sub); color: var(--accent-ink); }
+.mq-studio-document-copy > div:nth-child(2) { min-width: 0; }
+.mq-studio-document-copy strong { display: block; color: var(--ink-900); font-size: 14px; }
+.mq-studio-document-copy p { margin: 6px 0; color: var(--ink-600); font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+.mq-studio-document-copy span { color: var(--ink-400); font: 10px/1 var(--font-jetbrains-mono); }
+.mq-studio-document-copy > a { display: inline-flex; min-height: 36px; align-items: center; gap: 7px; padding: 0 13px; border-radius: 10px; background: var(--ink-900); color: var(--surface); font-size: 11.5px; font-weight: 650; text-decoration: none; }
+.mq-studio-document-copy .mq-studio-pdf-pending { padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; }
+.mq-studio-response-foot { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 15px; border-top: 1px solid var(--line-faint); color: var(--ink-400); font-size: 10.5px; }
+.mq-studio-response-foot span { display: inline-flex; align-items: center; gap: 5px; }
+.mq-studio-run-content { padding-top: 5px; }
+.mq-studio-run-heading { display: flex; min-height: 30px; align-items: center; justify-content: space-between; gap: 12px; }
+.mq-studio-run-heading > strong { color: var(--ink-900); font-size: 13px; }
+.mq-studio-run-heading > span { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-500); font: 10px/1 var(--font-jetbrains-mono); }
+.mq-studio-connecting, .mq-studio-reconnecting { display: flex; align-items: center; gap: 8px; margin-top: 12px; color: var(--ink-500); font-size: 12px; }
+.mq-studio-run-steps { display: flex; flex-direction: column; gap: 0; margin: 11px 0 0; padding: 0; list-style: none; }
+.mq-studio-run-steps li { position: relative; display: grid; min-height: 43px; grid-template-columns: 25px minmax(0, 1fr); gap: 7px; color: var(--ink-400); }
+.mq-studio-run-steps li:not(:last-child)::after { position: absolute; top: 22px; bottom: -1px; left: 7px; width: 1px; background: var(--line); content: ""; }
+.mq-studio-step-icon { position: relative; z-index: 1; display: inline-flex; width: 16px; height: 18px; align-items: center; justify-content: center; background: var(--canvas); color: var(--ink-300); }
+.mq-studio-run-steps li > span:last-child { display: flex; min-width: 0; flex-direction: column; gap: 3px; padding-top: 1px; }
+.mq-studio-run-steps strong { color: currentColor; font-size: 12px; font-weight: 560; }
+.mq-studio-run-steps small { color: var(--ink-400); font-size: 10.5px; line-height: 1.35; }
+.mq-studio-run-steps li.is-active, .mq-studio-run-steps li.is-retrying { color: var(--ink-900); }
+.mq-studio-run-steps li.is-active .mq-studio-step-icon, .mq-studio-run-steps li.is-retrying .mq-studio-step-icon { color: var(--accent-ink); }
+.mq-studio-run-steps li.is-completed { color: var(--ink-600); }
+.mq-studio-run-steps li.is-completed .mq-studio-step-icon { color: var(--pos); }
+.mq-studio-run-steps li.is-failed .mq-studio-step-icon, .mq-studio-run.is-failed .mq-studio-run-heading > strong { color: var(--neg); }
+.mq-studio-reconnecting { width: fit-content; padding: 6px 9px; border-radius: 999px; background: var(--canvas-sub); font-size: 10.5px; }
+.mq-studio-reconnecting svg { animation: mq-studio-spin 1.2s linear infinite; }
+.mq-studio-run-failure { margin-top: 11px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--neg) 25%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--neg) 6%, var(--surface)); }
+.mq-studio-run-failure p { margin: 0; color: var(--ink-700); font-size: 12px; line-height: 1.5; }
+.mq-studio-run-failure a { display: inline-flex; align-items: center; gap: 5px; margin-top: 9px; color: var(--neg); font-size: 11px; font-weight: 650; text-decoration: none; }
+.mq-studio-run-failure a svg { transform: rotate(45deg); }
+.mq-studio-run-failure button { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; padding: 0; border: 0; background: transparent; color: var(--neg); font: 650 11px var(--font-inter); cursor: pointer; }
+.mq-studio-refine-wrap { position: sticky; bottom: 12px; z-index: 5; margin-top: 8px; }
+.mq-studio-refine { padding: 13px 14px 12px; border: 1px solid var(--line-strong); border-radius: 17px; background: color-mix(in srgb, var(--surface) 94%, transparent); box-shadow: var(--sh-lg); backdrop-filter: blur(14px); }
+.mq-studio-refine textarea { display: block; width: 100%; min-height: 53px; resize: none; border: 0; outline: 0; background: transparent; color: var(--ink-900); font: 14px/1.5 var(--font-inter); }
+.mq-studio-refine textarea::placeholder { color: var(--ink-400); }
+.mq-studio-refine textarea:disabled { cursor: not-allowed; opacity: .7; }
+.mq-studio-refine-actions { display: flex; align-items: center; justify-content: flex-end; gap: 13px; }
+.mq-studio-refine-actions > span { color: var(--ink-400); font: 9.5px/1 var(--font-jetbrains-mono); }
+.mq-studio-refine button { display: inline-flex; min-width: 88px; min-height: 36px; align-items: center; justify-content: center; gap: 7px; padding: 0 13px; border: 0; border-radius: 10px; background: var(--ink-900); color: var(--surface); font: 650 11.5px var(--font-inter); cursor: pointer; }
+.mq-studio-refine button:disabled { cursor: not-allowed; opacity: .4; }
+.mq-studio-refine-error { margin: 7px 4px 0; color: var(--neg); font-size: 11px; }
+.mq-studio-refine-note { margin: 8px 0 0; color: var(--ink-400); font: 9.5px/1.4 var(--font-jetbrains-mono); text-align: center; }
+.mq-studio-load-error { display: flex; align-items: center; gap: 9px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--neg) 25%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--neg) 6%, var(--surface)); color: var(--neg); font-size: 12px; }
+.mq-studio-load-error span { flex: 1; }
+.mq-studio-load-error button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink-700); font: inherit; cursor: pointer; }
+.mq-studio-thread-loading { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 240px; color: var(--ink-400); font-size: 12px; }
+@keyframes mq-studio-spin { to { transform: rotate(360deg); } }
 .mq-post-list { overflow: hidden; }
 .mq-post-row { position: relative; display: flex; align-items: flex-start; gap: 14px; min-height: 89px; padding: 16px 18px; border-bottom: 1px solid var(--line-faint); }
 .mq-post-row:hover { background: var(--surface-2); }
@@ -895,6 +977,31 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
   .mq-artifact-type-options { grid-template-columns: 1fr; gap: 7px; }
   .mq-artifact-type-options button { min-height: 54px; }
   .mq-artifact-studio-note { max-width: 290px; }
+  .mq-studio-conversation { min-height: calc(100vh - 120px); padding: 0 0 24px; }
+  .mq-studio-conversation-head { padding: 0 0 16px; }
+  .mq-studio-conversation-head > a { width: 35px; height: 35px; border-radius: 10px; }
+  .mq-studio-conversation-head h1 { overflow: hidden; max-width: 240px; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+  .mq-studio-thread { min-height: 330px; gap: 19px; padding: 24px 0; }
+  .mq-studio-user-message { max-width: 88%; padding: 11px 14px; font-size: 13px; }
+  .mq-studio-assistant-message, .mq-studio-run { grid-template-columns: 29px minmax(0, 1fr); gap: 8px; }
+  .mq-studio-assistant-message .mq-studio-mark span, .mq-studio-run .mq-studio-mark span { width: 26px !important; height: 26px !important; }
+  .mq-studio-assistant-meta { margin: 5px 0 9px; font-size: 10.5px; }
+  .mq-studio-response { border-radius: 14px; }
+  .mq-studio-response-head { min-height: 50px; padding: 9px 11px; }
+  .mq-studio-response-body { padding: 17px 15px; }
+  .mq-studio-post-copy { font-size: 14px; line-height: 1.65; }
+  .mq-studio-poll-options { grid-template-columns: 1fr; gap: 8px; }
+  .mq-studio-document-copy { grid-template-columns: auto minmax(0, 1fr); gap: 11px; }
+  .mq-studio-document-icon { width: 42px; height: 50px; }
+  .mq-studio-document-copy > a, .mq-studio-document-copy > .mq-studio-pdf-pending { grid-column: 1 / -1; justify-content: center; }
+  .mq-studio-response-foot { min-height: 40px; padding: 9px 11px; }
+  .mq-studio-run-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .mq-studio-run-steps { margin-top: 13px; }
+  .mq-studio-refine-wrap { bottom: 72px; }
+  .mq-studio-refine { padding: 11px 11px 10px; border-radius: 14px; }
+  .mq-studio-refine textarea { min-height: 47px; font-size: 13px; }
+  .mq-studio-refine-note { display: none; }
+  .mq-studio-load-error { align-items: flex-start; flex-wrap: wrap; }
   .mq-filter-select { flex: 1; }
   .mq-filter-select input { max-width: none; }
   .mq-search-mobile { display: inline-flex; }
