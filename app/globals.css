@@ -522,6 +522,7 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-artifact-prompt-card textarea { display: block; width: 100%; min-height: 106px; resize: none; border: 0; outline: 0; background: transparent; color: var(--ink-900); font: 400 17px/1.55 var(--font-inter); }
 .mq-artifact-prompt-card textarea::placeholder { color: var(--ink-400); }
 .mq-artifact-prompt-footer { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-top: 8px; }
+.mq-artifact-prompt-modes { display: flex; min-width: 0; align-items: center; gap: 5px; }
 .mq-artifact-research-toggle { display: inline-flex; min-height: 34px; align-items: center; gap: 7px; padding: 0 10px 0 7px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--ink-500); font: 600 11.5px var(--font-inter); cursor: pointer; transition: border-color .18s ease, background-color .18s ease, color .18s ease; }
 .mq-artifact-research-toggle:hover { border-color: var(--line-strong); color: var(--ink-800); }
 .mq-artifact-research-toggle.is-active { border-color: color-mix(in srgb, var(--accent) 32%, var(--line)); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); color: var(--accent-ink); }
@@ -544,15 +545,14 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-artifact-type-options strong { color: currentColor; font-size: 12.5px; font-weight: 650; }
 .mq-artifact-type-options small { overflow: hidden; color: var(--ink-400); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .mq-artifact-type-options button.is-selected small { color: color-mix(in srgb, var(--accent-ink) 70%, var(--ink-500)); }
-.mq-artifact-type-options.is-collapsed { display: flex; }
-.mq-artifact-type-options button.mq-artifact-type-selection { width: fit-content; min-height: 40px; gap: 8px; padding: 5px 11px 5px 7px; border-color: transparent; border-radius: 999px; background: transparent; color: var(--accent-ink); box-shadow: none; }
-.mq-artifact-type-options button.mq-artifact-type-selection:hover, .mq-artifact-type-options button.mq-artifact-type-selection:focus-visible { border-color: transparent; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--accent-ink); transform: none; }
-.mq-artifact-type-options button.mq-artifact-type-selection > .mq-artifact-selection-icon { display: inline-flex; width: 24px; height: 24px; flex: none; align-items: center; justify-content: center; border-radius: 50%; }
+.mq-artifact-type-selection { display: inline-flex; width: fit-content; min-height: 34px; align-items: center; gap: 6px; padding: 3px 10px 3px 5px; border: 1px solid transparent; border-radius: 999px; background: transparent; color: var(--accent-ink); font: 600 11.5px var(--font-inter); cursor: pointer; transition: background-color .18s ease; }
+.mq-artifact-type-selection:hover, .mq-artifact-type-selection:focus-visible { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.mq-artifact-type-selection > .mq-artifact-selection-icon { display: inline-flex; width: 24px; height: 24px; flex: none; align-items: center; justify-content: center; border-radius: 50%; }
 .mq-artifact-type-selection .mq-artifact-selection-cancel-icon { display: none; }
 .mq-artifact-type-selection:hover .mq-artifact-selection-type-icon, .mq-artifact-type-selection:focus-visible .mq-artifact-selection-type-icon { display: none; }
 .mq-artifact-type-selection:hover .mq-artifact-selection-cancel-icon, .mq-artifact-type-selection:focus-visible .mq-artifact-selection-cancel-icon { display: block; }
 .mq-artifact-type-selection:hover .mq-artifact-selection-icon, .mq-artifact-type-selection:focus-visible .mq-artifact-selection-icon { background: var(--accent); color: var(--surface); }
-.mq-artifact-type-options button.mq-artifact-type-selection > strong { font-size: 13px; font-weight: 600; }
+.mq-artifact-type-selection > strong { font: inherit; }
 .mq-artifact-studio-note { margin: 18px 0 0; color: var(--ink-400); font: 10.5px/1.5 var(--font-jetbrains-mono); text-align: center; }
 .mq-artifact-submit.is-loading svg, .mq-studio-refine button svg, .mq-studio-connecting svg, .mq-studio-thread-loading svg, .mq-studio-step-icon .lucide-loader-circle { animation: mq-studio-spin .8s linear infinite; }
 .mq-artifact-create-error { margin-top: 13px; padding: 10px 13px; border: 1px solid color-mix(in srgb, var(--neg) 28%, var(--line)); border-radius: 11px; background: color-mix(in srgb, var(--neg) 7%, var(--surface)); color: var(--neg); font-size: 12px; line-height: 1.45; }
@@ -979,6 +979,7 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
   .mq-artifact-prompt-card { padding: 15px 14px 13px; border-radius: 18px; }
   .mq-artifact-prompt-card textarea { min-height: 112px; font-size: 15px; }
   .mq-artifact-prompt-footer { align-items: stretch; flex-direction: column; gap: 10px; }
+  .mq-artifact-prompt-modes { align-self: flex-start; flex-wrap: wrap; }
   .mq-artifact-research-toggle { align-self: flex-start; }
   .mq-artifact-prompt-controls { width: 100%; flex-wrap: wrap; }
   .mq-artifact-studio-select { flex: 1; }

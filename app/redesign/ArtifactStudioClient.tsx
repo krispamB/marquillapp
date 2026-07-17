@@ -157,17 +157,35 @@ export default function ArtifactStudioClient({
               />
 
               <div className="mq-artifact-prompt-footer">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={withResearch}
-                  className={`mq-artifact-research-toggle${withResearch ? " is-active" : ""}`}
-                  onClick={() => setWithResearch((current) => !current)}
-                >
-                  <span className="mq-artifact-switch" aria-hidden="true"><i /></span>
-                  <Search size={14} />
-                  Research
-                </button>
+                <div className="mq-artifact-prompt-modes">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={withResearch}
+                    className={`mq-artifact-research-toggle${withResearch ? " is-active" : ""}`}
+                    onClick={() => setWithResearch((current) => !current)}
+                  >
+                    <span className="mq-artifact-switch" aria-hidden="true"><i /></span>
+                    <Search size={14} />
+                    Research
+                  </button>
+
+                  {selectedArtifact ? (
+                    <button
+                      type="button"
+                      className="mq-artifact-type-selection"
+                      onClick={() => setType(undefined)}
+                      aria-label={`Cancel ${selectedArtifact.label} selection`}
+                      title={`Cancel ${selectedArtifact.label} selection`}
+                    >
+                      <span className="mq-artifact-selection-icon" aria-hidden="true">
+                        <selectedArtifact.Icon className="mq-artifact-selection-type-icon" size={16} />
+                        <X className="mq-artifact-selection-cancel-icon" size={14} />
+                      </span>
+                      <strong>{selectedArtifact.label}</strong>
+                    </button>
+                  ) : null}
+                </div>
 
                 <div className="mq-artifact-prompt-controls">
                   {type === "DOCUMENT" ? (
@@ -209,24 +227,10 @@ export default function ArtifactStudioClient({
               </div>
             </div>
 
-            <fieldset className={`mq-artifact-type-options${selectedArtifact ? " is-collapsed" : ""}`}>
-              <legend className="sr-only">Choose one artifact type</legend>
-              {selectedArtifact ? (
-                <button
-                  type="button"
-                  className="mq-artifact-type-selection"
-                  onClick={() => setType(undefined)}
-                  aria-label={`Cancel ${selectedArtifact.label} selection`}
-                  title={`Cancel ${selectedArtifact.label} selection`}
-                >
-                  <span className="mq-artifact-selection-icon" aria-hidden="true">
-                    <selectedArtifact.Icon className="mq-artifact-selection-type-icon" size={16} />
-                    <X className="mq-artifact-selection-cancel-icon" size={14} />
-                  </span>
-                  <strong>{selectedArtifact.label}</strong>
-                </button>
-              ) : (
-                artifactOptions.map(({ type: optionType, label, description, Icon }) => (
+            {!selectedArtifact ? (
+              <fieldset className="mq-artifact-type-options">
+                <legend className="sr-only">Choose one artifact type</legend>
+                {artifactOptions.map(({ type: optionType, label, description, Icon }) => (
                   <button
                     key={optionType}
                     type="button"
@@ -236,9 +240,9 @@ export default function ArtifactStudioClient({
                     <Icon size={16} />
                     <span><strong>{label}</strong><small>{description}</small></span>
                   </button>
-                ))
-              )}
-            </fieldset>
+                ))}
+              </fieldset>
+            ) : null}
 
             {creationError ? (
               <div className="mq-artifact-create-error" role="alert">{creationError}</div>
