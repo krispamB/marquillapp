@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Clock3, Plus } from "lucide-react";
 import RedesignShell from "./Shell";
 import { API_BASE, jsonRequest, readApi } from "./api";
 import { formatScheduledDate, getPostTitle, normalizeStatus, parseDate, toYearMonth } from "./types";
-import type { ConnectedAccount, DashboardPost, DashboardPostsResponse, UserProfile } from "../lib/types";
+import type { ConnectedAccount, DashboardPost, DashboardPostsResponse, SubscriptionTier, UserProfile } from "../lib/types";
 
 function monthCells(date: Date) {
   const first = new Date(date.getFullYear(), date.getMonth(), 1);
@@ -32,10 +32,12 @@ export default function CalendarRedesignClient({
   user,
   connectedAccounts,
   primaryAccountId,
+  subscription,
 }: {
   user: UserProfile;
   connectedAccounts: ConnectedAccount[];
   primaryAccountId?: string;
+  subscription?: SubscriptionTier | null;
 }) {
   const [selectedAccountId, setSelectedAccountId] = useState(primaryAccountId ?? connectedAccounts[0]?.id);
   const [cursor, setCursor] = useState(() => new Date());
@@ -101,6 +103,7 @@ export default function CalendarRedesignClient({
       accounts={connectedAccounts}
       selectedAccountId={selectedAccountId}
       onSelectAccount={setSelectedAccountId}
+      subscription={subscription}
       active="calendar"
       title="Calendar"
       topbarExtra={<div className="mq-calendar-top-controls"><button type="button" className="mq-icon-button" onClick={() => shiftMonth(-1)} aria-label="Previous month"><ChevronLeft size={15} /></button><strong>{cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong><button type="button" className="mq-icon-button" onClick={() => shiftMonth(1)} aria-label="Next month"><ChevronRight size={15} /></button></div>}

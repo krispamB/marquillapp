@@ -32,6 +32,11 @@ export type UserProfile = {
   tier?: Tier | null;
 };
 
+export type SubscriptionTier = {
+  name: string;
+  isDefault?: boolean;
+};
+
 export type UserApiResponse = UserProfile & {
   _id?: string;
   googleId?: string;

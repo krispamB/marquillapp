@@ -8,7 +8,7 @@ import { API_BASE, jsonRequest, readApi } from "./api";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import SchedulePicker, { getDefaultScheduleDate, localDateTimeValue } from "./SchedulePicker";
 import { formatRelativeDate, formatScheduledDate, getPostTitle, normalizeStatus, parseDate, toYearMonth } from "./types";
-import type { ConnectedAccount, DashboardPost, DashboardPostsResponse, UserProfile } from "../lib/types";
+import type { ConnectedAccount, DashboardPost, DashboardPostsResponse, SubscriptionTier, UserProfile } from "../lib/types";
 
 type PostFilter = "ALL" | "DRAFT" | "SCHEDULED" | "PUBLISHED";
 
@@ -33,10 +33,12 @@ export default function PostsRedesignClient({
   user,
   connectedAccounts,
   primaryAccountId,
+  subscription,
 }: {
   user: UserProfile;
   connectedAccounts: ConnectedAccount[];
   primaryAccountId?: string;
+  subscription?: SubscriptionTier | null;
 }) {
   const [selectedAccountId, setSelectedAccountId] = useState(primaryAccountId ?? connectedAccounts[0]?.id);
   const [selectedMonth, setSelectedMonth] = useState(toYearMonth(new Date()));
@@ -141,6 +143,7 @@ export default function PostsRedesignClient({
       accounts={connectedAccounts}
       selectedAccountId={selectedAccountId}
       onSelectAccount={setSelectedAccountId}
+      subscription={subscription}
       active="posts"
       title="Posts"
       topbarExtra={

@@ -31,6 +31,7 @@ import type {
   DashboardPostsResponse,
   PaymentUsageResponse,
   PostMetricsResponse,
+  SubscriptionTier,
   UserProfile,
 } from "../lib/types";
 
@@ -69,10 +70,12 @@ const workspaceSchedule = [
 export default function DashboardRedesignClient({
   user,
   connectedAccounts,
+  subscription,
 }: {
   user: UserProfile;
   connectedAccounts: ConnectedAccount[];
   primaryAccountId?: string;
+  subscription?: SubscriptionTier | null;
 }) {
   const [selectedAccountId, setSelectedAccountId] = useState(WORKSPACE_SELECTOR_VALUE);
   const [posts, setPosts] = useState<DashboardPost[]>([]);
@@ -156,6 +159,7 @@ export default function DashboardRedesignClient({
       selectedAccountId={selectedAccountId}
       onSelectAccount={setSelectedAccountId}
       includeWorkspaceOption
+      subscription={subscription}
       active="dashboard"
       title="Dashboard"
       topbarExtra={!isWorkspace ? (

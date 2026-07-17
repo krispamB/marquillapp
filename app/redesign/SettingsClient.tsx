@@ -7,17 +7,19 @@ import { useClerk } from "@clerk/nextjs";
 import RedesignShell from "./Shell";
 import OrganizationConnectModal from "./OrganizationConnectModal";
 import { API_BASE, readApi } from "./api";
-import type { ConnectedAccount, UserProfile } from "../lib/types";
+import type { ConnectedAccount, SubscriptionTier, UserProfile } from "../lib/types";
 import LinkedInIcon from "../../components/brand/LinkedInIcon";
 
 export default function SettingsRedesignClient({
   user,
   connectedAccounts,
   primaryAccountId,
+  subscription,
 }: {
   user: UserProfile;
   connectedAccounts: ConnectedAccount[];
   primaryAccountId?: string;
+  subscription?: SubscriptionTier | null;
 }) {
   const { signOut } = useClerk();
   const router = useRouter();
@@ -53,7 +55,7 @@ export default function SettingsRedesignClient({
   }
 
   return (
-    <RedesignShell user={user} accounts={accounts} selectedAccountId={effectiveSelectedAccountId} onSelectAccount={setSelectedAccountId} active="settings" title="Settings">
+    <RedesignShell user={user} accounts={accounts} selectedAccountId={effectiveSelectedAccountId} onSelectAccount={setSelectedAccountId} subscription={subscription} active="settings" title="Settings">
       <div className="mq-page-heading mq-page-heading-compact"><div><span className="mq-eyebrow">Workspace preferences</span><h1>Settings</h1><p>Manage your publishing accounts and workspace defaults.</p></div></div>
       {message ? <div className="mq-alert mq-alert-success">{message}</div> : null}
       {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}

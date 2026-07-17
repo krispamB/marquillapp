@@ -5,7 +5,7 @@ import { Check, CreditCard, ExternalLink } from "lucide-react";
 import RedesignShell from "./Shell";
 import { API_BASE, jsonRequest, readApi } from "./api";
 import { titleCase } from "./types";
-import type { ConnectedAccount, PaymentUsageResponse, Tier, UserProfile } from "../lib/types";
+import type { ConnectedAccount, PaymentUsageResponse, SubscriptionTier, Tier, UserProfile } from "../lib/types";
 
 type Invoice = { id?: string; date?: string; plan?: string; amount?: string | number; status?: string; customer?: string };
 type CheckoutResponse = { transactionId?: string };
@@ -28,7 +28,7 @@ export default function BillingRedesignClient({
   user: UserProfile;
   connectedAccounts: ConnectedAccount[];
   primaryAccountId?: string;
-  subscription?: { name: string; isDefault?: boolean } | null;
+  subscription?: SubscriptionTier | null;
 }) {
   const [selectedAccountId, setSelectedAccountId] = useState(primaryAccountId ?? connectedAccounts[0]?.id);
   const [tiers, setTiers] = useState<Tier[]>([]);
@@ -85,7 +85,7 @@ export default function BillingRedesignClient({
   };
 
   return (
-    <RedesignShell user={user} accounts={connectedAccounts} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} active="billing" title="Billing">
+    <RedesignShell user={user} accounts={connectedAccounts} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} subscription={subscription} active="billing" title="Billing">
       <div className="mq-page-heading mq-page-heading-compact"><div><span className="mq-eyebrow">Plan, usage &amp; payment history</span><h1>Billing</h1><p>Keep your plan and publishing capacity in view.</p></div></div>
       {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}
       {isLoading ? <div className="mq-alert">Loading billing data…</div> : null}

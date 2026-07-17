@@ -16,7 +16,7 @@ import {
   Settings,
   Sparkles,
 } from "lucide-react";
-import type { ConnectedAccount, UserProfile } from "../lib/types";
+import type { ConnectedAccount, SubscriptionTier, UserProfile } from "../lib/types";
 import MarquillLockup from "../../components/brand/MarquillLockup";
 import LinkedInIcon from "../../components/brand/LinkedInIcon";
 import FeedbackModal from "./FeedbackModal";
@@ -74,6 +74,7 @@ export default function RedesignShell({
   title,
   topbarExtra,
   includeWorkspaceOption = false,
+  subscription,
   children,
 }: {
   user: UserProfile;
@@ -84,6 +85,7 @@ export default function RedesignShell({
   title: string;
   topbarExtra?: ReactNode;
   includeWorkspaceOption?: boolean;
+  subscription?: SubscriptionTier | null;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -91,6 +93,14 @@ export default function RedesignShell({
   const [isOrganizationModalOpen, setIsOrganizationModalOpen] = useState(false);
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId);
   const initials = getInitials(user.name, user.email);
+  const tier = subscription ?? user.tier;
+  const tierName = tier?.name?.trim() || "Free";
+  const isFreeTier = Boolean(
+    tier && (
+      tier.isDefault === true ||
+      tier.name.trim().toLowerCase().replace(/\s+plan$/, "") === "free"
+    ),
+  );
   const hasPersonalAccount = accounts.some((account) => account.accountType !== "ORGANIZATION");
   const connectedOrganizationIds = useMemo(
     () => accounts.filter((account) => account.accountType === "ORGANIZATION").map((account) => account.id),
@@ -181,9 +191,9 @@ export default function RedesignShell({
           <span className="mq-avatar mq-avatar-md mq-avatar-accent">{initials}</span>
           <span className="mq-account-copy">
             <strong>{user.name}</strong>
-            <small>{user.tier?.name ?? "Free"} plan</small>
+            <small>{tierName} plan</small>
           </span>
-          <Link href="/billing" className="mq-upgrade-link">Upgrade</Link>
+          {isFreeTier ? <Link href="/billing" className="mq-upgrade-link">Upgrade</Link> : null}
         </div>
       </aside>
 

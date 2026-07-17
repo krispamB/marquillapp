@@ -13,7 +13,7 @@ import StockImagePicker from "./StockImagePicker";
 import MarquillMark from "../../components/brand/MarquillMark";
 import MarquillSelect from "../../components/ui/MarquillSelect";
 import { StylePreset } from "../lib/types";
-import type { ConnectedAccount, CreateDraftRequest, CreateDraftResponse, DraftStatusResponse, PostDetailResponse, UserProfile } from "../lib/types";
+import type { ConnectedAccount, CreateDraftRequest, CreateDraftResponse, DraftStatusResponse, PostDetailResponse, SubscriptionTier, UserProfile } from "../lib/types";
 
 type ComposerMode = "create" | "edit";
 type Action = "draft" | "publish" | "schedule";
@@ -31,12 +31,14 @@ export default function ComposerRedesignClient({
   user,
   connectedAccounts,
   primaryAccountId,
+  subscription,
   mode,
   initialPostId,
 }: {
   user: UserProfile;
   connectedAccounts: ConnectedAccount[];
   primaryAccountId?: string;
+  subscription?: SubscriptionTier | null;
   mode: ComposerMode;
   initialPostId?: string;
 }) {
@@ -208,6 +210,7 @@ export default function ComposerRedesignClient({
       accounts={connectedAccounts}
       selectedAccountId={selectedAccountId}
       onSelectAccount={setSelectedAccountId}
+      subscription={subscription}
       active="posts"
       title="New post"
       topbarExtra={<Link href="/posts" className="mq-back-link"><ArrowLeft size={15} /> Posts</Link>}
