@@ -3,7 +3,7 @@
 /* ============================================================
    MARQUILL — design tokens (ported from the Pulse design system)
    Warm-neutral monochrome canvas + a single blue accent.
-   Light is default; dark via [data-theme="dark"] (opt-in).
+   Dark is the page default; development can opt into light via the toggle.
    ============================================================ */
 
 :root {

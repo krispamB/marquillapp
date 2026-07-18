@@ -82,20 +82,25 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const nodeEnvironment = process.env.NODE_ENVIRONMENT;
+  const isProduction = nodeEnvironment === 'production';
+  const showThemeToggle = nodeEnvironment === 'development';
+
   return (
     <html
       lang="en"
+      data-theme="dark"
       className={`${inter.variable} ${jetbrainsMono.variable} ${specialElite.variable} ${courierPrime.variable} ${sourceCodePro.variable}`}
       suppressHydrationWarning
     >
       <head>
-        <ThemeScript />
+        <ThemeScript forceDark={isProduction} />
       </head>
       <body className="antialiased">
         <a href="#main-content" className="skip-to-content">
           Skip to main content
         </a>
-        <Header />
+        <Header showThemeToggle={showThemeToggle} />
         <main id="main-content">{children}</main>
         <Footer />
         <Analytics />

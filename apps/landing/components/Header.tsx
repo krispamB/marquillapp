@@ -13,7 +13,7 @@ const NAV_LINKS = [
   { label: 'Pricing', href: '/#pricing' },
 ];
 
-export default function Header() {
+export default function Header({ showThemeToggle = false }: { showThemeToggle?: boolean }) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const appUrl = normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL);
@@ -42,7 +42,7 @@ export default function Header() {
           </div>
 
           <div className="hidden items-center gap-3 md:flex">
-            <ThemeToggle />
+            {showThemeToggle && <ThemeToggle />}
             <a
               href={appUrl}
               className="inline-flex min-h-10 items-center gap-2 rounded-[10px] bg-ink-900 px-[18px] text-[14px] font-semibold tracking-[-0.01em] text-surface transition-opacity hover:opacity-90"
@@ -53,7 +53,7 @@ export default function Header() {
 
           {/* Mobile controls */}
           <div className="flex items-center gap-2 md:hidden">
-            <ThemeToggle />
+            {showThemeToggle && <ThemeToggle />}
             <button
               onClick={() => setMobileMenuOpen((v) => !v)}
               className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-ink-700 transition-colors hover:bg-canvas-sub hover:text-ink-900"
