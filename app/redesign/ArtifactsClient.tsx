@@ -18,7 +18,7 @@ import {
 import MarquillMark from "../../components/brand/MarquillMark";
 import ArtifactDeleteConfirmModal from "./ArtifactDeleteConfirmModal";
 import RedesignShell from "./Shell";
-import { API_BASE, readApi } from "./api";
+import { API_BASE, deleteArtifactRequest, readApi } from "./api";
 import { formatRelativeDate } from "./types";
 import type {
   ConnectedAccount,
@@ -33,7 +33,6 @@ import type {
   ArtifactSummary,
   ArtifactType,
   ArtifactsListResponse,
-  DeleteArtifactResponse,
 } from "./artifactTypes";
 
 type ArtifactFilter = "ALL" | ArtifactType;
@@ -503,10 +502,7 @@ export default function ArtifactsRedesignClient({
     setIsDeleting(true);
     setDeleteError(null);
     try {
-      await readApi<DeleteArtifactResponse>(
-        `${API_BASE}/artifacts/${encodeURIComponent(deleteArtifact.id)}`,
-        { method: "DELETE" },
-      );
+      await deleteArtifactRequest(deleteArtifact.id);
       detailControllers.current.get(deleteArtifact.id)?.abort();
       detailControllers.current.delete(deleteArtifact.id);
       detailCache.current.delete(deleteArtifact.id);

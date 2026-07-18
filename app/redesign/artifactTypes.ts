@@ -2,6 +2,9 @@ export type ArtifactType = "POST" | "POLL" | "DOCUMENT";
 
 export type ArtifactStatus = "GENERATING" | "READY" | "FAILED";
 
+export const POLL_DURATION_DAYS = [1, 3, 7, 14] as const;
+export type PollDurationDays = (typeof POLL_DURATION_DAYS)[number];
+
 export type WorkflowStep =
   | "RESOLVE_INPUT"
   | "RESEARCH"
@@ -126,7 +129,7 @@ export type ArtifactDetailData = {
     poll?: {
       question: string;
       options: string[];
-      durationDays: 1 | 3 | 7 | 14;
+      durationDays: PollDurationDays;
     };
     document?: {
       templateId: "bold" | "minimal" | "editorial" | "gradient";
@@ -151,7 +154,7 @@ export type UpdateArtifactRequest = {
     poll?: {
       question: string;
       options: string[];
-      durationDays: 1 | 3 | 7 | 14;
+      durationDays: PollDurationDays;
     };
   };
 };

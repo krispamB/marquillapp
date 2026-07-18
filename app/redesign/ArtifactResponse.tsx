@@ -18,8 +18,10 @@ import { useState } from "react";
 import type {
   ArtifactDetailData,
   ArtifactType,
+  PollDurationDays,
   UpdateArtifactRequest,
 } from "./artifactTypes";
+import { POLL_DURATION_DAYS } from "./artifactTypes";
 
 export const artifactTypeLabels: Record<ArtifactType, string> = {
   POST: "Post",
@@ -94,14 +96,12 @@ const responseBodies: Record<ArtifactType, typeof PostResponse> = {
   DOCUMENT: DocumentResponse,
 };
 
-const pollDurations = [1, 3, 7, 14] as const;
-
 function validatePollOptions(options: string[]) {
   if (options.length < 2 || options.length > 4) return "Polls need between 2 and 4 options.";
   const trimmed = options.map((option) => option.trim());
   if (trimmed.some((option) => !option)) return "Every poll option needs text.";
   if (trimmed.some((option) => option.length > 30)) return "Poll options must be 30 characters or fewer.";
-  const unique = new Set(trimmed.map((option) => option.toLocaleLowerCase()));
+  const unique = new Set(trimmed.map((option) => option.toLowerCase()));
   if (unique.size !== trimmed.length) return "Poll options must be unique.";
   return null;
 }
@@ -120,18 +120,24 @@ function ArtifactEditor({
   onSave: (request: UpdateArtifactRequest) => Promise<void>;
 }) {
   const poll = artifact.content.poll;
+  const hadTitle = Boolean(artifact.title?.trim());
   const hadPollCommentary = Boolean(artifact.content.commentary?.trim());
   const [title, setTitle] = useState(artifact.title ?? "");
   const [commentary, setCommentary] = useState(artifact.content.commentary ?? "");
   const [question, setQuestion] = useState(poll?.question ?? "");
   const [options, setOptions] = useState(poll?.options ?? ["", ""]);
-  const [durationDays, setDurationDays] = useState<1 | 3 | 7 | 14>(poll?.durationDays ?? 7);
+  const [durationDays, setDurationDays] = useState<PollDurationDays>(poll?.durationDays ?? 7);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   async function save() {
     const trimmedCommentary = commentary.trim();
     const trimmedTitle = title.trim();
     let request: UpdateArtifactRequest;
+
+    if (hadTitle && !trimmedTitle) {
+      setValidationError("The title cannot be cleared, but it can be replaced.");
+      return;
+    }
 
     if (artifact.type === "POST") {
       if (!trimmedCommentary) {
@@ -262,10 +268,13 @@ function ArtifactEditor({
             <span>Poll duration</span>
             <select
               value={durationDays}
-              onChange={(event) => setDurationDays(Number(event.target.value) as 1 | 3 | 7 | 14)}
+              onChange={(event) => {
+                const nextDuration = POLL_DURATION_DAYS.find((days) => days === Number(event.target.value));
+                if (nextDuration) setDurationDays(nextDuration);
+              }}
               disabled={isSaving}
             >
-              {pollDurations.map((days) => (
+              {POLL_DURATION_DAYS.map((days) => (
                 <option value={days} key={days}>{days} day{days === 1 ? "" : "s"}</option>
               ))}
             </select>

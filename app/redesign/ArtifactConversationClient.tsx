@@ -26,7 +26,6 @@ import type {
   ArtifactDetailData,
   ArtifactDetailResponse,
   ArtifactType,
-  DeleteArtifactResponse,
   RefineArtifactResponse,
   UpdateArtifactRequest,
 } from "./artifactTypes";
@@ -34,7 +33,13 @@ import ArtifactDeleteConfirmModal from "./ArtifactDeleteConfirmModal";
 import ArtifactResponse, { artifactTypeLabels } from "./ArtifactResponse";
 import ArtifactRunProgress from "./ArtifactRunProgress";
 import { readArtifactPrompt } from "./artifactStudioStorage";
-import { API_BASE, ApiRequestError, jsonRequest, readApi } from "./api";
+import {
+  API_BASE,
+  ApiRequestError,
+  deleteArtifactRequest,
+  jsonRequest,
+  readApi,
+} from "./api";
 import RedesignShell from "./Shell";
 import { useArtifactRun } from "./useArtifactRun";
 
@@ -71,6 +76,8 @@ export default function ArtifactConversationClient({
   const [isEditing, setIsEditing] = useState(false);
   const [savingVersion, setSavingVersion] = useState<number | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+  const [conflictError, setConflictError] = useState<string | null>(null);
+  const [editResetKey, setEditResetKey] = useState(0);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -87,10 +94,19 @@ export default function ArtifactConversationClient({
     if (artifact.title?.trim()) setArtifactTitle(artifact.title.trim());
     setEntries((current) => {
       const id = `version-${artifact.version}`;
-      const existingIndex = current.findIndex((entry) => entry.id === id);
-      const nextEntry: ConversationEntry = { id, role: "assistant", artifact, credits };
-      if (existingIndex === -1) return [...current, nextEntry];
-      const next = [...current];
+      const synchronized = current.map((entry) => entry.role === "assistant"
+        ? { ...entry, artifact: { ...entry.artifact, currentVersion: artifact.currentVersion } }
+        : entry);
+      const existingIndex = synchronized.findIndex((entry) => entry.id === id);
+      const existingEntry = existingIndex === -1 ? undefined : synchronized[existingIndex];
+      const nextEntry: ConversationEntry = {
+        id,
+        role: "assistant",
+        artifact,
+        credits: credits ?? (existingEntry?.role === "assistant" ? existingEntry.credits : undefined),
+      };
+      if (existingIndex === -1) return [...synchronized, nextEntry];
+      const next = [...synchronized];
       next[existingIndex] = nextEntry;
       return next;
     });
@@ -212,6 +228,7 @@ export default function ArtifactConversationClient({
   async function saveArtifact(version: number, request: UpdateArtifactRequest) {
     setSavingVersion(version);
     setEditError(null);
+    setConflictError(null);
     try {
       const response = await readApi<ArtifactDetailResponse>(
         `${API_BASE}/artifacts/${encodeURIComponent(artifactId)}`,
@@ -223,6 +240,7 @@ export default function ArtifactConversationClient({
       let message = reason instanceof Error ? reason.message : "The artifact could not be saved.";
       if (reason instanceof ApiRequestError && reason.status === 409) {
         setIsEditing(false);
+        setEditResetKey((current) => current + 1);
         try {
           const current = await readArtifact(undefined, true);
           setEntries((entries) => entries.map((entry) => entry.role === "assistant"
@@ -233,6 +251,7 @@ export default function ArtifactConversationClient({
         } catch {
           message = `${message} Reload the page before trying again.`;
         }
+        setConflictError(message);
       }
       setEditError(message);
       throw reason;
@@ -245,10 +264,7 @@ export default function ArtifactConversationClient({
     setIsDeleting(true);
     setDeleteError(null);
     try {
-      await readApi<DeleteArtifactResponse>(
-        `${API_BASE}/artifacts/${encodeURIComponent(artifactId)}`,
-        { method: "DELETE" },
-      );
+      await deleteArtifactRequest(artifactId);
       router.replace("/artifacts");
       router.refresh();
     } catch (reason) {
@@ -321,6 +337,13 @@ export default function ArtifactConversationClient({
             </div>
           ) : null}
 
+          {conflictError ? (
+            <div className="mq-studio-load-error" role="alert">
+              <XCircle size={17} />
+              <span>{conflictError}</span>
+            </div>
+          ) : null}
+
           {!isHydrated && !entries.length ? (
             <div className="mq-studio-thread-loading"><LoaderCircle size={18} /> Loading artifact…</div>
           ) : null}
@@ -333,6 +356,7 @@ export default function ArtifactConversationClient({
               <div className="mq-studio-assistant-content">
                 <div className="mq-studio-assistant-meta">Mark created version {entry.artifact.version}</div>
                 <ArtifactResponse
+                  key={`${entry.id}-${editResetKey}`}
                   artifact={entry.artifact}
                   credits={entry.credits}
                   canEdit={
@@ -347,7 +371,8 @@ export default function ArtifactConversationClient({
                   editError={entry.artifact.version === entry.artifact.currentVersion ? editError : null}
                   onEditingChange={(editing) => {
                     setIsEditing(editing);
-                    if (!editing) setEditError(null);
+                    if (editing) setConflictError(null);
+                    setEditError(null);
                   }}
                   onSave={(request) => saveArtifact(entry.artifact.version, request)}
                 />

@@ -3,6 +3,7 @@ import {
   FeatureLimitExceededError,
   type FeatureLimitErrorResponse,
 } from "../lib/types";
+import type { DeleteArtifactResponse } from "./artifactTypes";
 
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
@@ -74,6 +75,13 @@ export function jsonRequest(body: unknown, init: RequestInit = {}): RequestInit 
     headers: { "Content-Type": "application/json", ...(init.headers ?? {}) },
     body: JSON.stringify(body),
   };
+}
+
+export function deleteArtifactRequest(artifactId: string) {
+  return readApi<DeleteArtifactResponse>(
+    `${API_BASE}/artifacts/${encodeURIComponent(artifactId)}`,
+    { method: "DELETE" },
+  );
 }
 
 export function sleep(ms: number) {
