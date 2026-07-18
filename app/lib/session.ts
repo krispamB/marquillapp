@@ -126,24 +126,27 @@ export async function getDashboardInitialData(
 }
 
 export function getCachedUser(serverAuth: ServerAuth, cacheKey: string) {
-  return unstable_cache(
+  const readUser = unstable_cache(
     async () => {
-      try {
-        const res = await fetch(`${apiBase}/users/me`, {
-          headers: authHeaders(serverAuth),
-        });
-        if (!res.ok) return null;
-        return (await res.json()) as UserApiResponse;
-      } catch {
-        return null;
+      const res = await fetch(`${apiBase}/users/me`, {
+        headers: authHeaders(serverAuth),
+      });
+      if (!res.ok) {
+        throw new Error(`User profile request failed with ${res.status}.`);
       }
+      return (await res.json()) as UserApiResponse;
     },
     ["user-me", cacheKey],
     // Tagged so onboarding can bust this cache on completion (see
     // revalidateUserCache); without it a freshly-onboarded user would keep
     // reading the stale empty profile and bounce back to /onboarding.
     { revalidate: 300, tags: ["user-me"] }
-  )();
+  );
+
+  // Cache successful profiles, but not transient failures. A rejected cached
+  // function is retried on the next request instead of poisoning the session's
+  // profile cache with `null` for five minutes.
+  return readUser().catch(() => null);
 }
 
 export function getCachedSubscription(serverAuth: ServerAuth, cacheKey: string) {

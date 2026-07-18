@@ -1,6 +1,5 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import type { UserProfile } from "../lib/types";
 import {
   getDashboardInitialData,
   getCachedSubscription,
@@ -9,6 +8,7 @@ import {
   getServerAuth,
 } from "../lib/session";
 import { getOnboardingState } from "../lib/onboarding";
+import { resolveWorkspaceUser } from "./workspace-user";
 
 export async function getWorkspaceProps(options: { includeDashboard?: boolean } = {}) {
   const { userId, sessionId } = await auth();
@@ -31,18 +31,17 @@ export async function getWorkspaceProps(options: { includeDashboard?: boolean } 
     redirect("/onboarding");
   }
 
-  const name = apiUser?.name?.trim();
-  const email = apiUser?.email?.trim();
-  if (!name || !email) {
+  const hasApiIdentity = Boolean(apiUser?.name?.trim() && apiUser?.email?.trim());
+  const clerkUser = hasApiIdentity ? null : await currentUser();
+  const onboardingName = onboarding.profile.data?.name;
+  const user = resolveWorkspaceUser(
+    apiUser,
+    clerkUser,
+    typeof onboardingName === "string" ? onboardingName : undefined,
+  );
+  if (!user) {
     throw new Error("Unable to load the completed user's profile");
   }
-
-  const user: UserProfile = {
-    name,
-    email,
-    avatar: apiUser?.avatar ?? undefined,
-    tier: apiUser?.tier ?? undefined,
-  };
   return {
     user,
     connectedAccounts,
