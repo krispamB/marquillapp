@@ -380,18 +380,18 @@ export default function ArtifactConversationClient({
             </div>
           ))}
 
-          {run ? (
-            <ArtifactRunProgress
-              run={run}
-              artifactType={artifactType}
-              artifactId={artifactId}
-              onRetryLoad={retryCompletedVersion}
-            />
-          ) : null}
         </div>
 
-        {responses.length ? (
+        {responses.length || run ? (
           <div className="mq-studio-refine-wrap">
+            {run ? (
+              <ArtifactRunProgress
+                run={run}
+                artifactType={artifactType}
+                artifactId={artifactId}
+                onRetryLoad={retryCompletedVersion}
+              />
+            ) : null}
             <form className="mq-studio-refine" onSubmit={startRefinement}>
               <label htmlFor="artifact-feedback" className="sr-only">Reply to refine the artifact</label>
               <textarea
@@ -401,7 +401,7 @@ export default function ArtifactConversationClient({
                   setFeedback(event.target.value);
                   if (refineError) setRefineError(null);
                 }}
-                placeholder="Tell Mark what to change…"
+                placeholder={run ? "Mark is building your artifact…" : "Tell Mark what to change…"}
                 maxLength={2000}
                 rows={2}
                 disabled={!canRefine}

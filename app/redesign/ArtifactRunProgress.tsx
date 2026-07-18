@@ -1,18 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useId, useState } from "react";
 import {
-  ArrowUp,
   Check,
+  ChevronDown,
   Circle,
-  Coins,
   LoaderCircle,
   RefreshCw,
   XCircle,
 } from "lucide-react";
-import MarquillMark from "../../components/brand/MarquillMark";
 import type { ArtifactType, WorkflowStep } from "./artifactTypes";
-import { artifactTypeLabels } from "./ArtifactResponse";
 import type { RunState, StepStatus } from "./useArtifactRun";
 
 const stepLabels: Record<WorkflowStep, string> = {
@@ -31,10 +29,23 @@ function generationStepLabel(type?: ArtifactType) {
 }
 
 function RunStepIcon({ status }: { status: StepStatus }) {
-  if (status === "completed") return <Check size={14} />;
+  if (status === "completed") return <Check size={14} strokeWidth={2.4} />;
   if (status === "active" || status === "retrying") return <LoaderCircle size={15} />;
   if (status === "failed") return <XCircle size={15} />;
-  return <Circle size={14} />;
+  return <Circle size={12} />;
+}
+
+function currentStepNumber(run: RunState) {
+  if (!run.steps.length) return null;
+
+  const currentIndex = run.steps.findIndex(({ status }) =>
+    status === "active" || status === "retrying" || status === "failed");
+  if (currentIndex >= 0) return currentIndex + 1;
+
+  const pendingIndex = run.steps.findIndex(({ status }) => status === "pending");
+  if (pendingIndex >= 0) return pendingIndex + 1;
+
+  return run.steps.length;
 }
 
 export default function ArtifactRunProgress({
@@ -48,31 +59,57 @@ export default function ArtifactRunProgress({
   artifactId: string;
   onRetryLoad: () => void;
 }) {
+  const panelId = useId();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isFailureCollapsed, setIsFailureCollapsed] = useState(false);
   const type = run.type ?? artifactType;
+  const stepNumber = currentStepNumber(run);
+  const totalSteps = run.steps.length;
+  const isFailed = run.status === "failed";
+  const showDetails = isFailed ? !isFailureCollapsed : isExpanded;
   const retryHref = `/artifacts/new?${new URLSearchParams({
     ...(type ? { type } : {}),
     restore: artifactId,
   }).toString()}`;
 
-  return (
-    <div className={`mq-studio-run${run.status === "failed" ? " is-failed" : ""}`} aria-live="polite">
-      <div className="mq-studio-mark"><MarquillMark size={30} theme="auto" title="Mark" /></div>
-      <div className="mq-studio-run-content">
-        <div className="mq-studio-run-heading">
-          <strong>
-            {run.status === "failed"
-              ? run.kind === "REFINE" ? "Mark couldn't complete that refinement" : "Mark couldn't build this artifact"
-              : run.status === "loading-result"
-                ? "Preparing your response"
-                : run.kind === "REFINE"
-                  ? "Mark is refining your artifact"
-                  : `Mark is building your ${type ? artifactTypeLabels[type].toLowerCase() : "artifact"}`}
-          </strong>
-          {run.credits > 0 ? <span><Coins size={13} /> {run.credits} credits</span> : null}
-        </div>
+  const summary = stepNumber && totalSteps
+    ? `Step ${stepNumber}/${totalSteps}`
+    : "Starting build";
 
+  return (
+    <div
+      className={`mq-studio-progress${showDetails ? " is-expanded" : ""}${isFailed ? " is-failed" : ""}`}
+      aria-live="polite"
+    >
+      <button
+        type="button"
+        className="mq-studio-progress-toggle"
+        aria-expanded={showDetails}
+        aria-controls={panelId}
+        aria-label={`${showDetails ? "Collapse" : "Expand"} artifact build progress, ${summary}`}
+        onClick={() => {
+          if (isFailed) {
+            setIsFailureCollapsed((current) => !current);
+          } else {
+            setIsExpanded((current) => !current);
+          }
+        }}
+      >
+        <span className="mq-studio-progress-state" aria-hidden="true">
+          {isFailed ? <XCircle size={16} /> : <LoaderCircle size={16} />}
+        </span>
+        <strong>{summary}</strong>
+        {run.status === "reconnecting"
+          ? <small>Reconnecting…</small>
+          : run.credits > 0 ? <small>{run.credits} credits</small> : null}
+        <ChevronDown className="mq-studio-progress-chevron" size={16} aria-hidden="true" />
+      </button>
+
+      <div id={panelId} className="mq-studio-progress-panel" hidden={!showDetails}>
         {run.status === "connecting" && !run.steps.length ? (
-          <div className="mq-studio-connecting"><LoaderCircle size={15} /> Connecting to the run…</div>
+          <div className="mq-studio-progress-notice">
+            <LoaderCircle size={15} /> Connecting to the run…
+          </div>
         ) : null}
 
         {run.steps.length ? (
@@ -92,14 +129,18 @@ export default function ArtifactRunProgress({
           </ol>
         ) : null}
 
-        {run.status === "reconnecting" ? (
-          <div className="mq-studio-reconnecting"><RefreshCw size={13} /> Connection interrupted. Reconnecting…</div>
+        {run.status === "loading-result" ? (
+          <div className="mq-studio-progress-notice"><LoaderCircle size={15} /> Preparing your response…</div>
         ) : null}
 
-        {run.status === "failed" ? (
+        {run.status === "reconnecting" ? (
+          <div className="mq-studio-progress-notice"><RefreshCw size={14} /> Connection interrupted. Reconnecting…</div>
+        ) : null}
+
+        {isFailed ? (
           <div className="mq-studio-run-failure">
             <p>{run.failureReason || "The run stopped before the artifact was ready."}</p>
-            {run.failureAction === "retry-create" ? <Link href={retryHref}>Try again <ArrowUp size={14} /></Link> : null}
+            {run.failureAction === "retry-create" ? <Link href={retryHref}>Try again</Link> : null}
             {run.failureAction === "retry-load" ? (
               <button type="button" onClick={onRetryLoad}><RefreshCw size={13} /> Load response again</button>
             ) : null}
