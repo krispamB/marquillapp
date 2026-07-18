@@ -486,6 +486,7 @@ export default function ArtifactsRedesignClient({
       subscription={subscription}
       active="artifacts"
       title="Artifacts"
+      topbar={{ credits: {} }}
       showAccountSelector={false}
     >
       <div className="mq-toolbar mq-artifact-toolbar">

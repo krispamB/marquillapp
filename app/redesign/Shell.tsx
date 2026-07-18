@@ -18,7 +18,6 @@ import {
   Plus,
   RefreshCw,
   Settings,
-  Zap,
 } from "lucide-react";
 import type {
   ConnectedAccount,
@@ -297,7 +296,7 @@ export default function RedesignShell({
             {topbarExtra}
             {showTopbarCredits ? (
               <Link href="/billing" className="mq-topbar-credits" aria-label="View monthly credit usage">
-                <Zap size={16} />
+                <Coins size={16} />
                 <strong>{creditsRemaining === null ? "—" : numberFormatter.format(creditsRemaining)}</strong>
                 <span>credits</span>
               </Link>

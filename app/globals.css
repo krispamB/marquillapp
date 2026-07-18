@@ -629,7 +629,6 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-studio-refine textarea::placeholder { color: var(--ink-400); }
 .mq-studio-refine textarea:disabled { cursor: not-allowed; opacity: .7; }
 .mq-studio-refine-actions { display: flex; align-items: center; justify-content: flex-end; gap: 13px; }
-.mq-studio-refine-actions > span { color: var(--ink-400); font: 9.5px/1 var(--font-jetbrains-mono); }
 .mq-studio-refine button { display: inline-flex; min-width: 88px; min-height: 36px; align-items: center; justify-content: center; gap: 7px; padding: 0 13px; border: 0; border-radius: 10px; background: var(--ink-900); color: var(--surface); font: 650 11.5px var(--font-inter); cursor: pointer; }
 .mq-studio-refine button:disabled { cursor: not-allowed; opacity: .4; }
 .mq-studio-refine-error { margin: 7px 4px 0; color: var(--neg); font-size: 11px; }

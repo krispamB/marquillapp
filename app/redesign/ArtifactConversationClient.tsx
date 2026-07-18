@@ -288,7 +288,6 @@ export default function ArtifactConversationClient({
                 disabled={!canRefine}
               />
               <div className="mq-studio-refine-actions">
-                <span>{feedback.length.toLocaleString()} / 2,000</span>
                 <button
                   type="submit"
                   disabled={!canRefine || !feedback.trim()}
