@@ -60,6 +60,7 @@ type TopbarConfig = {
   credits?: {
     refreshKey?: string;
   };
+  minimal?: boolean;
 };
 
 function AccountAvatar({ account, size = "md" }: { account?: ConnectedAccount; size?: "sm" | "md" }) {
@@ -100,6 +101,7 @@ export default function RedesignShell({
   topbar,
   showAccountSelector = true,
   includeWorkspaceOption = false,
+  hideMobileNav = false,
   subscription,
   initialUsage,
   children,
@@ -114,6 +116,7 @@ export default function RedesignShell({
   topbar?: TopbarConfig;
   showAccountSelector?: boolean;
   includeWorkspaceOption?: boolean;
+  hideMobileNav?: boolean;
   subscription?: SubscriptionTier | null;
   initialUsage?: PaymentUsageResponse["data"] | null;
   children: ReactNode;
@@ -169,7 +172,7 @@ export default function RedesignShell({
   const numberFormatter = new Intl.NumberFormat();
 
   return (
-    <div className="mq-shell">
+    <div className={`mq-shell${hideMobileNav ? " mq-shell-no-mobile-nav" : ""}`}>
       <aside className="mq-sidebar">
         <Link href="/dashboard" className="mq-brand" aria-label="Marquill dashboard">
           <MarquillLockup size={29} theme="auto" className="mq-brand-lockup" />
@@ -280,7 +283,7 @@ export default function RedesignShell({
       </aside>
 
       <div className="mq-main">
-        <header className={`mq-topbar${showTopbarCredits ? " mq-topbar-with-credits" : ""}`}>
+        <header className={`mq-topbar${showTopbarCredits ? " mq-topbar-with-credits" : ""}${topbar?.minimal ? " mq-topbar-minimal" : ""}`}>
           <div className="mq-topbar-leading">
             {topbar?.back ? (
               <Link href={topbar.back.href} className="mq-topbar-back" aria-label={topbar.back.label ?? "Back"}>
@@ -335,7 +338,7 @@ export default function RedesignShell({
         <main className="mq-content">{children}</main>
       </div>
 
-      <nav className="mq-mobile-tabbar" aria-label="Mobile navigation">
+      {!hideMobileNav ? <nav className="mq-mobile-tabbar" aria-label="Mobile navigation">
         {mobileNavItems.slice(0, 2).map((item) => (
           <Link key={item.key} href={item.href} className={item.key === active ? "is-active" : ""}>
             {item.icon}
@@ -349,7 +352,7 @@ export default function RedesignShell({
             <span>{item.label}</span>
           </Link>
         ))}
-      </nav>
+      </nav> : null}
 
       <span className="mq-selected-account-name" aria-hidden="true">{selectedAccount?.displayName}</span>
       <FeedbackModal key={isFeedbackOpen ? "open" : "closed"} isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />

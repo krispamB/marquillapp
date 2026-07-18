@@ -267,6 +267,8 @@ export type PostDetailData = {
   status?: string;
   content?: string;
   media?: PostMediaItem[];
+  scheduledAt?: string;
+  failureReason?: string;
   createdAt?: string;
   updatedAt?: string;
   connectedAccount?: {
@@ -285,6 +287,20 @@ export type PostDetailData = {
       status?: string;
       content?: {
         commentary?: string;
+        poll?: {
+          question: string;
+          options: string[];
+          durationDays: 1 | 3 | 7 | 14;
+        };
+        document?: {
+          templateId: "bold" | "minimal" | "editorial" | "gradient";
+          slides: Array<{
+            type: string;
+            fields: Record<string, unknown>;
+          }>;
+          pageCount?: number;
+          pdfUrl?: string;
+        };
       };
       createdAt?: string;
     };
@@ -320,21 +336,59 @@ export type ImageUploadResponse = {
 };
 
 export type PostMediaItem = {
-  id?: string;
+  id: string;
   title?: string;
   altText?: string;
-  _id?: string;
+  linkedinUrn?: string;
+  type: "IMAGE" | "VIDEO";
+  status: "PENDING" | "UPLOADING" | "READY" | "FAILED";
+  mimeType?: string;
+  sizeBytes?: number;
+  pendingExpiresAt?: string;
 };
 
 export type LinkedinImageDetailsData = {
   downloadUrl?: string;
-  downloadUrlExpiresAt?: number;
+  downloadUrlExpiresAt?: number | string;
 };
 
 export type LinkedinImageDetailsResponse = {
   statusCode?: number;
   message?: string;
   data?: LinkedinImageDetailsData;
+};
+
+export type CreatePostRequest = {
+  artifactId: string;
+  version?: number;
+  connectedAccount: string;
+};
+
+export type PostMutationResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: PostDetailData;
+};
+
+export type PostMediaUploadSlot = {
+  mediaId: string;
+  uploadUrl: string;
+  requiredHeaders: Record<string, string>;
+};
+
+export type CreatePostMediaUploadsResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: {
+    expiresAt: string;
+    uploads: PostMediaUploadSlot[];
+  };
+};
+
+export type CompletePostMediaUploadsResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: PostMediaItem[] | PostDetailData;
 };
 
 // ─── LinkedIn Organization / Company Page ────────────────────────────────────
