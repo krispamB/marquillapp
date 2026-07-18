@@ -131,7 +131,7 @@ export default function ArtifactStudioClient({
       subscription={subscription}
       active="artifacts"
       title="Artifact Studio"
-      showTopbarCredits
+      topbar={{ credits: {} }}
       showAccountSelector={false}
     >
       <section className="mq-artifact-studio" aria-labelledby="mq-artifact-studio-title">

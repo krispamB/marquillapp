@@ -228,11 +228,11 @@ export default function ArtifactConversationClient({
       subscription={subscription}
       active="artifacts"
       title={artifactTitle}
-      topbarBackHref="/artifacts"
-      topbarBackLabel="Back to artifacts"
-      topbarSubtitle={artifactType ? `${artifactTypeLabels[artifactType]} · Created with Mark` : "Creating with Mark"}
-      showTopbarCredits
-      creditRefreshKey={activeRunId}
+      topbar={{
+        back: { href: "/artifacts", label: "Back to artifacts" },
+        subtitle: artifactType ? `${artifactTypeLabels[artifactType]} · Created with Mark` : "Creating with Mark",
+        credits: { refreshKey: activeRunId },
+      }}
       showAccountSelector={false}
     >
       <section className="mq-studio-conversation" aria-label="Artifact conversation">

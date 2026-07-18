@@ -52,6 +52,17 @@ const mobileNavItems = navItems.filter((item) =>
 
 export const WORKSPACE_SELECTOR_VALUE = "__marquill_workspace__";
 
+type TopbarConfig = {
+  back?: {
+    href: string;
+    label?: string;
+  };
+  subtitle?: string;
+  credits?: {
+    refreshKey?: string;
+  };
+};
+
 function AccountAvatar({ account, size = "md" }: { account?: ConnectedAccount; size?: "sm" | "md" }) {
   const initials = getInitials(
     account?.displayName ?? account?.profile?.localizedFirstName ?? "",
@@ -87,11 +98,7 @@ export default function RedesignShell({
   active,
   title,
   topbarExtra,
-  topbarBackHref,
-  topbarBackLabel = "Back",
-  topbarSubtitle,
-  showTopbarCredits = false,
-  creditRefreshKey,
+  topbar,
   showAccountSelector = true,
   includeWorkspaceOption = false,
   subscription,
@@ -105,11 +112,7 @@ export default function RedesignShell({
   active: WorkspacePage;
   title: string;
   topbarExtra?: ReactNode;
-  topbarBackHref?: string;
-  topbarBackLabel?: string;
-  topbarSubtitle?: string;
-  showTopbarCredits?: boolean;
-  creditRefreshKey?: string;
+  topbar?: TopbarConfig;
   showAccountSelector?: boolean;
   includeWorkspaceOption?: boolean;
   subscription?: SubscriptionTier | null;
@@ -121,6 +124,8 @@ export default function RedesignShell({
   const [isOrganizationModalOpen, setIsOrganizationModalOpen] = useState(false);
   const [isConnectedExpanded, setIsConnectedExpanded] = useState(false);
   const [fetchedCreditUsage, setFetchedCreditUsage] = useState<PaymentUsageMetric | null>(null);
+  const creditRefreshKey = topbar?.credits?.refreshKey;
+  const showTopbarCredits = Boolean(topbar?.credits);
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId);
   const initials = getInitials(user.name, user.email);
   const tier = subscription ?? user.tier;
@@ -278,14 +283,14 @@ export default function RedesignShell({
       <div className="mq-main">
         <header className={`mq-topbar${showTopbarCredits ? " mq-topbar-with-credits" : ""}`}>
           <div className="mq-topbar-leading">
-            {topbarBackHref ? (
-              <Link href={topbarBackHref} className="mq-topbar-back" aria-label={topbarBackLabel}>
+            {topbar?.back ? (
+              <Link href={topbar.back.href} className="mq-topbar-back" aria-label={topbar.back.label ?? "Back"}>
                 <ArrowLeft size={18} />
               </Link>
             ) : null}
             <div className="mq-topbar-copy">
               <div className="mq-topbar-title">{title}</div>
-              {topbarSubtitle ? <div className="mq-topbar-subtitle">{topbarSubtitle}</div> : null}
+              {topbar?.subtitle ? <div className="mq-topbar-subtitle">{topbar.subtitle}</div> : null}
             </div>
           </div>
           <div className="mq-topbar-actions">
