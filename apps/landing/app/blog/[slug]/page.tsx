@@ -79,7 +79,7 @@ export default async function BlogPost({ params }: Props) {
         <div className="mt-16 rounded-[18px] border border-line bg-surface p-8 text-center shadow-sm">
           <span className="ff-mono text-[12px] text-ink-400">_ ready to try it?</span>
           <h2 className="mt-3 text-2xl font-bold tracking-[-0.02em] text-ink-900">
-            Hire Mark free — your AI LinkedIn workspace
+            Get started for free with your AI LinkedIn workspace
           </h2>
           <p className="mx-auto mt-3 max-w-md text-sm text-ink-500">
             Generate posts, design carousels, run polls, and schedule publishing — all in one place.
@@ -88,7 +88,7 @@ export default async function BlogPost({ params }: Props) {
             href={appUrl}
             className="mt-6 inline-flex min-h-12 items-center justify-center rounded-[10px] bg-ink-900 px-6 text-sm font-semibold text-surface transition-opacity hover:opacity-90"
           >
-            Hire Mark free →
+            Get started for free →
           </a>
         </div>
 

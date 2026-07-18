@@ -54,14 +54,24 @@ export default function CheckoutContent() {
   useEffect(() => {
     if (!paddle || !transactionId) return;
 
+    // Paddle's inline checkout is transparent, so its text theme must match
+    // the surface underneath it. Otherwise light-theme text becomes nearly
+    // invisible when Marquill is using its dark palette.
+    const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
+    const checkoutTheme = isDarkTheme ? 'dark' : 'light';
+    const checkoutBackground = getComputedStyle(document.documentElement)
+      .getPropertyValue('--surface')
+      .trim();
+
     paddle.Checkout.open({
       transactionId,
       settings: {
         displayMode: 'inline',
+        theme: checkoutTheme,
         frameTarget: 'paddle-checkout',  // matches className on container div below
         frameInitialHeight: 450,
         frameStyle:
-          'width:100%;min-width:312px;background-color:transparent;border:none;',
+          `width:100%;min-width:312px;background-color:${checkoutBackground};color-scheme:${checkoutTheme};border:none;`,
       },
     });
 

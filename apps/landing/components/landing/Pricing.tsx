@@ -6,7 +6,7 @@ export default function Pricing({ appUrl }: { appUrl: string }) {
       <div className="mx-auto max-w-[640px] text-center">
         <Eyebrow>_ pricing</Eyebrow>
         <h2 className="mt-3 text-[28px] font-bold leading-[1.05] tracking-[-0.03em] text-ink-900 sm:text-[36px] lg:text-[40px]">
-          Pick how hard Mark works
+          Choose the plan that fits your workflow
         </h2>
         <p className="mt-3.5 text-[16px] leading-[1.5] text-ink-500 sm:text-[17px]">
           Start free. Upgrade as you add accounts and volume.

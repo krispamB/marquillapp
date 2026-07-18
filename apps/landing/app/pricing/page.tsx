@@ -106,7 +106,7 @@ export default function PricingPage() {
             <section className="border-b border-line bg-surface px-5 py-16 text-center sm:px-6 sm:py-20 lg:px-8">
                 <span className="ff-mono text-[12px] text-ink-400">_ pricing</span>
                 <h1 className="mx-auto mt-3 max-w-[760px] text-[34px] font-bold leading-[1.04] tracking-[-0.035em] text-ink-900 text-balance sm:text-[48px]">
-                    Pick how hard Mark works
+                    Choose the plan that fits your workflow
                 </h1>
                 <p className="mx-auto mt-4 max-w-2xl text-[17px] leading-[1.5] text-ink-500 sm:text-[19px]">
                     Choose the plan that fits your LinkedIn output. Every plan includes a 14-day free trial.
@@ -181,7 +181,7 @@ export default function PricingPage() {
             {/* CTA */}
             <section className="bg-canvas px-5 py-16 text-center sm:px-6 sm:py-20 lg:px-8">
                 <h2 className="mx-auto max-w-[640px] text-[28px] font-bold leading-[1.06] tracking-[-0.03em] sm:text-[34px]">
-                    <span className="text-ink-900">Hire Mark free.</span>{' '}
+                    <span className="text-ink-900">Get started for free.</span>{' '}
                     <span className="text-ink-500">Start your trial today.</span>
                 </h2>
                 <p className="mx-auto mt-4 max-w-xl text-[16px] text-ink-500">

@@ -47,7 +47,7 @@ export default function Header() {
               href={appUrl}
               className="inline-flex min-h-10 items-center gap-2 rounded-[10px] bg-ink-900 px-[18px] text-[14px] font-semibold tracking-[-0.01em] text-surface transition-opacity hover:opacity-90"
             >
-              Hire Mark free →
+              Get started for free →
             </a>
           </div>
 
@@ -90,7 +90,7 @@ export default function Header() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="mt-2 flex min-h-12 items-center justify-center rounded-[10px] bg-ink-900 px-5 text-[15px] font-semibold text-surface"
               >
-                Hire Mark free →
+                Get started for free →
               </a>
             </div>
           </div>

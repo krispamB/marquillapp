@@ -94,8 +94,8 @@ export type Plan = {
 };
 
 export const plans: Plan[] = [
-  { name: 'Free', price: '$0', period: '', blurb: 'Put Mark to work on the essentials.', cta: 'Hire Mark', popular: false, features: ['1 LinkedIn account', '5 Mark posts / month', 'Carousels & polls', '30 days post history'] },
-  { name: 'Starter', price: '$9.99', period: '/mo', blurb: 'For consistent weekly posting.', cta: 'Hire Mark', popular: false, features: ['1 LinkedIn account', '30 Mark posts / month', 'Unlimited carousels & polls', '90 days post history'] },
+  { name: 'Free', price: '$0', period: '', blurb: 'Create and publish the essentials.', cta: 'Get started for free', popular: false, features: ['1 LinkedIn account', '5 Mark posts / month', 'Carousels & polls', '30 days post history'] },
+  { name: 'Starter', price: '$9.99', period: '/mo', blurb: 'For consistent weekly posting.', cta: 'Get started', popular: false, features: ['1 LinkedIn account', '30 Mark posts / month', 'Unlimited carousels & polls', '90 days post history'] },
   { name: 'Creator', price: '$19.99', period: '/mo', blurb: 'Best for creators scaling output.', cta: 'Start creator plan', popular: true, features: ['2 LinkedIn accounts', '100 Mark posts / month', 'Priority drafting + scheduling', '1 year post history'] },
-  { name: 'Pro Writer', price: '$29.99', period: '/mo', blurb: 'High-volume teams and agencies.', cta: 'Hire Mark', popular: false, features: ['10 LinkedIn accounts', 'Unlimited Mark posts', 'Team workspace + brand voices', 'Unlimited post history'] },
+  { name: 'Pro Writer', price: '$29.99', period: '/mo', blurb: 'High-volume teams and agencies.', cta: 'Get started', popular: false, features: ['10 LinkedIn accounts', 'Unlimited Mark posts', 'Team workspace + brand voices', 'Unlimited post history'] },
 ];
