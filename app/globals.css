@@ -416,6 +416,9 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-artifact-card { display: flex; min-width: 0; min-height: 330px; flex-direction: column; overflow: hidden; }
 .mq-artifact-card-header, .mq-artifact-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 15px; }
 .mq-artifact-card-header { padding-bottom: 8px; }
+.mq-artifact-card-actions { display: flex; align-items: center; gap: 7px; }
+.mq-artifact-card-delete { display: inline-flex; width: 28px; height: 28px; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--ink-400); cursor: pointer; transition: border-color .18s ease, background .18s ease, color .18s ease; }
+.mq-artifact-card-delete:hover, .mq-artifact-card-delete:focus-visible { border-color: color-mix(in srgb, var(--neg) 22%, var(--line)); background: color-mix(in srgb, var(--neg) 7%, var(--surface)); color: var(--neg); }
 .mq-artifact-type, .mq-artifact-state { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
 .mq-artifact-type { padding: 4px 9px; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--accent-ink); }
 .mq-artifact-type-poll { background: color-mix(in srgb, var(--pos) 10%, var(--surface)); color: var(--pos); }
@@ -577,8 +580,36 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-studio-response-head { display: flex; min-height: 58px; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 15px; border-bottom: 1px solid var(--line-faint); }
 .mq-studio-response-labels { display: flex; align-items: center; gap: 8px; }
 .mq-studio-version { padding: 4px 8px; border-radius: 999px; background: var(--canvas-sub); color: var(--ink-500); font: 9.5px/1 var(--font-jetbrains-mono); }
-.mq-studio-edit { display: inline-flex; min-height: 34px; align-items: center; gap: 6px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--ink-400); font: 600 11px var(--font-inter); cursor: not-allowed; opacity: .72; }
+.mq-studio-edit { display: inline-flex; min-height: 34px; align-items: center; gap: 6px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--ink-600); font: 600 11px var(--font-inter); cursor: pointer; }
+.mq-studio-edit:hover, .mq-studio-edit:focus-visible { border-color: var(--accent); color: var(--accent-ink); }
 .mq-studio-response-body { padding: 23px 25px; }
+.mq-artifact-editor { display: flex; flex-direction: column; gap: 17px; }
+.mq-artifact-editor label { display: flex; min-width: 0; flex-direction: column; gap: 7px; }
+.mq-artifact-editor label > span, .mq-artifact-editor-options legend { color: var(--ink-500); font: 9.5px/1.2 var(--font-jetbrains-mono); letter-spacing: .04em; text-transform: uppercase; }
+.mq-artifact-editor input, .mq-artifact-editor textarea, .mq-artifact-editor select { width: 100%; border: 1px solid var(--line); border-radius: 10px; outline: 0; background: var(--surface-2); color: var(--ink-900); font: 13px/1.5 var(--font-inter); transition: border-color .18s ease, box-shadow .18s ease; }
+.mq-artifact-editor input { min-height: 42px; padding: 0 12px; }
+.mq-artifact-editor textarea { min-height: 72px; padding: 10px 12px; resize: vertical; }
+.mq-artifact-editor select { min-height: 42px; padding: 0 11px; cursor: pointer; }
+.mq-artifact-editor input:focus, .mq-artifact-editor textarea:focus, .mq-artifact-editor select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 11%, transparent); }
+.mq-artifact-editor input:disabled, .mq-artifact-editor textarea:disabled, .mq-artifact-editor select:disabled { cursor: not-allowed; opacity: .65; }
+.mq-artifact-editor label > small { align-self: flex-end; margin-top: -2px; color: var(--ink-400); font: 9px/1 var(--font-jetbrains-mono); }
+.mq-artifact-editor-options { display: flex; min-width: 0; flex-direction: column; gap: 10px; margin: 0; padding: 0; border: 0; }
+.mq-artifact-editor-options legend { margin-bottom: 3px; }
+.mq-artifact-editor-options > div { display: grid; grid-template-columns: minmax(0, 1fr) 34px; align-items: end; gap: 8px; }
+.mq-artifact-editor-options > div > button { display: inline-flex; width: 34px; height: 42px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink-400); cursor: pointer; }
+.mq-artifact-editor-options > div > button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--neg) 25%, var(--line)); color: var(--neg); }
+.mq-artifact-editor-options > div > button:disabled { cursor: not-allowed; opacity: .35; }
+.mq-artifact-editor-options .mq-artifact-editor-add { display: inline-flex; width: fit-content; min-height: 34px; align-items: center; gap: 6px; padding: 0 10px; border: 1px dashed var(--line-strong); border-radius: 9px; background: transparent; color: var(--accent-ink); font: 600 11px var(--font-inter); cursor: pointer; }
+.mq-artifact-editor-duration { width: min(100%, 190px); }
+.mq-artifact-editor-error { margin: 12px 0 0; padding: 9px 11px; border: 1px solid color-mix(in srgb, var(--neg) 24%, var(--line)); border-radius: 9px; background: color-mix(in srgb, var(--neg) 6%, var(--surface)); color: var(--neg); font-size: 11.5px; line-height: 1.45; }
+.mq-artifact-editor .mq-artifact-editor-error { margin-top: 2px; }
+.mq-artifact-editor-actions { display: flex; justify-content: flex-end; gap: 9px; padding-top: 2px; }
+.mq-artifact-editor-actions button { min-height: 36px; gap: 6px; }
+.mq-artifact-editor-actions .lucide-loader-circle { animation: mq-studio-spin .8s linear infinite; }
+.mq-artifact-delete-topbar { display: inline-flex; min-height: 35px; align-items: center; gap: 6px; padding: 0 11px; border: 1px solid color-mix(in srgb, var(--neg) 20%, var(--line)); border-radius: 10px; background: color-mix(in srgb, var(--neg) 5%, var(--surface)); color: var(--neg); font: 600 11px var(--font-inter); cursor: pointer; }
+.mq-artifact-delete-topbar:hover:not(:disabled) { background: color-mix(in srgb, var(--neg) 10%, var(--surface)); }
+.mq-artifact-delete-topbar:disabled { cursor: not-allowed; opacity: .45; }
+.mq-delete-error { padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--neg) 7%, var(--surface)); color: var(--neg) !important; font-size: 11px !important; }
 .mq-studio-post-copy { color: var(--ink-900); font-size: 15px; line-height: 1.72; white-space: pre-wrap; }
 .mq-studio-poll-copy { display: flex; flex-direction: column; gap: 14px; }
 .mq-studio-poll-copy > p { margin: 0 0 2px; color: var(--ink-700); font-size: 14px; line-height: 1.65; white-space: pre-wrap; }
@@ -1002,6 +1033,10 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
   .mq-studio-response { border-radius: 14px; }
   .mq-studio-response-head { min-height: 50px; padding: 9px 11px; }
   .mq-studio-response-body { padding: 17px 15px; }
+  .mq-artifact-editor { gap: 14px; }
+  .mq-artifact-editor-actions { align-items: stretch; flex-direction: column-reverse; }
+  .mq-artifact-editor-actions button { justify-content: center; }
+  .mq-artifact-delete-topbar { width: 35px; padding: 0; justify-content: center; font-size: 0; }
   .mq-studio-post-copy { font-size: 14px; line-height: 1.65; }
   .mq-studio-poll-options { grid-template-columns: 1fr; gap: 8px; }
   .mq-studio-document-copy { grid-template-columns: auto minmax(0, 1fr); gap: 11px; }

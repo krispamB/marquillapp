@@ -13,6 +13,7 @@ import {
   LoaderCircle,
   RefreshCw,
   Sparkles,
+  Trash2,
   XCircle,
 } from "lucide-react";
 import MarquillMark from "../../components/brand/MarquillMark";
@@ -25,12 +26,15 @@ import type {
   ArtifactDetailData,
   ArtifactDetailResponse,
   ArtifactType,
+  DeleteArtifactResponse,
   RefineArtifactResponse,
+  UpdateArtifactRequest,
 } from "./artifactTypes";
+import ArtifactDeleteConfirmModal from "./ArtifactDeleteConfirmModal";
 import ArtifactResponse, { artifactTypeLabels } from "./ArtifactResponse";
 import ArtifactRunProgress from "./ArtifactRunProgress";
 import { readArtifactPrompt } from "./artifactStudioStorage";
-import { API_BASE, jsonRequest, readApi } from "./api";
+import { API_BASE, ApiRequestError, jsonRequest, readApi } from "./api";
 import RedesignShell from "./Shell";
 import { useArtifactRun } from "./useArtifactRun";
 
@@ -64,6 +68,12 @@ export default function ArtifactConversationClient({
   const [feedback, setFeedback] = useState("");
   const [isStartingRefine, setIsStartingRefine] = useState(false);
   const [refineError, setRefineError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [savingVersion, setSavingVersion] = useState<number | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const cleanArtifactUrl = `/artifacts/${encodeURIComponent(artifactId)}`;
 
   const appendUser = useCallback((text: string, id: string) => {
@@ -192,7 +202,60 @@ export default function ArtifactConversationClient({
     () => entries.filter((entry): entry is Extract<ConversationEntry, { role: "assistant" }> => entry.role === "assistant"),
     [entries],
   );
-  const canRefine = responses.length > 0 && !activeRunId && !isStartingRefine;
+  const canRefine = responses.length > 0
+    && !activeRunId
+    && !isStartingRefine
+    && !isEditing
+    && savingVersion === null
+    && !isDeleting;
+
+  async function saveArtifact(version: number, request: UpdateArtifactRequest) {
+    setSavingVersion(version);
+    setEditError(null);
+    try {
+      const response = await readApi<ArtifactDetailResponse>(
+        `${API_BASE}/artifacts/${encodeURIComponent(artifactId)}`,
+        jsonRequest(request, { method: "PATCH" }),
+      );
+      if (!response?.data) throw new Error("The saved artifact could not be loaded.");
+      appendArtifact(response.data);
+    } catch (reason) {
+      let message = reason instanceof Error ? reason.message : "The artifact could not be saved.";
+      if (reason instanceof ApiRequestError && reason.status === 409) {
+        setIsEditing(false);
+        try {
+          const current = await readArtifact(undefined, true);
+          setEntries((entries) => entries.map((entry) => entry.role === "assistant"
+            ? { ...entry, artifact: { ...entry.artifact, currentVersion: current.currentVersion } }
+            : entry));
+          if (current.status === "READY") appendArtifact(current);
+          message = `${message} The latest version has been loaded.`;
+        } catch {
+          message = `${message} Reload the page before trying again.`;
+        }
+      }
+      setEditError(message);
+      throw reason;
+    } finally {
+      setSavingVersion(null);
+    }
+  }
+
+  async function deleteArtifact() {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await readApi<DeleteArtifactResponse>(
+        `${API_BASE}/artifacts/${encodeURIComponent(artifactId)}`,
+        { method: "DELETE" },
+      );
+      router.replace("/artifacts");
+      router.refresh();
+    } catch (reason) {
+      setDeleteError(reason instanceof Error ? reason.message : "The artifact could not be deleted.");
+      setIsDeleting(false);
+    }
+  }
 
   async function startRefinement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -233,6 +296,19 @@ export default function ArtifactConversationClient({
         subtitle: artifactType ? `${artifactTypeLabels[artifactType]} · Created with Mark` : "Creating with Mark",
         credits: { refreshKey: activeRunId },
       }}
+      topbarExtra={isHydrated ? (
+        <button
+          type="button"
+          className="mq-artifact-delete-topbar"
+          onClick={() => {
+            setDeleteError(null);
+            setIsDeleteOpen(true);
+          }}
+          disabled={isDeleting || isEditing || savingVersion !== null || isStartingRefine}
+        >
+          <Trash2 size={15} /> Delete
+        </button>
+      ) : null}
       showAccountSelector={false}
     >
       <section className="mq-studio-conversation" aria-label="Artifact conversation">
@@ -256,7 +332,25 @@ export default function ArtifactConversationClient({
               <div className="mq-studio-mark"><MarquillMark size={30} theme="auto" title="Mark" /></div>
               <div className="mq-studio-assistant-content">
                 <div className="mq-studio-assistant-meta">Mark created version {entry.artifact.version}</div>
-                <ArtifactResponse artifact={entry.artifact} credits={entry.credits} />
+                <ArtifactResponse
+                  artifact={entry.artifact}
+                  credits={entry.credits}
+                  canEdit={
+                    entry.artifact.status === "READY"
+                    && entry.artifact.version === entry.artifact.currentVersion
+                    && (entry.artifact.type === "POST" || entry.artifact.type === "POLL")
+                    && !activeRunId
+                    && !isStartingRefine
+                    && !isDeleting
+                  }
+                  isSaving={savingVersion === entry.artifact.version}
+                  editError={entry.artifact.version === entry.artifact.currentVersion ? editError : null}
+                  onEditingChange={(editing) => {
+                    setIsEditing(editing);
+                    if (!editing) setEditError(null);
+                  }}
+                  onSave={(request) => saveArtifact(entry.artifact.version, request)}
+                />
               </div>
             </div>
           ))}
@@ -302,6 +396,18 @@ export default function ArtifactConversationClient({
           </div>
         ) : null}
       </section>
+      <ArtifactDeleteConfirmModal
+        isOpen={isDeleteOpen}
+        isDeleting={isDeleting}
+        artifactTitle={artifactTitle === "Artifact Studio" ? undefined : artifactTitle}
+        error={deleteError}
+        onClose={() => {
+          if (isDeleting) return;
+          setIsDeleteOpen(false);
+          setDeleteError(null);
+        }}
+        onConfirm={() => void deleteArtifact()}
+      />
     </RedesignShell>
   );
 }

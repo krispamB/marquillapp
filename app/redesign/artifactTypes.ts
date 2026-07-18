@@ -143,3 +143,24 @@ export type ArtifactDetailResponse = {
   message?: string;
   data?: ArtifactDetailData;
 };
+
+export type UpdateArtifactRequest = {
+  title?: string;
+  content: {
+    commentary?: string;
+    poll?: {
+      question: string;
+      options: string[];
+      durationDays: 1 | 3 | 7 | 14;
+    };
+  };
+};
+
+export type DeleteArtifactResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: {
+    id: string;
+    deletedAt: string;
+  };
+};

@@ -12,9 +12,11 @@ import {
   GalleryHorizontal,
   Layers3,
   Plus,
+  Trash2,
   type LucideProps,
 } from "lucide-react";
 import MarquillMark from "../../components/brand/MarquillMark";
+import ArtifactDeleteConfirmModal from "./ArtifactDeleteConfirmModal";
 import RedesignShell from "./Shell";
 import { API_BASE, readApi } from "./api";
 import { formatRelativeDate } from "./types";
@@ -31,6 +33,7 @@ import type {
   ArtifactSummary,
   ArtifactType,
   ArtifactsListResponse,
+  DeleteArtifactResponse,
 } from "./artifactTypes";
 
 type ArtifactFilter = "ALL" | ArtifactType;
@@ -165,10 +168,12 @@ function ArtifactCard({
   artifact,
   detailState,
   onVisible,
+  onDelete,
 }: {
   artifact: ArtifactSummary;
   detailState?: DetailState;
   onVisible: (artifactId: string) => void;
+  onDelete: (artifact: ArtifactSummary) => void;
 }) {
   const cardRef = useRef<HTMLElement>(null);
   const shouldEnrich = artifact.status === "READY" && artifact.type !== "POST";
@@ -215,9 +220,20 @@ function ArtifactCard({
         <span className={`mq-artifact-type mq-artifact-type-${artifact.type.toLowerCase()}`}>
           <format.Icon size={13} /> {format.label}
         </span>
-        <span className={`mq-artifact-state mq-artifact-state-${artifact.status.toLowerCase()}`}>
-          <i /> {statusLabel(artifact.status)}
-        </span>
+        <div className="mq-artifact-card-actions">
+          <span className={`mq-artifact-state mq-artifact-state-${artifact.status.toLowerCase()}`}>
+            <i /> {statusLabel(artifact.status)}
+          </span>
+          <button
+            type="button"
+            className="mq-artifact-card-delete"
+            onClick={() => onDelete(artifact)}
+            aria-label={`Delete ${artifact.title?.trim() || format.label.toLowerCase()}`}
+            title="Delete artifact"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
       </div>
 
       <div className="mq-artifact-card-body">
@@ -385,6 +401,10 @@ export default function ArtifactsRedesignClient({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [details, setDetails] = useState<Record<string, DetailState>>({});
+  const [reloadKey, setReloadKey] = useState(0);
+  const [deleteArtifact, setDeleteArtifact] = useState<ArtifactSummary | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const detailCache = useRef(new Map<string, ArtifactDetailData>());
   const detailControllers = useRef(new Map<string, AbortController>());
 
@@ -423,7 +443,7 @@ export default function ArtifactsRedesignClient({
       });
 
     return () => controller.abort();
-  }, [abortDetailRequests, filter, month, page]);
+  }, [abortDetailRequests, filter, month, page, reloadKey]);
 
   useEffect(() => () => abortDetailRequests(false), [abortDetailRequests]);
 
@@ -476,6 +496,35 @@ export default function ArtifactsRedesignClient({
     setIsLoading(true);
     setError(null);
     setPage(nextPage);
+  }
+
+  async function confirmDeleteArtifact() {
+    if (!deleteArtifact) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await readApi<DeleteArtifactResponse>(
+        `${API_BASE}/artifacts/${encodeURIComponent(deleteArtifact.id)}`,
+        { method: "DELETE" },
+      );
+      detailControllers.current.get(deleteArtifact.id)?.abort();
+      detailControllers.current.delete(deleteArtifact.id);
+      detailCache.current.delete(deleteArtifact.id);
+      setDetails((current) => {
+        const next = { ...current };
+        delete next[deleteArtifact.id];
+        return next;
+      });
+      const shouldMoveBack = artifacts.length === 1 && page > 1;
+      setDeleteArtifact(null);
+      setIsDeleting(false);
+      setIsLoading(true);
+      if (shouldMoveBack) setPage((current) => Math.max(1, current - 1));
+      else setReloadKey((current) => current + 1);
+    } catch (reason) {
+      setDeleteError(reason instanceof Error ? reason.message : "The artifact could not be deleted.");
+      setIsDeleting(false);
+    }
   }
 
   return (
@@ -546,6 +595,10 @@ export default function ArtifactsRedesignClient({
                 artifact={artifact}
                 detailState={details[artifact.id]}
                 onVisible={loadDetail}
+                onDelete={(selectedArtifact) => {
+                  setDeleteError(null);
+                  setDeleteArtifact(selectedArtifact);
+                }}
               />
             ))}
           </div>
@@ -559,6 +612,18 @@ export default function ArtifactsRedesignClient({
           </div>
         </>
       ) : null}
+      <ArtifactDeleteConfirmModal
+        isOpen={Boolean(deleteArtifact)}
+        isDeleting={isDeleting}
+        artifactTitle={deleteArtifact?.title}
+        error={deleteError}
+        onClose={() => {
+          if (isDeleting) return;
+          setDeleteArtifact(null);
+          setDeleteError(null);
+        }}
+        onConfirm={() => void confirmDeleteArtifact()}
+      />
     </RedesignShell>
   );
 }

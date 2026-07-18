@@ -7,6 +7,16 @@ import {
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
 
+export class ApiRequestError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+  }
+}
+
 function isFeatureLimitError(
   payload: unknown,
 ): payload is Partial<FeatureLimitErrorResponse> & { code: "FEATURE_LIMIT_EXCEEDED" } {
@@ -53,7 +63,7 @@ export async function readApi<T>(input: string, init: RequestInit = {}) {
       payload && typeof payload === "object" && payload !== null && "message" in payload
         ? String((payload as { message?: unknown }).message ?? "")
         : text;
-    throw new Error(message || `Request failed with ${response.status}.`);
+    throw new ApiRequestError(message || `Request failed with ${response.status}.`, response.status);
   }
   return payload as T;
 }
