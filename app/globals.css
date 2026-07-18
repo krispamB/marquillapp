@@ -1175,6 +1175,8 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-readonly-document small { color: var(--ink-500); }
 .mq-readonly-document a { color: var(--accent-ink); font-size: 12px; }
 .mq-post-media-section { margin-top: auto; border-top: 1px solid var(--line-faint); }
+.mq-media-inline-error { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 12px 15px 0; padding: 9px 10px; border: 1px solid color-mix(in srgb, var(--neg) 35%, var(--line)); border-radius: var(--r-md); background: var(--neg-bg); color: var(--ink-700); font-size: 10px; line-height: 1.4; }
+.mq-media-inline-error button { display: inline-flex; min-height: 28px; flex: none; align-items: center; gap: 5px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); color: var(--ink-700); font: 600 10px inherit; }
 .mq-post-media-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 15px 0; }
 .mq-post-media-item { display: flex; min-width: 0; align-items: center; gap: 9px; padding: 8px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-2); }
 .mq-post-media-item > img, .mq-post-media-item > span { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 7px; object-fit: cover; }

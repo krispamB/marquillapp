@@ -1,3 +1,5 @@
+import type { ArtifactContent } from "./artifact-content";
+
 export type TierLimits = {
   postsPerMonth?: number;
   toneAnalysis?: boolean;
@@ -191,7 +193,7 @@ export type DashboardInitialData = {
   errors: string[];
 };
 
-export type PostStatus = "DRAFT" | "SCHEDULED" | "PUBLISHED";
+export type PostStatus = "DRAFT" | "SCHEDULED" | "PUBLISHED" | "FAILED";
 
 export enum StylePreset {
   PROFESSIONAL = 'professional',
@@ -285,23 +287,7 @@ export type PostDetailData = {
     version?: {
       version?: number;
       status?: string;
-      content?: {
-        commentary?: string;
-        poll?: {
-          question: string;
-          options: string[];
-          durationDays: 1 | 3 | 7 | 14;
-        };
-        document?: {
-          templateId: "bold" | "minimal" | "editorial" | "gradient";
-          slides: Array<{
-            type: string;
-            fields: Record<string, unknown>;
-          }>;
-          pageCount?: number;
-          pdfUrl?: string;
-        };
-      };
+      content?: ArtifactContent;
       createdAt?: string;
     };
   }>;

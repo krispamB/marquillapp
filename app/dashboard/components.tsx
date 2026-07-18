@@ -356,6 +356,12 @@ const statusVisuals: Record<
     fg: "#1E7A52",
     icon: <CheckCheck className="h-3.5 w-3.5" />,
   },
+  FAILED: {
+    label: "Failed",
+    bg: "#FDE8E8",
+    fg: "#B42318",
+    icon: <AlertTriangle className="h-3.5 w-3.5" />,
+  },
 };
 
 export function StatusTag({

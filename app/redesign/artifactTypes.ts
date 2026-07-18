@@ -1,9 +1,10 @@
+import type { ArtifactContent, ArtifactSlide, PollDurationDays } from "../lib/artifact-content";
+export { POLL_DURATION_DAYS } from "../lib/artifact-content";
+export type { ArtifactContent, ArtifactSlide, PollDurationDays } from "../lib/artifact-content";
+
 export type ArtifactType = "POST" | "POLL" | "DOCUMENT";
 
 export type ArtifactStatus = "GENERATING" | "READY" | "FAILED";
-
-export const POLL_DURATION_DAYS = [1, 3, 7, 14] as const;
-export type PollDurationDays = (typeof POLL_DURATION_DAYS)[number];
 
 export type WorkflowStep =
   | "RESOLVE_INPUT"
@@ -84,13 +85,6 @@ export type RunFailedEvent = {
   failureReason: string;
 };
 
-export type ArtifactSlide =
-  | { type: "cover"; fields: { eyebrow?: string; title: string; subtitle?: string } }
-  | { type: "content"; fields: { heading: string; body: string } }
-  | { type: "list"; fields: { heading: string; items: string[] } }
-  | { type: "quote"; fields: { quote: string; attribution?: string } }
-  | { type: "cta"; fields: { headline: string; action: string; handle?: string } };
-
 export type ArtifactSummary = {
   id: string;
   type: ArtifactType;
@@ -124,20 +118,7 @@ export type ArtifactDetailData = {
   version: number;
   status: ArtifactStatus;
   updatedAt?: string;
-  content: {
-    commentary?: string;
-    poll?: {
-      question: string;
-      options: string[];
-      durationDays: PollDurationDays;
-    };
-    document?: {
-      templateId: "bold" | "minimal" | "editorial" | "gradient";
-      slides: ArtifactSlide[];
-      pageCount?: number;
-      pdfUrl?: string;
-    };
-  };
+  content: ArtifactContent;
   versions?: ArtifactVersionSummary[];
 };
 
