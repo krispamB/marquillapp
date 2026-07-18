@@ -49,6 +49,8 @@ export default function PostArtifactPicker({
   const [artifacts, setArtifacts] = useState<ArtifactSummary[]>([]);
   const [filter, setFilter] = useState<ArtifactFilter>("ALL");
   const [month, setMonth] = useState("ALL");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
@@ -56,11 +58,24 @@ export default function PostArtifactPicker({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const nextSearch = searchInput.trim();
+    if (nextSearch === search) return;
+    const timer = window.setTimeout(() => {
+      setIsLoading(true);
+      setError(null);
+      setPage(1);
+      setSearch(nextSearch);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search, searchInput]);
+
+  useEffect(() => {
     if (!isOpen) return;
     const controller = new AbortController();
     const params = new URLSearchParams({ status: "READY", page: String(page) });
     if (filter !== "ALL") params.set("type", filter);
     if (month !== "ALL") params.set("month", month);
+    if (search) params.set("search", search);
     readApi<ArtifactsListResponse>(`${API_BASE}/artifacts?${params}`, { signal: controller.signal })
       .then((response) => {
         setError(null);
@@ -78,7 +93,7 @@ export default function PostArtifactPicker({
         if (!controller.signal.aborted) setIsLoading(false);
       });
     return () => controller.abort();
-  }, [filter, isOpen, month, page]);
+  }, [filter, isOpen, month, page, search]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -87,7 +102,7 @@ export default function PostArtifactPicker({
       if (event.key === "Escape") onClose();
       if (event.key !== "Tab" || !dialogRef.current) return;
       const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), a[href], select:not([disabled])',
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled])',
       )).filter((element) => element.offsetParent !== null);
       if (!focusable.length) return;
       const first = focusable[0];
@@ -118,10 +133,15 @@ export default function PostArtifactPicker({
         </header>
 
         <div className="mq-artifact-picker-tools">
-          <label className="mq-artifact-search-disabled" title="Artifact search is coming soon">
+          <label className="mq-artifact-picker-search">
             <Search size={16} />
-            <input type="search" placeholder="Search artifacts" disabled aria-label="Search artifacts (coming soon)" aria-describedby="artifact-search-note" />
-            <span id="artifact-search-note">Coming soon</span>
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Search artifacts"
+              aria-label="Search artifacts"
+            />
           </label>
           <MarquillSelect value={filter} onChange={(value) => { setIsLoading(true); setError(null); setFilter(value as ArtifactFilter); setPage(1); }} ariaLabel="Filter artifacts by type" options={typeOptions} />
           <MarquillSelect value={month} onChange={(value) => { setIsLoading(true); setError(null); setMonth(value); setPage(1); }} ariaLabel="Filter artifacts by month" options={[{ value: "ALL", label: "Any month" }, ...availableMonths.map((value) => ({ value, label: monthLabel(value) }))]} />
@@ -153,7 +173,7 @@ export default function PostArtifactPicker({
             );
           })}
           {!isLoading && !error && artifacts.length === 0 ? (
-            <div className="mq-artifact-picker-empty"><FileText size={24} /><strong>No READY artifacts found</strong><p>Adjust the filters or create an artifact first.</p><Link href="/artifacts/new" className="mq-primary-button">Create artifact</Link></div>
+            <div className="mq-artifact-picker-empty"><FileText size={24} /><strong>No READY artifacts found</strong><p>Adjust the search or filters, or create an artifact first.</p><Link href="/artifacts/new" className="mq-primary-button">Create artifact</Link></div>
           ) : null}
         </div>
 

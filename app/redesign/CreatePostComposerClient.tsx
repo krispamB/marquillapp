@@ -1,12 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, ChevronDown, FileText, LoaderCircle, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import MarquillSelect from "../../components/ui/MarquillSelect";
 import type {
   ConnectedAccount,
+  PostDetailData,
+  PostDetailResponse,
   PostMutationResponse,
+  PostStatus,
   SubscriptionTier,
   UserProfile,
 } from "../lib/types";
@@ -23,29 +26,62 @@ import StockImagePicker from "./StockImagePicker";
 import LinkedInConnectButton from "./LinkedInConnectButton";
 import usePostMediaWorkflow from "./usePostMediaWorkflow";
 
-type PendingAction = "attach" | "publish" | "schedule" | null;
+type PendingAction = "attach" | "publish" | "schedule" | "unschedule" | null;
 type StockProvider = "pexels" | "unsplash";
+
+function normalizePostStatus(value?: string): PostStatus {
+  const status = String(value ?? "DRAFT").toUpperCase();
+  if (status === "FAILED" || status === "SCHEDULED" || status === "PUBLISHED") return status;
+  return "DRAFT";
+}
+
+function pinnedArtifactFromPost(post: PostDetailData): ArtifactDetailData {
+  const reference = post.artifacts?.[0];
+  const artifact = reference?.artifact;
+  const version = reference?.version;
+  const type = artifact?.type;
+  if (!artifact?._id || (type !== "POST" && type !== "POLL" && type !== "DOCUMENT") || !version?.version || !version.content) {
+    throw new Error("This post does not include a usable pinned artifact version.");
+  }
+  const status = version.status === "FAILED" || version.status === "GENERATING" ? version.status : "READY";
+  return {
+    id: artifact._id,
+    type,
+    title: artifact.title?.trim() || artifact.source?.prompt?.trim() || undefined,
+    currentVersion: version.version,
+    version: version.version,
+    status,
+    updatedAt: version.editedAt ?? version.createdAt ?? post.updatedAt,
+    content: version.content,
+  };
+}
 
 export default function CreatePostComposerClient({
   user,
   connectedAccounts,
   subscription,
+  initialPostId,
 }: {
   user: UserProfile;
   connectedAccounts: ConnectedAccount[];
   subscription?: SubscriptionTier | null;
+  initialPostId?: string;
 }) {
+  const isEditing = Boolean(initialPostId);
   const router = useRouter();
   const [selectedAccountId, setSelectedAccountId] = useState(connectedAccounts[0]?.id ?? "");
-  const [postId, setPostId] = useState<string>();
+  const [postId, setPostId] = useState<string | undefined>(initialPostId);
+  const [postStatus, setPostStatus] = useState<PostStatus>();
   const [artifact, setArtifact] = useState<ArtifactDetailData>();
+  const [isLoadingPost, setIsLoadingPost] = useState(isEditing);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isArtifactPickerOpen, setIsArtifactPickerOpen] = useState(false);
   const [stockProvider, setStockProvider] = useState<StockProvider | null>(null);
   const [scheduleMode, setScheduleMode] = useState(false);
   const [isMobilePreviewOpen, setIsMobilePreviewOpen] = useState(false);
   const [scheduleValue, setScheduleValue] = useState(localDateTimeValue(getDefaultScheduleDate()));
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
-  const [statusText, setStatusText] = useState("Choose an account and attach an artifact");
+  const [statusText, setStatusText] = useState(isEditing ? "Loading saved post…" : "Choose an account and attach an artifact");
   const [error, setError] = useState<string | null>(null);
   const {
     error: mediaError,
@@ -58,15 +94,51 @@ export default function CreatePostComposerClient({
     uploadFiles,
   } = usePostMediaWorkflow({ postId, artifactType: artifact?.type, onStatus: setStatusText });
 
+  useEffect(() => {
+    if (!initialPostId) return;
+    const controller = new AbortController();
+    setIsLoadingPost(true);
+    setLoadError(null);
+    readApi<PostDetailResponse>(`${API_BASE}/posts/${encodeURIComponent(initialPostId)}`, { signal: controller.signal })
+      .then((response) => {
+        if (!response.data) throw new Error("The saved post was unavailable.");
+        const nextArtifact = pinnedArtifactFromPost(response.data);
+        const nextStatus = normalizePostStatus(response.data.status);
+        const accountId = response.data.connectedAccount?._id;
+        if (accountId) setSelectedAccountId(accountId);
+        setArtifact(nextArtifact);
+        setPostStatus(nextStatus);
+        replaceMedia(response.data.media ?? []);
+        if (response.data.scheduledAt) {
+          setScheduleValue(localDateTimeValue(new Date(response.data.scheduledAt)));
+          setScheduleMode(true);
+        }
+        setStatusText(`Post · ${nextStatus.toLowerCase()}`);
+      })
+      .catch((reason) => {
+        if (!(reason instanceof DOMException && reason.name === "AbortError")) {
+          setLoadError(reason instanceof Error ? reason.message : "Unable to load this post.");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoadingPost(false);
+      });
+    return () => controller.abort();
+  }, [initialPostId, replaceMedia]);
+
   const account = useMemo(
     () => connectedAccounts.find((item) => item.id === selectedAccountId) ?? connectedAccounts[0],
     [connectedAccounts, selectedAccountId],
   );
   const mediaBlocked = media.some((item) => item.status !== "READY");
   const isBusy = pendingAction !== null || isMediaMutating;
-  const canSubmit = Boolean(postId && artifact && !mediaBlocked && !isBusy);
+  const isPublished = postStatus === "PUBLISHED";
+  const isScheduled = postStatus === "SCHEDULED";
+  const compositionLocked = isScheduled || isPublished;
+  const canSubmit = Boolean(postId && artifact && !mediaBlocked && !isBusy && !isPublished);
 
   async function attachArtifact(summary: ArtifactSummary) {
+    if (compositionLocked) return;
     if (!selectedAccountId) {
       setError("Connect and select a LinkedIn account before attaching an artifact.");
       return;
@@ -84,6 +156,7 @@ export default function CreatePostComposerClient({
       const createdId = response.data?._id ?? (response.data as { id?: string } | undefined)?.id ?? postId;
       if (!createdId) throw new Error("The post service did not return a draft ID.");
       setPostId(createdId);
+      setPostStatus("DRAFT");
       setArtifact(nextArtifact);
       replaceMedia(response.data?.media ?? media);
       setStatusText("1 artifact attached · ready to publish");
@@ -140,12 +213,28 @@ export default function CreatePostComposerClient({
     }
   }
 
-  const topbarActions = (
+  async function unschedulePost() {
+    if (!postId || !isScheduled) return;
+    setPendingAction("unschedule");
+    setError(null);
+    try {
+      await readApi(`${API_BASE}/posts/${postId}/unschedule`, { method: "POST" });
+      setPostStatus("DRAFT");
+      setScheduleMode(false);
+      setStatusText("Post · draft");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to unschedule this post.");
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  const topbarActions = !isPublished ? (
     <div className="mq-create-post-top-actions">
       <button type="button" className="mq-secondary-button mq-create-post-schedule-top" disabled={!postId || isBusy} onClick={() => setScheduleMode(true)}><CalendarClock size={16} /> Schedule</button>
       <button type="button" className="mq-primary-button" disabled={!canSubmit} onClick={() => void publishNow()}>{pendingAction === "publish" ? <LoaderCircle className="mq-spin" size={16} /> : <Send size={16} />}<span>Publish now</span></button>
     </div>
-  );
+  ) : null;
 
   return (
     <RedesignShell
@@ -155,16 +244,19 @@ export default function CreatePostComposerClient({
       onSelectAccount={setSelectedAccountId}
       subscription={subscription}
       active="posts"
-      title="New post"
-      topbar={{ back: { href: "/posts", label: "Back to posts" }, subtitle: artifact ? "1 artifact attached" : "Attach an artifact to continue", minimal: true }}
+      title={isEditing ? "Edit post" : "New post"}
+      topbar={{ back: { href: "/posts", label: "Back to posts" }, subtitle: postStatus ? `Post · ${postStatus.toLowerCase()}` : artifact ? "1 artifact attached" : "Attach an artifact to continue", minimal: true }}
       topbarExtra={topbarActions}
       showAccountSelector={false}
       hideMobileNav
     >
       <div className="mq-create-post-page">
         {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}
+        {loadError ? <div className="mq-alert mq-alert-error" role="alert">{loadError}</div> : null}
 
-        <div className="mq-create-post-grid">
+        {isLoadingPost ? (
+          <div className="mq-card mq-create-post-empty" aria-busy="true"><LoaderCircle className="mq-spin" size={24} /><h2>Loading post</h2><p>Restoring the pinned artifact, media, and publishing details…</p></div>
+        ) : loadError ? null : <div className="mq-create-post-grid">
           <section className="mq-create-post-compose">
             <div className="mq-create-post-intro">
               <div><h1>Compose post</h1><span className="mq-mono">artifact → media → publish</span></div>
@@ -178,9 +270,17 @@ export default function CreatePostComposerClient({
                   ariaLabel="Connected LinkedIn account"
                   options={connectedAccounts.map((item) => ({ value: item.id, label: item.displayName ?? "LinkedIn account" }))}
                 />
-                {postId ? <small>Account locked to this draft</small> : null}
+                {postId ? <small>Account locked to this post</small> : null}
               </label>
             </div>
+
+            {isScheduled ? (
+              <div className="mq-alert mq-composer-lock-notice">
+                <span>This post is scheduled. Unschedule it before changing the artifact or media.</span>
+                <button type="button" className="mq-secondary-button mq-button-small" disabled={isBusy} onClick={() => void unschedulePost()}>{pendingAction === "unschedule" ? "Unscheduling…" : "Unschedule to edit"}</button>
+              </div>
+            ) : null}
+            {isPublished ? <div className="mq-alert mq-composer-lock-notice"><span>This post has been published and is available here as a read-only composition.</span></div> : null}
 
             {!connectedAccounts.length ? (
               <div className="mq-card mq-create-post-empty"><FileText size={24} /><h2>Connect LinkedIn to publish</h2><p>A connected personal account or organization page is required before attaching an artifact.</p><LinkedInConnectButton className="mq-primary-button">Connect LinkedIn</LinkedInConnectButton></div>
@@ -191,9 +291,11 @@ export default function CreatePostComposerClient({
             ) : (
               <AttachedArtifactComposition
                 artifact={artifact}
-                busy={isBusy}
+                busy={isBusy || compositionLocked}
+                canSwap={!compositionLocked}
+                readOnly={compositionLocked}
                 onSwap={() => setIsArtifactPickerOpen(true)}
-                mediaControls={artifact.type === "POST" ? <PostMediaControls error={mediaError} isBusy={isBusy} media={media} previewUrls={previewUrls} onChooseStock={setStockProvider} onRefresh={() => void refreshMedia()} onRemove={(item) => void removeMedia(item)} onUpload={uploadFiles} /> : undefined}
+                mediaControls={artifact.type === "POST" ? <PostMediaControls error={mediaError} isBusy={isBusy} readOnly={compositionLocked} media={media} previewUrls={previewUrls} onChooseStock={setStockProvider} onRefresh={() => void refreshMedia()} onRemove={(item) => void removeMedia(item)} onUpload={uploadFiles} /> : undefined}
               />
             )}
           </section>
@@ -201,15 +303,15 @@ export default function CreatePostComposerClient({
           <aside className="mq-create-post-sidebar">
             {artifact ? <><span className="mq-mono">_ linkedin preview</span><div className="mq-desktop-composition-preview"><PostCompositionPreview user={user} account={account} artifact={artifact} media={media} previewUrls={previewUrls} /></div><div className="mq-mobile-preview-wrap"><button type="button" onClick={() => setIsMobilePreviewOpen((value) => !value)} aria-expanded={isMobilePreviewOpen}>LinkedIn preview <ChevronDown className={isMobilePreviewOpen ? "is-open" : ""} size={16} /></button>{isMobilePreviewOpen ? <PostCompositionPreview user={user} account={account} artifact={artifact} media={media} previewUrls={previewUrls} /> : null}</div></> : null}
 
-            {postId ? <PostSchedulingControls canSubmit={canSubmit} isBusy={isBusy} isScheduling={pendingAction === "schedule"} scheduleMode={scheduleMode} scheduleValue={scheduleValue} onChange={setScheduleValue} onConfirm={() => void confirmSchedule()} onModeChange={setScheduleMode} /> : null}
+            {postId && !isPublished ? <PostSchedulingControls canSubmit={canSubmit} isBusy={isBusy} isScheduling={pendingAction === "schedule"} scheduleMode={scheduleMode} scheduleValue={scheduleValue} onChange={setScheduleValue} onConfirm={() => void confirmSchedule()} onModeChange={setScheduleMode} /> : null}
           </aside>
-        </div>
+        </div>}
 
         <span className="mq-create-post-status" aria-live="polite">{statusText}</span>
       </div>
 
-      <PostArtifactPicker isOpen={isArtifactPickerOpen} hasMedia={media.length > 0} busy={isBusy} onClose={() => setIsArtifactPickerOpen(false)} onSelect={(item) => void attachArtifact(item)} />
-      {stockProvider ? <StockImagePicker provider={stockProvider} onClose={() => setStockProvider(null)} onSelect={(image) => void selectStockImage(image)} /> : null}
+      <PostArtifactPicker isOpen={isArtifactPickerOpen && !compositionLocked} hasMedia={media.length > 0} busy={isBusy} onClose={() => setIsArtifactPickerOpen(false)} onSelect={(item) => void attachArtifact(item)} />
+      {stockProvider && !compositionLocked ? <StockImagePicker provider={stockProvider} onClose={() => setStockProvider(null)} onSelect={(image) => void selectStockImage(image)} /> : null}
     </RedesignShell>
   );
 }

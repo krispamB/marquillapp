@@ -12,6 +12,7 @@ import {
   GalleryHorizontal,
   Layers3,
   Plus,
+  Search,
   Trash2,
   type LucideProps,
 } from "lucide-react";
@@ -394,6 +395,8 @@ export default function ArtifactsRedesignClient({
   const [artifacts, setArtifacts] = useState<ArtifactSummary[]>([]);
   const [filter, setFilter] = useState<ArtifactFilter>("ALL");
   const [month, setMonth] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
@@ -418,14 +421,29 @@ export default function ArtifactsRedesignClient({
   }, []);
 
   useEffect(() => {
+    const nextSearch = searchInput.trim();
+    if (nextSearch === search) return;
+    const timer = window.setTimeout(() => {
+      abortDetailRequests();
+      setIsLoading(true);
+      setError(null);
+      setPage(1);
+      setSearch(nextSearch);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [abortDetailRequests, search, searchInput]);
+
+  useEffect(() => {
     const controller = new AbortController();
 
     const params = new URLSearchParams({ page: String(page) });
     if (filter !== "ALL") params.set("type", filter);
     if (month) params.set("month", month);
+    if (search) params.set("search", search);
 
     readApi<ArtifactsListResponse>(`${API_BASE}/artifacts?${params.toString()}`, { signal: controller.signal })
       .then((response) => {
+        setError(null);
         setArtifacts(Array.isArray(response?.data) ? response.data : []);
         setAvailableMonths(Array.isArray(response?.filters?.availableMonths) ? response.filters.availableMonths : []);
         setPages(Math.max(1, response?.pages ?? 1));
@@ -442,7 +460,7 @@ export default function ArtifactsRedesignClient({
       });
 
     return () => controller.abort();
-  }, [abortDetailRequests, filter, month, page, reloadKey]);
+  }, [abortDetailRequests, filter, month, page, reloadKey, search]);
 
   useEffect(() => () => abortDetailRequests(false), [abortDetailRequests]);
 
@@ -497,6 +515,17 @@ export default function ArtifactsRedesignClient({
     setPage(nextPage);
   }
 
+  function clearFilters() {
+    abortDetailRequests();
+    setIsLoading(true);
+    setError(null);
+    setFilter("ALL");
+    setMonth("");
+    setSearchInput("");
+    setSearch("");
+    setPage(1);
+  }
+
   async function confirmDeleteArtifact() {
     if (!deleteArtifact) return;
     setIsDeleting(true);
@@ -532,6 +561,18 @@ export default function ArtifactsRedesignClient({
       active="artifacts"
       title="Artifacts"
       topbar={{ credits: {} }}
+      topbarExtra={(
+        <label className="mq-search-field mq-search-desktop">
+          <Search size={15} />
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Search artifacts…"
+            aria-label="Search artifacts"
+          />
+        </label>
+      )}
       showAccountSelector={false}
     >
       <div className="mq-toolbar mq-artifact-toolbar">
@@ -550,6 +591,16 @@ export default function ArtifactsRedesignClient({
           ))}
         </div>
         <div className="mq-artifact-toolbar-actions">
+          <label className="mq-filter-select mq-search-mobile mq-artifact-mobile-search">
+            <Search size={14} />
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Search artifacts"
+              aria-label="Search artifacts"
+            />
+          </label>
           <label className="mq-filter-select mq-artifact-month-filter">
             <CalendarDays size={14} />
             <span className="sr-only">Filter artifacts by month</span>
@@ -562,7 +613,7 @@ export default function ArtifactsRedesignClient({
               ))}
             </select>
           </label>
-          {artifacts.length ? <CreateArtifactLink /> : null}
+          {artifacts.length || filter !== "ALL" || Boolean(month) || Boolean(search) ? <CreateArtifactLink /> : null}
         </div>
       </div>
 
@@ -570,14 +621,14 @@ export default function ArtifactsRedesignClient({
       {isLoading ? <ArtifactGridSkeleton /> : null}
 
       {!isLoading && !error && !artifacts.length ? (
-        filter === "ALL" && !month ? (
+        filter === "ALL" && !month && !search ? (
           <ArtifactEmptyState />
         ) : (
           <div className="mq-card mq-artifact-filter-empty">
             <Layers3 size={24} />
             <h2>No artifacts match this view</h2>
-            <p>Try another artifact type or month.</p>
-            <button type="button" className="mq-secondary-button" onClick={() => { changeFilter("ALL"); changeMonth(""); }}>Clear filters</button>
+            <p>Try another search, artifact type, or month.</p>
+            <button type="button" className="mq-secondary-button" onClick={clearFilters}>Clear filters</button>
           </div>
         )
       ) : null}

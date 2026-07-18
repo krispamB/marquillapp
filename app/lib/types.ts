@@ -276,19 +276,23 @@ export type PostDetailData = {
   connectedAccount?: {
     _id?: string;
     displayName?: string;
-    accountType?: "PERSON" | "ORGANIZATION";
+    accountType?: ConnectedAccountType | "PERSON";
   };
   artifacts?: Array<{
     artifact?: {
       _id?: string;
       type?: string;
       title?: string;
+      source?: {
+        prompt?: string;
+      };
     };
     version?: {
       version?: number;
       status?: string;
       content?: ArtifactContent;
       createdAt?: string;
+      editedAt?: string;
     };
   }>;
 };

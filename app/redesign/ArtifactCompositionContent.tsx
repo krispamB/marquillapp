@@ -49,22 +49,26 @@ export function ArtifactContentView({ artifact, variant }: { artifact: ArtifactD
 export default function AttachedArtifactComposition({
   artifact,
   busy,
+  canSwap = true,
+  readOnly = false,
   onSwap,
   mediaControls,
 }: {
   artifact: ArtifactDetailData;
   busy: boolean;
+  canSwap?: boolean;
+  readOnly?: boolean;
   onSwap: () => void;
   mediaControls?: ReactNode;
 }) {
   return (
     <>
       <article className="mq-card mq-attached-artifact">
-        <header><span className="mq-mono">_ attached artifact</span><button type="button" onClick={onSwap} disabled={busy}>Swap</button></header>
+        <header><span className="mq-mono">_ attached artifact</span>{canSwap ? <button type="button" onClick={onSwap} disabled={busy}>Swap</button> : null}</header>
         <div><span className={`mq-artifact-pick-icon is-${artifact.type.toLowerCase()}`}><FileText size={18} /></span><span><strong>{artifact.title?.trim() || "Untitled artifact"}</strong><small><b>{artifact.type}</b> · v{artifact.version}</small><p>{artifactSummaryCopy(artifact)}</p></span></div>
       </article>
       <article className="mq-card mq-readonly-artifact-content">
-        <header><strong>{contentLabels[artifact.type]}</strong><Link href={`/artifacts/${encodeURIComponent(artifact.id)}`}>Edit in Studio</Link><span className="mq-mono">{artifact.content.commentary?.length ?? 0}/3000</span></header>
+        <header><strong>{contentLabels[artifact.type]}</strong>{!readOnly ? <Link href={`/artifacts/${encodeURIComponent(artifact.id)}`}>Edit in Studio</Link> : null}<span className="mq-mono">{artifact.content.commentary?.length ?? 0}/3000</span></header>
         <ArtifactContentView artifact={artifact} variant="composer" />
         {mediaControls}
       </article>
