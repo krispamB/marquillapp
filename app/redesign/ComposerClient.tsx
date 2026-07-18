@@ -14,6 +14,7 @@ import MarquillMark from "../../components/brand/MarquillMark";
 import MarquillSelect from "../../components/ui/MarquillSelect";
 import { StylePreset } from "../lib/types";
 import type { ConnectedAccount, CreateDraftRequest, CreateDraftResponse, DraftStatusResponse, PostDetailResponse, SubscriptionTier, UserProfile } from "../lib/types";
+import { canUseResearch } from "./tier-access";
 
 type ComposerMode = "create" | "edit";
 type Action = "draft" | "publish" | "schedule";
@@ -60,6 +61,7 @@ export default function ComposerRedesignClient({
   const [mediaPreviewUrl, setMediaPreviewUrl] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
   const [stockProvider, setStockProvider] = useState<"pexels" | "unsplash" | null>(null);
+  const researchAvailable = canUseResearch(subscription ?? user.tier);
 
   const account = useMemo(
     () => connectedAccounts.find((item) => item.id === selectedAccountId) ?? connectedAccounts[0],
@@ -101,7 +103,12 @@ export default function ComposerRedesignClient({
     setError(null);
     setStatusText("Mark is starting your draft…");
     try {
-      const input = [prompt.trim(), youtubeUrl.trim() ? `Research this YouTube link: ${youtubeUrl.trim()}` : ""].filter(Boolean).join("\n\n");
+      const input = [
+        prompt.trim(),
+        researchAvailable && youtubeUrl.trim()
+          ? `Research this YouTube link: ${youtubeUrl.trim()}`
+          : "",
+      ].filter(Boolean).join("\n\n");
       const created = await readApi<CreateDraftResponse>(
         `${API_BASE}/posts/${selectedAccountId}/draft`,
         jsonRequest({ input, contentType: postType, stylePreset }, { method: "POST" }),
@@ -236,7 +243,7 @@ export default function ComposerRedesignClient({
           <div className="mq-card mq-chat-card">
             <div className="mq-chat-label"><MarquillMark size={22} theme="light" className="mq-ask-mark-small-svg" title="" /><span className="mq-mono">mark · conversation</span></div>
             <textarea className="mq-chat-input" value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Turn our Series A closing into an insight post. Keep my voice." rows={3} />
-            <div className="mq-research-row"><input className="mq-input" value={youtubeUrl} onChange={(event) => setYoutubeUrl(event.target.value)} placeholder="Add a YouTube link for research (optional)" /><button type="button" className="mq-chip-button" onClick={() => void generateDraft()} disabled={pendingAction !== null}><Sparkles size={14} /> {pendingAction === "generate" ? "Mark is drafting…" : "Generate"}</button></div>
+            <div className="mq-research-row"><input className="mq-input" value={youtubeUrl} onChange={(event) => setYoutubeUrl(event.target.value)} placeholder={researchAvailable ? "Add a YouTube link for research (optional)" : "Research is available on paid plans"} disabled={!researchAvailable} title={researchAvailable ? undefined : "Upgrade your plan to use research"} /><button type="button" className="mq-chip-button" onClick={() => void generateDraft()} disabled={pendingAction !== null}><Sparkles size={14} /> {pendingAction === "generate" ? "Mark is drafting…" : "Generate"}</button></div>
             <div className="mq-chat-status"><span className="mq-live-dot" /> {statusText}</div>
           </div>
 

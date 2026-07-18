@@ -539,6 +539,8 @@ html[data-theme="dark"] .mq-schedule-popover { --canvas:#0c0c0b;--canvas-sub:#18
 .mq-artifact-research-toggle { display: inline-flex; min-height: 34px; align-items: center; gap: 7px; padding: 0 10px 0 7px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--ink-500); font: 600 11.5px var(--font-inter); cursor: pointer; transition: border-color .18s ease, background-color .18s ease, color .18s ease; }
 .mq-artifact-research-toggle:hover { border-color: var(--line-strong); color: var(--ink-800); }
 .mq-artifact-research-toggle.is-active { border-color: color-mix(in srgb, var(--accent) 32%, var(--line)); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); color: var(--accent-ink); }
+.mq-artifact-research-toggle.is-locked { cursor: not-allowed; opacity: .58; }
+.mq-artifact-research-toggle.is-locked:hover { border-color: var(--line); color: var(--ink-500); }
 .mq-artifact-switch { width: 27px; height: 16px; padding: 2px; border-radius: 999px; background: var(--ink-300); transition: background-color .18s ease; }
 .mq-artifact-switch i { display: block; width: 12px; height: 12px; border-radius: 50%; background: var(--surface); box-shadow: var(--sh-xs); transition: transform .18s ease; }
 .mq-artifact-research-toggle.is-active .mq-artifact-switch { background: var(--accent); }

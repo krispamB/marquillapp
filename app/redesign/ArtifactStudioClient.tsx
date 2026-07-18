@@ -8,6 +8,7 @@ import {
   FileText,
   GalleryHorizontal,
   LoaderCircle,
+  LockKeyhole,
   Palette,
   PenLine,
   Search,
@@ -26,6 +27,7 @@ import type { ArtifactType, CreateArtifactResponse } from "./artifactTypes";
 import { readArtifactPrompt, storeArtifactPrompt } from "./artifactStudioStorage";
 import { API_BASE, jsonRequest, readApi } from "./api";
 import RedesignShell from "./Shell";
+import { canUseResearch } from "./tier-access";
 
 type CarouselTheme = "bold" | "minimal" | "editorial" | "gradient";
 
@@ -79,6 +81,7 @@ export default function ArtifactStudioClient({
   const [theme, setTheme] = useState<CarouselTheme>("minimal");
   const [isCreating, setIsCreating] = useState(false);
   const [creationError, setCreationError] = useState<string | null>(null);
+  const researchAvailable = canUseResearch(subscription ?? user.tier);
   const isReady = Boolean(type && prompt.trim());
   const selectedArtifact = artifactOptions.find((option) => option.type === type);
 
@@ -101,7 +104,7 @@ export default function ArtifactStudioClient({
         jsonRequest({
           type,
           prompt: trimmedPrompt,
-          withResearch,
+          withResearch: researchAvailable && withResearch,
           ...(type === "POST" ? { stylePreset } : {}),
           ...(type === "DOCUMENT" ? { theme } : {}),
         }, { method: "POST" }),
@@ -163,12 +166,15 @@ export default function ArtifactStudioClient({
                     type="button"
                     role="switch"
                     aria-checked={withResearch}
-                    className={`mq-artifact-research-toggle${withResearch ? " is-active" : ""}`}
+                    className={`mq-artifact-research-toggle${withResearch ? " is-active" : ""}${!researchAvailable ? " is-locked" : ""}`}
                     onClick={() => setWithResearch((current) => !current)}
+                    disabled={!researchAvailable}
+                    title={researchAvailable ? "Add web research" : "Research is available on paid plans"}
                   >
                     <span className="mq-artifact-switch" aria-hidden="true"><i /></span>
                     <Search size={14} />
                     Research
+                    {!researchAvailable ? <LockKeyhole size={12} aria-hidden="true" /> : null}
                   </button>
 
                   {selectedArtifact ? (
