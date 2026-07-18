@@ -125,6 +125,13 @@ export async function getDashboardInitialData(
   };
 }
 
+export function getPostDetail(serverAuth: ServerAuth, postId: string) {
+  return readServerApi<PostDetailResponse>(
+    `/posts/${encodeURIComponent(postId)}`,
+    serverAuth,
+  );
+}
+
 export function getCachedUser(serverAuth: ServerAuth, cacheKey: string) {
   const readUser = unstable_cache(
     async () => {

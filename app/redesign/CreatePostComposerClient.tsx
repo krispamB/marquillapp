@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CalendarClock, ChevronDown, FileText, LoaderCircle, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import MarquillSelect from "../../components/ui/MarquillSelect";
 import type {
   ConnectedAccount,
-  PostDetailData,
-  PostDetailResponse,
   PostMutationResponse,
   PostStatus,
   SubscriptionTier,
@@ -25,63 +23,37 @@ import { getDefaultScheduleDate, localDateTimeValue } from "./SchedulePicker";
 import StockImagePicker from "./StockImagePicker";
 import LinkedInConnectButton from "./LinkedInConnectButton";
 import usePostMediaWorkflow from "./usePostMediaWorkflow";
+import type { InitialPostComposerData } from "./postComposer";
 
 type PendingAction = "attach" | "publish" | "schedule" | "unschedule" | null;
 type StockProvider = "pexels" | "unsplash";
-
-function normalizePostStatus(value?: string): PostStatus {
-  const status = String(value ?? "DRAFT").toUpperCase();
-  if (status === "FAILED" || status === "SCHEDULED" || status === "PUBLISHED") return status;
-  return "DRAFT";
-}
-
-function pinnedArtifactFromPost(post: PostDetailData): ArtifactDetailData {
-  const reference = post.artifacts?.[0];
-  const artifact = reference?.artifact;
-  const version = reference?.version;
-  const type = artifact?.type;
-  if (!artifact?._id || (type !== "POST" && type !== "POLL" && type !== "DOCUMENT") || !version?.version || !version.content) {
-    throw new Error("This post does not include a usable pinned artifact version.");
-  }
-  const status = version.status === "FAILED" || version.status === "GENERATING" ? version.status : "READY";
-  return {
-    id: artifact._id,
-    type,
-    title: artifact.title?.trim() || artifact.source?.prompt?.trim() || undefined,
-    currentVersion: version.version,
-    version: version.version,
-    status,
-    updatedAt: version.editedAt ?? version.createdAt ?? post.updatedAt,
-    content: version.content,
-  };
-}
 
 export default function CreatePostComposerClient({
   user,
   connectedAccounts,
   subscription,
-  initialPostId,
+  initialPost,
+  initialLoadError,
 }: {
   user: UserProfile;
   connectedAccounts: ConnectedAccount[];
   subscription?: SubscriptionTier | null;
-  initialPostId?: string;
+  initialPost?: InitialPostComposerData;
+  initialLoadError?: string;
 }) {
-  const isEditing = Boolean(initialPostId);
+  const isEditing = Boolean(initialPost || initialLoadError);
   const router = useRouter();
-  const [selectedAccountId, setSelectedAccountId] = useState(connectedAccounts[0]?.id ?? "");
-  const [postId, setPostId] = useState<string | undefined>(initialPostId);
-  const [postStatus, setPostStatus] = useState<PostStatus>();
-  const [artifact, setArtifact] = useState<ArtifactDetailData>();
-  const [isLoadingPost, setIsLoadingPost] = useState(isEditing);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState(initialPost?.account.id ?? connectedAccounts[0]?.id ?? "");
+  const [postId, setPostId] = useState<string | undefined>(initialPost?.id);
+  const [postStatus, setPostStatus] = useState<PostStatus | undefined>(initialPost?.status);
+  const [artifact, setArtifact] = useState<ArtifactDetailData | undefined>(initialPost?.artifact);
   const [isArtifactPickerOpen, setIsArtifactPickerOpen] = useState(false);
   const [stockProvider, setStockProvider] = useState<StockProvider | null>(null);
-  const [scheduleMode, setScheduleMode] = useState(false);
+  const [scheduleMode, setScheduleMode] = useState(Boolean(initialPost?.scheduledAt));
   const [isMobilePreviewOpen, setIsMobilePreviewOpen] = useState(false);
-  const [scheduleValue, setScheduleValue] = useState(localDateTimeValue(getDefaultScheduleDate()));
+  const [scheduleValue, setScheduleValue] = useState(() => localDateTimeValue(initialPost?.scheduledAt ? new Date(initialPost.scheduledAt) : getDefaultScheduleDate()));
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
-  const [statusText, setStatusText] = useState(isEditing ? "Loading saved post…" : "Choose an account and attach an artifact");
+  const [statusText, setStatusText] = useState(initialPost ? `Post · ${initialPost.status.toLowerCase()}` : "Choose an account and attach an artifact");
   const [error, setError] = useState<string | null>(null);
   const {
     error: mediaError,
@@ -92,44 +64,25 @@ export default function CreatePostComposerClient({
     removeMedia,
     replaceMedia,
     uploadFiles,
-  } = usePostMediaWorkflow({ postId, artifactType: artifact?.type, onStatus: setStatusText });
-
-  useEffect(() => {
-    if (!initialPostId) return;
-    const controller = new AbortController();
-    setIsLoadingPost(true);
-    setLoadError(null);
-    readApi<PostDetailResponse>(`${API_BASE}/posts/${encodeURIComponent(initialPostId)}`, { signal: controller.signal })
-      .then((response) => {
-        if (!response.data) throw new Error("The saved post was unavailable.");
-        const nextArtifact = pinnedArtifactFromPost(response.data);
-        const nextStatus = normalizePostStatus(response.data.status);
-        const accountId = response.data.connectedAccount?._id;
-        if (accountId) setSelectedAccountId(accountId);
-        setArtifact(nextArtifact);
-        setPostStatus(nextStatus);
-        replaceMedia(response.data.media ?? []);
-        if (response.data.scheduledAt) {
-          setScheduleValue(localDateTimeValue(new Date(response.data.scheduledAt)));
-          setScheduleMode(true);
-        }
-        setStatusText(`Post · ${nextStatus.toLowerCase()}`);
-      })
-      .catch((reason) => {
-        if (!(reason instanceof DOMException && reason.name === "AbortError")) {
-          setLoadError(reason instanceof Error ? reason.message : "Unable to load this post.");
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoadingPost(false);
-      });
-    return () => controller.abort();
-  }, [initialPostId, replaceMedia]);
+  } = usePostMediaWorkflow({ postId, artifactType: artifact?.type, initialMedia: initialPost?.media, onStatus: setStatusText });
 
   const account = useMemo(
-    () => connectedAccounts.find((item) => item.id === selectedAccountId) ?? connectedAccounts[0],
-    [connectedAccounts, selectedAccountId],
+    () => {
+      const currentAccount = connectedAccounts.find((item) => item.id === selectedAccountId);
+      if (!initialPost?.account || initialPost.account.id !== selectedAccountId) return currentAccount ?? connectedAccounts[0];
+      if (!currentAccount) return initialPost.account;
+      return {
+        ...initialPost.account,
+        ...currentAccount,
+        profile: { ...initialPost.account.profile, ...currentAccount.profile },
+      };
+    },
+    [connectedAccounts, initialPost, selectedAccountId],
   );
+  const accountOptions = useMemo(() => {
+    if (!initialPost?.account || connectedAccounts.some((item) => item.id === initialPost.account.id)) return connectedAccounts;
+    return [initialPost.account, ...connectedAccounts];
+  }, [connectedAccounts, initialPost]);
   const mediaBlocked = media.some((item) => item.status !== "READY");
   const isBusy = pendingAction !== null || isMediaMutating;
   const isPublished = postStatus === "PUBLISHED";
@@ -252,11 +205,9 @@ export default function CreatePostComposerClient({
     >
       <div className="mq-create-post-page">
         {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}
-        {loadError ? <div className="mq-alert mq-alert-error" role="alert">{loadError}</div> : null}
+        {initialLoadError ? <div className="mq-alert mq-alert-error" role="alert">{initialLoadError}</div> : null}
 
-        {isLoadingPost ? (
-          <div className="mq-card mq-create-post-empty" aria-busy="true"><LoaderCircle className="mq-spin" size={24} /><h2>Loading post</h2><p>Restoring the pinned artifact, media, and publishing details…</p></div>
-        ) : loadError ? null : <div className="mq-create-post-grid">
+        {initialLoadError ? null : <div className="mq-create-post-grid">
           <section className="mq-create-post-compose">
             <div className="mq-create-post-intro">
               <div><h1>Compose post</h1><span className="mq-mono">artifact → media → publish</span></div>
@@ -268,7 +219,7 @@ export default function CreatePostComposerClient({
                   disabled={Boolean(postId)}
                   placeholder="Choose account"
                   ariaLabel="Connected LinkedIn account"
-                  options={connectedAccounts.map((item) => ({ value: item.id, label: item.displayName ?? "LinkedIn account" }))}
+                  options={accountOptions.map((item) => ({ value: item.id, label: item.displayName ?? "LinkedIn account" }))}
                 />
                 {postId ? <small>Account locked to this post</small> : null}
               </label>
@@ -282,7 +233,7 @@ export default function CreatePostComposerClient({
             ) : null}
             {isPublished ? <div className="mq-alert mq-composer-lock-notice"><span>This post has been published and is available here as a read-only composition.</span></div> : null}
 
-            {!connectedAccounts.length ? (
+            {!artifact && !connectedAccounts.length ? (
               <div className="mq-card mq-create-post-empty"><FileText size={24} /><h2>Connect LinkedIn to publish</h2><p>A connected personal account or organization page is required before attaching an artifact.</p><LinkedInConnectButton className="mq-primary-button">Connect LinkedIn</LinkedInConnectButton></div>
             ) : !artifact ? (
               <button type="button" className="mq-card mq-attach-artifact-empty" onClick={() => setIsArtifactPickerOpen(true)}>

@@ -35,13 +35,15 @@ export function mediaStatusLabel(item: PostMediaItem) {
 export default function usePostMediaWorkflow({
   postId,
   artifactType,
+  initialMedia = [],
   onStatus,
 }: {
   postId?: string;
   artifactType?: ArtifactType;
+  initialMedia?: PostMediaItem[];
   onStatus: (message: string) => void;
 }) {
-  const [media, setMedia] = useState<PostMediaItem[]>([]);
+  const [media, setMedia] = useState<PostMediaItem[]>(initialMedia);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [isMutating, setIsMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);

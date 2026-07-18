@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, ChevronLeft, ChevronRight, FileText, Search, X } from "lucide-react";
 import MarquillSelect from "../../components/ui/MarquillSelect";
 import { API_BASE, readApi } from "./api";
+import useDebouncedSearch from "./useDebouncedSearch";
 import type { ArtifactSummary, ArtifactType, ArtifactsListResponse } from "./artifactTypes";
 
 type ArtifactFilter = "ALL" | ArtifactType;
@@ -49,25 +50,18 @@ export default function PostArtifactPicker({
   const [artifacts, setArtifacts] = useState<ArtifactSummary[]>([]);
   const [filter, setFilter] = useState<ArtifactFilter>("ALL");
   const [month, setMonth] = useState("ALL");
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const nextSearch = searchInput.trim();
-    if (nextSearch === search) return;
-    const timer = window.setTimeout(() => {
-      setIsLoading(true);
-      setError(null);
-      setPage(1);
-      setSearch(nextSearch);
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [search, searchInput]);
+  const prepareSearch = useCallback(() => {
+    setIsLoading(true);
+    setError(null);
+    setPage(1);
+  }, []);
+  const { search, searchInput, setSearchInput } = useDebouncedSearch(prepareSearch);
 
   useEffect(() => {
     if (!isOpen) return;

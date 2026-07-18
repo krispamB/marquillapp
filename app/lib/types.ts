@@ -275,8 +275,14 @@ export type PostDetailData = {
   updatedAt?: string;
   connectedAccount?: {
     _id?: string;
+    provider?: ConnectedAccountProvider;
     displayName?: string;
     accountType?: ConnectedAccountType | "PERSON";
+    avatarUrl?: string;
+    vanityName?: string;
+    headline?: string;
+    profile?: ConnectedAccountProfile;
+    isActive?: boolean;
   };
   artifacts?: Array<{
     artifact?: {

@@ -20,6 +20,7 @@ import MarquillMark from "../../components/brand/MarquillMark";
 import ArtifactDeleteConfirmModal from "./ArtifactDeleteConfirmModal";
 import RedesignShell from "./Shell";
 import { API_BASE, deleteArtifactRequest, readApi } from "./api";
+import useDebouncedSearch from "./useDebouncedSearch";
 import { formatRelativeDate } from "./types";
 import type {
   ConnectedAccount,
@@ -395,8 +396,6 @@ export default function ArtifactsRedesignClient({
   const [artifacts, setArtifacts] = useState<ArtifactSummary[]>([]);
   const [filter, setFilter] = useState<ArtifactFilter>("ALL");
   const [month, setMonth] = useState("");
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
@@ -420,18 +419,13 @@ export default function ArtifactsRedesignClient({
     }
   }, []);
 
-  useEffect(() => {
-    const nextSearch = searchInput.trim();
-    if (nextSearch === search) return;
-    const timer = window.setTimeout(() => {
-      abortDetailRequests();
-      setIsLoading(true);
-      setError(null);
-      setPage(1);
-      setSearch(nextSearch);
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [abortDetailRequests, search, searchInput]);
+  const prepareSearch = useCallback(() => {
+    abortDetailRequests();
+    setIsLoading(true);
+    setError(null);
+    setPage(1);
+  }, [abortDetailRequests]);
+  const { clearSearch, search, searchInput, setSearchInput } = useDebouncedSearch(prepareSearch);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -521,8 +515,7 @@ export default function ArtifactsRedesignClient({
     setError(null);
     setFilter("ALL");
     setMonth("");
-    setSearchInput("");
-    setSearch("");
+    clearSearch();
     setPage(1);
   }
 
