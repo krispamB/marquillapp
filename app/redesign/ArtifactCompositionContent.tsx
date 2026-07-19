@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { FileText } from "lucide-react";
+import PdfPreview from "../../components/pdf/PdfPreview";
 import type { ArtifactDetailData } from "./artifactTypes";
 import { artifactTypeIcons } from "./artifactPresentation";
 import { truncatePostPreview } from "./postPreviewCutoff";
@@ -53,14 +54,25 @@ export function ArtifactContentView({ artifact }: { artifact: ArtifactDetailData
         </div>
       ) : null}
       {document ? (
-        <div className="mq-preview-document">
-          <FileText size={28} />
-          <span>
-            <strong>{artifact.title?.trim() || "LinkedIn document"}</strong>
-            <small>{document.pageCount ?? document.slides.length} pages · PDF</small>
-          </span>
-          {document.pdfUrl ? <a href={document.pdfUrl} target="_blank" rel="noreferrer">Preview PDF</a> : null}
-        </div>
+        document.pdfUrl ? (
+          <PdfPreview
+            source={document.pdfUrl}
+            title={artifact.title?.trim() || "LinkedIn document"}
+            pageCountHint={document.pageCount ?? document.slides.length}
+            openHref={document.pdfUrl}
+            ariaLabel={`${artifact.title?.trim() || "LinkedIn document"} carousel preview`}
+            className="mq-pdf-preview-composition"
+          />
+        ) : (
+          <div className="mq-preview-document">
+            <FileText size={28} />
+            <span>
+              <strong>{artifact.title?.trim() || "LinkedIn document"}</strong>
+              <small>{document.pageCount ?? document.slides.length} pages · PDF</small>
+            </span>
+            <small>PDF preview unavailable</small>
+          </div>
+        )
       ) : null}
     </>
   );

@@ -3,7 +3,6 @@
 import {
   BarChart3,
   Coins,
-  ExternalLink,
   FileText,
   GalleryHorizontal,
   LoaderCircle,
@@ -15,6 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
+import PdfPreview from "../../components/pdf/PdfPreview";
 import type {
   ArtifactDetailData,
   ArtifactType,
@@ -72,20 +72,26 @@ function DocumentResponse({ artifact }: { artifact: ArtifactDetailData }) {
   const document = artifact.content.document;
 
   return (
-    <div className="mq-studio-document-copy">
-      <div className="mq-studio-document-icon"><FileText size={22} /></div>
-      <div>
-        <strong>{artifact.title?.trim() || "Your carousel is ready"}</strong>
-        {commentary ? <p>{commentary}</p> : null}
-        <span>{document?.pageCount ?? document?.slides.length ?? 0} pages</span>
+    <div className="mq-studio-document-response">
+      <div className="mq-studio-document-copy">
+        <div className="mq-studio-document-icon"><FileText size={22} /></div>
+        <div>
+          <strong>{artifact.title?.trim() || "Your carousel is ready"}</strong>
+          {commentary ? <p>{commentary}</p> : null}
+          <span>{document?.pageCount ?? document?.slides.length ?? 0} pages</span>
+        </div>
+        {!document?.pdfUrl ? <span className="mq-studio-pdf-pending">PDF link unavailable</span> : null}
       </div>
       {document?.pdfUrl ? (
-        <a href={document.pdfUrl} target="_blank" rel="noreferrer">
-          Open PDF <ExternalLink size={14} />
-        </a>
-      ) : (
-        <span className="mq-studio-pdf-pending">PDF link unavailable</span>
-      )}
+        <PdfPreview
+          source={document.pdfUrl}
+          title={artifact.title?.trim() || "Your carousel is ready"}
+          pageCountHint={document.pageCount ?? document.slides.length}
+          openHref={document.pdfUrl}
+          ariaLabel={`${artifact.title?.trim() || "Carousel"} PDF preview`}
+          className="mq-pdf-preview-studio"
+        />
+      ) : null}
     </div>
   );
 }
