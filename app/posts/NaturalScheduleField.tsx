@@ -34,11 +34,11 @@ export default function NaturalScheduleField({
 
     useEffect(() => {
         if (!isFocused || text.trim()) return;
-        const id = window.setInterval(
+        const presetRotationTimer = window.setInterval(
             () => setPresetIndex((index) => (index + 1) % EMPTY_INPUT_PRESETS.length),
             3000,
         );
-        return () => window.clearInterval(id);
+        return () => window.clearInterval(presetRotationTimer);
     }, [isFocused, text]);
 
     const ghost = useMemo(() => {
