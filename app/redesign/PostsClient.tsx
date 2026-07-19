@@ -7,7 +7,7 @@ import RedesignShell from "./Shell";
 import { API_BASE, jsonRequest, readApi } from "./api";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import SchedulePicker, { getDefaultScheduleDate, localDateTimeValue } from "./SchedulePicker";
-import { formatRelativeDate, formatScheduledDate, getPostTitle, normalizeStatus, parseDate, toYearMonth } from "./types";
+import { formatRelativeDate, formatScheduledDate, getAccountInitials, getInitials, getPostTitle, normalizeStatus, parseDate, toYearMonth } from "./types";
 import type { ConnectedAccount, DashboardPost, DashboardPostsResponse, SubscriptionTier, UserProfile } from "../lib/types";
 
 type PostFilter = "ALL" | "DRAFT" | "SCHEDULED" | "PUBLISHED";
@@ -19,8 +19,8 @@ const filterLabels: Array<{ key: PostFilter; label: string }> = [
   { key: "PUBLISHED", label: "Published" },
 ];
 
-function compactTitle(content?: string) {
-  const title = getPostTitle(content);
+function compactTitle(post: DashboardPost) {
+  const title = post.title?.trim() || getPostTitle(post.content);
   return title.length > 150 ? `${title.slice(0, 147)}…` : title;
 }
 
@@ -88,7 +88,7 @@ export default function PostsRedesignClient({
     const query = search.trim().toLowerCase();
     return posts
       .filter((post) => filter === "ALL" || normalizeStatus(post.status) === filter)
-      .filter((post) => !query || String(post.content ?? "").toLowerCase().includes(query))
+      .filter((post) => !query || `${post.title ?? ""}\n${post.content ?? ""}`.toLowerCase().includes(query))
       .sort((a, b) => (parseDate(b.updatedAt ?? b.scheduledAt ?? b.createdAt)?.getTime() ?? 0) - (parseDate(a.updatedAt ?? a.scheduledAt ?? a.createdAt)?.getTime() ?? 0));
   }, [filter, posts, search]);
 
@@ -181,12 +181,20 @@ export default function PostsRedesignClient({
         {visiblePosts.map((post) => {
           const status = normalizeStatus(post.status);
           const dateLabel = status === "SCHEDULED" ? formatScheduledDate(post.scheduledAt) : formatRelativeDate(post.updatedAt ?? post.createdAt);
+          const account = connectedAccounts.find((item) => item.id === post.connectedAccount);
+          const accountName = post.connectedAccountName ?? account?.displayName ?? "LinkedIn account";
+          const accountInitials = account ? getAccountInitials(account) : getInitials(accountName);
           return (
             <article key={post._id} className="mq-post-row">
-              <span className={`mq-post-avatar mq-post-avatar-${status.toLowerCase()}`}>{postKind(post).slice(0, 1)}</span>
+              {account?.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={account.avatarUrl} alt="" className="mq-post-avatar mq-linkedin-avatar" />
+              ) : (
+                <span className={`mq-post-avatar mq-post-avatar-${status.toLowerCase()}`}>{accountInitials || "—"}</span>
+              )}
               <div className="mq-post-row-copy">
-                <div className="mq-post-row-meta"><strong>{connectedAccounts.find((account) => account.id === post.connectedAccount)?.displayName ?? "LinkedIn account"}</strong><span>{postKind(post)}</span></div>
-                <Link href={`/posts/${post._id}/edit`} className="mq-post-row-title">{compactTitle(post.content)}</Link>
+                <div className="mq-post-row-meta"><strong>{accountName}</strong><span>{postKind(post)}</span></div>
+                <Link href={`/posts/${post._id}/edit`} className="mq-post-row-title">{compactTitle(post)}</Link>
               </div>
               <div className="mq-post-row-status"><span className={`mq-status mq-status-${status.toLowerCase()}`}><i />{status[0] + status.slice(1).toLowerCase()}</span><span className="mq-mono">{dateLabel}</span></div>
               <div className="mq-post-row-actions">

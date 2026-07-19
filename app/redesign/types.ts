@@ -1,4 +1,4 @@
-import type { DashboardPost, UserProfile } from "../lib/types";
+import type { ConnectedAccount, DashboardPost, UserProfile } from "../lib/types";
 
 export type WorkspaceUser = UserProfile;
 
@@ -10,6 +10,13 @@ export function getInitials(name: string, email = "") {
     return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
   }
   return (parts[0] ?? email).slice(0, 2).toUpperCase();
+}
+
+export function getAccountInitials(account?: ConnectedAccount) {
+  return getInitials(
+    account?.displayName ?? account?.profile?.localizedFirstName ?? "",
+    account?.vanityName,
+  );
 }
 
 export function getFirstName(name: string) {

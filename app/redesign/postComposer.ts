@@ -8,6 +8,7 @@ import type { ArtifactDetailData } from "./artifactTypes";
 
 export type InitialPostComposerData = {
   id: string;
+  title: string;
   status: PostStatus;
   artifact: ArtifactDetailData;
   account: ConnectedAccount;
@@ -62,6 +63,7 @@ export function createInitialPostComposerData(post: PostDetailData): InitialPost
   if (!post._id) throw new Error("The saved post does not include an ID.");
   return {
     id: post._id,
+    title: post.title?.trim() ?? "",
     status: normalizePostStatus(post.status),
     artifact: pinnedArtifactFromPost(post),
     account: accountFromPost(post),

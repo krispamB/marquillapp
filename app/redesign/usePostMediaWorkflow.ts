@@ -56,7 +56,24 @@ export default function usePostMediaWorkflow({
   const [error, setError] = useState<string | null>(null);
   const [previewRetryKey, setPreviewRetryKey] = useState(0);
   const previewRequestedRef = useRef(new Set<string>());
+  const mediaRef = useRef(media);
+  const activePostIdRef = useRef(postId);
+  const isMountedRef = useRef(true);
+  const previewRetryTimerRef = useRef<number | undefined>(undefined);
   const hasPendingMedia = useMemo(() => media.some((item) => item.status === "PENDING" || item.status === "UPLOADING"), [media]);
+
+  useEffect(() => {
+    mediaRef.current = media;
+    activePostIdRef.current = postId;
+  }, [media, postId]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (previewRetryTimerRef.current) window.clearTimeout(previewRetryTimerRef.current);
+    };
+  }, []);
 
   async function refreshMedia() {
     if (!postId) return [];
@@ -95,8 +112,6 @@ export default function usePostMediaWorkflow({
     if (!postId) return;
     const candidates = media.filter((item) => item.status === "READY" && !previewUrls[item.id] && !previewRequestedRef.current.has(item.id));
     if (!candidates.length) return;
-    let cancelled = false;
-    let retryTimer: number | undefined;
     candidates.forEach((item) => previewRequestedRef.current.add(item.id));
     void Promise.all(candidates.map(async (item) => {
       try {
@@ -105,28 +120,30 @@ export default function usePostMediaWorkflow({
 
         const response = await request<LinkedinImageDetailsResponse>(`${API_BASE}/posts/${postId}/media/${item.id}/preview`);
         if (!response.data?.downloadUrl) throw new Error("The media preview URL was unavailable.");
-        writeCachedMediaPreview(item.id, response.data.downloadUrl, response.data.downloadUrlExpiresAt);
-        return { id: item.id, url: response.data.downloadUrl };
+        return { id: item.id, url: response.data.downloadUrl, expiresAt: response.data.downloadUrlExpiresAt };
       } catch (reason) {
         previewRequestedRef.current.delete(item.id);
         return { id: item.id, error: reason instanceof Error ? reason.message : "Unable to load a media preview." };
       }
     })).then((results) => {
-      if (cancelled) return;
-      const successful = results.filter((result): result is { id: string; url: string } => "url" in result);
-      const failed = results.filter((result) => "error" in result);
+      if (!isMountedRef.current || activePostIdRef.current !== postId) return;
+      const readyMediaIds = new Set(mediaRef.current.filter((item) => item.status === "READY").map((item) => item.id));
+      const relevant = results.filter((result) => readyMediaIds.has(result.id));
+      results.filter((result) => !readyMediaIds.has(result.id)).forEach((result) => previewRequestedRef.current.delete(result.id));
+      const successful = relevant.filter((result): result is { id: string; url: string; expiresAt?: number | string } => "url" in result);
+      const failed = relevant.filter((result): result is { id: string; error: string } => "error" in result);
+      successful.forEach((result) => writeCachedMediaPreview(result.id, result.url, result.expiresAt));
       if (successful.length) setPreviewUrls((current) => ({ ...current, ...Object.fromEntries(successful.map((result) => [result.id, result.url])) }));
       if (failed.length) {
         setError(`${failed[0].error} Retrying preview…`);
-        retryTimer = window.setTimeout(() => setPreviewRetryKey((value) => value + 1), 3000);
+        previewRetryTimerRef.current = window.setTimeout(() => {
+          previewRetryTimerRef.current = undefined;
+          if (isMountedRef.current) setPreviewRetryKey((value) => value + 1);
+        }, 3000);
       } else {
         setError(null);
       }
     });
-    return () => {
-      cancelled = true;
-      if (retryTimer) window.clearTimeout(retryTimer);
-    };
   }, [media, postId, previewRetryKey, previewUrls, request]);
 
   async function uploadFiles(files: File[]) {

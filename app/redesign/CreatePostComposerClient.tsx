@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { CalendarClock, ChevronDown, FileText, LoaderCircle, Send } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { CalendarClock, FileText, LoaderCircle, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import MarquillSelect from "../../components/ui/MarquillSelect";
 import type {
@@ -22,6 +22,7 @@ import RedesignShell from "./Shell";
 import { getDefaultScheduleDate, localDateTimeValue } from "./SchedulePicker";
 import StockImagePicker from "./StockImagePicker";
 import LinkedInConnectButton from "./LinkedInConnectButton";
+import MobileComposerSwitcher, { type MobileComposerView } from "./MobileComposerSwitcher";
 import usePostMediaWorkflow from "./usePostMediaWorkflow";
 import type { InitialPostComposerData } from "./postComposer";
 
@@ -45,12 +46,16 @@ export default function CreatePostComposerClient({
   const router = useRouter();
   const [selectedAccountId, setSelectedAccountId] = useState(initialPost?.account.id ?? connectedAccounts[0]?.id ?? "");
   const [postId, setPostId] = useState<string | undefined>(initialPost?.id);
+  const [postTitle, setPostTitle] = useState(initialPost?.title ?? "");
+  const lastSavedTitle = useRef(initialPost?.title.trim() ?? "");
+  const titleSavePromise = useRef<Promise<boolean> | null>(null);
+  const [isTitleSaving, setIsTitleSaving] = useState(false);
   const [postStatus, setPostStatus] = useState<PostStatus | undefined>(initialPost?.status);
   const [artifact, setArtifact] = useState<ArtifactDetailData | undefined>(initialPost?.artifact);
   const [isArtifactPickerOpen, setIsArtifactPickerOpen] = useState(false);
   const [stockProvider, setStockProvider] = useState<StockProvider | null>(null);
   const [scheduleMode, setScheduleMode] = useState(Boolean(initialPost?.scheduledAt));
-  const [isMobilePreviewOpen, setIsMobilePreviewOpen] = useState(false);
+  const [mobileView, setMobileView] = useState<MobileComposerView>("compose");
   const [scheduleValue, setScheduleValue] = useState(() => localDateTimeValue(initialPost?.scheduledAt ? new Date(initialPost.scheduledAt) : getDefaultScheduleDate()));
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [statusText, setStatusText] = useState(initialPost ? `Post · ${initialPost.status.toLowerCase()}` : "Choose an account and attach an artifact");
@@ -90,6 +95,46 @@ export default function CreatePostComposerClient({
   const compositionLocked = isScheduled || isPublished;
   const canSubmit = Boolean(postId && artifact && !mediaBlocked && !isBusy && !isPublished);
 
+  function saveTitle(): Promise<boolean> {
+    if (titleSavePromise.current) return titleSavePromise.current;
+    if (!postId || compositionLocked) return Promise.resolve(true);
+    const title = postTitle.trim();
+    if (!title) {
+      setPostTitle(lastSavedTitle.current);
+      setError("Post titles must contain at least one character.");
+      return Promise.resolve(false);
+    }
+    if (title === lastSavedTitle.current) {
+      if (title !== postTitle) setPostTitle(title);
+      return Promise.resolve(true);
+    }
+
+    setIsTitleSaving(true);
+    setError(null);
+    const request = readApi<PostMutationResponse>(
+        `${API_BASE}/posts/${postId}`,
+        jsonRequest({ title }, { method: "PATCH" }),
+      )
+      .then((response) => {
+        const savedTitle = response.data?.title?.trim() || title;
+        lastSavedTitle.current = savedTitle;
+        setPostTitle(savedTitle);
+        if (response.data?.status) setPostStatus(response.data.status as PostStatus);
+        setStatusText("Title saved");
+        return true;
+      })
+      .catch((reason) => {
+        setError(reason instanceof Error ? reason.message : "Unable to save the post title.");
+        return false;
+      })
+      .finally(() => {
+        titleSavePromise.current = null;
+        setIsTitleSaving(false);
+      });
+    titleSavePromise.current = request;
+    return request;
+  }
+
   async function attachArtifact(summary: ArtifactSummary) {
     if (compositionLocked) return;
     if (!selectedAccountId) {
@@ -103,13 +148,19 @@ export default function CreatePostComposerClient({
       const nextArtifact = detailResponse.data;
       if (!nextArtifact || nextArtifact.status !== "READY") throw new Error("Only READY artifacts can be attached.");
 
+      const trimmedTitle = postTitle.trim();
       const response = postId
-        ? await readApi<PostMutationResponse>(`${API_BASE}/posts/${postId}`, jsonRequest({ artifactId: nextArtifact.id, version: nextArtifact.version }, { method: "PATCH" }))
-        : await readApi<PostMutationResponse>(`${API_BASE}/posts`, jsonRequest({ artifactId: nextArtifact.id, version: nextArtifact.version, connectedAccount: selectedAccountId }, { method: "POST" }));
+        ? await readApi<PostMutationResponse>(`${API_BASE}/posts/${postId}`, jsonRequest({ artifactId: nextArtifact.id, version: nextArtifact.version, ...(trimmedTitle && trimmedTitle !== lastSavedTitle.current ? { title: trimmedTitle } : {}) }, { method: "PATCH" }))
+        : await readApi<PostMutationResponse>(`${API_BASE}/posts`, jsonRequest({ artifactId: nextArtifact.id, version: nextArtifact.version, connectedAccount: selectedAccountId, ...(trimmedTitle ? { title: trimmedTitle } : {}) }, { method: "POST" }));
       const createdId = response.data?._id ?? (response.data as { id?: string } | undefined)?.id ?? postId;
       if (!createdId) throw new Error("The post service did not return a draft ID.");
       setPostId(createdId);
       setPostStatus("DRAFT");
+      const savedTitle = response.data?.title?.trim() || trimmedTitle;
+      if (savedTitle) {
+        lastSavedTitle.current = savedTitle;
+        setPostTitle(savedTitle);
+      }
       setArtifact(nextArtifact);
       replaceMedia(response.data?.media ?? media);
       setStatusText("1 artifact attached · ready to publish");
@@ -135,6 +186,7 @@ export default function CreatePostComposerClient({
 
   async function publishNow() {
     if (!postId || !canSubmit) return;
+    if (!await saveTitle()) return;
     setPendingAction("publish");
     setError(null);
     try {
@@ -149,6 +201,7 @@ export default function CreatePostComposerClient({
 
   async function confirmSchedule() {
     if (!postId || !canSubmit) return;
+    if (!await saveTitle()) return;
     const scheduledDate = new Date(scheduleValue);
     if (Number.isNaN(scheduledDate.getTime()) || scheduledDate.getTime() < Date.now() + 5 * 60_000) {
       setError("Choose a valid schedule time at least five minutes in the future.");
@@ -197,7 +250,27 @@ export default function CreatePostComposerClient({
       onSelectAccount={setSelectedAccountId}
       subscription={subscription}
       active="posts"
-      title={isEditing ? "Edit post" : "New post"}
+      title={(
+        <label className="mq-post-title-editor">
+          <input
+            aria-label="Post title"
+            value={postTitle}
+            maxLength={100}
+            placeholder={isEditing ? "Untitled post" : "Add a title"}
+            disabled={Boolean(initialLoadError) || compositionLocked || isTitleSaving}
+            onChange={(event) => setPostTitle(event.target.value)}
+            onBlur={() => void saveTitle()}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.currentTarget.blur();
+              if (event.key === "Escape") {
+                setPostTitle(lastSavedTitle.current);
+                event.currentTarget.blur();
+              }
+            }}
+          />
+          {isTitleSaving ? <LoaderCircle className="mq-spin" size={13} aria-label="Saving title" /> : null}
+        </label>
+      )}
       topbar={{ back: { href: "/posts", label: "Back to posts" }, subtitle: postStatus ? `Post · ${postStatus.toLowerCase()}` : artifact ? "1 artifact attached" : "Attach an artifact to continue", minimal: true }}
       topbarExtra={topbarActions}
       showAccountSelector={false}
@@ -207,8 +280,15 @@ export default function CreatePostComposerClient({
         {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}
         {initialLoadError ? <div className="mq-alert mq-alert-error" role="alert">{initialLoadError}</div> : null}
 
-        {initialLoadError ? null : <div className="mq-create-post-grid">
-          <section className="mq-create-post-compose">
+        {initialLoadError ? null : <div className={`mq-create-post-grid mq-mobile-view-${mobileView}`}>
+          {artifact ? <MobileComposerSwitcher value={mobileView} onChange={setMobileView} /> : null}
+
+          <section
+            id="mq-mobile-compose-panel"
+            className="mq-create-post-compose"
+            role={artifact ? "tabpanel" : undefined}
+            aria-labelledby={artifact ? "mq-mobile-compose-tab" : undefined}
+          >
             <div className="mq-create-post-intro">
               <div><h1>Compose post</h1><span className="mq-mono">artifact → media → publish</span></div>
               <label className="mq-create-account-field">
@@ -251,7 +331,7 @@ export default function CreatePostComposerClient({
           </section>
 
           <aside className="mq-create-post-sidebar">
-            {artifact ? <><span className="mq-mono">_ linkedin preview</span><div className="mq-desktop-composition-preview"><PostCompositionPreview key={`desktop-${artifact.id}:${artifact.version}`} user={user} account={account} artifact={artifact} media={media} previewUrls={previewUrls} /></div><div className="mq-mobile-preview-wrap"><button type="button" onClick={() => setIsMobilePreviewOpen((value) => !value)} aria-expanded={isMobilePreviewOpen}>LinkedIn preview <ChevronDown className={isMobilePreviewOpen ? "is-open" : ""} size={16} /></button><div hidden={!isMobilePreviewOpen}><PostCompositionPreview key={`mobile-${artifact.id}:${artifact.version}`} user={user} account={account} artifact={artifact} media={media} previewUrls={previewUrls} /></div></div></> : null}
+            {artifact ? <><span className="mq-mono">_ linkedin preview</span><div className="mq-desktop-composition-preview"><PostCompositionPreview key={`desktop-${artifact.id}:${artifact.version}`} user={user} account={account} artifact={artifact} media={media} previewUrls={previewUrls} /></div><div id="mq-mobile-preview-panel" className="mq-mobile-preview-wrap" role="tabpanel" aria-labelledby="mq-mobile-preview-tab"><PostCompositionPreview key={`mobile-${artifact.id}:${artifact.version}`} user={user} account={account} artifact={artifact} media={media} previewUrls={previewUrls} /></div></> : null}
 
             {postId && !isPublished ? <PostSchedulingControls canSubmit={canSubmit} isBusy={isBusy} isScheduling={pendingAction === "schedule"} scheduleMode={scheduleMode} scheduleValue={scheduleValue} onChange={setScheduleValue} onConfirm={() => void confirmSchedule()} onModeChange={setScheduleMode} /> : null}
           </aside>

@@ -57,6 +57,33 @@ describe("usePostMediaWorkflow preview caching", () => {
     expect(requests).toHaveLength(1);
   });
 
+  test("shows a preview when media refreshes while its request is in flight", async () => {
+    let resolvePreview!: (value: unknown) => void;
+    const previewResponse = new Promise((resolve) => { resolvePreview = resolve; });
+    const request = async <T,>() => previewResponse as Promise<T>;
+    const hook = renderHook(() => usePostMediaWorkflow({ postId: "post-1", artifactType: "POST", initialMedia: media, onStatus: () => {}, request }));
+
+    await waitFor(() => expect(hook.result.current.media).toHaveLength(1));
+    act(() => {
+      hook.result.current.replaceMedia([
+        ...media,
+        { id: "media-2", type: "IMAGE", status: "UPLOADING" },
+      ]);
+    });
+
+    await act(async () => {
+      resolvePreview({
+        data: {
+          downloadUrl: "https://cdn.example/in-flight",
+          downloadUrlExpiresAt: Date.now() + 60_000,
+        },
+      });
+      await previewResponse;
+    });
+
+    await waitFor(() => expect(hook.result.current.previewUrls["media-1"]).toBe("https://cdn.example/in-flight"));
+  });
+
   test("keeps an uncachable endpoint preview for the current mount", async () => {
     const request = async <T,>() => ({ data: { downloadUrl: "https://cdn.example/current" } }) as T;
     const hook = renderHook(() => usePostMediaWorkflow({ postId: "post-1", artifactType: "POST", initialMedia: media, onStatus: () => {}, request }));

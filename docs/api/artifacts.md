@@ -29,6 +29,8 @@ Starts asynchronous initial generation. The server creates version `1` with stat
 
 `theme` controls carousel appearance. `stylePreset` controls writing voice; they are separate fields even though both can be `bold`.
 
+Initial generation also creates a trimmed, descriptive `title` of 1–100 characters. The title is stored as artifact library metadata, outside versioned content, and becomes visible through artifact reads after `run.completed`. Refinements preserve the existing title.
+
 ### Response: `202 Accepted`
 
 ```json
@@ -86,7 +88,10 @@ Lists live artifacts as lightweight summaries, newest first, with 20 results per
 | `type` | `POST \| POLL \| DOCUMENT` | Optional type filter. |
 | `status` | `GENERATING \| READY \| FAILED` | Optional current-version status filter. |
 | `month` | `YYYY-MM` | Optional `updatedAt` month filter. |
+| `search` | string | Optional case-insensitive literal substring match against `title` and the original `source.prompt`. Surrounding whitespace is ignored. |
 | `page` | positive integer | Optional one-based page; defaults to `1`. |
+
+Search treats punctuation and regular-expression characters literally. It can be combined with every other filter, and pagination metadata reflects the matching result set.
 
 ### Response: `200 OK`
 
@@ -200,7 +205,7 @@ Poll options must be unique after trimming and case-folding. The server validate
 
 ## `PATCH /artifacts/:id`
 
-Edits the current version in place. It does not create a new version. The current version must be `READY`; the response stamps `editedAt`.
+Edits the current version in place. It does not create a new version. The current version must be `READY`, must not be referenced by a `SCHEDULED` or `PUBLISHED` Post, and the response stamps `editedAt`.
 
 Preferred request envelope:
 
@@ -219,6 +224,8 @@ The endpoint also accepts content fields directly:
 
 Content is merged recursively with the current content and validated as the complete type-specific shape. For documents, `pdfKey`, `pageCount`, and `pdfUrl` are derived fields; do not edit them.
 
+When supplied, `title` is trimmed and must contain 1–100 characters.
+
 ### Response: `200 OK`
 
 The response is the same artifact detail shape as `GET /artifacts/:id`, inside `data`, with the updated content.
@@ -227,7 +234,7 @@ The response is the same artifact detail shape as `GET /artifacts/:id`, inside `
 
 - `400` invalid or incomplete content after merging the patch.
 - `404` artifact not found, deleted, or not owned by the caller.
-- `409` current version is not `READY`, or changed before the edit was saved.
+- `409` current version is not `READY`, is pinned by a scheduled/published Post, or changed before the edit was saved. Unschedule first or create/refine another version instead of mutating an approved composition.
 
 ## `DELETE /artifacts/:id`
 

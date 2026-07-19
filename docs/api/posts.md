@@ -2,283 +2,181 @@
 
 Base path: `/api/v1/posts`. All endpoints require authentication and are owner-scoped.
 
-Posts bind one artifact version to one usable LinkedIn connected account. The artifact stays in the library and can be posted again with another account or version.
+A Post is a mutable publishing composition. It pins one READY artifact version to one immutable LinkedIn connected account and may carry user-uploaded image or video media. The user previews the completed composition in `DRAFT`, then explicitly publishes or schedules it.
 
-## `POST /posts`
+## Create and edit a draft
 
-Creates a post binding. Without `scheduledAt`, the server publishes immediately. With a future `scheduledAt`, it creates a scheduled post and queues it.
+### `POST /posts`
 
-### Request
+Creates a `DRAFT`. It never publishes or schedules.
 
 ```json
 {
+  "title": "Deployment safety launch",
   "artifactId": "665f1a7f8f1e2c3d4a5b6c7d",
   "version": 2,
-  "connectedAccount": "665f1a7f8f1e2c3d4a5b6c90",
-  "scheduledAt": "2026-07-15T09:00:00.000Z"
+  "connectedAccount": "665f1a7f8f1e2c3d4a5b6c90"
 }
 ```
 
-| Field | Type | Required | Notes |
-|---|---|---:|---|
-| `artifactId` | Mongo ID | yes | Must belong to the caller. |
-| `version` | positive integer | no | Defaults to the artifact's current version; it must be `READY`. |
-| `connectedAccount` | Mongo ID | yes | Must be an owned, active LinkedIn account with an access token. |
-| `scheduledAt` | ISO date | no | If present, must be in the future. Without it, publish immediately. |
+| Field | Required | Notes |
+|---|---:|---|
+| `title` | no | Trimmed, 1–100 characters. Defaults to the artifact title, then to the source prompt truncated to 100 characters. |
+| `artifactId` | yes | Owned artifact. |
+| `version` | no | Defaults to the current version; must be `READY`. |
+| `connectedAccount` | yes | Owned, active LinkedIn account. It cannot be changed later. |
 
-Organization accounts are subject to company-page entitlement checks. Scheduling is subject to the user's scheduled-post quota.
+`scheduledAt` is rejected. Use `/schedule` after reviewing the draft.
 
-### Response: `201 Created`
+The `201` response contains the saved Post with `status: "DRAFT"`, one pinned artifact reference, and `media: []`.
+
+### `PATCH /posts/:id`
+
+Partially updates the title and/or selected artifact version on a `DRAFT` or `FAILED` Post.
+
+```json
+{ "title": "Safer deployments", "artifactId": "665f1a7f8f1e2c3d4a5b6c7d", "version": 3 }
+```
+
+`title`, `artifactId`, and `version` are optional, but at least `title` or `artifactId` must be supplied. `version` is valid only with `artifactId`. An omitted title remains unchanged when replacing the artifact. Titles are trimmed and must contain 1–100 characters.
+
+The replacement artifact must be owned and READY. A Post with uploaded media can select only a `POST` artifact because LinkedIn cannot combine uploaded media with polls or documents. Editing a `FAILED` Post returns it to `DRAFT` and clears stale failure/schedule fields.
+
+## Uploaded media
+
+Uploaded media is Post-owned composition data, not an Artifact. Supported compositions are up to 20 JPEG/PNG images or one MP4 video. Images and video cannot be mixed, including across separate upload batches. The application cap is 200 MB per file.
+
+```ts
+type PostMedia = {
+  id: string; // stable UUID used by client routes and polling
+  linkedinUrn?: string; // present after successful LinkedIn upload
+  type: 'IMAGE' | 'VIDEO';
+  title?: string;
+  altText?: string;
+  status: 'PENDING' | 'UPLOADING' | 'READY' | 'FAILED';
+  mimeType?: string;
+  sizeBytes?: number;
+  pendingExpiresAt?: string;
+};
+```
+
+### `POST /posts/:id/media/uploads`
+
+Declares files and creates 30-minute direct-to-R2 upload slots. The Post must be editable and select a `POST` artifact.
 
 ```json
 {
-  "statusCode": 201,
-  "message": "Post created successfully",
-  "data": {
-    "_id": "665f1a7f8f1e2c3d4a5b6ca0",
-    "user": "665f1a7f8f1e2c3d4a5b6c01",
-    "connectedAccount": "665f1a7f8f1e2c3d4a5b6c90",
-    "artifacts": [{ "artifact": "665f1a7f8f1e2c3d4a5b6c7d", "version": 2 }],
-    "status": "SCHEDULED",
-    "scheduledAt": "2026-07-15T09:00:00.000Z",
-    "createdAt": "2026-07-14T10:30:00.000Z",
-    "updatedAt": "2026-07-14T10:30:00.000Z"
-  }
+  "files": [
+    { "fileName": "photo.jpg", "mimeType": "image/jpeg", "sizeBytes": 1048576 }
+  ]
 }
 ```
 
-`data` is `PUBLISHED` (with `publishedAt` and usually `channelPostId`) when publishing immediately, or `SCHEDULED` when `scheduledAt` is provided.
+The `201` response contains `expiresAt` and `uploads[]` entries with stable `mediaId`, `uploadUrl`, and signed `requiredHeaders`. PUT each file directly to its URL using exactly those headers.
 
-### Common errors
+### `POST /posts/:id/media/uploads/complete`
 
-- `400` selected artifact version is not `READY`, date is not in the future, or the connected account is not LinkedIn.
-- `403` artifact/account is not owned, company-page access is unavailable, or another feature gate denies the operation.
-- `404` artifact or connected account does not exist.
-- `409` the account needs to be reconnected.
-
-## `POST /posts/:id/publish`
-
-Publishes an existing `SCHEDULED` or `FAILED` post immediately. Any existing schedule job is removed first. A published post cannot be published again.
-
-### Response: `200 OK`
+Confirms that files reached R2, verifies their declared type/size, changes their status to `UPLOADING`, and enqueues the R2-to-LinkedIn worker.
 
 ```json
-{
-  "statusCode": 200,
-  "message": "Post published successfully",
-  "data": {
-    "_id": "665f1a7f8f1e2c3d4a5b6ca0",
-    "status": "PUBLISHED",
-    "publishedAt": "2026-07-14T10:35:00.000Z",
-    "channelPostId": "urn:li:share:..."
-  }
-}
+{ "mediaIds": ["3f1c9a1e-6c9d-4e0f-9d2a-6f7b8c9d0e1f"] }
 ```
 
-If LinkedIn publishing fails, the post is recorded as `FAILED` with `failureReason`; retry by calling this endpoint again after fixing the account or content problem.
+Poll `GET /posts/:id` after the `202` response. A successful worker changes the item to `READY` and writes `linkedinUrn` without changing `id`. Retry exhaustion changes it to `FAILED`.
 
-## `POST /posts/:id/schedule`
+### `PATCH /posts/:postId/media/:mediaId`
 
-Schedules or reschedules an existing `SCHEDULED` or `FAILED` post. The request replaces `scheduledAt` and removes the prior queue job.
+Updates user-controlled metadata on an editable Post.
 
-### Request
+```json
+{ "title": "Launch preview", "altText": "Product dashboard" }
+```
+
+`altText` is valid only for images. Identity, type, URN, and status are server-controlled.
+
+### `DELETE /posts/:postId/media/:mediaId`
+
+Removes one media item from an editable Post and returns the remaining array. Pending/in-flight R2 cleanup is best-effort; workers ignore items removed before completion.
+
+### `GET /posts/:postId/media/:mediaId/preview`
+
+Returns the expiring LinkedIn `downloadUrl` and `downloadUrlExpiresAt` for a `READY` image or video. Resolution uses the Post's exact connected account.
+
+The older `GET /posts/linkedin/image/:urn` route remains available for compatibility, but new composer clients should use the Post/media route.
+
+## Publish and schedule actions
+
+### `POST /posts/:id/publish`
+
+Publishes a `DRAFT`, `FAILED`, or `SCHEDULED` Post immediately. A pending schedule job is removed first. `PUBLISHED` is terminal.
+
+Publishing is blocked with `409` while any media item is `PENDING`, `UPLOADING`, or `FAILED`; failed media must be removed or uploaded again. READY media is composed as one `content.media` object or an ordered `content.multiImage` object.
+
+LinkedIn failures persist `status: "FAILED"` and `failureReason`. The Post may be edited, retried, or scheduled again.
+
+### `POST /posts/:id/schedule`
+
+Schedules a `DRAFT` or `FAILED` Post, or reschedules a `SCHEDULED` Post.
 
 ```json
 { "scheduledAt": "2026-07-16T14:30:00.000Z" }
 ```
 
-`scheduledAt` is required, must be an ISO date, and must be in the future.
+The date must be in the future. The same media-readiness rules as immediate publishing apply. First-time scheduling consumes the existing scheduled-post quota; rescheduling and unscheduling do not refund or charge it again.
 
-### Response: `200 OK`
+### `POST /posts/:id/unschedule`
 
-The response envelope contains the updated post with `status: "SCHEDULED"` and the new `scheduledAt`.
+Removes the schedule job and returns a `SCHEDULED` Post to mutable `DRAFT`. Returns `409` if the worker already owns the active job.
 
-### Common errors
+## Read, delete, and metrics
 
-- `400` post is `PUBLISHED`, is not schedulable, or the date is not in the future.
-- `403` post is not owned by the caller.
-- `404` post does not exist.
-- `409` account access/reconnection or scheduled-post quota problem.
+### `GET /posts`
 
-## `GET /posts`
+Lists Posts newest first, 20 per page. Query parameters are `connectedAccount`, `status`, `month` (`YYYY-MM`), and one-based `page`. `status` accepts `DRAFT`, `SCHEDULED`, `PUBLISHED`, or `FAILED`. Filters contain `availableMonths` and `connectedAccountIds`; all statuses count.
 
-Lists the caller's posts, newest first, with up to 20 records per page.
-
-### Query parameters
-
-| Parameter | Type | Notes |
-|---|---|---|
-| `connectedAccount` | Mongo ID | Optional account filter. |
-| `status` | `SCHEDULED \| PUBLISHED \| FAILED` | Optional status filter. |
-| `month` | `YYYY-MM` | Optional `updatedAt` month filter. |
-| `page` | positive integer | Optional one-based page; defaults to `1`. |
-
-### Response: `200 OK`
+Each artifact reference is populated with the metadata needed to label the Post while retaining its pinned version number:
 
 ```json
 {
-  "statusCode": 200,
-  "message": "Posts retrieved successfully",
-  "data": [
-    {
-      "_id": "665f1a7f8f1e2c3d4a5b6ca0",
-      "connectedAccount": "665f1a7f8f1e2c3d4a5b6c90",
-      "artifacts": [{ "artifact": "665f1a7f8f1e2c3d4a5b6c7d", "version": 2 }],
-      "status": "PUBLISHED",
-      "publishedAt": "2026-07-14T10:35:00.000Z",
-      "channelPostId": "urn:li:share:...",
-      "createdAt": "2026-07-14T10:30:00.000Z",
-      "updatedAt": "2026-07-14T10:35:00.000Z"
+  "artifact": {
+    "_id": "665f1a7f8f1e2c3d4a5b6c7d",
+    "type": "POST",
+    "title": "Deployment safety",
+    "source": {
+      "prompt": "Write a practical LinkedIn post about reducing deployment risk"
     }
-  ],
-  "filters": {
-    "availableMonths": ["2026-07", "2026-06"],
-    "connectedAccountIds": ["665f1a7f8f1e2c3d4a5b6c90"]
-  }
+  },
+  "version": 2
 }
 ```
 
-The current response does not include `page` or `pages`; keep the requested page in client state. `data` contains raw post records with artifact references, not full artifact content. Use `GET /posts/:id` for resolved detail.
+The Post itself now carries its display `title`. The nested artifact title remains available as artifact metadata and does not change when the Post title is edited.
 
-## `GET /posts/:id`
+### `GET /posts/:id`
 
-Returns one owned post and resolves each artifact reference into source artifact metadata and the selected version.
+Returns an owned Post, its `media[]`, its safe connected-account summary, and each artifact reference resolved to the same minimal artifact metadata plus the exact pinned version payload. The artifact metadata contains only `_id`, `type`, optional `title`, and `source.prompt`.
 
-```json
-{
-  "statusCode": 200,
-  "message": "Post retrieved successfully",
-  "data": {
-    "_id": "665f1a7f8f1e2c3d4a5b6ca0",
-    "connectedAccount": {
-      "_id": "665f1a7f8f1e2c3d4a5b6c90",
-      "displayName": "Ada Lovelace",
-      "accountType": "PERSON"
-    },
-    "status": "PUBLISHED",
-    "artifacts": [
-      {
-        "artifact": {
-          "_id": "665f1a7f8f1e2c3d4a5b6c7d",
-          "type": "POST",
-          "title": "Deployment safety",
-          "currentVersion": 2,
-          "source": {
-            "prompt": "Write about deployment safety",
-            "withResearch": false,
-            "stylePreset": "founder"
-          }
-        },
-        "version": {
-          "version": 2,
-          "status": "READY",
-          "content": { "commentary": "The safest deploy is the one you can undo." },
-          "createdAt": "2026-07-14T10:20:00.000Z"
-        }
-      }
-    ]
-  }
-}
-```
+### `DELETE /posts/:id`
 
-The resolved version is the exact version bound to the post, not necessarily the artifact's current version. For document previews and signed PDF URLs, prefer `GET /artifacts/:id?version=<version>`.
+Deletes the Post. Scheduled jobs are removed first. For a published Post, the server also attempts to delete the LinkedIn Post when the account is usable and a `channelPostId` exists.
 
-The populated `connectedAccount` contains only its ID, display name, and
-`PERSON` or `ORGANIZATION` account type. Credentials and profile metadata are
-never included.
+### `GET /posts/comparison`
 
-## `GET /posts/comparison`
+Accepts `currentMonth` and `previousMonth` (`YYYY-MM`) and compares owned Post records created in those UTC months. All statuses, including `DRAFT`, count.
 
-Compares the number of owned Post records created in two UTC calendar months.
-All statuses are counted. The months do not need to be adjacent.
+### `GET /posts/metrics/:connectedAccountId`
 
-### Query parameters
+Returns `total` and non-empty monthly counts for the most recent six months. All statuses, including `DRAFT`, count.
 
-| Parameter       | Type      | Required | Notes                                  |
-| --------------- | --------- | -------: | -------------------------------------- |
-| `currentMonth`  | `YYYY-MM` |      yes | Month displayed as the current period. |
-| `previousMonth` | `YYYY-MM` |      yes | Month used as the comparison baseline. |
-
-### Response: `200 OK`
-
-```json
-{
-  "statusCode": 200,
-  "message": "Post comparison retrieved successfully",
-  "data": {
-    "current": { "month": "2026-07", "count": 7 },
-    "previous": { "month": "2026-06", "count": 3 },
-    "difference": 4,
-    "percentageChange": 133.33
-  }
-}
-```
-
-`difference` is current minus previous. `percentageChange` is rounded to two
-decimal places and is `null` when the previous count is zero.
-
-## `DELETE /posts/:id`
-
-Deletes a post record. For `SCHEDULED` posts, the schedule job is removed first. For `PUBLISHED` posts, the server also attempts to delete the LinkedIn post when the account is usable and a `channelPostId` exists.
-
-### Response: `200 OK`
-
-```json
-{
-  "statusCode": 200,
-  "message": "Post deleted successfully"
-}
-```
-
-Deleting a published post can return `409` if the LinkedIn account must be reconnected to safely remove the external post.
-
-## `GET /posts/metrics/:connectedAccountId`
-
-Returns post counts for the selected owned connected account over the most recent six months. Counts are grouped by post `createdAt` and include all post statuses.
-
-### Response: `200 OK`
-
-```json
-{
-  "statusCode": 200,
-  "message": "Post metrics retrieved successfully",
-  "data": {
-    "total": 12,
-    "monthly": [
-      { "month": "2026-02", "count": 1 },
-      { "month": "2026-07", "count": 4 }
-    ]
-  }
-}
-```
-
-`monthly` is sorted oldest to newest among months that contain posts. Empty months are omitted.
-
-## `GET /posts/linkedin/image/:urn`
-
-Retained LinkedIn image proxy. The server uses the caller's connected LinkedIn account and returns a short-lived LinkedIn download URL.
-
-### Response: `200 OK`
-
-```json
-{
-  "statusCode": 200,
-  "message": "Image details retrieved successfully",
-  "data": {
-    "downloadUrl": "https://media.licdn.com/...",
-    "downloadUrlExpiresAt": 1752503600000
-  }
-}
-```
-
-The `urn` path segment is URL-encoded by the client. A disconnected account returns `409`; LinkedIn lookup failures return `500`.
-
-## Post status model
+## Status model
 
 ```ts
-type PostStatus = 'SCHEDULED' | 'PUBLISHED' | 'FAILED';
+type PostStatus = 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'FAILED';
 ```
 
-- `SCHEDULED`: queued for a future publish time.
-- `PUBLISHED`: LinkedIn accepted the post; `publishedAt` and usually `channelPostId` are set.
-- `FAILED`: a publish attempt failed; `failureReason` explains the last failure. The post can be retried with `/publish` or rescheduled with `/schedule` when fixed.
+- `DRAFT`: mutable artifact/media composition awaiting explicit confirmation.
+- `SCHEDULED`: immutable composition queued for publication; use `/unschedule` before editing.
+- `PUBLISHED`: terminal successful LinkedIn publication.
+- `FAILED`: failed attempt; editable, retryable, and schedulable. Any edit returns it to `DRAFT`.
+
+Artifact versions referenced by `SCHEDULED` or `PUBLISHED` Posts cannot be edited in place. Unschedule first or create/refine another artifact version.

@@ -145,6 +145,7 @@ export type PostMetricsResponse = {
 
 export type DashboardPost = {
   _id: string;
+  title?: string;
   connectedAccount?: string;
   connectedAccountName?: string;
   status?: string;
@@ -265,6 +266,7 @@ export class FeatureLimitExceededError extends Error {
 
 export type PostDetailData = {
   _id?: string;
+  title?: string;
   type?: string;
   status?: string;
   content?: string;
@@ -355,6 +357,7 @@ export type LinkedinImageDetailsResponse = {
 };
 
 export type CreatePostRequest = {
+  title?: string;
   artifactId: string;
   version?: number;
   connectedAccount: string;

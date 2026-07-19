@@ -32,7 +32,7 @@ import FeedbackModal from "./FeedbackModal";
 import LinkedInConnectButton from "./LinkedInConnectButton";
 import OrganizationConnectModal from "./OrganizationConnectModal";
 import ThemeToggle from "./ThemeToggle";
-import { getInitials } from "./types";
+import { getAccountInitials, getInitials } from "./types";
 import type { WorkspacePage } from "./types";
 import MarquillSelect from "../../components/ui/MarquillSelect";
 import { API_BASE, readApi } from "./api";
@@ -64,10 +64,7 @@ type TopbarConfig = {
 };
 
 function AccountAvatar({ account, size = "md" }: { account?: ConnectedAccount; size?: "sm" | "md" }) {
-  const initials = getInitials(
-    account?.displayName ?? account?.profile?.localizedFirstName ?? "",
-    account?.vanityName,
-  );
+  const initials = getAccountInitials(account);
   return (
     <span className="mq-account-avatar-wrap">
       {account?.avatarUrl ? (
@@ -111,7 +108,7 @@ export default function RedesignShell({
   selectedAccountId?: string;
   onSelectAccount?: (accountId: string) => void;
   active: WorkspacePage;
-  title: string;
+  title: ReactNode;
   topbarExtra?: ReactNode;
   topbar?: TopbarConfig;
   showAccountSelector?: boolean;
