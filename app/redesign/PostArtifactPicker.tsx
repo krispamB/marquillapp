@@ -7,6 +7,7 @@ import MarquillSelect from "../../components/ui/MarquillSelect";
 import { API_BASE, readApi } from "./api";
 import useDebouncedSearch from "./useDebouncedSearch";
 import type { ArtifactSummary, ArtifactType, ArtifactsListResponse } from "./artifactTypes";
+import { artifactTypeIcons } from "./artifactPresentation";
 
 type ArtifactFilter = "ALL" | ArtifactType;
 
@@ -148,6 +149,7 @@ export default function PostArtifactPicker({
           {isLoading ? Array.from({ length: 4 }, (_, index) => <div className="mq-artifact-pick-skeleton" key={index}><span /><span /><span /></div>) : null}
           {!isLoading && !error && artifacts.map((artifact) => {
             const incompatible = hasMedia && artifact.type !== "POST";
+            const ArtifactIcon = artifactTypeIcons[artifact.type];
             return (
               <button
                 type="button"
@@ -157,7 +159,7 @@ export default function PostArtifactPicker({
                 onClick={() => onSelect(artifact)}
                 title={incompatible ? "Remove media before selecting this artifact type" : undefined}
               >
-                <span className={`mq-artifact-pick-icon is-${artifact.type.toLowerCase()}`}><FileText size={18} /></span>
+                <span className={`mq-artifact-pick-icon is-${artifact.type.toLowerCase()}`}><ArtifactIcon size={18} /></span>
                 <span className="mq-artifact-pick-copy">
                   <span><strong>{artifact.title?.trim() || "Untitled artifact"}</strong><b>{artifact.type}</b></span>
                   <small>{previewCopy(artifact)}</small>

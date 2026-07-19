@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarClock, Check, ChevronLeft, ChevronRight, Clock3 } from "lucide-react";
-import { createPortal } from "react-dom";
+import { useCallback, useId, useMemo, useRef, useState } from "react";
+import { CalendarDays } from "lucide-react";
+import MarquillMark from "../../components/brand/MarquillMark";
+import NaturalScheduleField from "../posts/NaturalScheduleField";
+import { ReschedulePopover } from "../posts/ReschedulePopover";
+import { formatPreviewText } from "../posts/naturalDate";
 
-const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 export function localDateTimeValue(date = getDefaultScheduleDate()) {
   const offset = date.getTimezoneOffset();
   return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 16);
@@ -23,38 +25,13 @@ function parseLocalValue(value: string) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function monthLabel(date: Date) {
-  return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-}
-
-function dateKey(date: Date) {
+function datePart(date: Date | null) {
+  if (!date) return "";
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function calendarCells(cursor: Date) {
-  const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
-  const start = new Date(first);
-  start.setDate(1 - first.getDay());
-  return Array.from({ length: 42 }, (_, index) => {
-    const date = new Date(start);
-    date.setDate(start.getDate() + index);
-    return date;
-  });
-}
-
-function formatValue(date: Date | null) {
-  if (!date) return "Pick a date and time";
-  return date.toLocaleString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function timeValue(date: Date | null) {
-  if (!date) return "09:00";
+function timePart(date: Date | null) {
+  if (!date) return "";
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
@@ -69,168 +46,69 @@ export default function SchedulePicker({
   disabled?: boolean;
   label?: string;
 }) {
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
-  const [cursor, setCursor] = useState(() => {
-    const selected = parseLocalValue(value);
-    const date = selected ?? getDefaultScheduleDate();
-    return new Date(date.getFullYear(), date.getMonth(), 1);
-  });
-  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
   const selected = useMemo(() => parseLocalValue(value), [value]);
-  const cells = useMemo(() => calendarCells(cursor), [cursor]);
+  const [draftText, setDraftText] = useState<string | null>(null);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const calendarButtonRef = useRef<HTMLButtonElement | null>(null);
+  const inputId = useId();
+  const text = draftText ?? "";
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const updatePosition = () => {
-      const rect = triggerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const width = Math.min(360, window.innerWidth - 32);
-      const height = Math.min(470, window.innerHeight - 32);
-      setPopoverPosition({
-        top: Math.max(16, Math.min(rect.bottom + 8, window.innerHeight - height - 16)),
-        left: Math.max(16, Math.min(rect.right - width, window.innerWidth - width - 16)),
-      });
-    };
-
-    updatePosition();
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
-    return () => {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-    };
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target as Node | null;
-      if (!target || triggerRef.current?.contains(target)) return;
-      if (target instanceof Element && target.closest("[data-schedule-picker]")) return;
-      setIsOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsOpen(false);
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen]);
-
-  function openPicker() {
-    if (disabled) return;
-    const next = selected ?? getDefaultScheduleDate();
-    setCursor(new Date(next.getFullYear(), next.getMonth(), 1));
-    setIsOpen((open) => !open);
-  }
-
-  function updateDate(day: Date) {
-    const next = selected ? new Date(selected) : getDefaultScheduleDate();
-    next.setFullYear(day.getFullYear(), day.getMonth(), day.getDate());
-    onChange(localDateTimeValue(next));
-  }
-
-  function updateTime(nextTime: string) {
-    const [hours, minutes] = nextTime.split(":").map(Number);
-    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return;
-    const next = selected ? new Date(selected) : getDefaultScheduleDate();
-    next.setHours(hours, minutes, 0, 0);
-    onChange(localDateTimeValue(next));
-  }
-
-  const popover = (
-    <div
-      className="mq-schedule-popover"
-      data-schedule-picker
-      role="dialog"
-      aria-label="Pick a schedule date and time"
-      style={{ top: popoverPosition.top, left: popoverPosition.left }}
-    >
-      <div className="mq-schedule-popover-heading">
-        <div>
-          <span className="mq-eyebrow">Schedule</span>
-          <strong>{formatValue(selected)}</strong>
-        </div>
-        <button type="button" className="mq-icon-button" onClick={() => setIsOpen(false)} aria-label="Close date picker">
-          <Check size={15} />
-        </button>
-      </div>
-
-      <div className="mq-schedule-month-nav">
-        <button
-          type="button"
-          className="mq-icon-button"
-          onClick={() => setCursor((date) => new Date(date.getFullYear(), date.getMonth() - 1, 1))}
-          aria-label="Previous month"
-        >
-          <ChevronLeft size={15} />
-        </button>
-        <strong>{monthLabel(cursor)}</strong>
-        <button
-          type="button"
-          className="mq-icon-button"
-          onClick={() => setCursor((date) => new Date(date.getFullYear(), date.getMonth() + 1, 1))}
-          aria-label="Next month"
-        >
-          <ChevronRight size={15} />
-        </button>
-      </div>
-
-      <div className="mq-schedule-weekdays" aria-hidden="true">
-        {WEEKDAYS.map((day) => <span key={day}>{day}</span>)}
-      </div>
-      <div className="mq-schedule-grid">
-        {cells.map((day) => {
-          const isSelected = selected ? dateKey(selected) === dateKey(day) : false;
-          const isToday = dateKey(new Date()) === dateKey(day);
-          const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
-          const isCurrentMonth = day.getMonth() === cursor.getMonth();
-          return (
-            <button
-              type="button"
-              key={dateKey(day)}
-              className={`mq-schedule-day ${isSelected ? "is-selected" : ""} ${isToday ? "is-today" : ""} ${!isCurrentMonth ? "is-outside" : ""}`}
-              disabled={isPast}
-              onClick={() => updateDate(day)}
-              aria-label={day.toLocaleDateString(undefined, { dateStyle: "full" })}
-              aria-pressed={isSelected}
-            >
-              {day.getDate()}
-            </button>
-          );
-        })}
-      </div>
-
-      <label className="mq-schedule-time">
-        <span><Clock3 size={14} /> Time</span>
-        <input type="time" value={timeValue(selected)} onChange={(event) => updateTime(event.target.value)} />
-      </label>
-      <p className="mq-schedule-helper">Times use your browser timezone. Choose at least five minutes from now.</p>
-    </div>
-  );
+  const updateText = useCallback((nextText: string, parsedDate: Date | null) => {
+    setDraftText(nextText);
+    onChange(parsedDate ? localDateTimeValue(parsedDate) : "");
+  }, [onChange]);
 
   return (
-    <div className="mq-schedule-picker">
-      <button
-        ref={triggerRef}
-        type="button"
-        className={`mq-schedule-trigger ${isOpen ? "is-open" : ""}`}
-        onClick={openPicker}
-        disabled={disabled}
-        aria-expanded={isOpen}
-        aria-haspopup="dialog"
-      >
-        <CalendarClock size={15} />
-        <span><small>{label}</small><strong>{formatValue(selected)}</strong></span>
-      </button>
-      {isOpen && typeof document !== "undefined" ? createPortal(popover, document.body) : null}
+    <div className="mq-schedule-picker mq-schedule-natural">
+      <label className="mq-schedule-natural-label" htmlFor={inputId}>{label}</label>
+      <div className="mq-schedule-natural-field">
+        <div className="mq-schedule-natural-input-wrap">
+          <NaturalScheduleField
+            id={inputId}
+            text={text}
+            disabled={disabled}
+            variant="inline"
+            ariaLabel={`${label} in natural language`}
+            onChange={updateText}
+            onFocusChange={(focused) => {
+              setDraftText(focused ? text : null);
+            }}
+          />
+        </div>
+        <button
+          ref={calendarButtonRef}
+          type="button"
+          className="mq-schedule-calendar-button"
+          onClick={() => setIsCalendarOpen((open) => !open)}
+          disabled={disabled}
+          aria-label="Pick from calendar"
+          aria-expanded={isCalendarOpen}
+          aria-haspopup="dialog"
+          data-schedule-trigger="true"
+        >
+          <CalendarDays size={17} />
+        </button>
+      </div>
+      <div className="mq-schedule-natural-status">
+        {selected ? <><MarquillMark size={15} theme="auto" className="mq-schedule-mark mq-schedule-mark-small" title="" /><span>{formatPreviewText(selected)}</span></> : <span>Try “next Friday at noon” or use the calendar.</span>}
+      </div>
+      <ReschedulePopover
+        isOpen={isCalendarOpen}
+        initialDate={datePart(selected)}
+        initialTime={timePart(selected)}
+        onClose={() => setIsCalendarOpen(false)}
+        onConfirm={(scheduledTime) => {
+          const next = new Date(scheduledTime);
+          if (!Number.isNaN(next.getTime())) {
+            onChange(localDateTimeValue(next));
+            setDraftText(null);
+          }
+          setIsCalendarOpen(false);
+        }}
+        isScheduling={disabled}
+        showNaturalInput={false}
+        anchorRef={calendarButtonRef}
+      />
     </div>
   );
 }

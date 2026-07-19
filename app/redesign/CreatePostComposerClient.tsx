@@ -244,7 +244,6 @@ export default function CreatePostComposerClient({
                 artifact={artifact}
                 busy={isBusy || compositionLocked}
                 canSwap={!compositionLocked}
-                readOnly={compositionLocked}
                 onSwap={() => setIsArtifactPickerOpen(true)}
                 mediaControls={artifact.type === "POST" ? <PostMediaControls error={mediaError} isBusy={isBusy} readOnly={compositionLocked} media={media} previewUrls={previewUrls} onChooseStock={setStockProvider} onRefresh={() => void refreshMedia()} onRemove={(item) => void removeMedia(item)} onUpload={uploadFiles} /> : undefined}
               />
@@ -252,7 +251,7 @@ export default function CreatePostComposerClient({
           </section>
 
           <aside className="mq-create-post-sidebar">
-            {artifact ? <><span className="mq-mono">_ linkedin preview</span><div className="mq-desktop-composition-preview"><PostCompositionPreview user={user} account={account} artifact={artifact} media={media} previewUrls={previewUrls} /></div><div className="mq-mobile-preview-wrap"><button type="button" onClick={() => setIsMobilePreviewOpen((value) => !value)} aria-expanded={isMobilePreviewOpen}>LinkedIn preview <ChevronDown className={isMobilePreviewOpen ? "is-open" : ""} size={16} /></button>{isMobilePreviewOpen ? <PostCompositionPreview user={user} account={account} artifact={artifact} media={media} previewUrls={previewUrls} /> : null}</div></> : null}
+            {artifact ? <><span className="mq-mono">_ linkedin preview</span><div className="mq-desktop-composition-preview"><PostCompositionPreview key={`desktop-${artifact.id}:${artifact.version}`} user={user} account={account} artifact={artifact} media={media} previewUrls={previewUrls} /></div><div className="mq-mobile-preview-wrap"><button type="button" onClick={() => setIsMobilePreviewOpen((value) => !value)} aria-expanded={isMobilePreviewOpen}>LinkedIn preview <ChevronDown className={isMobilePreviewOpen ? "is-open" : ""} size={16} /></button><div hidden={!isMobilePreviewOpen}><PostCompositionPreview key={`mobile-${artifact.id}:${artifact.version}`} user={user} account={account} artifact={artifact} media={media} previewUrls={previewUrls} /></div></div></> : null}
 
             {postId && !isPublished ? <PostSchedulingControls canSubmit={canSubmit} isBusy={isBusy} isScheduling={pendingAction === "schedule"} scheduleMode={scheduleMode} scheduleValue={scheduleValue} onChange={setScheduleValue} onConfirm={() => void confirmSchedule()} onModeChange={setScheduleMode} /> : null}
           </aside>

@@ -32,7 +32,7 @@ export default function PostCompositionPreview({
         <MoreHorizontal className="mq-more-dots" size={17} aria-label="More options" />
       </div>
 
-      <ArtifactContentView artifact={artifact} variant="preview" />
+      <ArtifactContentView artifact={artifact} />
 
       {artifact.type === "POST" && readyMedia.length ? (
         <div className={`mq-composition-media-grid count-${Math.min(readyMedia.length, 4)}`}>

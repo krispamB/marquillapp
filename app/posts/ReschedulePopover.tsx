@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { CalendarClock, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3, Sparkles } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock3 } from "lucide-react";
+import { createPortal } from "react-dom";
+import MarquillMark from "../../components/brand/MarquillMark";
+import NaturalScheduleField from "./NaturalScheduleField";
 import {
-    parseNaturalDate,
-    getGhostCompletion,
     formatCanonicalText,
     formatPreviewText,
-    EMPTY_INPUT_PRESETS,
 } from "./naturalDate";
 
 // ─── Utility functions ─────────────────────────────────────────────────────────
@@ -90,19 +90,19 @@ function CalendarGrid({
                     type="button"
                     onClick={onPrevMonth}
                     disabled={isScheduling}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--color-text-secondary)] transition hover:bg-slate-100 disabled:opacity-40"
+                    className="flex h-8 w-8 items-center justify-center rounded-[var(--r-sm)] text-[var(--ink-500)] transition hover:bg-[var(--surface-2)] hover:text-[var(--ink-900)] disabled:opacity-40"
                     aria-label="Previous month"
                 >
                     <ChevronLeft className="h-4 w-4" />
                 </button>
-                <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+                <span className="text-sm font-semibold text-[var(--ink-900)]">
                     {MONTH_NAMES[viewMonth]} {viewYear}
                 </span>
                 <button
                     type="button"
                     onClick={onNextMonth}
                     disabled={isScheduling}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--color-text-secondary)] transition hover:bg-slate-100 disabled:opacity-40"
+                    className="flex h-8 w-8 items-center justify-center rounded-[var(--r-sm)] text-[var(--ink-500)] transition hover:bg-[var(--surface-2)] hover:text-[var(--ink-900)] disabled:opacity-40"
                     aria-label="Next month"
                 >
                     <ChevronRight className="h-4 w-4" />
@@ -112,7 +112,7 @@ function CalendarGrid({
             {/* Day-of-week headers */}
             <div className="mb-1 grid grid-cols-7 text-center">
                 {DAY_LABELS.map((label) => (
-                    <span key={label} className="text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    <span key={label} className="text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-400)]">
                         {label}
                     </span>
                 ))}
@@ -145,17 +145,17 @@ function CalendarGrid({
                                 onSelectDay(dateStr);
                             }}
                             className={[
-                                "mx-auto flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition",
+                                "mx-auto flex h-8 w-8 items-center justify-center rounded-[var(--r-sm)] text-sm font-medium transition",
                                 isPast
                                     ? "cursor-not-allowed opacity-30"
                                     : "cursor-pointer",
                                 isSelected
-                                    ? "bg-[#1C1B27] text-white"
+                                    ? "bg-[var(--ink-900)] text-[var(--surface)]"
                                     : isToday
-                                        ? "ring-2 ring-[var(--color-primary)] text-[var(--color-primary)]"
+                                        ? "ring-1 ring-[var(--ink-900)] text-[var(--ink-900)]"
                                         : !isPast
-                                            ? "text-[var(--color-text-primary)] hover:bg-slate-100"
-                                            : "text-[var(--color-text-secondary)]",
+                                            ? "text-[var(--ink-700)] hover:bg-[var(--surface-2)] hover:text-[var(--ink-900)]"
+                                            : "text-[var(--ink-400)]",
                             ].join(" ")}
                             aria-label={`${MONTH_NAMES[viewMonth]} ${cell.day}, ${viewYear}`}
                             aria-pressed={isSelected}
@@ -192,26 +192,26 @@ function TimeStepper({
                     type="button"
                     disabled={isScheduling}
                     onClick={() => onChangeHours((hours + 1) % 24)}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition hover:bg-slate-100 disabled:opacity-40"
+                    className="flex h-7 w-7 items-center justify-center rounded-[var(--r-sm)] text-[var(--ink-500)] transition hover:bg-[var(--surface-2)] hover:text-[var(--ink-900)] disabled:opacity-40"
                     aria-label="Increase hours"
                 >
                     <ChevronUp className="h-4 w-4" />
                 </button>
-                <span className="w-10 rounded-xl border border-[#cfd5e1] bg-white py-1.5 text-center text-base font-semibold tabular-nums text-[var(--color-text-primary)]">
+                <span className="w-10 rounded-[var(--r-sm)] border border-[var(--line-strong)] bg-[var(--surface)] py-1.5 text-center text-base font-semibold tabular-nums text-[var(--ink-900)]">
                     {pad(hours)}
                 </span>
                 <button
                     type="button"
                     disabled={isScheduling}
                     onClick={() => onChangeHours((hours + 23) % 24)}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition hover:bg-slate-100 disabled:opacity-40"
+                    className="flex h-7 w-7 items-center justify-center rounded-[var(--r-sm)] text-[var(--ink-500)] transition hover:bg-[var(--surface-2)] hover:text-[var(--ink-900)] disabled:opacity-40"
                     aria-label="Decrease hours"
                 >
                     <ChevronDown className="h-4 w-4" />
                 </button>
             </div>
 
-            <span className="mb-0.5 text-xl font-semibold text-[var(--color-text-secondary)]">:</span>
+            <span className="mb-0.5 text-xl font-semibold text-[var(--ink-400)]">:</span>
 
             {/* Minutes */}
             <div className="flex flex-col items-center gap-1">
@@ -219,102 +219,24 @@ function TimeStepper({
                     type="button"
                     disabled={isScheduling}
                     onClick={() => onChangeMinutes((minutes + 1) % 60)}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition hover:bg-slate-100 disabled:opacity-40"
+                    className="flex h-7 w-7 items-center justify-center rounded-[var(--r-sm)] text-[var(--ink-500)] transition hover:bg-[var(--surface-2)] hover:text-[var(--ink-900)] disabled:opacity-40"
                     aria-label="Increase minutes"
                 >
                     <ChevronUp className="h-4 w-4" />
                 </button>
-                <span className="w-10 rounded-xl border border-[#cfd5e1] bg-white py-1.5 text-center text-base font-semibold tabular-nums text-[var(--color-text-primary)]">
+                <span className="w-10 rounded-[var(--r-sm)] border border-[var(--line-strong)] bg-[var(--surface)] py-1.5 text-center text-base font-semibold tabular-nums text-[var(--ink-900)]">
                     {pad(minutes)}
                 </span>
                 <button
                     type="button"
                     disabled={isScheduling}
                     onClick={() => onChangeMinutes((minutes + 59) % 60)}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-text-secondary)] transition hover:bg-slate-100 disabled:opacity-40"
+                    className="flex h-7 w-7 items-center justify-center rounded-[var(--r-sm)] text-[var(--ink-500)] transition hover:bg-[var(--surface-2)] hover:text-[var(--ink-900)] disabled:opacity-40"
                     aria-label="Decrease minutes"
                 >
                     <ChevronDown className="h-4 w-4" />
                 </button>
             </div>
-        </div>
-    );
-}
-
-// ─── Natural language input with ghost completion ──────────────────────────────
-
-function NaturalInput({
-    text,
-    ghost,
-    isScheduling,
-    onTextChange,
-    onAcceptGhost,
-    onEnter,
-    onFocusChange,
-    inputRef,
-}: {
-    text: string;
-    ghost: string | null;
-    isScheduling: boolean;
-    onTextChange: (value: string) => void;
-    onAcceptGhost: () => void;
-    onEnter: () => void;
-    onFocusChange: (focused: boolean) => void;
-    inputRef: React.RefObject<HTMLInputElement | null>;
-}) {
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (ghost && (e.key === "Tab" || (e.key === "ArrowRight" && e.currentTarget.selectionStart === text.length))) {
-            e.preventDefault();
-            onAcceptGhost();
-            return;
-        }
-        if (e.key === "Enter") {
-            e.preventDefault();
-            onEnter();
-        }
-    };
-
-    return (
-        <div className="relative">
-            <input
-                ref={inputRef}
-                type="text"
-                value={text}
-                disabled={isScheduling}
-                onChange={(e) => onTextChange(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onFocus={() => onFocusChange(true)}
-                onBlur={() => onFocusChange(false)}
-                placeholder={ghost ? "" : "Try “tomorrow at 9am” or “in 2 hours”…"}
-                autoComplete="off"
-                autoCorrect="off"
-                spellCheck={false}
-                aria-label="Schedule time in natural language"
-                className="w-full rounded-xl border border-[#cfd5e1] bg-white px-3 py-2.5 text-sm font-medium text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]/60 focus:border-[var(--color-primary)] focus:outline-none disabled:opacity-50"
-            />
-            {/* Ghost completion overlay: mirrors the typed text invisibly so the
-                gray suffix lands exactly where the caret is. */}
-            {ghost ? (
-                <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre px-3 text-sm font-medium"
-                >
-                    <span className="invisible">{text}</span>
-                    <span
-                        className="pointer-events-auto cursor-pointer text-[var(--color-text-secondary)]/50"
-                        onMouseDown={(e) => {
-                            // preventDefault keeps focus in the input; stopPropagation
-                            // keeps document-level outside-click handlers from seeing a
-                            // node that React unmounts when the ghost is accepted.
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onAcceptGhost();
-                        }}
-                    >
-                        {ghost}
-                    </span>
-                </div>
-            ) : null}
         </div>
     );
 }
@@ -328,6 +250,8 @@ export function ReschedulePopover({
     onClose,
     onConfirm,
     isScheduling = false,
+    showNaturalInput = true,
+    anchorRef,
     positionClasses = "top-full right-0 mt-2",
     zIndexClass = "z-[72]",
 }: {
@@ -337,6 +261,8 @@ export function ReschedulePopover({
     onClose: () => void;
     onConfirm: (scheduledTime: string, timezone: string) => void;
     isScheduling?: boolean;
+    showNaturalInput?: boolean;
+    anchorRef?: React.RefObject<HTMLElement | null>;
     positionClasses?: string;
     zIndexClass?: string;
 }) {
@@ -344,15 +270,13 @@ export function ReschedulePopover({
     const [text, setText] = useState("");
     const [resolved, setResolved] = useState<Date | null>(null);
     const [showManual, setShowManual] = useState(false);
-    const [isInputFocused, setIsInputFocused] = useState(false);
-    const [presetIndex, setPresetIndex] = useState(0);
     const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
     const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
     const [scheduleError, setScheduleError] = useState<string | null>(null);
     const [isMobile, setIsMobile] = useState(false);
+    const [popoverPosition, setPopoverPosition] = useState({ top: 16, left: 16 });
 
     const desktopPopoverRef = useRef<HTMLDivElement | null>(null);
-    const inputRef = useRef<HTMLInputElement | null>(null);
 
     const userTimezone = useMemo(
         () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
@@ -377,7 +301,7 @@ export function ReschedulePopover({
         if (!isOpen) return;
         const now = new Date();
         setScheduleError(null);
-        setShowManual(false);
+        setShowManual(!showNaturalInput);
 
         let initial: Date | null = null;
         if (initialDate) {
@@ -397,19 +321,37 @@ export function ReschedulePopover({
         setViewYear((initial ?? now).getFullYear());
         setViewMonth((initial ?? now).getMonth());
 
-        // Focus the input once the popover has rendered.
-        requestAnimationFrame(() => inputRef.current?.focus());
-    }, [isOpen, initialDate, initialTime]);
+    }, [isOpen, initialDate, initialTime, showNaturalInput]);
 
-    // ── Cycle ghost presets while focused and empty ──
+    // ── Keep portaled desktop popovers inside the viewport ──
     useEffect(() => {
-        if (!isOpen || !isInputFocused || text.trim()) return;
-        const id = setInterval(
-            () => setPresetIndex((i) => (i + 1) % EMPTY_INPUT_PRESETS.length),
-            3000,
-        );
-        return () => clearInterval(id);
-    }, [isOpen, isInputFocused, text]);
+        if (!isOpen || isMobile || !anchorRef?.current) return;
+
+        const updatePosition = () => {
+            const rect = anchorRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            const width = Math.min(380, window.innerWidth - 32);
+            const height = desktopPopoverRef.current?.offsetHeight ?? 520;
+            const below = rect.bottom + 8;
+            const top = below + height <= window.innerHeight - 16
+                ? below
+                : Math.max(16, rect.top - height - 8);
+            setPopoverPosition({
+                top,
+                left: Math.max(16, Math.min(rect.left, window.innerWidth - width - 16)),
+            });
+        };
+
+        updatePosition();
+        const frame = requestAnimationFrame(updatePosition);
+        window.addEventListener("resize", updatePosition);
+        window.addEventListener("scroll", updatePosition, true);
+        return () => {
+            cancelAnimationFrame(frame);
+            window.removeEventListener("resize", updatePosition);
+            window.removeEventListener("scroll", updatePosition, true);
+        };
+    }, [anchorRef, isMobile, isOpen, showManual]);
 
     // ── Desktop outside-click handler ──
     useEffect(() => {
@@ -445,26 +387,11 @@ export function ReschedulePopover({
     }, [isOpen, isMobile, onClose]);
 
     // ── Text editing ──
-    const handleTextChange = useCallback((value: string) => {
+    const handleTextChange = useCallback((value: string, date: Date | null) => {
         setText(value);
         setScheduleError(null);
-        const parsed = parseNaturalDate(value);
-        setResolved(parsed ? parsed.date : null);
+        setResolved(date);
     }, []);
-
-    const ghost = useMemo(() => {
-        if (!isOpen || isScheduling) return null;
-        if (!text.trim()) {
-            return isInputFocused ? EMPTY_INPUT_PRESETS[presetIndex] : null;
-        }
-        return getGhostCompletion(text);
-    }, [isOpen, isScheduling, text, isInputFocused, presetIndex]);
-
-    const handleAcceptGhost = useCallback(() => {
-        if (!ghost) return;
-        handleTextChange(text + ghost);
-        inputRef.current?.focus();
-    }, [ghost, text, handleTextChange]);
 
     // ── Manual picker (two-way sync: picks write canonical text back) ──
     const applyManualDate = useCallback((next: Date) => {
@@ -563,49 +490,48 @@ export function ReschedulePopover({
         <>
             {/* Header */}
             <div className="mb-4 flex items-center gap-2">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#eef3ff] text-[#3451d1]">
-                    <CalendarClock className="h-4 w-4" />
-                </span>
-                <p className="flex-1 text-sm font-semibold text-[var(--color-text-primary)]">Schedule Post</p>
-                <button
-                    type="button"
-                    onClick={handleToggleManual}
-                    disabled={isScheduling}
-                    className={[
-                        "flex h-8 w-8 items-center justify-center rounded-full transition disabled:opacity-40",
-                        showManual
-                            ? "bg-[#eef3ff] text-[#3451d1]"
-                            : "text-[var(--color-text-secondary)] hover:bg-slate-100",
-                    ].join(" ")}
-                    aria-label={showManual ? "Hide calendar" : "Pick from calendar"}
-                    aria-pressed={showManual}
-                >
-                    <CalendarDays className="h-4 w-4" />
-                </button>
+                <MarquillMark size={32} theme="auto" className="mq-schedule-mark" title="" />
+                <p className="flex-1 text-sm font-semibold text-[var(--ink-900)]">{showNaturalInput ? "Schedule post" : "Pick a date and time"}</p>
+                {showNaturalInput ? (
+                    <button
+                        type="button"
+                        onClick={handleToggleManual}
+                        disabled={isScheduling}
+                        className={[
+                            "flex h-8 w-8 items-center justify-center rounded-full transition disabled:opacity-40",
+                            showManual
+                                ? "bg-[var(--ink-900)] text-[var(--surface)]"
+                                : "text-[var(--ink-500)] hover:bg-[var(--surface-2)] hover:text-[var(--ink-900)]",
+                        ].join(" ")}
+                        aria-label={showManual ? "Hide calendar" : "Pick from calendar"}
+                        aria-pressed={showManual}
+                    >
+                        <CalendarDays className="h-4 w-4" />
+                    </button>
+                ) : null}
             </div>
 
             {/* Natural language input */}
-            <NaturalInput
-                text={text}
-                ghost={ghost}
-                isScheduling={isScheduling}
-                onTextChange={handleTextChange}
-                onAcceptGhost={handleAcceptGhost}
-                onEnter={handleConfirm}
-                onFocusChange={setIsInputFocused}
-                inputRef={inputRef}
-            />
+            {showNaturalInput ? (
+                <NaturalScheduleField
+                    text={text}
+                    disabled={isScheduling}
+                    autoFocus
+                    onChange={handleTextChange}
+                    onEnter={handleConfirm}
+                />
+            ) : null}
 
             {/* Live preview */}
-            <div className="mt-2 min-h-[1.25rem] text-xs font-medium">
+            {showNaturalInput ? <div className="mt-2 min-h-[1.25rem] text-xs font-medium">
                 {resolved ? (
-                    <p className={isTooSoon ? "text-rose-600" : "text-[#3451d1]"}>
-                        <Sparkles className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />
+                    <p className={isTooSoon ? "text-rose-600" : "text-[var(--ink-900)]"}>
+                        <MarquillMark size={15} theme="auto" className="mq-schedule-mark mq-schedule-mark-small mr-1" title="" />
                         {formatPreviewText(resolved)}
                         {isTooSoon ? " — at least 5 minutes ahead, please" : ""}
                     </p>
                 ) : text.trim() ? (
-                    <p className="text-amber-600">
+                    <p className="text-[var(--ink-500)]">
                         Couldn’t read that yet —{" "}
                         <button
                             type="button"
@@ -616,16 +542,16 @@ export function ReschedulePopover({
                         </button>
                     </p>
                 ) : (
-                    <p className="text-[var(--color-text-secondary)]/70">
+                    <p className="text-[var(--ink-400)]">
                         Press Tab to accept a suggestion
                     </p>
                 )}
-            </div>
+            </div> : null}
 
             {/* Manual fallback: calendar + time stepper */}
             {showManual ? (
                 <>
-                    <div className="my-4 border-t border-[var(--color-border)]" />
+                    <div className="my-4 border-t border-[var(--line-faint)]" />
                     <CalendarGrid
                         viewYear={viewYear}
                         viewMonth={viewMonth}
@@ -635,8 +561,8 @@ export function ReschedulePopover({
                         onNextMonth={handleNextMonth}
                         onSelectDay={handleSelectDay}
                     />
-                    <div className="my-4 border-t border-[var(--color-border)]" />
-                    <p className="mb-2 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-secondary)]">
+                    <div className="my-4 border-t border-[var(--line-faint)]" />
+                    <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-400)]">
                         Time
                     </p>
                     <TimeStepper
@@ -650,8 +576,8 @@ export function ReschedulePopover({
             ) : null}
 
             {/* Timezone */}
-            <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#e2e7f2] bg-[#f7f9ff] px-3 py-2 text-xs font-medium text-[#445065]">
-                <Clock3 className="h-4 w-4 shrink-0 text-[#5575F5]" />
+            <div className="mt-3 flex items-center gap-2 rounded-[var(--r-md)] border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 text-xs font-medium text-[var(--ink-500)]">
+                <Clock3 className="h-4 w-4 shrink-0 text-[var(--ink-900)]" />
                 <span className="truncate">{timezoneLabel}</span>
             </div>
 
@@ -666,7 +592,7 @@ export function ReschedulePopover({
                     type="button"
                     onClick={handleClose}
                     disabled={isScheduling}
-                    className="inline-flex items-center rounded-full border border-[#d4dae6] bg-white px-4 py-2 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:text-[var(--color-text-primary)] disabled:opacity-50"
+                    className="inline-flex items-center rounded-[var(--r-md)] border border-[var(--line-strong)] bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--ink-700)] transition hover:bg-[var(--surface-2)] hover:text-[var(--ink-900)] disabled:opacity-50"
                 >
                     Cancel
                 </button>
@@ -674,7 +600,7 @@ export function ReschedulePopover({
                     type="button"
                     onClick={handleConfirm}
                     disabled={isScheduling || !isConfirmable}
-                    className="inline-flex items-center rounded-full bg-[#1C1B27] px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
+                    className="inline-flex items-center rounded-[var(--r-md)] border border-[var(--ink-900)] bg-[var(--ink-900)] px-4 py-2 text-xs font-semibold text-[var(--surface)] transition hover:bg-[var(--ink-800)] disabled:opacity-50"
                 >
                     {isScheduling ? "Scheduling…" : "Confirm Schedule"}
                 </button>
@@ -691,27 +617,32 @@ export function ReschedulePopover({
                     onClick={handleClose}
                 />
                 <div
-                    className="fixed bottom-0 left-0 right-0 z-[101] max-h-[90dvh] overflow-y-auto rounded-t-3xl bg-white px-5 pb-10 pt-4 shadow-[0_-8px_30px_-4px_rgba(15,23,42,0.15)]"
+                    className="mq-schedule-theme fixed bottom-0 left-0 right-0 z-[101] max-h-[90dvh] overflow-y-auto rounded-t-[var(--r-xl)] border-t border-[var(--line-strong)] bg-[var(--surface)] px-5 pb-10 pt-4 shadow-[var(--sh-lg)]"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-slate-200" />
+                    <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[var(--ink-300)]" />
                     {content}
                 </div>
             </>
         );
     }
 
-    // ── Desktop: absolute popover ──
-    return (
+    // ── Desktop: portal when anchored, legacy absolute positioning otherwise ──
+    const desktopPopover = (
         <div
             id="schedule-popover"
             ref={desktopPopoverRef}
             role="dialog"
             aria-label="Schedule post"
-            className={`absolute ${positionClasses} ${zIndexClass} w-[min(92vw,380px)] rounded-2xl border border-[#d6dae3] bg-white p-5 shadow-[0_20px_44px_-28px_rgba(15,23,42,0.45)]`}
+            className={`mq-schedule-theme ${anchorRef ? "fixed z-[100]" : `absolute ${positionClasses} ${zIndexClass}`} max-h-[calc(100dvh-32px)] w-[min(92vw,380px)] overflow-y-auto rounded-[var(--r-lg)] border border-[var(--line-strong)] bg-[var(--surface)] p-5 text-[var(--ink-900)] shadow-[var(--sh-lg)]`}
+            style={anchorRef ? popoverPosition : undefined}
             onClick={(e) => e.stopPropagation()}
         >
             {content}
         </div>
     );
+
+    return anchorRef && typeof document !== "undefined"
+        ? createPortal(desktopPopover, document.body)
+        : desktopPopover;
 }
