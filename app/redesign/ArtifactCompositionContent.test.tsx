@@ -2,6 +2,7 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterAll, afterEach, describe, expect, test } from "bun:test";
 import { ArtifactContentView } from "./ArtifactCompositionContent";
+import { documentArtifactFixture } from "./artifactTestFixtures";
 import type { ArtifactDetailData } from "./artifactTypes";
 
 GlobalRegistrator.register();
@@ -18,28 +19,6 @@ function postArtifact(id = "artifact-1", version = 1): ArtifactDetailData {
     version,
     status: "READY",
     content: { commentary },
-  };
-}
-
-function documentArtifact(pdfUrl?: string): ArtifactDetailData {
-  return {
-    id: "document-1",
-    type: "DOCUMENT",
-    title: "Marketing playbook",
-    currentVersion: 1,
-    version: 1,
-    status: "READY",
-    content: {
-      document: {
-        templateId: "editorial",
-        slides: [
-          { type: "cover", fields: { title: "Marketing playbook" } },
-          { type: "cta", fields: { headline: "Start today", action: "Follow" } },
-        ],
-        pageCount: 2,
-        ...(pdfUrl ? { pdfUrl } : {}),
-      },
-    },
   };
 }
 
@@ -64,14 +43,14 @@ describe("ArtifactContentView", () => {
   });
 
   test("uses the reusable PDF preview when a document URL is available", () => {
-    const view = render(<ArtifactContentView artifact={documentArtifact("https://files.example/document.pdf")} />);
+    const view = render(<ArtifactContentView artifact={documentArtifactFixture({ pdfUrl: "https://files.example/document.pdf" })} />);
 
     expect(view.getByLabelText("Marketing playbook carousel preview")).toBeTruthy();
     expect(view.queryByText("PDF preview unavailable")).toBeNull();
   });
 
   test("keeps a useful document fallback when no PDF URL is available", () => {
-    const view = render(<ArtifactContentView artifact={documentArtifact()} />);
+    const view = render(<ArtifactContentView artifact={documentArtifactFixture()} />);
 
     expect(view.getByText("PDF preview unavailable")).toBeTruthy();
     expect(view.queryByLabelText("Marketing playbook carousel preview")).toBeNull();

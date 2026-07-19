@@ -11,6 +11,7 @@ import {
 } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import type { PdfPreviewProps } from "./PdfPreview";
+import PdfPreviewLoading from "./PdfPreviewLoading";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -24,15 +25,6 @@ type DragState = {
   startX: number;
   scrollLeft: number;
 };
-
-function LoadingPages({ pageCountHint }: { pageCountHint?: number }) {
-  return (
-    <div className="mq-pdf-preview-loading" role="status" aria-live="polite">
-      <div className="mq-pdf-preview-skeleton" aria-hidden="true" />
-      <span>Loading PDF{pageCountHint ? ` · ${pageCountHint} pages` : ""}…</span>
-    </div>
-  );
-}
 
 export default function PdfPreviewRenderer({
   source,
@@ -69,6 +61,9 @@ export default function PdfPreviewRenderer({
   const handleSourceError = useCallback((sourceError: Error) => {
     setError(sourceError.message || "The PDF source is unavailable.");
   }, []);
+  const handlePageError = useCallback((pageError: Error) => {
+    setError(pageError.message || "A PDF page could not be rendered.");
+  }, []);
 
   useEffect(() => {
     const rail = railRef.current;
@@ -96,13 +91,16 @@ export default function PdfPreviewRenderer({
 
   function closestPage() {
     const rail = railRef.current;
-    if (!rail || !pageRefs.current.length) return currentPage;
+    const firstPage = pageRefs.current[0];
+    if (!rail || !firstPage) return currentPage;
 
     let closest = currentPage;
     let closestDistance = Number.POSITIVE_INFINITY;
+    const firstPageLeft = firstPage.getBoundingClientRect().left;
     pageRefs.current.forEach((page, index) => {
       if (!page) return;
-      const distance = Math.abs(page.offsetLeft - rail.scrollLeft - rail.clientLeft);
+      const pageTarget = page.getBoundingClientRect().left - firstPageLeft;
+      const distance = Math.abs(pageTarget - rail.scrollLeft);
       if (distance < closestDistance) {
         closest = index + 1;
         closestDistance = distance;
@@ -121,9 +119,11 @@ export default function PdfPreviewRenderer({
 
   function scrollToPage(pageNumber: number, behavior: ScrollBehavior = "smooth") {
     const rail = railRef.current;
+    const firstPage = pageRefs.current[0];
     const page = pageRefs.current[pageNumber - 1];
-    if (!rail || !page) return;
-    rail.scrollTo({ left: page.offsetLeft - rail.clientLeft, behavior });
+    if (!rail || !firstPage || !page) return;
+    const targetLeft = page.getBoundingClientRect().left - firstPage.getBoundingClientRect().left;
+    rail.scrollTo({ left: targetLeft, behavior });
     setCurrentPage(pageNumber);
   }
 
@@ -199,7 +199,7 @@ export default function PdfPreviewRenderer({
         key={attempt}
         file={documentSource}
         className="mq-pdf-preview-document"
-        loading={<LoadingPages pageCountHint={pageCountHint} />}
+        loading={<PdfPreviewLoading pageCountHint={pageCountHint} />}
         error={null}
         onLoadSuccess={handleDocumentLoadSuccess}
         onLoadError={handleDocumentLoadError}
@@ -227,6 +227,8 @@ export default function PdfPreviewRenderer({
                   width={pageWidth}
                   renderTextLayer={false}
                   renderAnnotationLayer={false}
+                  onLoadError={handlePageError}
+                  onRenderError={handlePageError}
                   loading={<div className="mq-pdf-preview-page-loading" aria-hidden="true" />}
                   error={<div className="mq-pdf-preview-page-error">Page unavailable</div>}
                 />

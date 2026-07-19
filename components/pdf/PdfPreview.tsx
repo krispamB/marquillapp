@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
+import PdfPreviewLoading from "./PdfPreviewLoading";
 
 export type PdfSource = string | File | ArrayBuffer | Uint8Array;
 
@@ -17,17 +18,8 @@ export type PdfPreviewProps = {
 
 const PdfPreviewRenderer = dynamic(() => import("./PdfPreviewRenderer"), {
   ssr: false,
-  loading: () => <PdfPreviewSkeleton />,
+  loading: () => <PdfPreviewLoading />,
 });
-
-function PdfPreviewSkeleton({ pageCountHint }: { pageCountHint?: number }) {
-  return (
-    <div className="mq-pdf-preview-loading" role="status" aria-live="polite">
-      <div className="mq-pdf-preview-skeleton" aria-hidden="true" />
-      <span>Loading PDF{pageCountHint ? ` · ${pageCountHint} pages` : ""}…</span>
-    </div>
-  );
-}
 
 export default function PdfPreview({
   source,
@@ -77,7 +69,7 @@ export default function PdfPreview({
           onPageChange={onPageChange}
         />
       ) : (
-        <PdfPreviewSkeleton pageCountHint={pageCountHint} />
+        <PdfPreviewLoading pageCountHint={pageCountHint} />
       )}
     </div>
   );
