@@ -9,6 +9,11 @@ import type {
 } from "../lib/types";
 import type { ArtifactType } from "./artifactTypes";
 import { API_BASE, jsonRequest, readApi, sleep } from "./api";
+import {
+  deleteCachedMediaPreview,
+  readCachedMediaPreview,
+  writeCachedMediaPreview,
+} from "./mediaPreviewCache";
 
 const MAX_FILE_BYTES = 200 * 1024 * 1024;
 const allowedTypes = new Set(["image/jpeg", "image/png", "video/mp4"]);
@@ -37,11 +42,13 @@ export default function usePostMediaWorkflow({
   artifactType,
   initialMedia = [],
   onStatus,
+  request = readApi,
 }: {
   postId?: string;
   artifactType?: ArtifactType;
   initialMedia?: PostMediaItem[];
   onStatus: (message: string) => void;
+  request?: typeof readApi;
 }) {
   const [media, setMedia] = useState<PostMediaItem[]>(initialMedia);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
@@ -53,7 +60,7 @@ export default function usePostMediaWorkflow({
 
   async function refreshMedia() {
     if (!postId) return [];
-    const response = await readApi<PostDetailResponse>(`${API_BASE}/posts/${postId}`);
+    const response = await request<PostDetailResponse>(`${API_BASE}/posts/${postId}`);
     const next = response.data?.media ?? [];
     setMedia(next);
     return next;
@@ -68,7 +75,7 @@ export default function usePostMediaWorkflow({
         await sleep(delay);
         if (cancelled) return;
         try {
-          const response = await readApi<PostDetailResponse>(`${API_BASE}/posts/${postId}`);
+          const response = await request<PostDetailResponse>(`${API_BASE}/posts/${postId}`);
           const next = response.data?.media ?? [];
           if (cancelled) return;
           setMedia(next);
@@ -82,7 +89,7 @@ export default function usePostMediaWorkflow({
       }
     })();
     return () => { cancelled = true; };
-  }, [hasPendingMedia, postId]);
+  }, [hasPendingMedia, postId, request]);
 
   useEffect(() => {
     if (!postId) return;
@@ -93,8 +100,12 @@ export default function usePostMediaWorkflow({
     candidates.forEach((item) => previewRequestedRef.current.add(item.id));
     void Promise.all(candidates.map(async (item) => {
       try {
-        const response = await readApi<LinkedinImageDetailsResponse>(`${API_BASE}/posts/${postId}/media/${item.id}/preview`);
+        const cachedUrl = readCachedMediaPreview(item.id);
+        if (cachedUrl) return { id: item.id, url: cachedUrl };
+
+        const response = await request<LinkedinImageDetailsResponse>(`${API_BASE}/posts/${postId}/media/${item.id}/preview`);
         if (!response.data?.downloadUrl) throw new Error("The media preview URL was unavailable.");
+        writeCachedMediaPreview(item.id, response.data.downloadUrl, response.data.downloadUrlExpiresAt);
         return { id: item.id, url: response.data.downloadUrl };
       } catch (reason) {
         previewRequestedRef.current.delete(item.id);
@@ -116,7 +127,7 @@ export default function usePostMediaWorkflow({
       cancelled = true;
       if (retryTimer) window.clearTimeout(retryTimer);
     };
-  }, [media, postId, previewRetryKey, previewUrls]);
+  }, [media, postId, previewRetryKey, previewUrls, request]);
 
   async function uploadFiles(files: File[]) {
     setIsMutating(true);
@@ -124,7 +135,7 @@ export default function usePostMediaWorkflow({
     try {
       if (!postId || artifactType !== "POST") throw new Error("Attach a POST artifact before adding media.");
       validateFiles(files, media);
-      const declared = await readApi<CreatePostMediaUploadsResponse>(
+      const declared = await request<CreatePostMediaUploadsResponse>(
         `${API_BASE}/posts/${postId}/media/uploads`,
         jsonRequest({ files: files.map((file) => ({ fileName: file.name, mimeType: file.type, sizeBytes: file.size })) }, { method: "POST" }),
       );
@@ -135,7 +146,7 @@ export default function usePostMediaWorkflow({
         const response = await fetch(slot.uploadUrl, { method: "PUT", headers: slot.requiredHeaders, body: files[index] });
         if (!response.ok) throw new Error(`Upload failed for ${files[index].name}.`);
       }));
-      await readApi(
+      await request(
         `${API_BASE}/posts/${postId}/media/uploads/complete`,
         jsonRequest({ mediaIds: slots.map((slot) => slot.mediaId) }, { method: "POST" }),
       );
@@ -155,10 +166,11 @@ export default function usePostMediaWorkflow({
     setIsMutating(true);
     setError(null);
     try {
-      const response = await readApi<{ data?: PostMediaItem[] }>(`${API_BASE}/posts/${postId}/media/${item.id}`, { method: "DELETE" });
+      const response = await request<{ data?: PostMediaItem[] }>(`${API_BASE}/posts/${postId}/media/${item.id}`, { method: "DELETE" });
       setMedia((current) => Array.isArray(response.data) ? response.data : current.filter((candidate) => candidate.id !== item.id));
       previewRequestedRef.current.delete(item.id);
       setPreviewUrls((current) => { const next = { ...current }; delete next[item.id]; return next; });
+      deleteCachedMediaPreview(item.id);
       onStatus("Media removed");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to remove media.");
