@@ -2,8 +2,41 @@ import { MarkCursor } from './data';
 
 export default function Hero() {
   return (
-    <section id="top" className="bg-surface px-5 pb-14 pt-14 text-center sm:px-6 sm:pt-20 lg:px-8">
-      <div className="mx-auto max-w-[840px]">
+    <section id="top" className="relative isolate overflow-hidden bg-surface px-5 pb-14 pt-14 text-center sm:px-6 sm:pt-20 lg:px-8">
+      {/* Decorative integration cards — desktop only */}
+      <div
+        className="pointer-events-none absolute inset-0 z-0 mx-auto hidden max-w-[1280px] lg:block"
+        aria-hidden="true"
+      >
+        <div className="absolute left-2 top-[120px] -rotate-6 xl:left-5">
+          <div
+            className="animate-mq-float flex h-20 w-20 items-center justify-center rounded-[22px] border border-white/10 bg-[#101012] p-[22px] shadow-[0_18px_44px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.06)] xl:h-24 xl:w-24 xl:rounded-[26px] xl:p-[26px]"
+            style={{ animationDuration: '7.5s', animationDelay: '-1.2s' }}
+          >
+            <img src="/claude/Symbol.svg" alt="" className="h-full w-full" />
+          </div>
+        </div>
+
+        <div className="absolute right-2 top-[112px] rotate-6 xl:right-5">
+          <div
+            className="animate-mq-float flex h-20 w-20 items-center justify-center rounded-[22px] border border-white/10 bg-[#101012] p-[15px] shadow-[0_18px_44px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.06)] xl:h-24 xl:w-24 xl:rounded-[26px] xl:p-[18px]"
+            style={{ animationDuration: '8.6s', animationDelay: '-4.1s' }}
+          >
+            <img src="/openAi/OpenAI_Symbol_0.svg" alt="" className="h-full w-full" />
+          </div>
+        </div>
+
+        <div className="absolute left-4 top-[440px] rotate-[5deg] xl:left-12 xl:top-[448px]">
+          <div
+            className="animate-mq-float flex h-20 w-20 items-center justify-center rounded-[22px] border border-white/10 bg-[#101012] p-[21px] shadow-[0_18px_44px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.06)] xl:h-24 xl:w-24 xl:rounded-[26px] xl:p-[25px]"
+            style={{ animationDuration: '9.2s', animationDelay: '-2.8s' }}
+          >
+            <img src="/linkedIn/LinkedIn_Symbol_0.svg" alt="" className="h-full w-full" />
+          </div>
+        </div>
+      </div>
+
+      <div className="relative z-10 mx-auto max-w-[840px]">
         {/* Eyebrow badge */}
         <span className="ff-mono inline-flex items-center gap-2 rounded-full border border-line bg-surface px-[13px] py-1.5 text-[12.5px] font-medium text-ink-700 shadow-xs">
           meet mark, your linkedin agent
