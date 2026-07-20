@@ -54,6 +54,7 @@ export default function CreatePostComposerClient({
   const [artifact, setArtifact] = useState<ArtifactDetailData | undefined>(initialPost?.artifact);
   const [isArtifactPickerOpen, setIsArtifactPickerOpen] = useState(false);
   const [stockProvider, setStockProvider] = useState<StockProvider | null>(null);
+  const [isPreparingStock, setIsPreparingStock] = useState(false);
   const [scheduleMode, setScheduleMode] = useState(Boolean(initialPost?.scheduledAt));
   const [mobileView, setMobileView] = useState<MobileComposerView>("compose");
   const [scheduleValue, setScheduleValue] = useState(() => localDateTimeValue(initialPost?.scheduledAt ? new Date(initialPost.scheduledAt) : getDefaultScheduleDate()));
@@ -62,6 +63,7 @@ export default function CreatePostComposerClient({
   const [error, setError] = useState<string | null>(null);
   const {
     error: mediaError,
+    hasPendingMedia,
     isMutating: isMediaMutating,
     media,
     previewUrls,
@@ -69,6 +71,8 @@ export default function CreatePostComposerClient({
     removeMedia,
     replaceMedia,
     uploadFiles,
+    uploadProgress,
+    workflowPhase,
   } = usePostMediaWorkflow({ postId, artifactType: artifact?.type, initialMedia: initialPost?.media, onStatus: setStatusText });
 
   const account = useMemo(
@@ -89,7 +93,7 @@ export default function CreatePostComposerClient({
     return [initialPost.account, ...connectedAccounts];
   }, [connectedAccounts, initialPost]);
   const mediaBlocked = media.some((item) => item.status !== "READY");
-  const isBusy = pendingAction !== null || isMediaMutating;
+  const isBusy = pendingAction !== null || isMediaMutating || isPreparingStock || hasPendingMedia;
   const isPublished = postStatus === "PUBLISHED";
   const isScheduled = postStatus === "SCHEDULED";
   const compositionLocked = isScheduled || isPublished;
@@ -173,14 +177,20 @@ export default function CreatePostComposerClient({
   }
 
   async function selectStockImage(image: { downloadUrl: string; alt: string }) {
+    const provider = stockProvider ?? "stock";
+    setStockProvider(null);
+    setIsPreparingStock(true);
+    setError(null);
     try {
       const response = await fetch(image.downloadUrl);
       if (!response.ok) throw new Error("Unable to download the selected stock image.");
       const blob = await response.blob();
-      const uploaded = await uploadFiles([new File([blob], `${stockProvider ?? "stock"}-image.jpg`, { type: blob.type === "image/png" ? "image/png" : "image/jpeg" })]);
-      if (uploaded) setStockProvider(null);
+      setIsPreparingStock(false);
+      await uploadFiles([new File([blob], `${provider}-image.jpg`, { type: blob.type === "image/png" ? "image/png" : "image/jpeg" })]);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to add the selected image.");
+    } finally {
+      setIsPreparingStock(false);
     }
   }
 
@@ -325,7 +335,7 @@ export default function CreatePostComposerClient({
                 busy={isBusy || compositionLocked}
                 canSwap={!compositionLocked}
                 onSwap={() => setIsArtifactPickerOpen(true)}
-                mediaControls={artifact.type === "POST" ? <PostMediaControls error={mediaError} isBusy={isBusy} readOnly={compositionLocked} media={media} previewUrls={previewUrls} onChooseStock={setStockProvider} onRefresh={() => void refreshMedia()} onRemove={(item) => void removeMedia(item)} onUpload={uploadFiles} /> : undefined}
+                mediaControls={artifact.type === "POST" ? <PostMediaControls error={mediaError} isBusy={isBusy} phase={isPreparingStock ? "preparing" : workflowPhase} readOnly={compositionLocked} media={media} previewUrls={previewUrls} uploadProgress={uploadProgress} onChooseStock={setStockProvider} onRefresh={() => void refreshMedia()} onRemove={(item) => void removeMedia(item)} onUpload={uploadFiles} /> : undefined}
               />
             )}
           </section>

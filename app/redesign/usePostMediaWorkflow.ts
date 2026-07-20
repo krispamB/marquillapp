@@ -14,6 +14,11 @@ import {
   readCachedMediaPreview,
   writeCachedMediaPreview,
 } from "./mediaPreviewCache";
+import {
+  aggregateUploadProgress,
+  uploadFileToUrl,
+  type UploadFileToUrl,
+} from "./mediaUpload";
 
 const MAX_FILE_BYTES = 200 * 1024 * 1024;
 const allowedTypes = new Set(["image/jpeg", "image/png", "video/mp4"]);
@@ -37,23 +42,29 @@ export function mediaStatusLabel(item: PostMediaItem) {
   return item.status === "PENDING" ? "Waiting to upload" : "Processing for LinkedIn";
 }
 
+export type MediaWorkflowPhase = "idle" | "uploading" | "processing";
+
 export default function usePostMediaWorkflow({
   postId,
   artifactType,
   initialMedia = [],
   onStatus,
   request = readApi,
+  upload = uploadFileToUrl,
 }: {
   postId?: string;
   artifactType?: ArtifactType;
   initialMedia?: PostMediaItem[];
   onStatus: (message: string) => void;
   request?: typeof readApi;
+  upload?: UploadFileToUrl;
 }) {
   const [media, setMedia] = useState<PostMediaItem[]>(initialMedia);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [isMutating, setIsMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [previewRetryKey, setPreviewRetryKey] = useState(0);
   const previewRequestedRef = useRef(new Set<string>());
   const mediaRef = useRef(media);
@@ -61,6 +72,7 @@ export default function usePostMediaWorkflow({
   const isMountedRef = useRef(true);
   const previewRetryTimerRef = useRef<number | undefined>(undefined);
   const hasPendingMedia = useMemo(() => media.some((item) => item.status === "PENDING" || item.status === "UPLOADING"), [media]);
+  const workflowPhase: MediaWorkflowPhase = isUploading ? "uploading" : hasPendingMedia ? "processing" : "idle";
 
   useEffect(() => {
     mediaRef.current = media;
@@ -149,6 +161,7 @@ export default function usePostMediaWorkflow({
   async function uploadFiles(files: File[]) {
     setIsMutating(true);
     setError(null);
+    let declaredMediaIds: string[] = [];
     try {
       if (!postId || artifactType !== "POST") throw new Error("Attach a POST artifact before adding media.");
       validateFiles(files, media);
@@ -158,11 +171,21 @@ export default function usePostMediaWorkflow({
       );
       const slots = declared.data?.uploads ?? [];
       if (slots.length !== files.length) throw new Error("The upload service did not return a slot for every file.");
+      declaredMediaIds = slots.map((slot) => slot.mediaId);
       setMedia((current) => [...current, ...slots.map((slot, index): PostMediaItem => ({ id: slot.mediaId, type: files[index].type === "video/mp4" ? "VIDEO" : "IMAGE", status: "PENDING", title: files[index].name, mimeType: files[index].type, sizeBytes: files[index].size }))]);
-      await Promise.all(slots.map(async (slot, index) => {
-        const response = await fetch(slot.uploadUrl, { method: "PUT", headers: slot.requiredHeaders, body: files[index] });
-        if (!response.ok) throw new Error(`Upload failed for ${files[index].name}.`);
-      }));
+      const loadedBytesByFile = files.map(() => 0);
+      setUploadProgress(0);
+      setIsUploading(true);
+      await Promise.all(slots.map((slot, index) => upload(
+        slot.uploadUrl,
+        slot.requiredHeaders,
+        files[index],
+        (loadedBytes) => {
+          loadedBytesByFile[index] = loadedBytes;
+          setUploadProgress(aggregateUploadProgress(loadedBytesByFile, files));
+        },
+      )));
+      setUploadProgress(100);
       await request(
         `${API_BASE}/posts/${postId}/media/uploads/complete`,
         jsonRequest({ mediaIds: slots.map((slot) => slot.mediaId) }, { method: "POST" }),
@@ -171,9 +194,15 @@ export default function usePostMediaWorkflow({
       await refreshMedia();
       return true;
     } catch (reason) {
+      if (declaredMediaIds.length) {
+        const failedIds = new Set(declaredMediaIds);
+        setMedia((current) => current.map((item) => failedIds.has(item.id) ? { ...item, status: "FAILED" } : item));
+      }
       setError(reason instanceof Error ? reason.message : "Unable to upload media.");
       return false;
     } finally {
+      setIsUploading(false);
+      setUploadProgress(null);
       setIsMutating(false);
     }
   }
@@ -202,6 +231,8 @@ export default function usePostMediaWorkflow({
     isMutating,
     media,
     previewUrls,
+    uploadProgress,
+    workflowPhase,
     refreshMedia: async () => {
       try {
         setError(null);

@@ -107,4 +107,53 @@ describe("usePostMediaWorkflow preview caching", () => {
 
     expect(readCachedMediaPreview("media-1")).toBeUndefined();
   });
+
+  test("moves from aggregate upload progress into processing", async () => {
+    let reportProgress!: (loadedBytes: number) => void;
+    let finishUpload!: () => void;
+    const upload = async (_url: string, _headers: Record<string, string>, _file: File, onProgress: (loadedBytes: number) => void) => {
+      reportProgress = onProgress;
+      await new Promise<void>((resolve) => { finishUpload = resolve; });
+    };
+    const request = async <T,>(input: string) => {
+      if (input.endsWith("/media/uploads")) return { data: { uploads: [{ mediaId: "media-new", uploadUrl: "https://s3.example/upload", requiredHeaders: {} }] } } as T;
+      if (input.endsWith("/media/uploads/complete")) return { data: [] } as T;
+      return { data: { media: [{ id: "media-new", type: "IMAGE", status: "UPLOADING", title: "image.jpg" }] } } as T;
+    };
+    const hook = renderHook(() => usePostMediaWorkflow({ postId: "post-1", artifactType: "POST", onStatus: () => {}, request, upload }));
+    const file = new File([new Uint8Array(100)], "image.jpg", { type: "image/jpeg" });
+    let pendingUpload!: Promise<boolean>;
+
+    act(() => { pendingUpload = hook.result.current.uploadFiles([file]); });
+    await waitFor(() => expect(hook.result.current.workflowPhase).toBe("uploading"));
+    act(() => reportProgress(50));
+    expect(hook.result.current.uploadProgress).toBe(50);
+
+    await act(async () => {
+      finishUpload();
+      await pendingUpload;
+    });
+    expect(hook.result.current.workflowPhase).toBe("processing");
+    expect(hook.result.current.uploadProgress).toBeNull();
+    hook.unmount();
+  });
+
+  test("clears upload progress and marks declared media failed after an S3 error", async () => {
+    const request = async <T,>(input: string) => {
+      if (input.endsWith("/media/uploads")) return { data: { uploads: [{ mediaId: "media-failed", uploadUrl: "https://s3.example/upload", requiredHeaders: {} }] } } as T;
+      throw new Error("The completion endpoint should not be called");
+    };
+    const upload = async () => { throw new Error("Upload failed for image.jpg."); };
+    const hook = renderHook(() => usePostMediaWorkflow({ postId: "post-1", artifactType: "POST", onStatus: () => {}, request, upload }));
+    const file = new File([new Uint8Array(100)], "image.jpg", { type: "image/jpeg" });
+
+    await act(async () => {
+      expect(await hook.result.current.uploadFiles([file])).toBe(false);
+    });
+
+    expect(hook.result.current.workflowPhase).toBe("idle");
+    expect(hook.result.current.uploadProgress).toBeNull();
+    expect(hook.result.current.media[0]?.status).toBe("FAILED");
+    expect(hook.result.current.error).toBe("Upload failed for image.jpg.");
+  });
 });
