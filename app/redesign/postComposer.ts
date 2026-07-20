@@ -22,25 +22,14 @@ function normalizePostStatus(value?: string): PostStatus {
   return "DRAFT";
 }
 
-function pinnedArtifactFromPost(post: PostDetailData): ArtifactDetailData {
+export function pinnedArtifactReferenceFromPost(post: PostDetailData) {
   const reference = post.artifacts?.[0];
   const artifact = reference?.artifact;
   const version = reference?.version;
-  const type = artifact?.type;
-  if (!artifact?._id || (type !== "POST" && type !== "POLL" && type !== "DOCUMENT") || !version?.version || !version.content) {
-    throw new Error("This post does not include a usable pinned artifact version.");
+  if (!artifact?._id || !version?.version) {
+    throw new Error("This post does not include a pinned artifact version.");
   }
-  const status = version.status === "FAILED" || version.status === "GENERATING" ? version.status : "READY";
-  return {
-    id: artifact._id,
-    type,
-    title: artifact.title?.trim() || artifact.source?.prompt?.trim() || undefined,
-    currentVersion: version.version,
-    version: version.version,
-    status,
-    updatedAt: version.editedAt ?? version.createdAt ?? post.updatedAt,
-    content: version.content,
-  };
+  return { artifactId: artifact._id, version: version.version };
 }
 
 function accountFromPost(post: PostDetailData): ConnectedAccount {
@@ -59,13 +48,13 @@ function accountFromPost(post: PostDetailData): ConnectedAccount {
   };
 }
 
-export function createInitialPostComposerData(post: PostDetailData): InitialPostComposerData {
+export function createInitialPostComposerData(post: PostDetailData, artifact: ArtifactDetailData): InitialPostComposerData {
   if (!post._id) throw new Error("The saved post does not include an ID.");
   return {
     id: post._id,
     title: post.title?.trim() ?? "",
     status: normalizePostStatus(post.status),
-    artifact: pinnedArtifactFromPost(post),
+    artifact,
     account: accountFromPost(post),
     media: post.media ?? [],
     scheduledAt: post.scheduledAt,

@@ -173,7 +173,7 @@ export default function ArtifactStudioClient({
                   >
                     <span className="mq-artifact-switch" aria-hidden="true"><i /></span>
                     <Search size={14} />
-                    Research
+                    <span className="mq-artifact-research-label">Research</span>
                     {!researchAvailable ? <LockKeyhole size={12} aria-hidden="true" /> : null}
                   </button>
 

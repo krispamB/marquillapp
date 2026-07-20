@@ -16,6 +16,7 @@ import type {
   PostDetailResponse,
   UserApiResponse,
 } from "./types";
+import type { ArtifactDetailResponse } from "../redesign/artifactTypes";
 
 // Absolute backend URL for server-side fetches. The client uses the relative
 // NEXT_PUBLIC_API_BASE_URL (= /api/v1) so requests proxy same-origin; on the
@@ -128,6 +129,14 @@ export async function getDashboardInitialData(
 export function getPostDetail(serverAuth: ServerAuth, postId: string) {
   return readServerApi<PostDetailResponse>(
     `/posts/${encodeURIComponent(postId)}`,
+    serverAuth,
+  );
+}
+
+export function getArtifactDetail(serverAuth: ServerAuth, artifactId: string, version: number) {
+  const query = new URLSearchParams({ version: String(version) });
+  return readServerApi<ArtifactDetailResponse>(
+    `/artifacts/${encodeURIComponent(artifactId)}?${query.toString()}`,
     serverAuth,
   );
 }

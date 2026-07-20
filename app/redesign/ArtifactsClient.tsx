@@ -28,9 +28,6 @@ import type {
   UserProfile,
 } from "../lib/types";
 import type {
-  ArtifactDetailData,
-  ArtifactDetailResponse,
-  ArtifactSlide,
   ArtifactStatus,
   ArtifactSummary,
   ArtifactType,
@@ -38,10 +35,6 @@ import type {
 } from "./artifactTypes";
 
 type ArtifactFilter = "ALL" | ArtifactType;
-type DetailState =
-  | { status: "loading" }
-  | { status: "loaded"; data: ArtifactDetailData }
-  | { status: "error" };
 
 function PostEmptyPreview() {
   return (
@@ -129,93 +122,48 @@ function statusLabel(status: ArtifactStatus) {
   return "Ready";
 }
 
-function slideCopy(slide: ArtifactSlide) {
-  switch (slide.type) {
-    case "cover":
-      return { heading: slide.fields.title, detail: slide.fields.eyebrow ?? slide.fields.subtitle };
-    case "content":
-      return { heading: slide.fields.heading, detail: slide.fields.body };
-    case "list":
-      return { heading: slide.fields.heading, detail: slide.fields.items.slice(0, 2).join(" · ") };
-    case "quote":
-      return { heading: slide.fields.quote, detail: slide.fields.attribution };
-    case "cta":
-      return { heading: slide.fields.headline, detail: slide.fields.action };
+// Chosen motion direction: kinetic editorial — abstract format cues that reveal no artifact content.
+function ArtifactMotionPreview({ type }: { type: ArtifactType }) {
+  if (type === "POST") {
+    return (
+      <div className="mq-artifact-motion mq-artifact-motion-post" aria-hidden="true">
+        <span className="mq-artifact-motion-caret" />
+        <i /><i /><i /><i /><i />
+        <b>✦</b>
+      </div>
+    );
   }
-}
 
-function SlidePreview({ slide, index }: { slide: ArtifactSlide; index: number }) {
-  const copy = slideCopy(slide);
-  return (
-    <div className={`mq-artifact-slide mq-artifact-slide-${slide.type}`}>
-      <span>{String(index + 1).padStart(2, "0")}</span>
-      <strong>{copy.heading}</strong>
-      {copy.detail ? <small>{copy.detail}</small> : null}
-    </div>
-  );
-}
+  if (type === "POLL") {
+    return (
+      <div className="mq-artifact-motion mq-artifact-motion-poll" aria-hidden="true">
+        <span /><span /><span /><span />
+        <b />
+      </div>
+    );
+  }
 
-function DetailSkeleton({ type }: { type: "POLL" | "DOCUMENT" }) {
   return (
-    <div className={`mq-artifact-detail-skeleton mq-artifact-detail-skeleton-${type.toLowerCase()}`} aria-hidden="true">
-      <span />
-      <span />
-      <span />
+    <div className="mq-artifact-motion mq-artifact-motion-document" aria-hidden="true">
+      <span className="mq-artifact-motion-sheet-1"><i /><i /></span>
+      <span className="mq-artifact-motion-sheet-2"><i /><i /></span>
+      <span className="mq-artifact-motion-sheet-3"><i /><i /></span>
     </div>
   );
 }
 
 function ArtifactCard({
   artifact,
-  detailState,
-  onVisible,
   onDelete,
 }: {
   artifact: ArtifactSummary;
-  detailState?: DetailState;
-  onVisible: (artifactId: string) => void;
   onDelete: (artifact: ArtifactSummary) => void;
 }) {
-  const cardRef = useRef<HTMLElement>(null);
-  const shouldEnrich = artifact.status === "READY" && artifact.type !== "POST";
   const format = artifactFormats[artifact.type];
-
-  useEffect(() => {
-    if (!shouldEnrich || detailState) return;
-    const node = cardRef.current;
-    if (!node || !("IntersectionObserver" in window)) {
-      onVisible(artifact.id);
-      return;
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          onVisible(artifact.id);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: "220px" },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [artifact.id, detailState, onVisible, shouldEnrich]);
-
-  const detail = detailState?.status === "loaded" ? detailState.data : undefined;
-  const summaryCommentary = artifact.preview?.commentary?.trim();
-  const commentary = detail?.content.commentary?.trim() || summaryCommentary;
-  const poll = detail?.content.poll;
-  const document = detail?.content.document;
-  const pollQuestion = poll?.question?.trim() || artifact.title?.trim() || "Untitled poll";
-  const documentSlides = document?.slides ?? (artifact.preview?.firstSlide ? [artifact.preview.firstSlide] : []);
-  const visibleSlides = documentSlides.slice(0, 3);
-  const documentPageCount = document?.pageCount ?? documentSlides.length;
-  const remainingSlides = Math.max(0, documentPageCount - visibleSlides.length);
 
   return (
     <article
-      ref={cardRef}
       className={`mq-card mq-artifact-card mq-artifact-card-${artifact.type.toLowerCase()}`}
-      aria-busy={detailState?.status === "loading" || undefined}
     >
       <div className="mq-artifact-card-header">
         <span className={`mq-artifact-type mq-artifact-type-${artifact.type.toLowerCase()}`}>
@@ -237,42 +185,11 @@ function ArtifactCard({
         </div>
       </div>
 
-      <div className="mq-artifact-card-body">
-        {artifact.type === "POST" ? (
-          <>
-            {artifact.title ? <h2>{artifact.title}</h2> : null}
-            <p className="mq-artifact-commentary">{summaryCommentary || "No post preview is available yet."}</p>
-          </>
-        ) : null}
+      <ArtifactMotionPreview type={artifact.type} />
 
-        {artifact.type === "POLL" ? (
-          <>
-            <h2>{pollQuestion}</h2>
-            {commentary && commentary !== pollQuestion ? <p className="mq-artifact-intro">{commentary}</p> : null}
-            {detailState?.status === "loading" ? <DetailSkeleton type="POLL" /> : null}
-            {poll?.options?.length ? (
-              <div className="mq-artifact-poll-options">
-                {poll.options.map((option) => <span key={option}>{option}</span>)}
-              </div>
-            ) : null}
-            {poll ? <span className="mq-artifact-duration">Open for {poll.durationDays} day{poll.durationDays === 1 ? "" : "s"}</span> : null}
-          </>
-        ) : null}
-
-        {artifact.type === "DOCUMENT" ? (
-          <>
-            {detailState?.status === "loading" ? <DetailSkeleton type="DOCUMENT" /> : null}
-            {visibleSlides.length ? (
-              <div className="mq-artifact-slides">
-                {visibleSlides.map((slide, index) => <SlidePreview key={`${slide.type}-${index}`} slide={slide} index={index} />)}
-                {remainingSlides ? <span className="mq-artifact-slide-more">+{remainingSlides}</span> : null}
-              </div>
-            ) : null}
-            <h2>{artifact.title?.trim() || slideCopy(documentSlides[0] ?? { type: "cover", fields: { title: "Untitled carousel" } }).heading}</h2>
-            <p className="mq-artifact-commentary">{commentary || "No carousel commentary is available yet."}</p>
-          </>
-        ) : null}
-      </div>
+      <h2 className="mq-artifact-card-title">
+        {artifact.title?.trim() || `Untitled ${format.label.toLowerCase()}`}
+      </h2>
 
       <footer className="mq-artifact-card-footer">
         <span>{artifact.status === "READY" ? "Current version" : statusLabel(artifact.status)}</span>
@@ -401,30 +318,15 @@ export default function ArtifactsRedesignClient({
   const [pages, setPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [details, setDetails] = useState<Record<string, DetailState>>({});
   const [reloadKey, setReloadKey] = useState(0);
   const [deleteArtifact, setDeleteArtifact] = useState<ArtifactSummary | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const detailCache = useRef(new Map<string, ArtifactDetailData>());
-  const detailControllers = useRef(new Map<string, AbortController>());
-
-  const abortDetailRequests = useCallback((resetLoading = true) => {
-    detailControllers.current.forEach((controller) => controller.abort());
-    detailControllers.current.clear();
-    if (resetLoading) {
-      setDetails((current) => Object.fromEntries(
-        Object.entries(current).filter(([, state]) => state.status !== "loading"),
-      ));
-    }
-  }, []);
-
   const prepareSearch = useCallback(() => {
-    abortDetailRequests();
     setIsLoading(true);
     setError(null);
     setPage(1);
-  }, [abortDetailRequests]);
+  }, []);
   const { clearSearch, search, searchInput, setSearchInput } = useDebouncedSearch(prepareSearch);
 
   useEffect(() => {
@@ -454,40 +356,9 @@ export default function ArtifactsRedesignClient({
       });
 
     return () => controller.abort();
-  }, [abortDetailRequests, filter, month, page, reloadKey, search]);
-
-  useEffect(() => () => abortDetailRequests(false), [abortDetailRequests]);
-
-  const loadDetail = useCallback((artifactId: string) => {
-    const cached = detailCache.current.get(artifactId);
-    if (cached) {
-      setDetails((current) => ({ ...current, [artifactId]: { status: "loaded", data: cached } }));
-      return;
-    }
-    if (detailControllers.current.has(artifactId)) return;
-
-    const controller = new AbortController();
-    detailControllers.current.set(artifactId, controller);
-    setDetails((current) => ({ ...current, [artifactId]: { status: "loading" } }));
-
-    readApi<ArtifactDetailResponse>(`${API_BASE}/artifacts/${encodeURIComponent(artifactId)}`, { signal: controller.signal })
-      .then((response) => {
-        if (!response?.data) throw new Error("Artifact details were unavailable.");
-        detailCache.current.set(artifactId, response.data);
-        setDetails((current) => ({ ...current, [artifactId]: { status: "loaded", data: response.data! } }));
-      })
-      .catch((reason) => {
-        if (!(reason instanceof DOMException && reason.name === "AbortError")) {
-          setDetails((current) => ({ ...current, [artifactId]: { status: "error" } }));
-        }
-      })
-      .finally(() => {
-        if (detailControllers.current.get(artifactId) === controller) detailControllers.current.delete(artifactId);
-      });
-  }, []);
+  }, [filter, month, page, reloadKey, search]);
 
   function changeFilter(nextFilter: ArtifactFilter) {
-    abortDetailRequests();
     setIsLoading(true);
     setError(null);
     setFilter(nextFilter);
@@ -495,7 +366,6 @@ export default function ArtifactsRedesignClient({
   }
 
   function changeMonth(nextMonth: string) {
-    abortDetailRequests();
     setIsLoading(true);
     setError(null);
     setMonth(nextMonth);
@@ -503,14 +373,12 @@ export default function ArtifactsRedesignClient({
   }
 
   function changePage(nextPage: number) {
-    abortDetailRequests();
     setIsLoading(true);
     setError(null);
     setPage(nextPage);
   }
 
   function clearFilters() {
-    abortDetailRequests();
     setIsLoading(true);
     setError(null);
     setFilter("ALL");
@@ -525,14 +393,6 @@ export default function ArtifactsRedesignClient({
     setDeleteError(null);
     try {
       await deleteArtifactRequest(deleteArtifact.id);
-      detailControllers.current.get(deleteArtifact.id)?.abort();
-      detailControllers.current.delete(deleteArtifact.id);
-      detailCache.current.delete(deleteArtifact.id);
-      setDetails((current) => {
-        const next = { ...current };
-        delete next[deleteArtifact.id];
-        return next;
-      });
       const shouldMoveBack = artifacts.length === 1 && page > 1;
       setDeleteArtifact(null);
       setIsDeleting(false);
@@ -633,8 +493,6 @@ export default function ArtifactsRedesignClient({
               <ArtifactCard
                 key={artifact.id}
                 artifact={artifact}
-                detailState={details[artifact.id]}
-                onVisible={loadDetail}
                 onDelete={(selectedArtifact) => {
                   setDeleteError(null);
                   setDeleteArtifact(selectedArtifact);
