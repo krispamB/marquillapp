@@ -116,6 +116,34 @@
 .skeleton span { display: block; aspect-ratio: 1.42 / 1; border-radius: 4px; background: linear-gradient(100deg, #eceeef 20%, #f7f8f8 40%, #eceeef 60%); background-size: 200% 100%; animation: shimmer 1.2s infinite linear; }
 .skeleton small { display: block; width: 42%; height: 8px; margin-top: 7px; border-radius: 10px; background: #eceeef; }
 
+.sentinel {
+  height: 1px;
+  grid-column: 1 / -1;
+}
+
+.paginationState {
+  display: flex;
+  min-height: 42px;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: #74777b;
+  font-size: 12px;
+  text-align: center;
+}
+
+.paginationState button {
+  padding: 6px 10px;
+  border: 1px solid #c9cccf;
+  border-radius: 6px;
+  background: #fff;
+  color: #34363a;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .state { display: flex; height: 220px; grid-column: 1 / -1; flex-direction: column; align-items: center; justify-content: center; gap: 9px; color: #74777b; text-align: center; }
 .state p { margin: 0; font-size: 13px; }
 .state button { padding: 7px 11px; border: 1px solid #c9cccf; border-radius: 6px; background: #fff; color: #34363a; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
