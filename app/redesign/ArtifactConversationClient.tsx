@@ -19,6 +19,7 @@ import {
 import MarquillMark from "../../components/brand/MarquillMark";
 import type {
   ConnectedAccount,
+  PostMutationResponse,
   SubscriptionTier,
   UserProfile,
 } from "../lib/types";
@@ -30,8 +31,12 @@ import type {
   UpdateArtifactRequest,
 } from "./artifactTypes";
 import ArtifactDeleteConfirmModal from "./ArtifactDeleteConfirmModal";
-import ArtifactResponse, { artifactTypeLabels } from "./ArtifactResponse";
+import ArtifactResponse, {
+  artifactTypeLabels,
+  isAttachableArtifact,
+} from "./ArtifactResponse";
 import ArtifactRunProgress from "./ArtifactRunProgress";
+import ConnectedAccountPicker, { activeConnectedAccounts } from "./ConnectedAccountPicker";
 import { readArtifactPrompt } from "./artifactStudioStorage";
 import {
   API_BASE,
@@ -81,7 +86,16 @@ export default function ArtifactConversationClient({
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [attachTarget, setAttachTarget] = useState<ArtifactDetailData | null>(null);
+  const [isAccountPickerOpen, setIsAccountPickerOpen] = useState(false);
+  const [isAttaching, setIsAttaching] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const isCreatingPostRef = useRef(false);
   const cleanArtifactUrl = `/artifacts/${encodeURIComponent(artifactId)}`;
+  const attachableAccounts = useMemo(
+    () => activeConnectedAccounts(connectedAccounts),
+    [connectedAccounts],
+  );
 
   const appendUser = useCallback((text: string, id: string) => {
     setEntries((current) => current.some((entry) => entry.id === id)
@@ -223,7 +237,8 @@ export default function ArtifactConversationClient({
     && !isStartingRefine
     && !isEditing
     && savingVersion === null
-    && !isDeleting;
+    && !isDeleting
+    && !isAttaching;
 
   async function saveArtifact(version: number, request: UpdateArtifactRequest) {
     setSavingVersion(version);
@@ -273,6 +288,42 @@ export default function ArtifactConversationClient({
     }
   }
 
+  async function createDraft(artifact: ArtifactDetailData, connectedAccount: string) {
+    if (isCreatingPostRef.current || !connectedAccount) return;
+    isCreatingPostRef.current = true;
+    setIsAttaching(true);
+    setAttachError(null);
+    try {
+      const response = await readApi<PostMutationResponse>(
+        `${API_BASE}/posts`,
+        jsonRequest({
+          artifactId: artifact.id,
+          version: artifact.version,
+          connectedAccount,
+        }, { method: "POST" }),
+      );
+      const createdId = response.data?._id
+        ?? (response.data as { id?: string } | undefined)?.id;
+      if (!createdId) throw new Error("The post service did not return a draft ID.");
+      router.push(`/posts/new?draft=${encodeURIComponent(createdId)}`);
+    } catch (reason) {
+      setAttachError(reason instanceof Error ? reason.message : "Unable to create a post from this artifact.");
+      setIsAttaching(false);
+      isCreatingPostRef.current = false;
+    }
+  }
+
+  function requestAttach(artifact: ArtifactDetailData) {
+    if (isCreatingPostRef.current) return;
+    setAttachError(null);
+    setAttachTarget(artifact);
+    if (attachableAccounts.length === 1) {
+      void createDraft(artifact, attachableAccounts[0].id);
+      return;
+    }
+    setIsAccountPickerOpen(true);
+  }
+
   async function startRefinement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedFeedback = feedback.trim();
@@ -320,7 +371,7 @@ export default function ArtifactConversationClient({
             setDeleteError(null);
             setIsDeleteOpen(true);
           }}
-          disabled={isDeleting || isEditing || savingVersion !== null || isStartingRefine}
+          disabled={isDeleting || isEditing || savingVersion !== null || isStartingRefine || isAttaching}
         >
           <Trash2 size={15} /> Delete
         </button>
@@ -366,6 +417,21 @@ export default function ArtifactConversationClient({
                     && !activeRunId
                     && !isStartingRefine
                     && !isDeleting
+                    && !isAttaching
+                  }
+                  canAttach={isAttachableArtifact(entry.artifact)}
+                  isAttachDisabled={
+                    isEditing
+                    || savingVersion !== null
+                    || Boolean(activeRunId)
+                    || isStartingRefine
+                    || isDeleting
+                  }
+                  isAttaching={isAttaching}
+                  attachError={
+                    entry.artifact.version === entry.artifact.currentVersion
+                      ? attachError
+                      : null
                   }
                   isSaving={savingVersion === entry.artifact.version}
                   editError={entry.artifact.version === entry.artifact.currentVersion ? editError : null}
@@ -374,6 +440,7 @@ export default function ArtifactConversationClient({
                     if (editing) setConflictError(null);
                     setEditError(null);
                   }}
+                  onAttach={() => requestAttach(entry.artifact)}
                   onSave={(request) => saveArtifact(entry.artifact.version, request)}
                 />
               </div>
@@ -432,6 +499,21 @@ export default function ArtifactConversationClient({
           setDeleteError(null);
         }}
         onConfirm={() => void deleteArtifact()}
+      />
+      <ConnectedAccountPicker
+        isOpen={isAccountPickerOpen}
+        accounts={attachableAccounts}
+        isCreating={isAttaching}
+        error={attachError}
+        onClose={() => {
+          if (isAttaching) return;
+          setIsAccountPickerOpen(false);
+          setAttachTarget(null);
+          setAttachError(null);
+        }}
+        onConfirm={(accountId) => {
+          if (attachTarget) void createDraft(attachTarget, accountId);
+        }}
       />
     </RedesignShell>
   );

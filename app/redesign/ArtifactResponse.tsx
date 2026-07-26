@@ -35,6 +35,11 @@ const artifactTypeIcons: Record<ArtifactType, LucideIcon> = {
   DOCUMENT: GalleryHorizontal,
 };
 
+export function isAttachableArtifact(artifact: ArtifactDetailData) {
+  return artifact.status === "READY"
+    && artifact.version === artifact.currentVersion;
+}
+
 function PostResponse({ artifact }: { artifact: ArtifactDetailData }) {
   return (
     <div className="mq-studio-post-copy">
@@ -308,17 +313,27 @@ export default function ArtifactResponse({
   artifact,
   credits,
   canEdit = false,
+  canAttach = false,
+  isAttachDisabled = false,
+  isAttaching = false,
+  attachError,
   isSaving = false,
   editError,
   onEditingChange,
+  onAttach,
   onSave,
 }: {
   artifact: ArtifactDetailData;
   credits?: number;
   canEdit?: boolean;
+  canAttach?: boolean;
+  isAttachDisabled?: boolean;
+  isAttaching?: boolean;
+  attachError?: string | null;
   isSaving?: boolean;
   editError?: string | null;
   onEditingChange?: (isEditing: boolean) => void;
+  onAttach?: () => void;
   onSave?: (request: UpdateArtifactRequest) => Promise<void>;
 }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -367,8 +382,25 @@ export default function ArtifactResponse({
       </div>
 
       <footer className="mq-studio-response-foot">
-        <span>Created by Mark</span>
-        {typeof credits === "number" && credits > 0 ? <span><Coins size={13} /> {credits} credits</span> : null}
+        <div className="mq-studio-response-meta">
+          <span>Created by Mark</span>
+          {typeof credits === "number" && credits > 0 ? <span><Coins size={13} /> {credits} credits</span> : null}
+        </div>
+        {canAttach && onAttach ? (
+          <div className="mq-studio-attach-wrap">
+            {attachError ? <p className="mq-studio-attach-error" role="alert">{attachError}</p> : null}
+            <button
+              type="button"
+              className="mq-studio-attach-button"
+              onClick={onAttach}
+              disabled={isAttachDisabled || isAttaching || isEditing || isSaving}
+              aria-busy={isAttaching}
+            >
+              {isAttaching ? <LoaderCircle size={17} /> : null}
+              {isAttaching ? "Creating draft…" : "Attach to post"}
+            </button>
+          </div>
+        ) : null}
       </footer>
     </article>
   );
