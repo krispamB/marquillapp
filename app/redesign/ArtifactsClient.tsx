@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type KeyboardEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   ArrowUpRight,
   BarChart3,
@@ -19,14 +18,16 @@ import {
 } from "lucide-react";
 import MarquillMark from "../../components/brand/MarquillMark";
 import ArtifactDeleteConfirmModal from "./ArtifactDeleteConfirmModal";
-import ConnectedAccountPicker, { activeConnectedAccounts } from "./ConnectedAccountPicker";
+import ConnectedAccountPicker, {
+  resolveAttachAccountChoice,
+} from "./ConnectedAccountPicker";
 import RedesignShell from "./Shell";
-import { API_BASE, deleteArtifactRequest, jsonRequest, readApi } from "./api";
+import { API_BASE, deleteArtifactRequest, readApi } from "./api";
 import useDebouncedSearch from "./useDebouncedSearch";
+import useArtifactPostDraft from "./useArtifactPostDraft";
 import { formatRelativeDate } from "./types";
 import type {
   ConnectedAccount,
-  PostMutationResponse,
   SubscriptionTier,
   UserProfile,
 } from "../lib/types";
@@ -160,12 +161,14 @@ function ArtifactMotionPreview({ type }: { type: ArtifactType }) {
 export function ArtifactCard({
   artifact,
   attachError,
+  isAttachDisabled,
   isAttaching,
   onAttach,
   onDelete,
 }: {
   artifact: ArtifactSummary;
   attachError?: string | null;
+  isAttachDisabled: boolean;
   isAttaching: boolean;
   onAttach: (artifact: ArtifactSummary) => void;
   onDelete: (artifact: ArtifactSummary) => void;
@@ -212,7 +215,7 @@ export function ArtifactCard({
           <button
             type="button"
             onClick={() => onAttach(artifact)}
-            disabled={isAttaching}
+            disabled={isAttachDisabled || isAttaching}
             aria-busy={isAttaching}
           >
             {isAttaching ? "Preparing draft…" : "Attach to post"}
@@ -334,7 +337,6 @@ export default function ArtifactsRedesignClient({
   primaryAccountId?: string;
   subscription?: SubscriptionTier | null;
 }) {
-  const router = useRouter();
   const [artifacts, setArtifacts] = useState<ArtifactSummary[]>([]);
   const [filter, setFilter] = useState<ArtifactFilter>("ALL");
   const [month, setMonth] = useState("");
@@ -350,14 +352,20 @@ export default function ArtifactsRedesignClient({
   const [attachSourceId, setAttachSourceId] = useState<string | null>(null);
   const [attachTarget, setAttachTarget] = useState<ArtifactDetailData | null>(null);
   const [isAccountPickerOpen, setIsAccountPickerOpen] = useState(false);
-  const [isAttaching, setIsAttaching] = useState(false);
-  const [attachError, setAttachError] = useState<string | null>(null);
+  const [prepareAttachError, setPrepareAttachError] = useState<string | null>(null);
   const [attachErrorId, setAttachErrorId] = useState<string | null>(null);
-  const isCreatingPostRef = useRef(false);
-  const attachableAccounts = useMemo(
-    () => activeConnectedAccounts(connectedAccounts),
+  const {
+    clearError: clearDraftError,
+    createDraft,
+    error: draftError,
+    isCreating: isAttaching,
+  } = useArtifactPostDraft();
+  const attachAccountChoice = useMemo(
+    () => resolveAttachAccountChoice(connectedAccounts),
     [connectedAccounts],
   );
+  const attachableAccounts = attachAccountChoice.accounts;
+  const attachError = prepareAttachError ?? draftError;
   const prepareSearch = useCallback(() => {
     setIsLoading(true);
     setError(null);
@@ -441,39 +449,34 @@ export default function ArtifactsRedesignClient({
     }
   }
 
-  async function createDraft(artifact: ArtifactDetailData, connectedAccount: string) {
-    if (isCreatingPostRef.current || !connectedAccount) return;
-    isCreatingPostRef.current = true;
-    setIsAttaching(true);
-    setAttachError(null);
+  function clearAttachError() {
+    setPrepareAttachError(null);
+    clearDraftError();
     setAttachErrorId(null);
-    try {
-      const response = await readApi<PostMutationResponse>(
-        `${API_BASE}/posts`,
-        jsonRequest({
-          artifactId: artifact.id,
-          version: artifact.version,
-          connectedAccount,
-        }, { method: "POST" }),
-      );
-      const createdId = response.data?._id
-        ?? (response.data as { id?: string } | undefined)?.id;
-      if (!createdId) throw new Error("The post service did not return a draft ID.");
-      router.push(`/posts/new?draft=${encodeURIComponent(createdId)}`);
-    } catch (reason) {
-      setAttachError(reason instanceof Error ? reason.message : "Unable to create a post from this artifact.");
+  }
+
+  async function createDraftFromArtifact(
+    artifact: ArtifactDetailData,
+    connectedAccount: string,
+  ) {
+    const result = await createDraft(artifact, connectedAccount);
+    if (result === "failed") {
       setAttachErrorId(artifact.id);
-      setIsAttaching(false);
-      isCreatingPostRef.current = false;
+      setAttachSourceId(null);
     }
   }
 
   async function prepareAttach(summary: ArtifactSummary) {
-    if (attachSourceId || isCreatingPostRef.current || summary.status !== "READY") return;
+    if (
+      attachSourceId
+      || isAttaching
+      || deleteArtifact
+      || isDeleting
+      || summary.status !== "READY"
+    ) return;
     setAttachSourceId(summary.id);
     setAttachTarget(null);
-    setAttachError(null);
-    setAttachErrorId(null);
+    clearAttachError();
     try {
       const response = await readApi<ArtifactDetailResponse>(
         `${API_BASE}/artifacts/${encodeURIComponent(summary.id)}`,
@@ -483,14 +486,14 @@ export default function ArtifactsRedesignClient({
         throw new Error("Only the current READY artifact version can be attached.");
       }
       setAttachTarget(artifact);
-      if (attachableAccounts.length === 1) {
-        await createDraft(artifact, attachableAccounts[0].id);
+      if (attachAccountChoice.kind === "single") {
+        await createDraftFromArtifact(artifact, attachAccountChoice.account.id);
         return;
       }
       setAttachSourceId(null);
       setIsAccountPickerOpen(true);
     } catch (reason) {
-      setAttachError(reason instanceof Error ? reason.message : "Unable to prepare this artifact.");
+      setPrepareAttachError(reason instanceof Error ? reason.message : "Unable to prepare this artifact.");
       setAttachErrorId(summary.id);
       setAttachSourceId(null);
     }
@@ -585,6 +588,7 @@ export default function ArtifactsRedesignClient({
                 key={artifact.id}
                 artifact={artifact}
                 attachError={attachErrorId === artifact.id ? attachError : null}
+                isAttachDisabled={Boolean(deleteArtifact) || isDeleting}
                 isAttaching={attachSourceId === artifact.id || (isAttaching && attachTarget?.id === artifact.id)}
                 onAttach={(selectedArtifact) => void prepareAttach(selectedArtifact)}
                 onDelete={(selectedArtifact) => {
@@ -626,13 +630,12 @@ export default function ArtifactsRedesignClient({
           setIsAccountPickerOpen(false);
           setAttachSourceId(null);
           setAttachTarget(null);
-          setAttachError(null);
-          setAttachErrorId(null);
+          clearAttachError();
         }}
         onConfirm={(accountId) => {
           if (!attachTarget) return;
           setAttachSourceId(attachTarget.id);
-          void createDraft(attachTarget, accountId);
+          void createDraftFromArtifact(attachTarget, accountId);
         }}
       />
     </RedesignShell>

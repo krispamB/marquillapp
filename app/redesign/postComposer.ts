@@ -1,10 +1,14 @@
 import type {
   ConnectedAccount,
   PostDetailData,
+  PostDetailResponse,
   PostMediaItem,
   PostStatus,
 } from "../lib/types";
-import type { ArtifactDetailData } from "./artifactTypes";
+import type {
+  ArtifactDetailData,
+  ArtifactDetailResponse,
+} from "./artifactTypes";
 
 export type InitialPostComposerData = {
   id: string;
@@ -15,6 +19,20 @@ export type InitialPostComposerData = {
   media: PostMediaItem[];
   scheduledAt?: string;
 };
+
+export type DraftQueryResolution =
+  | { kind: "new" }
+  | { kind: "invalid" }
+  | { kind: "draft"; draftId: string };
+
+export function resolveDraftQuery(
+  draft: string | string[] | undefined,
+): DraftQueryResolution {
+  if (draft === undefined) return { kind: "new" };
+  const value = Array.isArray(draft) ? draft[0] : draft;
+  const draftId = value?.trim() ?? "";
+  return draftId ? { kind: "draft", draftId } : { kind: "invalid" };
+}
 
 function normalizePostStatus(value?: string): PostStatus {
   const status = String(value ?? "DRAFT").toUpperCase();
@@ -59,4 +77,23 @@ export function createInitialPostComposerData(post: PostDetailData, artifact: Ar
     media: post.media ?? [],
     scheduledAt: post.scheduledAt,
   };
+}
+
+export async function loadInitialPostComposerData(
+  draftId: string,
+  readPost: (postId: string) => Promise<PostDetailResponse>,
+  readArtifact: (
+    artifactId: string,
+    version: number,
+  ) => Promise<ArtifactDetailResponse>,
+) {
+  const postResponse = await readPost(draftId);
+  if (!postResponse.data) throw new Error("The saved post was unavailable.");
+  const artifactReference = pinnedArtifactReferenceFromPost(postResponse.data);
+  const artifactResponse = await readArtifact(
+    artifactReference.artifactId,
+    artifactReference.version,
+  );
+  if (!artifactResponse.data) throw new Error("The pinned artifact was unavailable.");
+  return createInitialPostComposerData(postResponse.data, artifactResponse.data);
 }

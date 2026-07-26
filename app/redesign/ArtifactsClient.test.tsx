@@ -21,6 +21,7 @@ describe("ArtifactCard attach action", () => {
     const view = render(
       <ArtifactCard
         artifact={readyArtifact}
+        isAttachDisabled={false}
         isAttaching={false}
         onAttach={(artifact) => { selectedId = artifact.id; }}
         onDelete={() => {}}
@@ -36,6 +37,7 @@ describe("ArtifactCard attach action", () => {
     const view = render(
       <ArtifactCard
         artifact={{ ...readyArtifact, status: "GENERATING" }}
+        isAttachDisabled={false}
         isAttaching={false}
         onAttach={() => {}}
         onDelete={() => {}}
@@ -43,5 +45,19 @@ describe("ArtifactCard attach action", () => {
     );
 
     expect(view.queryByRole("button", { name: "Attach to post" })).toBeNull();
+  });
+
+  test("disables attachment while deletion is active", () => {
+    const view = render(
+      <ArtifactCard
+        artifact={readyArtifact}
+        isAttachDisabled
+        isAttaching={false}
+        onAttach={() => {}}
+        onDelete={() => {}}
+      />,
+    );
+
+    expect(view.getByRole("button", { name: "Attach to post" }).hasAttribute("disabled")).toBe(true);
   });
 });

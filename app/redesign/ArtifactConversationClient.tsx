@@ -19,7 +19,6 @@ import {
 import MarquillMark from "../../components/brand/MarquillMark";
 import type {
   ConnectedAccount,
-  PostMutationResponse,
   SubscriptionTier,
   UserProfile,
 } from "../lib/types";
@@ -36,7 +35,9 @@ import ArtifactResponse, {
   isAttachableArtifact,
 } from "./ArtifactResponse";
 import ArtifactRunProgress from "./ArtifactRunProgress";
-import ConnectedAccountPicker, { activeConnectedAccounts } from "./ConnectedAccountPicker";
+import ConnectedAccountPicker, {
+  resolveAttachAccountChoice,
+} from "./ConnectedAccountPicker";
 import { readArtifactPrompt } from "./artifactStudioStorage";
 import {
   API_BASE,
@@ -47,6 +48,7 @@ import {
 } from "./api";
 import RedesignShell from "./Shell";
 import { useArtifactRun } from "./useArtifactRun";
+import useArtifactPostDraft from "./useArtifactPostDraft";
 
 type ConversationEntry =
   | { id: string; role: "user"; text: string }
@@ -88,14 +90,18 @@ export default function ArtifactConversationClient({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [attachTarget, setAttachTarget] = useState<ArtifactDetailData | null>(null);
   const [isAccountPickerOpen, setIsAccountPickerOpen] = useState(false);
-  const [isAttaching, setIsAttaching] = useState(false);
-  const [attachError, setAttachError] = useState<string | null>(null);
-  const isCreatingPostRef = useRef(false);
+  const {
+    clearError: clearAttachError,
+    createDraft,
+    error: attachError,
+    isCreating: isAttaching,
+  } = useArtifactPostDraft();
   const cleanArtifactUrl = `/artifacts/${encodeURIComponent(artifactId)}`;
-  const attachableAccounts = useMemo(
-    () => activeConnectedAccounts(connectedAccounts),
+  const attachAccountChoice = useMemo(
+    () => resolveAttachAccountChoice(connectedAccounts),
     [connectedAccounts],
   );
+  const attachableAccounts = attachAccountChoice.accounts;
 
   const appendUser = useCallback((text: string, id: string) => {
     setEntries((current) => current.some((entry) => entry.id === id)
@@ -288,37 +294,12 @@ export default function ArtifactConversationClient({
     }
   }
 
-  async function createDraft(artifact: ArtifactDetailData, connectedAccount: string) {
-    if (isCreatingPostRef.current || !connectedAccount) return;
-    isCreatingPostRef.current = true;
-    setIsAttaching(true);
-    setAttachError(null);
-    try {
-      const response = await readApi<PostMutationResponse>(
-        `${API_BASE}/posts`,
-        jsonRequest({
-          artifactId: artifact.id,
-          version: artifact.version,
-          connectedAccount,
-        }, { method: "POST" }),
-      );
-      const createdId = response.data?._id
-        ?? (response.data as { id?: string } | undefined)?.id;
-      if (!createdId) throw new Error("The post service did not return a draft ID.");
-      router.push(`/posts/new?draft=${encodeURIComponent(createdId)}`);
-    } catch (reason) {
-      setAttachError(reason instanceof Error ? reason.message : "Unable to create a post from this artifact.");
-      setIsAttaching(false);
-      isCreatingPostRef.current = false;
-    }
-  }
-
   function requestAttach(artifact: ArtifactDetailData) {
-    if (isCreatingPostRef.current) return;
-    setAttachError(null);
+    if (isAttaching) return;
+    clearAttachError();
     setAttachTarget(artifact);
-    if (attachableAccounts.length === 1) {
-      void createDraft(artifact, attachableAccounts[0].id);
+    if (attachAccountChoice.kind === "single") {
+      void createDraft(artifact, attachAccountChoice.account.id);
       return;
     }
     setIsAccountPickerOpen(true);
@@ -509,7 +490,7 @@ export default function ArtifactConversationClient({
           if (isAttaching) return;
           setIsAccountPickerOpen(false);
           setAttachTarget(null);
-          setAttachError(null);
+          clearAttachError();
         }}
         onConfirm={(accountId) => {
           if (attachTarget) void createDraft(attachTarget, accountId);

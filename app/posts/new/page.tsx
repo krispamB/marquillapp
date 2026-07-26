@@ -1,7 +1,8 @@
 import CreatePostComposerClient from "../../redesign/CreatePostComposerClient";
 import {
-  createInitialPostComposerData,
-  pinnedArtifactReferenceFromPost,
+  loadInitialPostComposerData,
+  resolveDraftQuery,
+  type InitialPostComposerData,
 } from "../../redesign/postComposer";
 import { getWorkspaceProps } from "../../redesign/workspace";
 import {
@@ -19,9 +20,9 @@ export default async function NewPostPage({
     getWorkspaceProps(),
     searchParams,
   ]);
-  const draftParam = Array.isArray(query.draft) ? query.draft[0] : query.draft;
+  const draftQuery = resolveDraftQuery(query.draft);
 
-  if (draftParam === undefined) {
+  if (draftQuery.kind === "new") {
     return (
       <CreatePostComposerClient
         user={workspace.user}
@@ -31,8 +32,7 @@ export default async function NewPostPage({
     );
   }
 
-  const draftId = draftParam.trim();
-  if (!draftId) {
+  if (draftQuery.kind === "invalid") {
     return (
       <CreatePostComposerClient
         user={workspace.user}
@@ -43,37 +43,30 @@ export default async function NewPostPage({
     );
   }
 
+  let initialPost: InitialPostComposerData | undefined;
+  let initialLoadError: string | undefined;
   try {
     const serverAuth = await getServerAuth();
-    const postResponse = await getPostDetail(serverAuth, draftId);
-    if (!postResponse.data) throw new Error("The saved post was unavailable.");
-    const artifactReference = pinnedArtifactReferenceFromPost(postResponse.data);
-    const artifactResponse = await getArtifactDetail(
-      serverAuth,
-      artifactReference.artifactId,
-      artifactReference.version,
-    );
-    if (!artifactResponse.data) throw new Error("The pinned artifact was unavailable.");
-    const initialPost = createInitialPostComposerData(
-      postResponse.data,
-      artifactResponse.data,
-    );
-    return (
-      <CreatePostComposerClient
-        user={workspace.user}
-        connectedAccounts={workspace.connectedAccounts}
-        subscription={workspace.subscription}
-        initialPost={initialPost}
-      />
+    initialPost = await loadInitialPostComposerData(
+      draftQuery.draftId,
+      (postId) => getPostDetail(serverAuth, postId),
+      (artifactId, version) => getArtifactDetail(
+        serverAuth,
+        artifactId,
+        version,
+      ),
     );
   } catch {
-    return (
-      <CreatePostComposerClient
-        user={workspace.user}
-        connectedAccounts={workspace.connectedAccounts}
-        subscription={workspace.subscription}
-        initialLoadError="Unable to load this post."
-      />
-    );
+    initialLoadError = "Unable to load this post.";
   }
+
+  return (
+    <CreatePostComposerClient
+      user={workspace.user}
+      connectedAccounts={workspace.connectedAccounts}
+      subscription={workspace.subscription}
+      initialPost={initialPost}
+      initialLoadError={initialLoadError}
+    />
+  );
 }

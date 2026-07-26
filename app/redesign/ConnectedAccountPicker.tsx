@@ -11,6 +11,21 @@ export function activeConnectedAccounts(accounts: ConnectedAccount[]) {
   return accounts.filter((account) => account.isActive !== false);
 }
 
+export function resolveAttachAccountChoice(accounts: ConnectedAccount[]) {
+  const activeAccounts = activeConnectedAccounts(accounts);
+  if (!activeAccounts.length) {
+    return { kind: "none" as const, accounts: activeAccounts };
+  }
+  if (activeAccounts.length === 1) {
+    return {
+      kind: "single" as const,
+      accounts: activeAccounts,
+      account: activeAccounts[0],
+    };
+  }
+  return { kind: "choose" as const, accounts: activeAccounts };
+}
+
 export default function ConnectedAccountPicker({
   isOpen,
   accounts,
