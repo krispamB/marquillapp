@@ -21,7 +21,7 @@ at each boundary.
   proxy/compression concerns. This doc does **not** redesign the vocabulary — it
   adopts #103 §5 verbatim as the client schema and specifies how it reaches the
   browser.
-- **Two processes, one relay hop** (CLAUDE.md architecture). The engine runs in
+- **Two processes, one relay hop** (AGENTS.md architecture). The engine runs in
   the **BullMQ worker**; the SSE endpoint lives on the **HTTP server**. They
   share Redis (`ioredis`, `REDIS_URL`, `RedisService`). So the wire is:
   `worker step → Redis (per-run log) → HTTP-server relay → EventSource`. #103 §6

@@ -1,0 +1,78 @@
+/* gradient — saturated diagonal wash, white type, glassy accents. */
+
+.slide {
+  background: linear-gradient(135deg, #6d28d9 0%, #db2777 100%);
+  color: #ffffff;
+}
+
+.eyebrow {
+  color: #ffffff;
+  opacity: 0.85;
+}
+
+.title {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+}
+
+.subtitle {
+  color: #ffffff;
+  opacity: 0.92;
+}
+
+.heading,
+.headline {
+  font-weight: 800;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+}
+
+.body {
+  color: #ffffff;
+  opacity: 0.95;
+}
+
+/* translucent chip marker */
+.list-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 16px;
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.slide--quote .quote::before {
+  content: '\201C';
+  display: block;
+  font-size: 150px;
+  line-height: 0.55;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 20px;
+}
+
+.quote {
+  font-weight: 600;
+}
+
+.attribution {
+  color: #ffffff;
+  opacity: 0.85;
+  letter-spacing: 0.06em;
+}
+
+.action {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.95);
+  color: #6d28d9;
+  font-weight: 800;
+  padding: 22px 40px;
+  border-radius: 999px;
+}
+
+.handle {
+  color: #ffffff;
+  opacity: 0.85;
+}

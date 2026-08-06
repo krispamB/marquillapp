@@ -13,6 +13,8 @@ jest.mock(
     Subscription: class Subscription {},
     Tier: class Tier {},
     Usage: class Usage {},
+    Artifact: class Artifact {},
+    ArtifactType: { POST: 'POST', POLL: 'POLL', DOCUMENT: 'DOCUMENT' },
   }),
   { virtual: true },
 );
@@ -37,12 +39,16 @@ describe('FeatureGatingService', () => {
     const connectedAccountModel = {
       countDocuments: jest.fn(),
     };
+    const artifactModel = {
+      aggregate: jest.fn().mockResolvedValue([]),
+    };
 
     const service = new FeatureGatingService(
       subscriptionModel as any,
       tierModel as any,
       usageModel as any,
       connectedAccountModel as any,
+      artifactModel as any,
     );
 
     return {
@@ -52,6 +58,7 @@ describe('FeatureGatingService', () => {
         tierModel,
         usageModel,
         connectedAccountModel,
+        artifactModel,
       },
     };
   };
@@ -62,7 +69,7 @@ describe('FeatureGatingService', () => {
     const paidTier = {
       _id: new Types.ObjectId(),
       name: 'Pro',
-      limits: { ai_drafts: 100, connected_accounts: 10 },
+      limits: { credits: 100, connected_accounts: 10 },
     };
     const subscription = {
       status: SubscriptionStatus.ACTIVE,
@@ -94,7 +101,7 @@ describe('FeatureGatingService', () => {
     const defaultTier = {
       _id: new Types.ObjectId(),
       name: 'Free',
-      limits: { ai_drafts: 2, connected_accounts: 1 },
+      limits: { credits: 2, connected_accounts: 1 },
     };
 
     mocks.subscriptionModel.findOne.mockReturnValue({
@@ -123,37 +130,79 @@ describe('FeatureGatingService', () => {
       limits: {},
     } as any;
 
-    expect(() => service.getLimitFromTier(tier, 'ai_drafts')).toThrow(
+    expect(() => service.getLimitFromTier(tier, 'credits')).toThrow(
       InternalServerErrorException,
     );
   });
 
-  it('blocks AI draft creation when usage reaches the plan limit', async () => {
-    const { service, mocks } = makeService();
-    const userId = new Types.ObjectId().toString();
-    const periodStart = new Date('2026-03-01T00:00:00.000Z');
-    const tier = {
-      _id: new Types.ObjectId(),
-      name: 'Starter',
-      limits: { ai_drafts: 10, connected_accounts: 1 },
-    } as any;
+  describe('assertResearchAccess', () => {
+    it('should reject research with the standard feature gate when the tier disables it', async () => {
+      const { service } = makeService();
+      const tier = {
+        _id: new Types.ObjectId(),
+        name: 'Free',
+        limits: { research: 0 },
+      } as any;
+      jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
 
-    jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
-    jest
-      .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
-      .mockResolvedValue(periodStart);
-    mocks.usageModel.findOne.mockReturnValue({
-      lean: jest.fn().mockResolvedValue({ count: 10 }),
+      await expect(
+        service.assertResearchAccess(new Types.ObjectId().toString()),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'FEATURE_LIMIT_EXCEEDED',
+          feature: 'research',
+          limit: 0,
+          currentUsage: 0,
+        },
+        status: 403,
+      });
     });
 
-    await expect(service.assertAiDraftQuota(userId)).rejects.toMatchObject({
-      response: {
-        code: 'FEATURE_LIMIT_EXCEEDED',
-        feature: 'ai_drafts',
-        limit: 10,
-        currentUsage: 10,
-      },
-      status: 403,
+    it('should allow research when the paid tier enables it', async () => {
+      const { service } = makeService();
+      const tier = {
+        _id: new Types.ObjectId(),
+        name: 'Starter',
+        limits: { research: 1 },
+      } as any;
+      jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
+
+      await expect(
+        service.assertResearchAccess(new Types.ObjectId().toString()),
+      ).resolves.toBeUndefined();
+    });
+
+    it('should reject research for a persisted legacy Free tier without a research field', async () => {
+      const { service } = makeService();
+      const tier = {
+        _id: new Types.ObjectId(),
+        name: 'Free',
+        monthlyPrice: 0,
+        limits: { credits: 120 },
+      } as any;
+      jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
+
+      await expect(
+        service.assertResearchAccess(new Types.ObjectId().toString()),
+      ).rejects.toMatchObject({
+        response: { feature: 'research', limit: 0, currentUsage: 0 },
+        status: 403,
+      });
+    });
+
+    it('should allow research for a persisted legacy paid tier without a research field', async () => {
+      const { service } = makeService();
+      const tier = {
+        _id: new Types.ObjectId(),
+        name: 'Starter',
+        monthlyPrice: 9.99,
+        limits: { credits: 2000 },
+      } as any;
+      jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
+
+      await expect(
+        service.assertResearchAccess(new Types.ObjectId().toString()),
+      ).resolves.toBeUndefined();
     });
   });
 
@@ -164,7 +213,7 @@ describe('FeatureGatingService', () => {
     const tier = {
       _id: new Types.ObjectId(),
       name: 'Starter',
-      limits: { ai_drafts: 10, connected_accounts: 1, scheduled_posts: 5 },
+      limits: { credits: 10, connected_accounts: 1, scheduled_posts: 5 },
     } as any;
 
     jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
@@ -195,7 +244,7 @@ describe('FeatureGatingService', () => {
     const tier = {
       _id: new Types.ObjectId(),
       name: 'Starter',
-      limits: { ai_drafts: 10, connected_accounts: 1, scheduled_posts: 5 },
+      limits: { credits: 10, connected_accounts: 1, scheduled_posts: 5 },
     } as any;
 
     jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
@@ -230,7 +279,7 @@ describe('FeatureGatingService', () => {
     expect(periodStart).toEqual(currentPeriodStart);
   });
 
-  it('returns dashboard usage summary for active subscription cycle', async () => {
+  it('returns dashboard usage and counts every artifact lifecycle state in the active cycle', async () => {
     const { service, mocks } = makeService();
     const userId = new Types.ObjectId().toString();
     const tierId = new Types.ObjectId();
@@ -241,10 +290,9 @@ describe('FeatureGatingService', () => {
       _id: tierId,
       name: 'Starter',
       limits: {
-        ai_drafts: 5,
+        credits: 100000,
         connected_accounts: 1,
         scheduled_posts: 3,
-        mark_tokens: 100000,
       },
     };
 
@@ -272,12 +320,16 @@ describe('FeatureGatingService', () => {
     mocks.usageModel.find.mockReturnValue({
       select: jest.fn().mockReturnValue({
         lean: jest.fn().mockResolvedValue([
-          { feature: 'ai_drafts', count: 2 },
           { feature: 'scheduled_posts', count: 1 },
-          { feature: 'mark_tokens', count: 5000 },
+          { feature: 'credits', count: 5000 },
         ]),
       }),
     });
+    mocks.artifactModel.aggregate.mockResolvedValue([
+      { _id: 'POST', count: 4 },
+      { _id: 'POLL', count: 2 },
+      { _id: 'DOCUMENT', count: 1 },
+    ]);
 
     const result = await service.getDashboardUsage(userId);
 
@@ -290,11 +342,24 @@ describe('FeatureGatingService', () => {
       },
       usage: {
         connected_accounts: { used: 1, limit: 1, remaining: 0 },
-        ai_drafts: { used: 2, limit: 5, remaining: 3 },
         scheduled_posts: { used: 1, limit: 3, remaining: 2 },
-        mark_tokens: { used: 5000, limit: 100000, remaining: 95000 },
+        credits: { used: 5000, limit: 100000, remaining: 95000 },
       },
+      artifactsCreated: { posts: 4, polls: 2, documents: 1 },
     });
+    expect(mocks.artifactModel.aggregate).toHaveBeenCalledWith([
+      {
+        $match: {
+          user: new Types.ObjectId(userId),
+          createdAt: { $gte: currentPeriodStart, $lt: currentPeriodEnd },
+        },
+      },
+      { $group: { _id: '$type', count: { $sum: 1 } } },
+    ]);
+    const artifactMatch =
+      mocks.artifactModel.aggregate.mock.calls[0][0][0].$match;
+    expect(artifactMatch).not.toHaveProperty('deletedAt');
+    expect(artifactMatch).not.toHaveProperty('versions');
     jest.useRealTimers();
   });
 
@@ -315,17 +380,16 @@ describe('FeatureGatingService', () => {
         _id: defaultTierId,
         name: 'Free',
         limits: {
-          ai_drafts: 2,
+          credits: -1,
           connected_accounts: 1,
           scheduled_posts: 0,
-          mark_tokens: -1,
         },
       }),
     });
     mocks.connectedAccountModel.countDocuments.mockResolvedValue(3);
     mocks.usageModel.find.mockReturnValue({
       select: jest.fn().mockReturnValue({
-        lean: jest.fn().mockResolvedValue([{ feature: 'ai_drafts', count: 7 }]),
+        lean: jest.fn().mockResolvedValue([{ feature: 'credits', count: 7 }]),
       }),
     });
 
@@ -338,11 +402,56 @@ describe('FeatureGatingService', () => {
     });
     expect(result.usage).toEqual({
       connected_accounts: { used: 3, limit: 1, remaining: 0 },
-      ai_drafts: { used: 7, limit: 2, remaining: 0 },
       scheduled_posts: { used: 0, limit: 0, remaining: 0 },
-      mark_tokens: { used: 0, limit: -1, remaining: -1 },
+      credits: { used: 7, limit: -1, remaining: -1 },
+    });
+    expect(result.artifactsCreated).toEqual({
+      posts: 0,
+      polls: 0,
+      documents: 0,
     });
     jest.useRealTimers();
+  });
+
+  describe('getDashboardUsage', () => {
+    it('should return the shared Free credit allowance and remaining headroom', async () => {
+      const { service, mocks } = makeService();
+      const userId = new Types.ObjectId().toString();
+      const defaultTierId = new Types.ObjectId();
+
+      mocks.subscriptionModel.findOne.mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue(null),
+        }),
+      });
+      mocks.tierModel.findOne.mockReturnValue({
+        lean: jest.fn().mockResolvedValue({
+          _id: defaultTierId,
+          name: 'Free',
+          limits: {
+            credits: 120,
+            connected_accounts: 1,
+            scheduled_posts: 1,
+          },
+        }),
+      });
+      mocks.connectedAccountModel.countDocuments.mockResolvedValue(0);
+      mocks.usageModel.find.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          lean: jest
+            .fn()
+            .mockResolvedValue([{ feature: 'credits', count: 30 }]),
+        }),
+      });
+
+      const result = await service.getDashboardUsage(userId);
+
+      expect(result.usage.credits).toEqual({
+        used: 30,
+        limit: 120,
+        remaining: 90,
+      });
+    });
   });
 
   it('falls back to UTC month start for free/default users', async () => {
@@ -362,64 +471,86 @@ describe('FeatureGatingService', () => {
     jest.useRealTimers();
   });
 
-  it('increments ai_drafts usage with upsert', async () => {
-    const { service, mocks } = makeService();
-    const userId = new Types.ObjectId().toString();
-    const periodStart = new Date('2026-03-01T00:00:00.000Z');
+  describe('incrementScheduledPostUsage', () => {
+    it('should increment scheduled_posts once when the post has not been counted', async () => {
+      const { service, mocks } = makeService();
+      const userId = new Types.ObjectId().toString();
+      const postId = new Types.ObjectId().toString();
+      const periodStart = new Date('2026-03-01T00:00:00.000Z');
 
-    jest
-      .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
-      .mockResolvedValue(periodStart);
-    mocks.usageModel.updateOne.mockResolvedValue({ acknowledged: true });
+      jest
+        .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
+        .mockResolvedValue(periodStart);
+      mocks.usageModel.updateOne.mockResolvedValue({ acknowledged: true });
 
-    await service.incrementAiDraftUsage(userId);
+      await service.incrementScheduledPostUsage(userId, postId);
 
-    expect(mocks.usageModel.updateOne).toHaveBeenCalledWith(
-      {
-        user_id: new Types.ObjectId(userId),
-        feature: 'ai_drafts',
-        periodStart,
-      },
-      {
-        $inc: { count: 1 },
-        $setOnInsert: {
-          user_id: new Types.ObjectId(userId),
-          feature: 'ai_drafts',
-          periodStart,
-        },
-      },
-      { upsert: true },
-    );
-  });
-
-  it('increments scheduled_posts usage with upsert', async () => {
-    const { service, mocks } = makeService();
-    const userId = new Types.ObjectId().toString();
-    const periodStart = new Date('2026-03-01T00:00:00.000Z');
-
-    jest
-      .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
-      .mockResolvedValue(periodStart);
-    mocks.usageModel.updateOne.mockResolvedValue({ acknowledged: true });
-
-    await service.incrementScheduledPostUsage(userId);
-
-    expect(mocks.usageModel.updateOne).toHaveBeenCalledWith(
-      {
-        user_id: new Types.ObjectId(userId),
-        feature: 'scheduled_posts',
-        periodStart,
-      },
-      {
-        $inc: { count: 1 },
-        $setOnInsert: {
+      expect(mocks.usageModel.updateOne).toHaveBeenCalledWith(
+        {
           user_id: new Types.ObjectId(userId),
           feature: 'scheduled_posts',
           periodStart,
+          scheduledPostIds: { $ne: new Types.ObjectId(postId) },
         },
-      },
-      { upsert: true },
-    );
+        {
+          $inc: { count: 1 },
+          $addToSet: { scheduledPostIds: new Types.ObjectId(postId) },
+          $setOnInsert: {
+            user_id: new Types.ObjectId(userId),
+            feature: 'scheduled_posts',
+            periodStart,
+          },
+        },
+        { upsert: true },
+      );
+    });
+
+    it('should keep the conditional post claim when a concurrent upsert races', async () => {
+      const { service, mocks } = makeService();
+      const userId = new Types.ObjectId().toString();
+      const postId = new Types.ObjectId().toString();
+      jest
+        .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
+        .mockResolvedValue(new Date('2026-03-01T00:00:00.000Z'));
+      mocks.usageModel.updateOne
+        .mockRejectedValueOnce({ code: 11000 })
+        .mockResolvedValueOnce({ modifiedCount: 0 });
+
+      await service.incrementScheduledPostUsage(userId, postId);
+
+      expect(mocks.usageModel.updateOne).toHaveBeenCalledTimes(2);
+      expect(mocks.usageModel.updateOne.mock.calls[1][0]).toEqual(
+        expect.objectContaining({
+          scheduledPostIds: { $ne: new Types.ObjectId(postId) },
+        }),
+      );
+      expect(mocks.usageModel.updateOne.mock.calls[1][1]).toEqual(
+        expect.objectContaining({
+          $inc: { count: 1 },
+          $addToSet: { scheduledPostIds: new Types.ObjectId(postId) },
+        }),
+      );
+    });
+  });
+
+  describe('hasScheduledPostUsage', () => {
+    it('should find prior scheduling usage when the post was counted in any period', async () => {
+      const { service, mocks } = makeService();
+      const userId = new Types.ObjectId().toString();
+      const postId = new Types.ObjectId().toString();
+      mocks.usageModel.findOne.mockReturnValue({
+        lean: jest.fn().mockResolvedValue({ _id: new Types.ObjectId() }),
+      });
+
+      await expect(service.hasScheduledPostUsage(userId, postId)).resolves.toBe(
+        true,
+      );
+      expect(mocks.usageModel.findOne).toHaveBeenCalledWith({
+        user_id: new Types.ObjectId(userId),
+        feature: 'scheduled_posts',
+        scheduledPostIds: new Types.ObjectId(postId),
+      });
+    });
   });
 
   it('skips connected account limit check for reconnect flow', async () => {
@@ -436,14 +567,14 @@ describe('FeatureGatingService', () => {
     expect(mocks.connectedAccountModel.countDocuments).not.toHaveBeenCalled();
   });
 
-  describe('assertMarkTokenQuota', () => {
+  describe('assertBalance', () => {
     const setup = (limit: number, currentUsage: number) => {
       const { service, mocks } = makeService();
       const userId = new Types.ObjectId().toString();
       const tier = {
         _id: new Types.ObjectId(),
         name: 'Starter',
-        limits: { mark_tokens: limit },
+        limits: { credits: limit },
       } as any;
       jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
       jest
@@ -452,55 +583,89 @@ describe('FeatureGatingService', () => {
       mocks.usageModel.findOne.mockReturnValue({
         lean: jest.fn().mockResolvedValue({ count: currentUsage }),
       });
-      return { service, userId };
+      return { service, mocks, tier, userId };
     };
 
-    it('blocks when the estimate would not fit the remaining budget', async () => {
-      const { service, userId } = setup(1000, 800);
+    it('should pass when any headroom remains', async () => {
+      const { service, userId } = setup(1000, 999);
 
-      await expect(
-        service.assertMarkTokenQuota(userId, 300),
-      ).rejects.toMatchObject({
+      await expect(service.assertBalance(userId)).resolves.toBeUndefined();
+    });
+
+    it('should pass on a fresh period when nothing is used', async () => {
+      const { service, userId } = setup(1000, 0);
+
+      await expect(service.assertBalance(userId)).resolves.toBeUndefined();
+    });
+
+    it('should block when usage exactly reaches the limit', async () => {
+      const { service, userId } = setup(1000, 1000);
+
+      await expect(service.assertBalance(userId)).rejects.toMatchObject({
         response: {
           code: 'FEATURE_LIMIT_EXCEEDED',
-          feature: 'mark_tokens',
+          feature: 'credits',
           limit: 1000,
-          currentUsage: 800,
+          currentUsage: 1000,
         },
         status: 403,
       });
     });
 
-    it('allows when the estimate fits within the remaining budget', async () => {
-      const { service, userId } = setup(1000, 800);
-      await expect(
-        service.assertMarkTokenQuota(userId, 200),
-      ).resolves.toBeUndefined();
+    it('should block when a previous run overshot the limit', async () => {
+      const { service, userId } = setup(1000, 1060);
+
+      await expect(service.assertBalance(userId)).rejects.toMatchObject({
+        response: { feature: 'credits', currentUsage: 1060 },
+      });
     });
 
-    it('short-circuits as unlimited when the limit is -1', async () => {
-      const { service, userId } = setup(-1, 9_999_999);
-      await expect(
-        service.assertMarkTokenQuota(userId, 1_000_000),
-      ).resolves.toBeUndefined();
+    it('should pass without reading usage when the limit is -1', async () => {
+      const { service, mocks, userId } = setup(-1, 9_999_999);
+
+      await expect(service.assertBalance(userId)).resolves.toBeUndefined();
+      expect(mocks.usageModel.findOne).not.toHaveBeenCalled();
     });
 
-    it('signals plan-not-available hint when the limit is 0', async () => {
+    it('should signal plan-not-available when the limit is 0', async () => {
       const { service, userId } = setup(0, 0);
-      await expect(
-        service.assertMarkTokenQuota(userId, 100),
-      ).rejects.toMatchObject({
+
+      await expect(service.assertBalance(userId)).rejects.toMatchObject({
         response: {
-          feature: 'mark_tokens',
+          feature: 'credits',
           limit: 0,
           upgradeHint: expect.stringContaining('not available'),
         },
       });
     });
+
+    it('should signal an exhausted balance when the limit is positive', async () => {
+      const { service, userId } = setup(1000, 1000);
+
+      await expect(service.assertBalance(userId)).rejects.toMatchObject({
+        response: {
+          upgradeHint: expect.stringContaining('used all your credits'),
+        },
+      });
+    });
+
+    it('should apply a tier upgrade immediately without resetting usage', async () => {
+      const { service, mocks, tier, userId } = setup(2000, 2000);
+
+      await expect(service.assertBalance(userId)).rejects.toMatchObject({
+        response: { limit: 2000, currentUsage: 2000 },
+      });
+
+      tier.name = 'Creator';
+      tier.limits.credits = 10000;
+
+      await expect(service.assertBalance(userId)).resolves.toBeUndefined();
+      expect(mocks.usageModel.findOne).toHaveBeenCalledTimes(2);
+    });
   });
 
-  describe('incrementMarkTokenUsage', () => {
-    it('increments mark_tokens usage by the actual amount with upsert', async () => {
+  describe('debit', () => {
+    it('should increment credits usage by the settled amount with upsert', async () => {
       const { service, mocks } = makeService();
       const userId = new Types.ObjectId().toString();
       const periodStart = new Date('2026-03-01T00:00:00.000Z');
@@ -509,19 +674,19 @@ describe('FeatureGatingService', () => {
         .mockResolvedValue(periodStart);
       mocks.usageModel.updateOne.mockResolvedValue({ acknowledged: true });
 
-      await service.incrementMarkTokenUsage(userId, 1234);
+      await service.debit(userId, 1234);
 
       expect(mocks.usageModel.updateOne).toHaveBeenCalledWith(
         {
           user_id: new Types.ObjectId(userId),
-          feature: 'mark_tokens',
+          feature: 'credits',
           periodStart,
         },
         {
           $inc: { count: 1234 },
           $setOnInsert: {
             user_id: new Types.ObjectId(userId),
-            feature: 'mark_tokens',
+            feature: 'credits',
             periodStart,
           },
         },
@@ -529,61 +694,61 @@ describe('FeatureGatingService', () => {
       );
     });
 
-    it('is a no-op when the amount is zero or negative', async () => {
+    it('should retry with a plain increment when the upsert races on E11000', async () => {
+      const { service, mocks } = makeService();
+      const userId = new Types.ObjectId().toString();
+      const periodStart = new Date('2026-03-01T00:00:00.000Z');
+      jest
+        .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
+        .mockResolvedValue(periodStart);
+      mocks.usageModel.updateOne
+        .mockRejectedValueOnce({ code: 11000 })
+        .mockResolvedValueOnce({ acknowledged: true });
+
+      await service.debit(userId, 50);
+
+      expect(mocks.usageModel.updateOne).toHaveBeenCalledTimes(2);
+      expect(mocks.usageModel.updateOne).toHaveBeenLastCalledWith(
+        {
+          user_id: new Types.ObjectId(userId),
+          feature: 'credits',
+          periodStart,
+        },
+        { $inc: { count: 50 } },
+      );
+    });
+
+    it('should rethrow a write error that is not a duplicate key', async () => {
+      const { service, mocks } = makeService();
+      const userId = new Types.ObjectId().toString();
+      jest
+        .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
+        .mockResolvedValue(new Date('2026-03-01T00:00:00.000Z'));
+      mocks.usageModel.updateOne.mockRejectedValue(
+        new Error('connection lost'),
+      );
+
+      await expect(service.debit(userId, 50)).rejects.toThrow(
+        'connection lost',
+      );
+    });
+
+    it('should be a no-op when the amount is zero', async () => {
       const { service, mocks } = makeService();
       const userId = new Types.ObjectId().toString();
 
-      await service.incrementMarkTokenUsage(userId, 0);
+      await service.debit(userId, 0);
 
       expect(mocks.usageModel.updateOne).not.toHaveBeenCalled();
     });
-  });
 
-  describe('getMarkTokenBudget', () => {
-    it('returns used/limit/remaining for a metered tier', async () => {
+    it('should be a no-op when the amount is negative', async () => {
       const { service, mocks } = makeService();
       const userId = new Types.ObjectId().toString();
-      const tier = {
-        _id: new Types.ObjectId(),
-        name: 'Starter',
-        limits: { mark_tokens: 1000 },
-      } as any;
-      jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
-      jest
-        .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
-        .mockResolvedValue(new Date('2026-03-01T00:00:00.000Z'));
-      mocks.usageModel.findOne.mockReturnValue({
-        lean: jest.fn().mockResolvedValue({ count: 300 }),
-      });
 
-      await expect(service.getMarkTokenBudget(userId)).resolves.toEqual({
-        used: 300,
-        limit: 1000,
-        remaining: 700,
-      });
-    });
+      await service.debit(userId, -5);
 
-    it('reports remaining as -1 for an unlimited tier', async () => {
-      const { service, mocks } = makeService();
-      const userId = new Types.ObjectId().toString();
-      const tier = {
-        _id: new Types.ObjectId(),
-        name: 'Pro',
-        limits: { mark_tokens: -1 },
-      } as any;
-      jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
-      jest
-        .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
-        .mockResolvedValue(new Date('2026-03-01T00:00:00.000Z'));
-      mocks.usageModel.findOne.mockReturnValue({
-        lean: jest.fn().mockResolvedValue({ count: 5000 }),
-      });
-
-      await expect(service.getMarkTokenBudget(userId)).resolves.toEqual({
-        used: 5000,
-        limit: -1,
-        remaining: -1,
-      });
+      expect(mocks.usageModel.updateOne).not.toHaveBeenCalled();
     });
   });
 });

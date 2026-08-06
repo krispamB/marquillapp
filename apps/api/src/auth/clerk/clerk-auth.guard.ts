@@ -59,8 +59,9 @@ export class ClerkAuthGuard implements CanActivate {
   }
 
   private extractClerkToken(request: Request): string | null {
-    const cookieToken = (request as Request & { cookies?: Record<string, string> })
-      .cookies?.__session;
+    const cookieToken = (
+      request as Request & { cookies?: Record<string, string> }
+    ).cookies?.__session;
     if (cookieToken) {
       return cookieToken;
     }

@@ -1,11 +1,9 @@
 import { Global, Module } from '@nestjs/common';
-import { AgentService } from './agent.service';
-import { AgentController } from './agent.controller';
+import { AgentRunnerService } from './agent-runner.service';
 
 @Global()
 @Module({
-  providers: [AgentService],
-  controllers: [AgentController],
-  exports: [AgentService],
+  providers: [AgentRunnerService],
+  exports: [AgentRunnerService],
 })
 export class AgentModule {}

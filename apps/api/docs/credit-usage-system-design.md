@@ -27,9 +27,14 @@ enforcement points, and the Paddle/tier-config implications**. The engine's hook
   balance guard, and the debit.
 - **#104 §7 emits raw signals, not credits:** each LLM turn → `record({ kind: 'llm',
   amount: usage.cost, detail: { model, totalTokens } })` where `usage.cost` is the
-  **real per-call USD cost** from OpenRouter's `costDetails`; each web search →
+  **real per-call USD cost OpenRouter charged the account**; each web search →
   `record({ kind: 'web_search', amount: 1 })`. Converting those to credits is this
   ticket's job.
+
+  > **Not `usage.costDetails`.** That sibling field reports what the *upstream provider*
+  > charged OpenRouter — wholesale, excluding OpenRouter's margin, and different under
+  > BYOK. Metering on it would systematically under-count real spend, worst where the
+  > margin is widest. `Usage` (PRD §7) carries `cost` alone, by design.
 
 ---
 
@@ -41,7 +46,7 @@ enforcement points, and the Paddle/tier-config implications**. The engine's hook
 1 credit = $0.001 of raw provider cost      →  CREDITS_PER_USD = 1000
 ```
 
-`CREDITS_PER_USD` and a margin multiplier `CREDIT_MARKUP` (default `1.0`) are global env
+`CREDITS_PER_USD` and a margin multiplier `CREDIT_MARKUP` (launch default `2.0`) are global env
 (`ConfigService`, code defaults, added to `.env.example`) — never per-tier. Per-tier
 config carries **only the allowance** (§5).
 
@@ -91,21 +96,22 @@ This is a coarse safety net (one flat rate, not per-model). For OpenRouter v1 (#
 `cost` is always present, so the fallback should effectively never fire; it exists so a
 future provider without cost reporting can't slip through free. Log a warning when it does.
 
-## 3. Fixed surcharges for non-LLM actions
+## 3. Provider-unit pricing for non-LLM actions
 
 Web search (Tavily) and PDF render (Browserless) cost the operator real money but emit no
-`usage.cost`. Each carries a **flat credit surcharge**, priced in the same credit unit so
-it is commensurable with LLM credits (i.e. set each ≈ the action's real cost × peg × markup):
+`usage.cost`. They are priced in the same credit unit from their provider billing units:
 
-| Signal `kind`  | Fired by (#104/#103)                    | Env constant                    | Illustrative |
-|----------------|------------------------------------------|----------------------------------|--------------|
-| `web_search`   | research agent, per Tavily call (#104 §7) | `CREDIT_SURCHARGE_WEB_SEARCH`   | `8`          |
-| `pdf_render`   | RENDER_PDF step, per Browserless render (#103 §4) | `CREDIT_SURCHARGE_PDF_RENDER` | `5` |
+| Signal `kind` | Fired by | Env configuration | Launch policy |
+|---|---|---|---|
+| `web_search` | research agent, per successful advanced Tavily lookup | `CREDIT_SURCHARGE_WEB_SEARCH` | 32 credits |
+| `pdf_render` | RENDER_PDF step, per measured Browserless 30-second unit | `CREDIT_SURCHARGE_PDF_RENDER`, `CREDIT_MINIMUM_PDF_RENDER` | `max(8, 4 × units)` |
 
 Surcharge signals carry `amount` as a **count**, not dollars:
 
 ```
-credits = amount * CREDIT_SURCHARGE_<KIND>
+web search credits = successful lookups * CREDIT_SURCHARGE_WEB_SEARCH
+pdf render credits = max(CREDIT_MINIMUM_PDF_RENDER,
+                         measured units * CREDIT_SURCHARGE_PDF_RENDER)
 ```
 
 `UsageKind` is defined here (the enum #103 §9 references):
@@ -193,9 +199,9 @@ export const FEATURE_KEYS = {
 type Feature = 'credits' | 'connected_accounts' | 'scheduled_posts';
 ```
 
-`limits.credits` is the per-period allowance: a positive integer, `-1` = unlimited
-(short-circuits the guard, as the current `assertScheduledPostQuota`/`assertMarkTokenQuota`
-already do), `0` = **AI disabled on this plan** (every run blocked — the free/no-AI tier).
+`limits.credits` is the per-period allowance. Launch tiers all use positive, finite
+allowances; the generic gate continues to understand `-1` for non-provider-backed legacy
+features and `0` for a disabled feature.
 
 **`Usage`** — schema unchanged. Consumption is recorded exactly as today, keyed
 `(user_id, 'credits', periodStart)`, with the same unique index and the same `$inc` upsert
@@ -204,14 +210,15 @@ now credits). **Period resolution is reused verbatim** — subscription
 `currentPeriodStart` or UTC-month start (`resolveUsagePeriod`). Credits reset each period;
 **no rollover** in v1.
 
-**No new `MarkRun`-style ledger collection.** The per-run credit breakdown already lives on
-the `WorkflowRun` (#103's `creditsUsed` + the recorded ticks); the period total lives on
-`Usage`. That covers dashboard, SSE, and audit without a third store. The `MarkRun`
-collection is deleted with the rest of `src/mark`.
+**No new `MarkRun`-style ledger collection.** The per-run credit breakdown lives on the
+`WorkflowRun`: `creditsUsed`, live usage ticks, and an append-only `renderAttempts` list
+containing Browserless duration, units, outcome, and failure stage. Failed attempts remain
+auditable but are excluded from the credit accumulator. The period total lives on `Usage`.
+That covers dashboard, SSE, and provider-cost audit without a third store.
 
 **Config (new global env, `.env.example`):** `CREDITS_PER_USD`, `CREDIT_MARKUP`,
 `FALLBACK_CREDITS_PER_1K_TOKENS`, `CREDIT_SURCHARGE_WEB_SEARCH`,
-`CREDIT_SURCHARGE_PDF_RENDER`. Retire all `MARK_*`.
+`CREDIT_SURCHARGE_PDF_RENDER`, `CREDIT_MINIMUM_PDF_RENDER`. Retire all `MARK_*`.
 
 ## 6. Enforcement points
 
@@ -267,22 +274,25 @@ untouched). There is **no coexistence window** for `ai_drafts` — the clean wri
 deletes the draft path that gated it (#104 §12 removes `createDraft`/`createLinkedInPost`),
 so the counter has no remaining caller.
 
-`getDashboardUsage` returns the new shape: `credits` (used/limit/remaining, `-1` for
-unlimited) alongside `connected_accounts` and `scheduled_posts`; the `ai_drafts` and
-`mark_tokens` keys are dropped.
+`getDashboardUsage` returns `credits` (used/limit/remaining, `-1` for unlimited)
+alongside `connected_accounts` and `scheduled_posts`; the `ai_drafts` and
+`mark_tokens` keys are dropped. It also returns `artifactsCreated` with zero-filled
+`posts`, `polls`, and `documents` counts for artifacts created during the same billing
+cycle, including failed and subsequently soft-deleted records.
 
 ## 8. Paddle / tier-config implications
 
 - **Each plan's Paddle price maps to a tier, and each tier carries `limits.credits`** —
-  the credit allowance is set in tier config next to the existing limits (operator-tuned,
-  seeded from: target model cost per average run × expected runs/mo × `CREDIT_MARKUP`).
-  Illustrative ladder — free `0` (no AI) or a small trial grant, Starter `2000`, Pro
-  `10000`, top tier `-1` (unlimited).
-- **Sizing anchor (illustrative, at `CREDITS_PER_USD = 1000`, markup `1.0`):** an
-  insight post ≈ research (~$0.02) + generation (~$0.01) + 1 web search (`8`) ≈ **~38
-  credits**; a quick post (no research) ≈ **~12 credits**; a carousel adds a `pdf_render`
-  (`5`). So "2,000 credits" ≈ 50 insight posts or ~160 quick posts — the operator sizes
-  the ladder against these.
+  the launch ladder is Free `120`, Starter `2,000`, Creator `10,000`, and Pro Writer
+  `30,000`. All provider-backed allowances are finite. Free credits are shared across
+  posts, polls, and documents and do not enable research.
+- **Sizing anchor (at `CREDITS_PER_USD = 1000`, markup `2.0`):** LLM usage costs
+  `ceil(provider cost in USD × 1000 × 2)`. Successful advanced Tavily lookups cost 32
+  credits each, while successful Browserless renders cost `max(8, 4 × measured units)`.
+  The plan ladder is therefore evaluated against the actual mix of artifact, search, and
+  render usage rather than a fixed draft count.
+- **Rollout:** re-run `npm run seed:tiers:temp` in each environment to upsert the launch
+  allowances and plan metadata onto existing tier documents.
 - **Upgrades take effect immediately.** The allowance is read live from the resolved tier
   at guard time while the `Usage` aggregate persists, so a mid-period upgrade instantly
   raises headroom without touching usage rows (existing `resolveEntitlementTier` behavior).
@@ -303,6 +313,8 @@ metered billing is a later pricing decision, not a launch blocker.
 
 - **Dashboard** — `getDashboardUsage.usage.credits = { used, limit, remaining }`
   (`remaining === -1` when unlimited), for the plan/usage screen.
+- **Artifact breakdown** — `getDashboardUsage.artifactsCreated = { posts, polls,
+documents }`, counted over the returned billing cycle.
 - **Live (SSE, #107)** — `usage.tick` events carry the per-signal credit delta and running
   `creditsUsed`, so a long research run shows a climbing credit count; the terminal
   `run.completed` / dashboard reflects the committed total. `limit === 0` lets the frontend
@@ -336,9 +348,9 @@ successful runs**.
 - **Delete** `src/mark` entirely, including the `MarkRun` collection and all `MARK_*` config
   (charter #9); the Tavily helper's surcharge signal is now `web_search` via #104's tool.
 - **Config:** add `CREDITS_PER_USD`, `CREDIT_MARKUP`, `FALLBACK_CREDITS_PER_1K_TOKENS`,
-  `CREDIT_SURCHARGE_WEB_SEARCH`, `CREDIT_SURCHARGE_PDF_RENDER` to `.env.example`; remove all
-  `MARK_*`.
-- **Tests** (CLAUDE.md): `credit-meter.service.spec.ts` (conversion per kind incl. fallback
+  `CREDIT_SURCHARGE_WEB_SEARCH`, `CREDIT_SURCHARGE_PDF_RENDER`, and
+  `CREDIT_MINIMUM_PDF_RENDER` to `.env.example`; remove all `MARK_*`.
+- **Tests** (AGENTS.md): `credit-meter.service.spec.ts` (conversion per kind incl. fallback
   and rounding; surcharge math) and updated `feature-gating.service.spec.ts` (headroom
   guard, `credits` debit, dashboard shape, `-1`/`0` edge cases), manual construction +
   `makeService()` + `jest.mock(..., { virtual: true })`, run with `bun jest`.

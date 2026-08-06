@@ -5,5 +5,5 @@ export class SchedulePostDto {
   @IsDateString()
   @IsNotEmpty()
   @IsFutureDate()
-  scheduledTime: string;
+  scheduledAt: string;
 }

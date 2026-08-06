@@ -6,6 +6,12 @@
 > Supersedes the current `src/database/schemas/artifact.schema.ts` (which has a
 > `type` enum/type mismatch: `enum: ['html','text','structured']` on a field typed
 > `ArtifactType`).
+>
+> **Amended 2026-07-18:** a READY version may still be edited in place while unpinned, but
+> `PATCH /artifacts/:id` returns `409` when the current version is referenced by a SCHEDULED
+> or PUBLISHED Post. A family-level `pinRevision` CAS also closes the race between an edit
+> and a concurrent schedule/publish action. This preserves the approved scheduled preview
+> and published history.
 
 Feeds the final spec assembly (#110). Interlocking tickets are referenced inline
 at each boundary.
@@ -57,6 +63,8 @@ GENERATING → FAILED
   orthogonal to generation).
 - **Publish state is deliberately absent** — whether an artifact has been posted is a
   `Post` concern (#106); referencing an artifact from a post doesn't mutate it.
+- **Pinned versions are immutable** — the Post reference does not mutate the artifact, but
+  it prevents in-place edits while any SCHEDULED or PUBLISHED Post depends on that version.
 
 ## 3. Schema
 
@@ -67,8 +75,9 @@ enum VersionStatus  { GENERATING = 'GENERATING', READY = 'READY', FAILED = 'FAIL
 Artifact {                          // top-level, user-owned library unit
   _id
   user:           ObjectId<User>
+  pinRevision:    number            // CAS bumped whenever a version is pinned
   type:           ArtifactType
-  title?:         string            // editable display label for the library
+  title?:         string            // generated on initial completion; editable 1–100 character library label
   source:         { prompt: string; withResearch: boolean; stylePreset?: StylePreset }
   currentVersion: number            // → versions[].version
   versions:       ArtifactVersion[] // ordered, append-only (head is mutable)
@@ -147,6 +156,9 @@ history and muddies what "version" means.
   **enqueues a generation run on the new engine** (#103); responds `202
   {artifactId, runId}`. The client watches progress via SSE (#107) and/or polls
   `GET /artifacts/:id`.
+- Initial `GENERATE` returns a trimmed 1–100 character title alongside content;
+  `PERSIST_VERSION` stores it at family level when version 1 becomes `READY`.
+  Refinements never replace the family title.
 - **Input:** `{ type, prompt, withResearch, stylePreset? }`.
   - `withResearch` is the research/no-research toggle from the #100 resolution — this
     is exactly where `quickPostLinkedin`/`insightPostLinkedin` collapse into one flow
@@ -180,7 +192,7 @@ artifact isn't the caller's — same pattern as `PostService`).
 | POST | `/artifacts` | `{type, prompt, withResearch, stylePreset?}` | `202 {artifactId, runId}` |
 | POST | `/artifacts/:id/refine` | `{feedback}` | `202 {artifactId, version, runId}` |
 | PATCH | `/artifacts/:id` | partial content edit (head, `READY` only) | `200` |
-| GET | `/artifacts` | `?type&status&month&page` | list of **summaries** + `filters {availableMonths, types}` |
+| GET | `/artifacts` | `?type&status&month&search&page` | list of **summaries** + `filters {availableMonths, types}` |
 | GET | `/artifacts/:id` | `?version=N` / `?includeVersions=true` | current version (or a specific version / + version-metadata history) |
 | DELETE | `/artifacts/:id` | — | `200` soft delete |
 
@@ -190,6 +202,9 @@ artifact isn't the caller's — same pattern as `PostService`).
   soft-deleted, sorted `updatedAt` desc, paginated. The `month` filter reuses the
   existing `getPosts` `%Y-%m` aggregation; the `filters` block mirrors today's posts
   endpoint minus `connectedAccountIds` (artifacts are account-agnostic).
+- **Search is library-oriented** — `search` is a trimmed, case-insensitive literal
+  substring match against the editable `title` and immutable `source.prompt`. It
+  composes with the other list filters and is applied before pagination/counting.
 - **Get** returns the current version's full content by default; `?version=N` for a
   specific version; `?includeVersions=true` adds **version metadata only**
   (`{version, status, createdAt, editedAt, refineFeedback}`) for a history sidebar.

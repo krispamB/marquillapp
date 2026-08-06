@@ -10,10 +10,7 @@ import 'dotenv/config';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../../app.module';
-import { AgentService } from '../../agent/agent.service';
 import { PostService } from '../../post/post.service';
-import { WorkflowRegistry } from '../engine/workflow.registory';
-import { runWorkflow } from '../engine/workflow.engine';
 import { getModelToken } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from '../../database/schemas';
@@ -21,6 +18,15 @@ import { AuthService } from '../../auth/auth.service';
 import { MailService } from '../../mail';
 import { EmailQueue } from '../email.queue';
 import { processEmailJob } from './email.worker.handler';
+import { ArtifactRunProcessor } from './artifact-run.worker.handler';
+import { AgentRunnerService } from '../../agent/agent-runner.service';
+import { ArtifactService } from '../../artifact/artifact.service';
+import { CarouselRendererService } from '../../carousel';
+import { CreditMeterService } from '../../feature-gating/credit-meter.service';
+import { FeatureGatingService } from '../../feature-gating/feature-gating.service';
+import { RedisService } from '../../redis/redis.service';
+import { WorkflowRunService } from '../workflow-run.service';
+import { BuildInput } from '../engine/workflow.types';
 import { LinkedinMediaService } from '../../post/linkedin-media.service';
 import { MediaUploadJobData } from '../media-upload.queue';
 import {
@@ -36,35 +42,31 @@ async function bootstrapWorker() {
   logger.log('Bootstrapping workflow context...');
   const app = await NestFactory.createApplicationContext(AppModule);
 
-  const agentService = app.get(AgentService);
   const postService = app.get(PostService);
   const authService = app.get(AuthService);
   const mailService = app.get(MailService);
   const emailQueue = app.get(EmailQueue);
-  const linkedinMediaService = app.get(LinkedinMediaService);
   const userModel = app.get<Model<User>>(getModelToken(User.name));
+  const linkedinMediaService = app.get(LinkedinMediaService);
 
   logger.log('NestJs context ready');
 
-  new Worker(
-    QUEUE_NAME,
-    async (job: Job) => {
-      logger.log(`Processing job ${job.id}`);
-      const workflow = WorkflowRegistry[job.name];
-      if (!workflow) {
-        throw new Error(`Unknown workflow: ${job.name}`);
-      }
+  // Every `StepContext` role, resolved once. `RunEventEmitter` and
+  // `RunCreditMeter` are per-run, so the processor builds those itself.
+  const artifactRuns = new ArtifactRunProcessor({
+    agent: app.get(AgentRunnerService),
+    artifacts: app.get(ArtifactService),
+    renderer: app.get(CarouselRendererService),
+    creditMeter: app.get(CreditMeterService),
+    featureGating: app.get(FeatureGatingService),
+    runs: app.get(WorkflowRunService),
+    redis: app.get(RedisService).getClient(),
+    logger,
+  });
 
-      try {
-        return runWorkflow(workflow, job, {
-          logger,
-          agentService,
-        });
-      } catch (error) {
-        logger.error(error);
-        throw error;
-      }
-    },
+  const workflowWorker = new Worker(
+    QUEUE_NAME,
+    (job: Job<BuildInput>) => artifactRuns.process(job),
     {
       connection: {
         url: process.env.REDIS_URL!,
@@ -73,6 +75,12 @@ async function bootstrapWorker() {
       },
     },
   );
+
+  // Fires on every failed attempt; the processor decides which one ends the run.
+  workflowWorker.on('failed', (job, error) => {
+    if (!job) return;
+    artifactRuns.onFailed(job, error).catch((err) => logger.error(err));
+  });
 
   new Worker(
     SCHEDULE_QUEUE_NAME,
@@ -85,7 +93,7 @@ async function bootstrapWorker() {
           return;
         }
 
-        await postService.publishOnLinkedIn(user, postId);
+        await postService.publishPost(postId);
         try {
           await emailQueue.addScheduledPostPublishedEmailJob(
             user.email,
@@ -183,13 +191,13 @@ async function bootstrapWorker() {
     if (!job) return;
     if (job.attemptsMade >= (job.opts.attempts ?? 1)) {
       handleMediaUploadJobExhausted(job, logger, linkedinMediaService).catch(
-        (err) => logger.error(err),
+        (failure) => logger.error(failure),
       );
-    } else {
-      logger.warn(
-        `Media upload job ${job.id} failed (attempt ${job.attemptsMade}/${job.opts.attempts ?? 1}): ${error.message}`,
-      );
+      return;
     }
+    logger.warn(
+      `Media upload job ${job.id} failed (attempt ${job.attemptsMade}/${job.opts.attempts ?? 1}): ${error.message}`,
+    );
   });
 }
 bootstrapWorker();

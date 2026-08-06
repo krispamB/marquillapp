@@ -13,6 +13,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ApifyModule } from './apify/apify.module';
 import { ActorsModule } from './actors/actors.module';
 import { WorkflowModule } from './workflow/workflow.module';
+import { WorkflowRunModule } from './workflow/workflow-run.module';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
 import { ClerkAuthModule } from './auth/clerk';
@@ -21,13 +22,13 @@ import { PostModule } from './post/post.module';
 import { EncryptionModule } from './encryption/encryption.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { PaymentModule } from './payment/payment.module';
-import { YoutubeTranscriptModule } from './youtube-transcript';
 import { TierModule } from './tier/tier.module';
 import { MailModule } from './mail';
 import { FeedbackModule } from './feedback/feedback.module';
 import { OnboardingModule } from './onboarding';
 import { DiagnosticsModule } from './diagnostics/diagnostics.module';
-import { MarkModule } from './mark';
+import { ArtifactModule } from './artifact';
+import { CarouselModule } from './carousel';
 
 @Module({
   imports: [
@@ -44,16 +45,17 @@ import { MarkModule } from './mark';
     }),
     ActorsModule,
     WorkflowModule,
+    WorkflowRunModule,
     DatabaseModule,
     AuthModule,
     ClerkAuthModule,
     UserModule,
     PostModule,
     EncryptionModule,
-    YoutubeTranscriptModule,
     OnboardingModule,
     DiagnosticsModule,
-    MarkModule,
+    ArtifactModule,
+    CarouselModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -2,9 +2,13 @@ import { ExecutionContext } from '@nestjs/common';
 import { ClerkAuthGuard } from './clerk-auth.guard';
 
 const verifyToken = jest.fn();
-jest.mock('@clerk/backend', () => ({ verifyToken: (...args: any[]) => verifyToken(...args) }), {
-  virtual: true,
-});
+jest.mock(
+  '@clerk/backend',
+  () => ({ verifyToken: (...args: any[]) => verifyToken(...args) }),
+  {
+    virtual: true,
+  },
+);
 
 const makeContext = (request: any): ExecutionContext =>
   ({
@@ -58,7 +62,9 @@ describe('ClerkAuthGuard', () => {
         authorizedParties: ['https://app.example.com'],
         jwtKey: expect.stringContaining('BEGIN PUBLIC KEY'),
       });
-      expect(mocks.userProvisioning.findOrCreate).toHaveBeenCalledWith('user_clerk_1');
+      expect(mocks.userProvisioning.findOrCreate).toHaveBeenCalledWith(
+        'user_clerk_1',
+      );
       expect(request.user).toBe(user);
       expect(mocks.jwtAuthGuard.canActivate).not.toHaveBeenCalled();
     });

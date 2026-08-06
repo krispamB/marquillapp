@@ -18,21 +18,26 @@ export class PaddleClient {
 
   async createTransaction(input: {
     priceId: string;
-    userId: string;
-  }): Promise<{ checkoutUrl: string }> {
+    userData: {
+      userId: string;
+      name: string;
+    };
+  }): Promise<{ transactionId: string }> {
     const transaction = await this.paddle.transactions.create({
       items: [{ priceId: input.priceId, quantity: 1 }],
-      customData: { userId: input.userId },
+      customData: {
+        userId: input.userData.userId,
+        userName: input.userData.name,
+      },
     });
 
-    const url = transaction.checkout?.url;
-    if (!url) {
+    if (!transaction.id) {
       throw new InternalServerErrorException(
-        'Paddle did not return a checkout URL',
+        'Paddle did not return a transaction ID',
       );
     }
 
-    return { checkoutUrl: url };
+    return { transactionId: transaction.id };
   }
 
   async listTransactions(input: { customerId: string }): Promise<any[]> {

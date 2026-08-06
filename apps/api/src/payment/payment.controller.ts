@@ -6,12 +6,13 @@ import {
   HttpStatus,
   Post,
   UseGuards,
+  ValidationPipe,
 } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { ClerkAuthGuard } from '../auth/clerk';
 import { GetUser } from '../common/decorators';
 import { User } from '../database/schemas';
-import { CreateCheckoutDto } from './payment.dto';
+import { CreateCheckoutDto } from './dto';
 import { IAppResponse } from '../common/interfaces';
 
 @UseGuards(ClerkAuthGuard)
@@ -21,11 +22,20 @@ export class PaymentController {
 
   @Post('checkout')
   @HttpCode(HttpStatus.OK)
-  async createCheckout(@GetUser() user: User, @Body() dto: CreateCheckoutDto) {
+  async createCheckout(
+    @GetUser() user: User,
+    @Body(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    )
+    dto: CreateCheckoutDto,
+  ) {
     return this.paymentService.createCheckoutSession(
       user._id.toString(),
-      dto.tierId,
-      dto.billingInterval,
+      dto.priceId,
     );
   }
 

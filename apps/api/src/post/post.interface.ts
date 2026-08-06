@@ -21,6 +21,15 @@ export interface IContent {
   multiImage?: {
     images: { id: string; altText?: string }[];
   };
+  poll?: {
+    question: string;
+    options: { text: string }[];
+    settings: {
+      duration: 'ONE_DAY' | 'THREE_DAYS' | 'SEVEN_DAYS' | 'FOURTEEN_DAYS';
+      voteSelectionType: 'SINGLE_VOTE';
+      isVoterVisibleToAuthor: true;
+    };
+  };
 }
 
 export interface IVideoInitResponse {

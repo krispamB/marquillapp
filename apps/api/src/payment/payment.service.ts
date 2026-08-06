@@ -43,45 +43,42 @@ export class PaymentService {
     private readonly featureGatingService: FeatureGatingService,
   ) {}
 
-  async createCheckoutSession(
-    userId: string,
-    tierId: string,
-    billingInterval: BillingInterval,
-  ) {
+  async createCheckoutSession(userId: string, priceId: string) {
     const userObjectId = new Types.ObjectId(userId);
     const user = await this.userModel.findById(userObjectId).lean();
     if (!user) throw new NotFoundException('User not found');
 
     const targetTier = await this.tierModel
-      .findById(new Types.ObjectId(tierId))
+      .findOne({
+        isActive: true,
+        $or: [
+          { paddleMonthlyPriceId: priceId },
+          { paddleYearlyPriceId: priceId },
+        ],
+      })
       .lean();
 
     if (!targetTier) {
-      throw new NotFoundException('Tier not found');
-    }
-
-    if (!targetTier.isActive) {
-      throw new BadRequestException(`Tier "${targetTier.name}" is not active`);
-    }
-
-    const priceId =
-      billingInterval === BillingInterval.MONTHLY
-        ? targetTier.paddleMonthlyPriceId
-        : targetTier.paddleYearlyPriceId;
-
-    if (!priceId) {
       throw new BadRequestException(
-        `Tier "${targetTier.name}" is missing Paddle ${billingInterval} price ID`,
+        'priceId does not belong to an active billing tier',
       );
     }
 
-    const { checkoutUrl } = await this.paddleClient.createTransaction({
+    const billingInterval =
+      targetTier.paddleMonthlyPriceId === priceId
+        ? BillingInterval.MONTHLY
+        : BillingInterval.YEARLY;
+
+    const { transactionId } = await this.paddleClient.createTransaction({
       priceId,
-      userId: user._id.toString(),
+      userData: {
+        userId: user._id.toString(),
+        name: user.name,
+      },
     });
 
     return {
-      url: checkoutUrl,
+      transactionId,
       tier: {
         id: targetTier._id.toString(),
         name: targetTier.name,

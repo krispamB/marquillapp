@@ -173,7 +173,7 @@ describe('AuthService.linkedinCallback', () => {
       findOneAndUpdate: jest.fn(),
       updateMany: jest.fn().mockResolvedValue({}),
     };
-    const postDraftModel = {
+    const postModel = {
       find: jest.fn(),
       updateMany: jest.fn(),
     };
@@ -201,7 +201,7 @@ describe('AuthService.linkedinCallback', () => {
       userModel as any,
       jwtService as any,
       connectedAccountModel as any,
-      postDraftModel as any,
+      postModel as any,
       tierModel as any,
       configService as any,
       encryptionService as any,
@@ -215,7 +215,7 @@ describe('AuthService.linkedinCallback', () => {
       service,
       mocks: {
         connectedAccountModel,
-        postDraftModel,
+        postModel,
         encryptionService,
         featureGatingService,
         linkedinAvatarRefreshQueue,
@@ -399,7 +399,7 @@ describe('AuthService.disconnectConnectedAccount', () => {
       countDocuments: jest.fn().mockResolvedValue(0),
       updateMany: jest.fn().mockResolvedValue({}),
     };
-    const postDraftModel = {
+    const postModel = {
       find: jest.fn().mockReturnValue({
         select: jest.fn().mockResolvedValue([]),
       }),
@@ -410,26 +410,40 @@ describe('AuthService.disconnectConnectedAccount', () => {
         getJob: jest.fn().mockResolvedValue(null),
       },
     };
+    const featureGatingService = {
+      decrementScheduledPostUsage: jest.fn(),
+    };
     const service = new AuthService(
       {} as any,
       {} as any,
       connectedAccountModel as any,
-      postDraftModel as any,
+      postModel as any,
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
+      featureGatingService as any,
       {} as any,
       scheduleQueue as any,
       {} as any,
     );
 
-    return { service, connectedAccountModel, postDraftModel, scheduleQueue };
+    return {
+      service,
+      connectedAccountModel,
+      postModel,
+      scheduleQueue,
+      featureGatingService,
+    };
   };
 
-  it('deactivates personal account and org accounts, then cancels scheduled posts', async () => {
-    const { service, connectedAccountModel, postDraftModel, scheduleQueue } =
-      makeService();
+  it('should cancel jobs and fail scheduled posts when LinkedIn accounts are deactivated', async () => {
+    const {
+      service,
+      connectedAccountModel,
+      postModel,
+      scheduleQueue,
+      featureGatingService,
+    } = makeService();
     const userId = new Types.ObjectId().toString();
     const accountId = new Types.ObjectId().toString();
     const orgId = new Types.ObjectId();
@@ -445,7 +459,7 @@ describe('AuthService.disconnectConnectedAccount', () => {
       select: jest.fn().mockResolvedValue([{ _id: accountId }, { _id: orgId }]),
     });
     connectedAccountModel.countDocuments.mockResolvedValue(2);
-    postDraftModel.find.mockReturnValueOnce({
+    postModel.find.mockReturnValueOnce({
       select: jest.fn().mockResolvedValue([{ _id: new Types.ObjectId() }]),
     });
     scheduleQueue.queue.getJob.mockResolvedValueOnce({ remove });
@@ -453,16 +467,29 @@ describe('AuthService.disconnectConnectedAccount', () => {
     const result = await service.disconnectConnectedAccount(userId, accountId);
 
     expect(connectedAccountModel.updateMany).toHaveBeenCalled();
-    expect(postDraftModel.updateMany).toHaveBeenCalledWith(
+    expect(postModel.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user: new Types.ObjectId(userId),
+        connectedAccount: { $in: expect.any(Array) },
+        status: 'SCHEDULED',
+      }),
+    );
+    expect(postModel.updateMany).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({
         $set: expect.objectContaining({
-          status: 'DRAFT',
-          scheduledAt: null,
+          status: 'FAILED',
+          failureReason: 'connected account disconnected',
         }),
       }),
     );
+    expect(postModel.updateMany.mock.calls[0][1].$set).not.toHaveProperty(
+      'scheduledAt',
+    );
     expect(remove).toHaveBeenCalledTimes(1);
+    expect(
+      featureGatingService.decrementScheduledPostUsage,
+    ).not.toHaveBeenCalled();
     expect(result).toEqual({
       accountId,
       deactivatedCount: 2,

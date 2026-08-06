@@ -144,7 +144,8 @@ upstream slot is missing — #103 §3) and **write only their own slots** via a 
 
 ### `GENERATE` — AI (single structured completion) — *always*
 
-- **Purpose:** produce the typed `ArtifactContent` for the artifact's `type`.
+- **Purpose:** produce the typed `ArtifactContent` for the artifact's `type`, plus
+  a 1–100 character library title on the initial run only.
 - **Reads:** `input` (`type, prompt, stylePreset`), `research?` (cached or fresh),
   `refine?` (prior content + feedback).
 - **Calls:** `ctx.agent.generate({ type, prompt, stylePreset, research?, refine? })`
@@ -201,8 +202,9 @@ upstream slot is missing — #103 §3) and **write only their own slots** via a 
 - **Purpose:** write the finished content onto the pre-created version and flip it
   `READY` (the run's only durable content write; #103 §8 idempotency spine).
 - **Reads:** `input` (`artifactId, version`), `content`, `render?` (documents).
-- **Calls:** `ctx.artifacts.setVersionContent(artifactId, version, content, render?)`
-  (the `ArtifactWriter` role, #103 §10) — writes `content`, folds `render.pdfKey` +
+- **Calls:** `ctx.artifacts.setVersionContent(artifactId, version, content, {render?, title?})`
+  (the `ArtifactWriter` role, #103 §10) — writes `content`, stores the initial
+  family title, folds `render.pdfKey` +
   `pageCount` into `content.document` for documents, and sets `status: GENERATING →
   READY` (#102 §2's lifecycle).
 - **Writes:** no RunState slot (terminal step); side effect is the artifact version

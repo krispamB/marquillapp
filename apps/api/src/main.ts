@@ -17,7 +17,10 @@ async function bootstrap() {
   app.use(
     compression({
       filter: (req, res) => {
-        if (req.path.endsWith('/mark/chat')) return false;
+        // The SSE progress stream must not be gzipped: compression buffers the
+        // stream to build its window and would stall live progress.
+        if (req.path.includes('/runs/') && req.path.endsWith('/events'))
+          return false;
         return compression.filter(req, res);
       },
     }),

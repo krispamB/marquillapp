@@ -1,0 +1,1 @@
+export const CONTENT_TITLE_MAX_LENGTH = 100;

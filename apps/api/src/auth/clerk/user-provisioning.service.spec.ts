@@ -42,7 +42,11 @@ const makeService = () => {
     },
   };
 
-  return { service, mocks: { userModel, tierModel, clerkClient, emailQueue }, fixtures };
+  return {
+    service,
+    mocks: { userModel, tierModel, clerkClient, emailQueue },
+    fixtures,
+  };
 };
 
 describe('UserProvisioningService', () => {
@@ -57,7 +61,10 @@ describe('UserProvisioningService', () => {
 
   describe('findOrCreate', () => {
     it('should return the existing user without calling Clerk when clerkId is already linked', async () => {
-      const existing = { _id: new Types.ObjectId(), clerkId: fixtures.clerkUserId };
+      const existing = {
+        _id: new Types.ObjectId(),
+        clerkId: fixtures.clerkUserId,
+      };
       mocks.userModel.findOne.mockResolvedValueOnce(existing);
 
       const result = await service.findOrCreate(fixtures.clerkUserId);
@@ -91,7 +98,10 @@ describe('UserProvisioningService', () => {
     });
 
     it('should create a new user with the default tier and enqueue a welcome email when no match exists', async () => {
-      const created = { _id: new Types.ObjectId(), clerkId: fixtures.clerkUserId };
+      const created = {
+        _id: new Types.ObjectId(),
+        clerkId: fixtures.clerkUserId,
+      };
       mocks.userModel.findOne
         .mockResolvedValueOnce(null) // by clerkId
         .mockResolvedValueOnce(null); // by email
@@ -119,13 +129,19 @@ describe('UserProvisioningService', () => {
 
     it('should still create the user when the welcome email enqueue fails', async () => {
       const created = { _id: new Types.ObjectId() };
-      mocks.userModel.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+      mocks.userModel.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
       mocks.clerkClient.users.getUser.mockResolvedValueOnce(fixtures.clerkUser);
       mocks.tierModel.findOne.mockResolvedValueOnce(fixtures.defaultTier);
       mocks.userModel.create.mockResolvedValueOnce(created);
-      mocks.emailQueue.addWelcomeEmailJob.mockRejectedValueOnce(new Error('queue down'));
+      mocks.emailQueue.addWelcomeEmailJob.mockRejectedValueOnce(
+        new Error('queue down'),
+      );
 
-      await expect(service.findOrCreate(fixtures.clerkUserId)).resolves.toBe(created);
+      await expect(service.findOrCreate(fixtures.clerkUserId)).resolves.toBe(
+        created,
+      );
     });
   });
 });

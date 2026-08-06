@@ -4,6 +4,11 @@
 > Author: generated for Christopher Pam.
 > Scope: primary-source API research only. No code changes. Every factual claim
 > cites the first-party LinkedIn doc page (learn.microsoft.com/linkedin) that owns it.
+>
+> **2026-07-18 implementation note:** references below to `PostDraft.media[]` describe the
+> machinery at research time. The current `Post.media[]` keeps a stable UUID in `id` and
+> stores the uploaded LinkedIn image/video asset in `linkedinUrn`. Poll/document mutual
+> exclusivity remains unchanged; uploaded Post media is allowed only with POST artifacts.
 
 All findings below are drawn from the versioned **REST** API docs (the `/rest/*`
 surface the app already targets in `src/post/linkedin-media.service.ts`), not the

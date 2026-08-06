@@ -15,6 +15,9 @@ export class Usage extends Document {
 
   @Prop({ required: true, index: true })
   periodStart: Date;
+
+  @Prop({ type: [Types.ObjectId], default: undefined })
+  scheduledPostIds?: Types.ObjectId[];
 }
 
 export const UsageSchema = SchemaFactory.createForClass(Usage);

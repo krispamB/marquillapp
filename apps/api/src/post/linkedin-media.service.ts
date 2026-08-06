@@ -6,12 +6,17 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { ConnectedAccount, PostDraft } from 'src/database/schemas';
-import { EncryptionService } from 'src/encryption/encryption.service';
 import { ApiError, apiFetch } from 'src/common/HelperFn/apiFetch.helper';
 import { delay } from 'src/common/HelperFn';
-import { deleteFile, getFile } from 'src/s3';
 import { IVideoInitResponse } from './post.interface';
+import {
+  ConnectedAccount,
+  Post,
+  PostMediaStatus,
+  PostMediaType,
+} from 'src/database/schemas';
+import { EncryptionService } from 'src/encryption/encryption.service';
+import { deleteFile, getFile } from 'src/s3';
 import {
   MediaUploadJobData,
   MediaUploadJobItem,
@@ -23,8 +28,8 @@ export class LinkedinMediaService {
   private readonly LINKEDIN_API_BASE = 'https://api.linkedin.com/rest';
 
   constructor(
-    @InjectModel(PostDraft.name)
-    private readonly postDraftModel: Model<PostDraft>,
+    @InjectModel(Post.name)
+    private readonly postModel: Model<Post>,
     @InjectModel(ConnectedAccount.name)
     private readonly connectedAccountModel: Model<ConnectedAccount>,
     private readonly encryptionService: EncryptionService,
@@ -32,8 +37,7 @@ export class LinkedinMediaService {
 
   async processMediaUpload(data: MediaUploadJobData): Promise<void> {
     const { postId, connectedAccountId, ownerUrn, items } = data;
-
-    const post = await this.postDraftModel.findById(postId);
+    const post = await this.postModel.findById(postId);
     if (!post) {
       this.logger.warn(
         `Post ${postId} no longer exists; discarding media upload job`,
@@ -42,36 +46,53 @@ export class LinkedinMediaService {
       return;
     }
 
-    const connectedAccount =
+    const account =
       await this.connectedAccountModel.findById(connectedAccountId);
-    if (!connectedAccount?.accessToken) {
+    if (!account?.accessToken) {
       throw new Error(
         `Connected account ${connectedAccountId} is missing or has no access token`,
       );
     }
-
     const accessToken = await this.encryptionService.decrypt(
-      connectedAccount.accessToken,
+      account.accessToken,
     );
 
     for (const item of items) {
-      const pending = await this.postDraftModel.exists({
+      const attached = await this.postModel.exists({
         _id: postId,
-        'media.id': item.mediaId,
+        media: {
+          $elemMatch: {
+            id: item.mediaId,
+            status: PostMediaStatus.UPLOADING,
+          },
+        },
       });
-      if (!pending) continue;
-
-      const fileBuffer = await getFile(item.r2Key);
-      const urn =
-        item.mediaType === 'VIDEO'
-          ? await this.uploadVideo(ownerUrn, accessToken, fileBuffer)
-          : await this.uploadImage(ownerUrn, accessToken, fileBuffer);
-
-      await this.postDraftModel.updateOne(
-        { _id: postId, 'media.id': item.mediaId },
-        { $set: { 'media.$.id': urn, 'media.$.status': 'READY' } },
+      if (!attached) {
+        await deleteFile(item.r2Key).catch(() => undefined);
+        continue;
+      }
+      const file = await getFile(item.r2Key);
+      const linkedinUrn =
+        item.mediaType === PostMediaType.VIDEO
+          ? await this.uploadVideo(ownerUrn, accessToken, file)
+          : await this.uploadImage(ownerUrn, accessToken, file);
+      await this.postModel.updateOne(
+        {
+          _id: postId,
+          media: {
+            $elemMatch: {
+              id: item.mediaId,
+              status: PostMediaStatus.UPLOADING,
+            },
+          },
+        },
+        {
+          $set: {
+            'media.$.linkedinUrn': linkedinUrn,
+            'media.$.status': PostMediaStatus.READY,
+          },
+        },
       );
-
       await deleteFile(item.r2Key).catch((error) =>
         this.logger.warn(
           `Failed to delete R2 object ${item.r2Key}: ${error instanceof Error ? error.message : String(error)}`,
@@ -82,10 +103,18 @@ export class LinkedinMediaService {
 
   async handleMediaUploadFailure(data: MediaUploadJobData): Promise<void> {
     for (const item of data.items) {
-      await this.postDraftModel
+      await this.postModel
         .updateOne(
-          { _id: data.postId, 'media.id': item.mediaId },
-          { $set: { 'media.$.status': 'FAILED' } },
+          {
+            _id: data.postId,
+            media: {
+              $elemMatch: {
+                id: item.mediaId,
+                status: PostMediaStatus.UPLOADING,
+              },
+            },
+          },
+          { $set: { 'media.$.status': PostMediaStatus.FAILED } },
         )
         .catch((error) =>
           this.logger.error(
@@ -96,16 +125,34 @@ export class LinkedinMediaService {
     await this.deleteR2Objects(data.items);
   }
 
-  private async deleteR2Objects(items: MediaUploadJobItem[]): Promise<void> {
-    await Promise.allSettled(
-      items.map((item) =>
-        deleteFile(item.r2Key).catch((error) =>
-          this.logger.warn(
-            `Failed to delete R2 object ${item.r2Key}: ${error instanceof Error ? error.message : String(error)}`,
-          ),
-        ),
-      ),
+  async getMediaDetails(
+    type: PostMediaType,
+    linkedinUrn: string,
+    accessToken: string,
+  ): Promise<{ downloadUrl: string; downloadUrlExpiresAt?: number }> {
+    const resource = type === PostMediaType.VIDEO ? 'videos' : 'images';
+    const { data } = await apiFetch<{
+      downloadUrl: string;
+      downloadUrlExpiresAt?: number;
+    }>(
+      `${this.LINKEDIN_API_BASE}/${resource}/${encodeURIComponent(linkedinUrn)}`,
+      {
+        method: 'GET',
+        headers: {
+          'X-Restli-Protocol-Version': '2.0.0',
+          'LinkedIn-Version': '202601',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
     );
+    return {
+      downloadUrl: data.downloadUrl,
+      downloadUrlExpiresAt: data.downloadUrlExpiresAt,
+    };
+  }
+
+  private async deleteR2Objects(items: MediaUploadJobItem[]): Promise<void> {
+    await Promise.allSettled(items.map((item) => deleteFile(item.r2Key)));
   }
 
   async uploadImage(
@@ -239,18 +286,88 @@ export class LinkedinMediaService {
     return videoUrn;
   }
 
+  async uploadDocument(
+    ownerUrn: string,
+    accessToken: string,
+    fileBuffer: Buffer,
+    pageCount: number,
+  ): Promise<string> {
+    const maxDocumentBytes = 100 * 1024 * 1024;
+    if (fileBuffer.length > maxDocumentBytes) {
+      throw new BadRequestException('LinkedIn documents cannot exceed 100 MB');
+    }
+    if (pageCount > 300) {
+      throw new BadRequestException(
+        'LinkedIn documents cannot exceed 300 pages',
+      );
+    }
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Restli-Protocol-Version': '2.0.0',
+      'LinkedIn-Version': '202601',
+      Authorization: `Bearer ${accessToken}`,
+    };
+    const { data } = await apiFetch<{
+      value: { uploadUrl: string; document: string };
+    }>(`${this.LINKEDIN_API_BASE}/documents?action=initializeUpload`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ initializeUploadRequest: { owner: ownerUrn } }),
+    });
+
+    await apiFetch(data.value.uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: fileBuffer as unknown as BodyInit,
+    });
+    await this.waitForDocumentAvailable(data.value.document, accessToken);
+    return data.value.document;
+  }
+
   private async waitForVideoAvailable(
     videoUrn: string,
     accessToken: string,
     timeoutMs = 300_000,
   ): Promise<void> {
-    const encodedUrn = encodeURIComponent(videoUrn);
+    return this.waitForMediaAvailable(
+      'video',
+      videoUrn,
+      accessToken,
+      timeoutMs,
+    );
+  }
+
+  private async waitForDocumentAvailable(
+    documentUrn: string,
+    accessToken: string,
+    timeoutMs = 300_000,
+  ): Promise<void> {
+    return this.waitForMediaAvailable(
+      'document',
+      documentUrn,
+      accessToken,
+      timeoutMs,
+    );
+  }
+
+  private async waitForMediaAvailable(
+    mediaType: 'video' | 'document',
+    mediaUrn: string,
+    accessToken: string,
+    timeoutMs: number,
+  ): Promise<void> {
+    const encodedUrn = encodeURIComponent(mediaUrn);
     const deadline = Date.now() + timeoutMs;
+    const resource = `${mediaType}s`;
 
     while (Date.now() < deadline) {
       await delay(3000);
       const { data } = await apiFetch<{ status: string }>(
-        `${this.LINKEDIN_API_BASE}/videos/${encodedUrn}`,
+        `${this.LINKEDIN_API_BASE}/${resource}/${encodedUrn}`,
         {
           method: 'GET',
           headers: {
@@ -260,17 +377,15 @@ export class LinkedinMediaService {
           },
         },
       );
-
       if (data.status === 'AVAILABLE') return;
       if (data.status === 'PROCESSING_FAILED') {
         throw new InternalServerErrorException(
-          'LinkedIn video processing failed',
+          `LinkedIn ${mediaType} processing failed`,
         );
       }
     }
-
     throw new InternalServerErrorException(
-      'Timed out waiting for LinkedIn video to become available',
+      `Timed out waiting for LinkedIn ${mediaType} to become available`,
     );
   }
 }

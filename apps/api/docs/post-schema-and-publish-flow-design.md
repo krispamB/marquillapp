@@ -1,6 +1,6 @@
 # Post Schema & Publish Flow — Design
 
-> Status: design spec for wayfinder map #99, ticket #106 (grilling outcome).
+> Status: implemented design, amended 2026-07-18 for mutable Post composition and uploaded media.
 > Author: generated for Christopher Pam. Decisions settled 2026-07-09.
 > Blocked by #100 (compat audit — resolved as a clean write-over) and #101 (LinkedIn
 > poll/document API research); both docs land in `docs/`.
@@ -13,15 +13,14 @@ referenced inline.
 
 ## Framing (charter-derived givens)
 
-- **Charter #1 / #102:** content lives as an **`Artifact`** (a user-owned library entity,
-  account-agnostic) until the user chooses to post it. A `Post` *references* artifacts; it
-  does not hold content.
-- **Charter #2:** a `Post` references **multiple** artifacts (leaves room for a future
-  image artifact accompanying text). But **#101 §4:** a LinkedIn post carries **commentary
+- **Charter #1 / #102:** generated content lives as an account-agnostic **`Artifact`**. A
+  `Post` references the selected version and owns the account-specific publishing composition,
+  including user-uploaded media.
+- **Charter #2:** uploaded images/videos are Post media, not image artifacts. LinkedIn carries **commentary
   + at most one mutually-exclusive content object** (poll *xor* document *xor* image/media).
   So the multi-ref array is real in the schema but **publish-composition enforces LinkedIn's
   one-content-object rule** — for v1 (artifact types POST/POLL/DOCUMENT, image is future) a
-  post binds **exactly one** artifact.
+  post binds **exactly one** artifact; uploaded media is valid only beside a POST artifact.
 - **Clean write-over (#100 §0):** relaunch, no users. Drop `postdrafts`, build `posts`
   clean — no backfill, no `_id` preservation, no coexistence window, no versioned
   endpoints. The compat audit's data-migration hazards (H1/H4/H6/H9/H10) are moot; its
@@ -29,40 +28,44 @@ referenced inline.
 
 ---
 
-## 1. The core decision: a Post is a **publish record**, not a draft
+## 1. The core decision: a Post is a mutable publishing composition
 
-In the `PostDraft` world the draft *was* the content (embedded `content`/`media`) and moved
-`DRAFT → SCHEDULED → PUBLISHED`. In the artifact world the **artifact is the draft** — it
-lives `READY` in the library (#102). So a `Post` is created **only when the user acts to
-publish or schedule**; there is no `DRAFT` post stage.
+Artifacts remain the reusable source of generated content, but they are not the complete
+account-specific preview. A Post is created as `DRAFT`, pins an artifact version and account,
+owns uploaded media, and lets the user confirm the complete LinkedIn composition before an
+explicit publish or schedule action.
 
 This collapses the status enum to three states and removes a whole redundant lifecycle:
 
 ```
-SCHEDULED → PUBLISHED
+DRAFT → SCHEDULED → PUBLISHED
+DRAFT → PUBLISHED
 SCHEDULED → FAILED        (publish attempt errored, or account disconnected — §7)
-(immediate publish) → PUBLISHED | FAILED
+FAILED → DRAFT            (composition edit)
+FAILED → SCHEDULED | PUBLISHED
+SCHEDULED → DRAFT         (explicit unschedule)
 ```
 
-**Rejected — keep a `DRAFT` Post that mirrors the artifact's READY state** (Option A,
-`PostDraft`-shaped). It duplicates the artifact library as the drafting surface, reintroduces
-the `content`/`media` embedding #102 deliberately moved out, and adds a status with no user
-meaning ("a draft of a thing that's already a finished library item").
+The earlier rejection of `DRAFT` is superseded: it omitted the account-specific media and
+preview/confirmation stage. Post still does not duplicate artifact content.
 
 ## 2. `Post` schema
 
 ```ts
-enum PostStatus { SCHEDULED = 'SCHEDULED', PUBLISHED = 'PUBLISHED', FAILED = 'FAILED' }
+enum PostStatus { DRAFT = 'DRAFT', SCHEDULED = 'SCHEDULED', PUBLISHED = 'PUBLISHED', FAILED = 'FAILED' }
 
 @Schema({ timestamps: true })
 class Post {
   _id
   user:             ObjectId<User>              // owner, required
   connectedAccount: ObjectId<ConnectedAccount>  // bound HERE (deferred from artifact create, #102 §6)
+  title?:            string                     // independent 1–100 character composer label
   artifacts: [{                                  // ordered refs — v1: length 1 (§0 framing)
     artifact: ObjectId<Artifact>,
     version:  number,                            // PINNED at post creation (§4)
   }]
+  media: [{ id, linkedinUrn?, type, title?, altText?, status,
+            mimeType?, sizeBytes?, pendingExpiresAt? }]
   status:           PostStatus
   scheduledAt?:     Date                         // set when SCHEDULED
   publishedAt?:     Date                         // set when PUBLISHED
@@ -77,8 +80,8 @@ class Post {
 - **`connectedAccount` lives on the Post**, not the artifact — the artifact is
   account-agnostic (#102 §6); account choice is a publish-time decision. Retains the existing
   `PERSON`/`ORGANIZATION` account model and `resolveLinkedinAuthorUrn` unchanged.
-- **No embedded `content`/`media`/`type`/`stylePreset`/`youtubeResearch`/`userIntent`/
-  `compressionResult`** — all gone. Content is read live from the pinned artifact version at
+- **No embedded generated content/type/style metadata**. Generated content is read from the pinned artifact version;
+  `media[]` contains only Post-owned user uploads and their transfer lifecycle.
   publish; the legacy `type` field (H3, a workflow-name string) has no successor here (the
   artifact carries `type`).
 - **`_id` is the BullMQ `jobId` and `data.postId`** for the schedule queue (§5) — unchanged
@@ -87,10 +90,10 @@ class Post {
 
 ## 3. Creating a post from an artifact
 
-One creation endpoint that captures the whole decision (artifact + version + account + when):
+Creation captures the artifact/version and immutable account, but performs no external action:
 
 ```
-POST /posts   { artifactId, version?, connectedAccount, scheduledAt? }
+POST /posts   { artifactId, version?, connectedAccount }
 ```
 
 Flow:
@@ -107,23 +110,21 @@ Flow:
      mutual-exclusivity;
    - company-page authoring keeps the existing `assertCompanyPagesAccess` gate for org
      accounts.
-3. **Branch on `scheduledAt`**
-   - **absent → publish now:** run the publish routine (§5) inline; persist `Post` as
-     `PUBLISHED` (+ `channelPostId`, `publishedAt`) or `FAILED` (+ `failureReason`).
-   - **present → schedule:** first-time schedule asserts the `scheduled_posts` counter (§7);
-     persist `Post` as `SCHEDULED` (+ `scheduledAt`); enqueue the schedule job (§5);
-     increment the counter.
-4. Return the `Post`.
+3. Persist and return `DRAFT`. `scheduledAt` is rejected; `/publish` and `/schedule` capture
+   explicit confirmation.
 
-**Rejected — create a Post at artifact-generation time.** Breaks charter #1 (artifacts are
-account-agnostic library items); most artifacts are refined/discarded and never posted, so a
-Post per artifact is mostly dead records.
+Posts are still not created at artifact-generation time; the user creates one when composing
+an account-specific publication.
 
 ## 4. Version pinning — post the version the user approved
 
 An artifact is **mutable**: refine appends a new `currentVersion`, and a manual `PATCH` edits
-the head in place (#102 §5). A Post therefore stores **`{ artifact, version }`**, pinned at
+an unpinned head in place (#102 §5). `PATCH` is blocked once that version is referenced by a
+SCHEDULED or PUBLISHED Post. A Post therefore stores **`{ artifact, version }`**, pinned at
 creation, and publishes **that** version's content — not "whatever is latest at fire time."
+Scheduling and publishing increment the artifact family's `pinRevision`; editor updates
+compare that revision atomically so a concurrent action cannot slip between the pin check
+and the content write.
 
 - A post **scheduled** for next Tuesday publishes the version approved today, even if the
   artifact is refined thrice before then.
@@ -154,10 +155,10 @@ handler in `workflow.worker.ts` already reads `job.data.postId` and calls a publ
 - **`ScheduleQueue` / the `post-schedule` queue unchanged** — `addScheduleJob(postId,
   userId, delay)`, `jobId: postId`, `removeOnFail: false`; worker → `publishPost`.
 
-**Rebuilt — content composition reads the artifact, not `post.content`/`post.media[]`:**
+**Rebuilt — generated content reads the artifact; uploaded media reads `post.media[]`:**
 
-The old code folded `post.content` + READY `post.media[]` into `IContent`. The new code
-resolves each pinned artifact version's **`ArtifactContent`** (#102 §4) and composes per type,
+The code resolves the pinned artifact version's **`ArtifactContent`** (#102 §4) and, for POST,
+folds READY uploaded media into the LinkedIn content object. It composes per type,
 using the **#101** publish facts:
 
 | Artifact `type` | `commentary` | `content` object | LinkedIn asset upload at publish |
@@ -180,14 +181,10 @@ using the **#101** publish facts:
   #101 §3 flags the wait as unconfirmed — poll to be safe). Enforce ≤100 MB / ≤300 pages
   before upload (#101 §2).
 
-**Retired for v1 (preserved as the future-image seed, not deleted):** the **post-level
-embedded-media user-upload path** — `addLinkedinMedia`, the presigned `initiate/complete`
-direct-to-R2 flow, and the `media-upload` queue that patched `PostDraft.media.$`. Artifact
-content is produced by *generation* (documents pre-rendered to R2), so a post never uploads
-user media in v1. `LinkedinMediaService`'s **LinkedIn-upload half** (`uploadImage`/new
-`uploadDocument`, `waitFor*Available`, R2 `getFile`) is reused by `publishPost`; its
-**user-upload half** stays dormant for the future **image artifact** type (charter: image is
-later work), when a Post would reference a text artifact + an image artifact.
+**Restored:** the direct-to-R2 `initiate/complete` flow and `media-upload` worker. Media keeps
+a stable UUID in `id`; the worker writes the resulting LinkedIn asset to `linkedinUrn` and
+marks it READY. Uploads are allowed only on editable POST compositions. Publish/schedule block
+until every remaining media item is READY; FAILED media must be removed or re-uploaded.
 
 **Immediate-publish latency note:** a DOCUMENT immediate-publish does init→PUT→poll inline, so
 the HTTP call blocks on the LinkedIn upload. Acceptable for a one-shot PUT; if it proves slow,
@@ -196,9 +193,8 @@ seam is already there.
 
 ## 6. Cancel / reschedule / retry
 
-- **`DELETE /posts/:id`** — cancels a `SCHEDULED` post: `scheduleQueue.queue.getJob(postId)`
-  → `remove()`, then delete the record (or mark terminal). Same job-id assumption as today,
-  now on `Post._id`. Does **not** touch the source artifact.
+- **`POST /posts/:id/unschedule`** — removes the scheduled job and returns the Post to DRAFT.
+  `DELETE /posts/:id` still removes the Post entirely.
 - **`POST /posts/:id/schedule` `{ scheduledAt }`** — reschedule a `SCHEDULED`/`FAILED` post
   (remove old job, add new); reuses today's remove-then-re-add logic. First-ever schedule
   counts against `scheduled_posts`; a reschedule of an already-counted post does **not**
@@ -223,21 +219,27 @@ seam is already there.
 - **H8 — account-disconnect safety** (`auth.service` disconnect): repoint the query from
   `postdrafts status:'SCHEDULED'` to `posts status:'SCHEDULED'` for the disconnected
   `connectedAccount`; for each, `getJob(post._id).remove()` and set the post
-  `FAILED`, reason `"connected account disconnected"` (there is no `DRAFT` to reset to —
-  §1; the **source artifact is untouched** in the library, so the user re-posts it after
-  reconnecting). Add a regression test for disconnect → schedule-job cancel (audit called this
+  `FAILED`, reason `"connected account disconnected"`. The Post becomes editable and returns
+  to DRAFT on its next composition edit; the source artifact is untouched. Add a regression
+  test for disconnect → schedule-job cancel (audit called this
   out explicitly).
 
 ## 8. HTTP surface (`api/v1/posts`, behind the auth guard, owner-scoped)
 
 | Method | Route | Body / Query | Result |
 |---|---|---|---|
-| POST | `/posts` | `{artifactId, version?, connectedAccount, scheduledAt?}` | `201 Post` (PUBLISHED now, or SCHEDULED) |
-| POST | `/posts/:id/publish` | — | publish now / retry a FAILED post |
+| POST | `/posts` | `{title?, artifactId, version?, connectedAccount}` | `201 DRAFT`; title defaults from artifact metadata/source prompt |
+| PATCH | `/posts/:id` | `{title?, artifactId?, version?}` | partial title/selection edit while editable |
+| POST | `/posts/:id/media/uploads` | file declarations | presigned R2 slots |
+| POST | `/posts/:id/media/uploads/complete` | `{mediaIds}` | enqueue LinkedIn transfer |
+| PATCH/DELETE | `/posts/:postId/media/:mediaId` | metadata / — | edit or remove media |
+| GET | `/posts/:postId/media/:mediaId/preview` | — | image/video preview URL |
+| POST | `/posts/:id/publish` | — | publish DRAFT/SCHEDULED/FAILED |
 | POST | `/posts/:id/schedule` | `{scheduledAt}` | reschedule |
+| POST | `/posts/:id/unschedule` | — | SCHEDULED → DRAFT |
 | DELETE | `/posts/:id` | — | cancel a SCHEDULED post + remove job |
-| GET | `/posts` | `?status&month&connectedAccount&page` | list + `filters {availableMonths, connectedAccountIds}` |
-| GET | `/posts/:id` | — | one post (with resolved artifact refs) |
+| GET | `/posts` | `?status&month&connectedAccount&page` | list + filters; artifact refs populated with `_id`, `type`, optional `title`, and `source.prompt` |
+| GET | `/posts/:id` | — | one post with the same minimal artifact metadata and exact pinned-version payloads |
 | GET | `/posts/metrics/:connectedAccountId` | — | `{ total, monthly[] }` |
 
 - **List/detail** reuse today's `getPosts` shape and the `%Y-%m` `availableMonths`
@@ -257,7 +259,7 @@ seam is already there.
 | `Slide` internals / Browserless PDF render that fills `pdfUrl` | #108 |
 | Generation engine + run record that produces READY versions | #103 |
 | Credit gating on generation/refine; `scheduled_posts` staying a counter | #105 |
-| Image artifact type (would make `artifacts[]` length > 1) + reviving the user-upload media path | future |
+| Additional artifact families | future |
 
 ## 10. Migration note (clean write-over, #100)
 
@@ -274,7 +276,7 @@ seam is already there.
   `waitForDocumentAvailable`; `MediaType`/publish branch gains `DOCUMENT`.
 - **`auth.service`** disconnect logic re-pointed (H2/H8).
 - **No data migration** (drop `postdrafts`, flush Redis + R2 per #100 §0).
-- **Tests** (CLAUDE.md): `post.service.spec.ts` updated for the artifact-ref publish
+- **Tests** (AGENTS.md): `post.service.spec.ts` updated for the artifact-ref publish
   composition (POST/POLL/DOCUMENT → `IContent`), version pinning, immediate-vs-scheduled
   branch, disconnect→cancel; `linkedin-media.service.spec.ts` for `uploadDocument` (single
   PUT, no finalize). Manual construction + `makeService()` + `jest.mock(..., { virtual: true })`,

@@ -122,6 +122,7 @@ interface RunState {
   research?: ResearchResult;                  // set by RESEARCH, or seeded on refine (§8)
   refine?: { priorContent: ArtifactContent;   // set by RESOLVE_INPUT on a refine run
              feedback: string };
+  generatedTitle?: string;                    // set by GENERATE on INITIAL only
   content?: ArtifactContent;                  // set by GENERATE (Zod union per #102 §4)
   render?: { pdfUrl: string; pageCount: number }; // set by RENDER_PDF (documents)
 }

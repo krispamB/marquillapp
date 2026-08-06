@@ -1,5 +1,5 @@
-import { Job } from 'bullmq';
 import { Logger } from '@nestjs/common';
+import { Job } from 'bullmq';
 import { LinkedinMediaService } from '../../post/linkedin-media.service';
 import { MediaUploadJobData } from '../media-upload.queue';
 
@@ -9,7 +9,7 @@ export async function processMediaUploadJob(
   linkedinMediaService: LinkedinMediaService,
 ): Promise<void> {
   logger.log(
-    `Processing media upload job ${job.id} for post ${job.data.postId} (${job.data.items.length} item(s))`,
+    `Processing media upload job ${job.id} for post ${job.data.postId}`,
   );
   await linkedinMediaService.processMediaUpload(job.data);
 }
@@ -20,7 +20,7 @@ export async function handleMediaUploadJobExhausted(
   linkedinMediaService: LinkedinMediaService,
 ): Promise<void> {
   logger.error(
-    `Media upload job ${job.id} for post ${job.data.postId} exhausted all retries; marking media as FAILED`,
+    `Media upload job ${job.id} exhausted all retries for post ${job.data.postId}`,
   );
   await linkedinMediaService.handleMediaUploadFailure(job.data);
 }

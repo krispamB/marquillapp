@@ -16,10 +16,11 @@ import {
 } from '../database/schemas/connected-account.schema';
 import { User } from '../database/schemas/user.schema';
 import { Tier } from '../database/schemas/tier.schema';
+import { Post, PostStatus } from '../database/schemas/post.schema';
 import { ConfigService } from '@nestjs/config';
 import { ApiError, apiFetch } from 'src/common/HelperFn';
 import { EncryptionService } from '../encryption/encryption.service';
-import { FeatureGatingService } from '../feature-gating';
+import { FeatureGatingService } from '../feature-gating/feature-gating.service';
 import { LinkedinAvatarRefreshQueue } from '../workflow/linkedin-avatar-refresh.queue';
 import { ScheduleQueue } from '../workflow/schedule.queue';
 import { EmailQueue } from '../workflow/email.queue';
@@ -73,8 +74,8 @@ export class AuthService {
     private jwtService: JwtService,
     @InjectModel(ConnectedAccount.name)
     private connectedAccountModel: Model<ConnectedAccount>,
-    @InjectModel('PostDraft')
-    private readonly postDraftModel: Model<any>,
+    @InjectModel(Post.name)
+    private readonly postModel: Model<Post>,
     @InjectModel(Tier.name) private tierModel: Model<Tier>,
     private configService: ConfigService,
     private encryptionService: EncryptionService,
@@ -600,7 +601,7 @@ export class AuthService {
       },
     );
 
-    const scheduledPosts = await this.postDraftModel
+    const scheduledPosts = await this.postModel
       .find({
         user: userObjectId,
         connectedAccount: { $in: accountIds },
@@ -618,7 +619,7 @@ export class AuthService {
     }
 
     if (scheduledPosts.length > 0) {
-      await this.postDraftModel.updateMany(
+      await this.postModel.updateMany(
         {
           _id: {
             $in: scheduledPosts.map((post) => new Types.ObjectId(post._id)),
@@ -626,8 +627,8 @@ export class AuthService {
         },
         {
           $set: {
-            status: 'DRAFT',
-            scheduledAt: null,
+            status: PostStatus.FAILED,
+            failureReason: 'connected account disconnected',
           },
         },
       );

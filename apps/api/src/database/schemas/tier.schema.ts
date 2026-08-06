@@ -2,10 +2,10 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
 export type Feature =
-  | 'ai_drafts'
+  | 'credits'
+  | 'research'
   | 'connected_accounts'
-  | 'scheduled_posts'
-  | 'mark_tokens';
+  | 'scheduled_posts';
 
 @Schema({ timestamps: true })
 export class Tier extends Document {

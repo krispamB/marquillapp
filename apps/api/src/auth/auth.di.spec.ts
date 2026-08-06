@@ -21,7 +21,7 @@ jest.mock(
   { virtual: true },
 );
 jest.mock(
-  '../feature-gating',
+  '../feature-gating/feature-gating.service',
   () => ({ FeatureGatingService: class FeatureGatingService {} }),
   { virtual: true },
 );
@@ -41,7 +41,7 @@ describe('AuthService DI', () => {
           useValue: {},
         },
         {
-          provide: getModelToken('PostDraft'),
+          provide: getModelToken('Post'),
           useValue: {},
         },
         {

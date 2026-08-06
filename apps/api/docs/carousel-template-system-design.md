@@ -403,7 +403,7 @@ src/carousel/
   index.ts                           # barrel (repo rule: every folder exposes one)
   carousel.module.ts
   carousel-renderer.service.ts       # CarouselRendererService — assembleHtml + render + store (§6)
-  carousel-renderer.service.spec.ts  # CLAUDE.md: every service ships a spec
+  carousel-renderer.service.spec.ts  # AGENTS.md: every service ships a spec
   templates.ts                       # registry (below) + boot-time compile/validation
   schemas.ts                         # slideFieldSchemas / slideSchema / slidesSchema (§3)
   utils/

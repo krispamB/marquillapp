@@ -13,7 +13,7 @@ import {
 } from 'class-validator';
 
 export const MAX_MEDIA_FILE_SIZE_BYTES = 200 * 1024 * 1024;
-export const MAX_MEDIA_FILES_PER_UPLOAD = 20;
+export const MAX_MEDIA_FILES_PER_POST = 20;
 
 export class MediaUploadFileDto {
   @IsString()
@@ -34,7 +34,7 @@ export class MediaUploadFileDto {
 export class InitiateMediaUploadDto {
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(MAX_MEDIA_FILES_PER_UPLOAD)
+  @ArrayMaxSize(MAX_MEDIA_FILES_PER_POST)
   @ValidateNested({ each: true })
   @Type(() => MediaUploadFileDto)
   files: MediaUploadFileDto[];

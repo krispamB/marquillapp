@@ -78,9 +78,7 @@ export class UserProvisioningService {
       (entry) => entry.id === clerkUser.primaryEmailAddressId,
     );
     return (
-      primary?.emailAddress ??
-      clerkUser.emailAddresses[0]?.emailAddress ??
-      ''
+      primary?.emailAddress ?? clerkUser.emailAddresses[0]?.emailAddress ?? ''
     );
   }
 

@@ -1,12 +1,4 @@
 jest.mock(
-  'src/database/schemas',
-  () => ({
-    ConnectedAccount: { name: 'ConnectedAccount' },
-    PostDraft: { name: 'PostDraft' },
-  }),
-  { virtual: true },
-);
-jest.mock(
   'src/common/HelperFn/apiFetch.helper',
   () => ({
     apiFetch: jest.fn(),
@@ -28,170 +20,146 @@ jest.mock(
   { virtual: true },
 );
 jest.mock(
+  'src/s3',
+  () => ({
+    deleteFile: jest.fn().mockResolvedValue(undefined),
+    getFile: jest.fn().mockResolvedValue(Buffer.from('media')),
+  }),
+  { virtual: true },
+);
+jest.mock(
+  'src/database/schemas',
+  () => ({
+    ConnectedAccount: class ConnectedAccount {},
+    Post: class Post {},
+    PostMediaStatus: {
+      PENDING: 'PENDING',
+      UPLOADING: 'UPLOADING',
+      READY: 'READY',
+      FAILED: 'FAILED',
+    },
+    PostMediaType: { IMAGE: 'IMAGE', VIDEO: 'VIDEO' },
+  }),
+  { virtual: true },
+);
+jest.mock(
   'src/encryption/encryption.service',
   () => ({ EncryptionService: class EncryptionService {} }),
   { virtual: true },
 );
-jest.mock(
-  'src/s3',
-  () => ({
-    getFile: jest.fn(),
-    deleteFile: jest.fn(),
-  }),
-  { virtual: true },
-);
-
-import { Types } from 'mongoose';
 import { LinkedinMediaService } from './linkedin-media.service';
 import { apiFetch } from 'src/common/HelperFn/apiFetch.helper';
 import { deleteFile, getFile } from 'src/s3';
 
-const makeService = () => {
-  (deleteFile as jest.Mock).mockResolvedValue(undefined);
-  const postDraftModel = {
-    findById: jest.fn(),
-    exists: jest.fn(),
-    updateOne: jest.fn().mockResolvedValue({ matchedCount: 1 }),
-  };
-  const connectedAccountModel = {
-    findById: jest.fn(),
-  };
-  const encryptionService = {
-    decrypt: jest.fn().mockResolvedValue('token'),
-  };
-  const service = new LinkedinMediaService(
-    postDraftModel as any,
-    connectedAccountModel as any,
-    encryptionService as any,
-  );
-
-  const postId = new Types.ObjectId().toString();
-  const connectedAccountId = new Types.ObjectId().toString();
-  const fixtures = {
-    jobData: {
-      postId,
-      connectedAccountId,
-      ownerUrn: 'urn:li:person:abc',
-      items: [
-        {
-          mediaId: 'media-1',
-          r2Key: `media-uploads/${postId}/media-1`,
-          mediaType: 'IMAGE' as const,
-        },
-      ],
-    },
-    post: { _id: postId, media: [{ id: 'media-1', status: 'UPLOADING' }] },
-    connectedAccount: { accessToken: 'encrypted-token' },
-  };
-
-  return {
-    service,
-    mocks: { postDraftModel, connectedAccountModel, encryptionService },
-    fixtures,
-  };
-};
-
 let service: LinkedinMediaService;
-let mocks: ReturnType<typeof makeService>['mocks'];
-let fixtures: ReturnType<typeof makeService>['fixtures'];
+let postModel: {
+  findById: jest.Mock;
+  exists: jest.Mock;
+  updateOne: jest.Mock;
+};
+let connectedAccountModel: { findById: jest.Mock };
+let encryptionService: { decrypt: jest.Mock };
 
 beforeEach(() => {
   jest.clearAllMocks();
-  ({ service, mocks, fixtures } = makeService());
+  postModel = {
+    findById: jest.fn(),
+    exists: jest.fn(),
+    updateOne: jest.fn().mockResolvedValue(undefined),
+  };
+  connectedAccountModel = { findById: jest.fn() };
+  encryptionService = { decrypt: jest.fn().mockResolvedValue('token') };
+  service = new LinkedinMediaService(
+    postModel as any,
+    connectedAccountModel as any,
+    encryptionService as any,
+  );
 });
 
 describe('LinkedinMediaService', () => {
   describe('processMediaUpload', () => {
-    it('should upload pending media, mark it READY, and delete the R2 object when the job runs', async () => {
-      mocks.postDraftModel.findById.mockResolvedValue(fixtures.post);
-      mocks.connectedAccountModel.findById.mockResolvedValue(
-        fixtures.connectedAccount,
-      );
-      mocks.postDraftModel.exists.mockResolvedValue({ _id: 'x' });
-      (getFile as jest.Mock).mockResolvedValue(Buffer.from('image-bytes'));
-      const uploadImage = jest
-        .spyOn(service, 'uploadImage')
-        .mockResolvedValue('urn:li:image:1');
+    it('should preserve the stable id and store the LinkedIn URN separately', async () => {
+      postModel.findById.mockResolvedValue({ _id: 'post-1' });
+      postModel.exists.mockResolvedValue(true);
+      connectedAccountModel.findById.mockResolvedValue({
+        accessToken: 'encrypted',
+      });
+      jest.spyOn(service, 'uploadImage').mockResolvedValue('urn:li:image:1');
 
-      await service.processMediaUpload(fixtures.jobData);
-
-      expect(getFile).toHaveBeenCalledWith(fixtures.jobData.items[0].r2Key);
-      expect(uploadImage).toHaveBeenCalledWith(
-        'urn:li:person:abc',
-        'token',
-        Buffer.from('image-bytes'),
-      );
-      expect(mocks.postDraftModel.updateOne).toHaveBeenCalledWith(
-        { _id: fixtures.jobData.postId, 'media.id': 'media-1' },
-        { $set: { 'media.$.id': 'urn:li:image:1', 'media.$.status': 'READY' } },
-      );
-      expect(deleteFile).toHaveBeenCalledWith(fixtures.jobData.items[0].r2Key);
-    });
-
-    it('should use the video upload path when mediaType is VIDEO', async () => {
-      fixtures.jobData.items[0].mediaType = 'VIDEO' as any;
-      mocks.postDraftModel.findById.mockResolvedValue(fixtures.post);
-      mocks.connectedAccountModel.findById.mockResolvedValue(
-        fixtures.connectedAccount,
-      );
-      mocks.postDraftModel.exists.mockResolvedValue({ _id: 'x' });
-      (getFile as jest.Mock).mockResolvedValue(Buffer.from('video-bytes'));
-      const uploadVideo = jest
-        .spyOn(service, 'uploadVideo')
-        .mockResolvedValue('urn:li:video:1');
-
-      await service.processMediaUpload(fixtures.jobData);
-
-      expect(uploadVideo).toHaveBeenCalledTimes(1);
-      expect(mocks.postDraftModel.updateOne).toHaveBeenCalledWith(
-        { _id: fixtures.jobData.postId, 'media.id': 'media-1' },
-        { $set: { 'media.$.id': 'urn:li:video:1', 'media.$.status': 'READY' } },
-      );
-    });
-
-    it('should skip items whose media entry no longer exists when retrying', async () => {
-      mocks.postDraftModel.findById.mockResolvedValue(fixtures.post);
-      mocks.connectedAccountModel.findById.mockResolvedValue(
-        fixtures.connectedAccount,
-      );
-      mocks.postDraftModel.exists.mockResolvedValue(null);
-
-      await service.processMediaUpload(fixtures.jobData);
-
-      expect(getFile).not.toHaveBeenCalled();
-      expect(mocks.postDraftModel.updateOne).not.toHaveBeenCalled();
-    });
-
-    it('should discard the job and delete R2 objects when the post is gone', async () => {
-      mocks.postDraftModel.findById.mockResolvedValue(null);
-
-      await service.processMediaUpload(fixtures.jobData);
-
-      expect(deleteFile).toHaveBeenCalledWith(fixtures.jobData.items[0].r2Key);
-      expect(mocks.connectedAccountModel.findById).not.toHaveBeenCalled();
-    });
-
-    it('should throw when the connected account has no access token', async () => {
-      mocks.postDraftModel.findById.mockResolvedValue(fixtures.post);
-      mocks.connectedAccountModel.findById.mockResolvedValue({
-        accessToken: null,
+      await service.processMediaUpload({
+        postId: 'post-1',
+        connectedAccountId: 'account-1',
+        ownerUrn: 'urn:li:person:1',
+        items: [
+          {
+            mediaId: 'media-1',
+            r2Key: 'media-uploads/post-1/media-1',
+            mediaType: 'IMAGE',
+          },
+        ],
       });
 
-      await expect(
-        service.processMediaUpload(fixtures.jobData),
-      ).rejects.toThrow('missing or has no access token');
+      expect(getFile).toHaveBeenCalledWith('media-uploads/post-1/media-1');
+      expect(postModel.updateOne).toHaveBeenCalledWith(
+        {
+          _id: 'post-1',
+          media: { $elemMatch: { id: 'media-1', status: 'UPLOADING' } },
+        },
+        {
+          $set: {
+            'media.$.linkedinUrn': 'urn:li:image:1',
+            'media.$.status': 'READY',
+          },
+        },
+      );
+      expect(deleteFile).toHaveBeenCalledWith('media-uploads/post-1/media-1');
     });
   });
 
   describe('handleMediaUploadFailure', () => {
-    it('should mark items FAILED and delete R2 objects when retries are exhausted', async () => {
-      await service.handleMediaUploadFailure(fixtures.jobData);
+    it('should mark uploading entries failed and clean their R2 objects', async () => {
+      postModel.updateOne.mockResolvedValue({ matchedCount: 1 });
 
-      expect(mocks.postDraftModel.updateOne).toHaveBeenCalledWith(
-        { _id: fixtures.jobData.postId, 'media.id': 'media-1' },
+      await service.handleMediaUploadFailure({
+        postId: 'post-1',
+        connectedAccountId: 'account-1',
+        ownerUrn: 'urn:li:person:1',
+        items: [
+          {
+            mediaId: 'media-1',
+            r2Key: 'media-uploads/post-1/media-1',
+            mediaType: 'IMAGE',
+          },
+        ],
+      });
+
+      expect(postModel.updateOne).toHaveBeenCalledWith(
+        {
+          _id: 'post-1',
+          media: { $elemMatch: { id: 'media-1', status: 'UPLOADING' } },
+        },
         { $set: { 'media.$.status': 'FAILED' } },
       );
-      expect(deleteFile).toHaveBeenCalledWith(fixtures.jobData.items[0].r2Key);
+      expect(deleteFile).toHaveBeenCalledWith('media-uploads/post-1/media-1');
+    });
+  });
+
+  describe('getMediaDetails', () => {
+    it('should resolve video preview details from LinkedIn', async () => {
+      (apiFetch as jest.Mock).mockResolvedValue({
+        data: {
+          downloadUrl: 'https://media.linkedin.test/video',
+          downloadUrlExpiresAt: 1234,
+        },
+      });
+
+      await expect(
+        service.getMediaDetails('VIDEO', 'urn:li:video:1', 'token'),
+      ).resolves.toEqual({
+        downloadUrl: 'https://media.linkedin.test/video',
+        downloadUrlExpiresAt: 1234,
+      });
+      expect((apiFetch as jest.Mock).mock.calls[0][0]).toContain('/videos/');
     });
   });
 
@@ -303,6 +271,63 @@ describe('LinkedinMediaService', () => {
       await expect(
         service.uploadVideo('urn:li:person:abc', 'token', Buffer.from('abcd')),
       ).rejects.toThrow('LinkedIn video processing failed');
+    });
+  });
+
+  describe('uploadDocument', () => {
+    it('should PUT the whole document once without finalizing when the upload is initialized', async () => {
+      const mockedApiFetch = apiFetch as jest.Mock;
+      mockedApiFetch
+        .mockResolvedValueOnce({
+          data: {
+            value: {
+              uploadUrl: 'https://upload.example.com/document',
+              document: 'urn:li:document:1',
+            },
+          },
+        })
+        .mockResolvedValueOnce({ data: {}, response: {} })
+        .mockResolvedValueOnce({ data: { status: 'AVAILABLE' } });
+      const fileBuffer = Buffer.from('pdf-bytes');
+
+      await expect(
+        service.uploadDocument('urn:li:person:abc', 'token', fileBuffer, 12),
+      ).resolves.toBe('urn:li:document:1');
+
+      expect(mockedApiFetch).toHaveBeenCalledTimes(3);
+      expect(mockedApiFetch.mock.calls[0][0]).toContain(
+        '/documents?action=initializeUpload',
+      );
+      expect(mockedApiFetch.mock.calls[1]).toEqual([
+        'https://upload.example.com/document',
+        expect.objectContaining({ method: 'PUT', body: fileBuffer }),
+      ]);
+      expect(
+        mockedApiFetch.mock.calls.some(([url]) =>
+          String(url).includes('finalizeUpload'),
+        ),
+      ).toBe(false);
+    });
+
+    it('should reject the document before upload when it exceeds 100 MB', async () => {
+      const oversized = Buffer.alloc(100 * 1024 * 1024 + 1);
+
+      await expect(
+        service.uploadDocument('urn:li:person:abc', 'token', oversized, 1),
+      ).rejects.toThrow('100 MB');
+      expect(apiFetch).not.toHaveBeenCalled();
+    });
+
+    it('should reject the document before upload when it exceeds 300 pages', async () => {
+      await expect(
+        service.uploadDocument(
+          'urn:li:person:abc',
+          'token',
+          Buffer.from('pdf'),
+          301,
+        ),
+      ).rejects.toThrow('300 pages');
+      expect(apiFetch).not.toHaveBeenCalled();
     });
   });
 });

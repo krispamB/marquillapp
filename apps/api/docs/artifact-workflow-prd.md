@@ -1,5 +1,16 @@
 # LinkedIn Artifact Workflow — PRD
 
+> **2026-07-18 product amendment — supersedes Post lifecycle/media claims below.**
+> `POST /posts` now creates a mutable `DRAFT` that pins one READY artifact version and an
+> immutable connected account. User-uploaded JPEG/PNG images or one MP4 video live in
+> `Post.media[]`, use the presigned R2 → LinkedIn worker flow, and are not image artifacts.
+> Publish and schedule are explicit actions; `/unschedule` returns a scheduled Post to DRAFT.
+> Media identity stays a stable UUID while `linkedinUrn` is populated asynchronously. Only
+> POST artifacts accept uploads, and every media item must be READY before publish/schedule.
+> FAILED composition edits return to DRAFT. Artifact versions referenced by SCHEDULED or
+> PUBLISHED Posts cannot be patched in place. See `docs/post-schema-and-publish-flow-design.md`
+> and `docs/api/posts.md` for the current normative contract.
+
 > Status: **build-ready specification.** Assembled for wayfinder map #99, ticket #110.
 > Compiled 2026-07-10 from the closed design tickets #100–#109 and their reports in `docs/`.
 >
@@ -45,8 +56,8 @@ tool.
 
 1. **Artifacts are the library.** Content lives as an `Artifact` until the user chooses to
    post it.
-2. **A new `Post` schema replaces `PostDraft`.** A post references *multiple* artifacts
-   (leaving room for a future image artifact). This is a **complete write-over**: a
+2. **A new `Post` schema replaces `PostDraft`.** A post pins one artifact version and owns
+   uploaded media for its account-specific composition. This is a **complete write-over**: a
    relaunch with no existing users, so `postdrafts` is dropped and rebuilt clean. No
    backfill, no `_id` preservation, no coexistence window, no versioned API endpoints.
 3. **One new workflow engine, one build flow.** The old engine is absorbed, not preserved:
@@ -68,8 +79,8 @@ tool.
 
 ### Explicitly out of scope
 
-Rebuilding the autonomous Mark agent. Image-generation artifacts (the multi-artifact
-`Post` shape leaves room; the artifact type itself is later work). Mid-run checkpoint
+Rebuilding the autonomous Mark agent. Image-generation artifacts remain later work and are
+separate from user-uploaded Post media. Mid-run checkpoint
 pause/resume. Token streaming. Credit top-ups, overage billing, rollover, mid-run credit
 cutoff. Artifact version revert. Background R2 cleanup sweep.
 
@@ -335,21 +346,21 @@ those files are deleted (§12) and both now **part of the Zod union**:
   behavior on duplicate options is untested, and a poll with two identical options is a
   product defect regardless.
 
-### `Post` — a publish record, not a draft
+### `Post` — a mutable publishing composition
 
-In the `PostDraft` world the draft *was* the content. In the artifact world **the artifact
-is the draft** — it lives `READY` in the library. So a `Post` is created **only when the
-user acts to publish or schedule**. There is no `DRAFT` post stage, which collapses the
-status enum to three states and removes a whole redundant lifecycle.
+The artifact remains reusable generated content. A Post is the account-specific composition:
+it pins that content, owns uploaded media, starts as DRAFT, and requires an explicit publish
+or schedule action after preview.
 
 ```ts
-enum PostStatus { SCHEDULED = 'SCHEDULED', PUBLISHED = 'PUBLISHED', FAILED = 'FAILED' }
+enum PostStatus { DRAFT = 'DRAFT', SCHEDULED = 'SCHEDULED', PUBLISHED = 'PUBLISHED', FAILED = 'FAILED' }
 
 Post {
   _id                                            // = BullMQ jobId = data.postId
   user:             ObjectId<User>
   connectedAccount: ObjectId<ConnectedAccount>   // bound HERE, not on the artifact
   artifacts: [{ artifact: ObjectId<Artifact>, version: number }]   // PINNED; v1 length 1
+  media:            PostMedia[]                    // account-owned user uploads
   status:           PostStatus
   scheduledAt?:     Date
   publishedAt?:     Date
@@ -443,6 +454,7 @@ interface RunState {
   input:    BuildInput;                                  // RESOLVE_INPUT
   research?: ResearchResult;                             // RESEARCH, or seeded on REFINE
   refine?:  { priorContent: ArtifactContent; feedback: string };  // RESOLVE_INPUT on REFINE
+  generatedTitle?: string;                               // GENERATE on INITIAL only
   content?: ArtifactContent;                             // GENERATE
   render?:  { pdfKey: string; pageCount: number };       // RENDER_PDF — R1
 }
@@ -564,8 +576,9 @@ them, so absence is a bug, and re-running cannot fix it.
 `step.progress { sourcesFound }`. Tool errors are absorbed in-loop; an LLM transport error
 surfaces as `WorkflowError { retryable }` per `src/llm`'s classification.
 
-**`GENERATE`** — calls `ctx.agent.generate(...)` → `ArtifactContent`, one `complete` call
-with no tools, validated against the §4 Zod union with **one inline repair retry**.
+**`GENERATE`** — calls `ctx.agent.generate(...)` → `{ title?, content }`, one `complete`
+call with no tools, validated against the §4 Zod union with **one inline repair retry**.
+Initial runs require a trimmed 1–100 character title; refine runs produce content only.
 Dispatch on `type`. For DOCUMENT, `templateId` resolution happens **inside this step**: a
 user-supplied `theme` is stamped authoritatively (the model cannot override it); if omitted
 the model picks one and Zod validates it is a real `CarouselTheme` (R4). `slides` is the
@@ -579,8 +592,9 @@ slides.length }`. Emits **no** `step.progress` (R7) and one
 validated the content, so it cannot occur and re-running cannot fix it).
 
 **`PERSIST_VERSION`** — calls `ctx.artifacts.setVersionContent(artifactId, version, content,
-render?)`: writes `content`, folds `render.pdfKey` + `pageCount` into `content.document` for
-documents, and flips `GENERATING → READY`. The run's only durable content write. On
+{ render?, title? })`: writes `content`, stores the initial title at artifact-family level,
+folds `render.pdfKey` + `pageCount` into `content.document` for documents, and flips
+`GENERATING → READY`. The run's only durable content write. On
 `run.completed` the engine calls `meter.commit(runId)` — the **only** real credit debit,
 charged once for the winning attempt. A DB write error is retryable; the write targets the
 fixed `(artifactId, version)`, so a retry overwrites rather than appends.
@@ -637,16 +651,32 @@ interface ToolCall         { id: string; name: string; input: unknown }
 interface Usage { promptTokens: number; completionTokens: number; totalTokens: number; cost: number }
 ```
 
-The OpenRouter strategy implements these over `@openrouter/sdk` — its `tool()` Zod helper
-for schema conversion, `chat.send` with `tools` for the single turn, and `usage.cost` /
-`costDetails` for real per-call dollar cost. Add a typed `LLMError { retryable }`: the
-`src/llm` layer owns retryable classification because it knows provider error semantics
-(429/5xx/network → retryable; 4xx/auth → terminal).
+The OpenRouter strategy implements these over `@openrouter/sdk` (**floor: `0.13.x`** — see
+below), using `chat.send` with `tools` for the single turn, `z.toJSONSchema` to convert a
+`ToolDefinition`'s Zod `parameters` into the JSON Schema that `tools[].function.parameters`
+expects, and `usage.cost` for real per-call dollar cost. Add a typed `LLMError { retryable }`:
+the `src/llm` layer owns retryable classification because it knows provider error semantics
+(429/408/5xx/network → retryable; 4xx/auth → terminal; a client-side abort is terminal,
+since the caller cancelled it).
 
 We deliberately do **not** adopt the SDK's `callModel` orchestrator, which ships an
 automatic multi-turn tool loop — burying the loop inside the vendor SDK defeats the
-provider-swappability the layering exists for. We lean on its lower-level per-turn helpers
-and own the loop.
+provider-swappability the layering exists for. We call `chat.send` directly and own the loop.
+
+**Do not use the SDK's `tool()` helper.** It builds `callModel`'s argument — a tool object
+carrying an `execute` function — not JSON Schema, so `chat.send` will not take it. Reaching
+for `tool()` quietly drags in the orchestrator this section just rejected.
+
+**`usage.cost` is not `usage.costDetails`.** `cost` is what OpenRouter charged the account;
+`costDetails` (`upstreamInferenceCost`, `upstreamInferencePromptCost`,
+`upstreamInferenceCompletionsCost`) is what the upstream provider charged *OpenRouter* —
+wholesale, excluding margin, and different under BYOK. Only `cost` may denominate credits
+(§9). `Usage` therefore carries `cost` alone; `costDetails` is not plumbed through.
+
+**SDK floor.** `usage.cost` does not exist on `@openrouter/sdk` before ~`0.13.x`: the older
+chat usage type has no cost field, the request carries no usage-accounting toggle, and the
+response is parsed through a plain `z.object`, so a `cost` key is stripped before it is read.
+`0.13.x` also nests the request under `chatRequest` and renames `ChatResponse` → `ChatResult`.
 
 ### Layer 2 — `AgentRunner`, provider-agnostic
 
@@ -680,7 +710,7 @@ thorough" into a failed run that the engine would then retry into the same cap.
 ```ts
 interface AgentRunner {
   research(input: ResearchInput): Promise<ResearchResult>;   // agentic
-  generate(input: GenerateInput): Promise<ArtifactContent>;  // single structured completion
+  generate(input: GenerateInput): Promise<{ title?: string; content: ArtifactContent }>; // single structured completion
 }
 
 interface ResearchInput { prompt: string; type: ArtifactType; stylePreset?: StylePreset }
@@ -910,7 +940,7 @@ new folder plus one registry entry; no schema or engine change.
 credits  = ceil(amount_usd * CREDITS_PER_USD * CREDIT_MARKUP)
 ```
 
-`CREDITS_PER_USD` and `CREDIT_MARKUP` (default `1.0`) are **global** env, never per-tier.
+`CREDITS_PER_USD` and `CREDIT_MARKUP` (launch default `2.0`) are **global** env, never per-tier.
 Per-tier config carries only the allowance.
 
 Because `amount_usd` is OpenRouter's authoritative per-call `usage.cost` — which already
@@ -934,11 +964,11 @@ Tokens are carried on `detail.totalTokens` for display and audit, never for pric
 Web search and PDF render cost real money but emit no `usage.cost`. Each carries a flat
 credit surcharge, priced in the same unit so it is commensurable with LLM credits:
 
-| `UsageKind` | Fired by | Env constant | Illustrative |
+| `UsageKind` | Fired by | Env constant | Launch policy |
 |---|---|---|---|
 | `llm` | every LLM turn | — (cost-derived) | — |
-| `web_search` | research agent, per Tavily call | `CREDIT_SURCHARGE_WEB_SEARCH` | `8` |
-| `pdf_render` | `RENDER_PDF`, per render (R5) | `CREDIT_SURCHARGE_PDF_RENDER` | `5` |
+| `web_search` | research agent, per successful Tavily lookup | `CREDIT_SURCHARGE_WEB_SEARCH` | `32` |
+| `pdf_render` | `RENDER_PDF`, per successful measured Browserless unit | `CREDIT_SURCHARGE_PDF_RENDER`, `CREDIT_MINIMUM_PDF_RENDER` | `max(8, 4 × units)` |
 
 `record`'s `amount` is **polymorphic by `kind`** — USD for `llm`, a unit count for
 surcharges (`credits = amount * CREDIT_SURCHARGE_<KIND>`). This asymmetry is inherited from
@@ -1045,14 +1075,14 @@ that gated it, so the counter has no remaining caller. `getDashboardUsage` retur
 
 ### Paddle / tier config
 
-Each plan's Paddle price maps to a tier carrying `limits.credits`, seeded from *target model
-cost per average run × expected runs per month × `CREDIT_MARKUP`*. Illustrative ladder: free
-`0` (no AI) or a small trial grant, Starter `2000`, Pro `10000`, top tier `-1`.
+Each plan's Paddle price maps to a tier carrying `limits.credits`. The launch ladder is Free
+`120`, Starter `2,000`, Creator `10,000`, and Pro Writer `30,000`; no paid tier has unlimited
+provider-backed credits. Free's allowance is one shared pool across posts, polls, and
+documents and does not enable research.
 
-**Sizing anchor** (illustrative, at `CREDITS_PER_USD = 1000`, markup `1.0`): an insight post
-≈ research (~$0.02) + generation (~$0.01) + one web search (`8`) ≈ **~38 credits**; a quick
-post (no research) ≈ **~12 credits**; a carousel adds a `pdf_render` (`5`). So "2,000
-credits" ≈ 50 insight posts or ~160 quick posts.
+**Sizing anchor** (at `CREDITS_PER_USD = 1000`, markup `2.0`): LLM usage is
+`ceil(provider cost in USD × 1000 × 2)`, each successful advanced Tavily lookup costs 32
+credits, and a successful Browserless render costs `max(8, 4 × measured units)`.
 
 **Upgrades take effect immediately** — the allowance is read live from the resolved tier at
 guard time while the `Usage` aggregate persists, so a mid-period upgrade instantly raises
@@ -1067,7 +1097,7 @@ cadence is the existing usage period, reused verbatim.
 ### Creating a post
 
 ```
-POST /posts   { artifactId, version?, connectedAccount, scheduledAt? }
+POST /posts   { artifactId, version?, connectedAccount }
 ```
 
 1. **Resolve and authorize** — load the artifact owner-scoped (403 if not the caller's);
@@ -1075,12 +1105,9 @@ POST /posts   { artifactId, version?, connectedAccount, scheduledAt? }
    `getOwnedUsableLinkedinConnectedAccount(userId, accountId, action)`.
 2. **Validate publishability** — the pinned version must be `READY` (cannot post
    `GENERATING` or `FAILED`); the composition must be valid for LinkedIn (trivially so for
-   a single artifact — this is the seam where a future text+image pair is checked against
-   the mutual-exclusivity rule); org accounts keep the existing `assertCompanyPagesAccess`
+   a single artifact); org accounts keep the existing `assertCompanyPagesAccess`
    gate.
-3. **Branch on `scheduledAt`** — absent → run `publishPost` inline and persist `PUBLISHED`
-   (+ `channelPostId`, `publishedAt`) or `FAILED` (+ `failureReason`). Present → assert the
-   `scheduled_posts` counter on first-time schedule, persist `SCHEDULED`, enqueue the job,
+3. Persist `DRAFT`. `/publish` and `/schedule` are the only confirmation actions.
    increment the counter.
 
 ### Publish composition
@@ -1126,20 +1153,18 @@ the HTTP call blocks on the LinkedIn upload. Acceptable for a one-shot PUT; if i
 slow, route immediate publish through the schedule queue with `delay: 0` — same
 `publishPost`, and the seam is already there.
 
-### Retired for v1, preserved as the future-image seed
+### Post-owned user media
 
-The **post-level embedded-media user-upload path** — `addLinkedinMedia`, the presigned
-`initiate`/`complete` direct-to-R2 flow, and the `media-upload` queue that patched
-`PostDraft.media.$` — goes dormant. Artifact content is produced by *generation* (documents
-pre-rendered to R2), so a post never uploads user media in v1.
-`LinkedinMediaService`'s **LinkedIn-upload half** (`uploadImage`, new `uploadDocument`,
-`waitFor*Available`, R2 `getFile`) is reused by `publishPost`; its **user-upload half**
-stays for the future image artifact type.
+The presigned `initiate`/`complete` direct-to-R2 flow and `media-upload` worker are active on
+editable Posts. Stable media UUIDs are never replaced; the worker writes `linkedinUrn` and
+READY/FAILED. Only POST artifacts accept JPEG/PNG images or one MP4 video. Publish/schedule
+require all remaining media to be READY.
 
 ### Cancel / reschedule / retry
 
 - **`DELETE /posts/:id`** — cancels a `SCHEDULED` post: `getJob(postId)` → `remove()`, then
   delete the record. Does **not** touch the source artifact.
+- **`POST /posts/:id/unschedule`** — removes the job and returns SCHEDULED to DRAFT.
 - **`POST /posts/:id/schedule { scheduledAt }`** — reschedule a `SCHEDULED`/`FAILED` post
   (remove old job, add new). First-ever schedule counts against `scheduled_posts`; a
   reschedule of an already-counted post does **not** re-charge.
@@ -1164,17 +1189,22 @@ Redis and R2 at cutover. The *engineering* residue is real and must be done:
 - **Account-disconnect safety:** repoint `auth.service`'s query from `postdrafts
   status:'SCHEDULED'` to `posts status:'SCHEDULED'` for the disconnected account; for each,
   `getJob(post._id).remove()` and set the post `FAILED`, reason `"connected account
-  disconnected"`. There is no `DRAFT` to reset to, and the source artifact is untouched in
-  the library, so the user re-posts it after reconnecting. **Add a regression test for
+  disconnected"`. A later composition edit returns the Post to DRAFT; the source artifact
+  is untouched. **Add a regression test for
   disconnect → schedule-job cancel** — the audit called this out explicitly.
 
 ### HTTP surface
 
 | Method | Route | Body / Query | Result |
 |---|---|---|---|
-| POST | `/posts` | `{artifactId, version?, connectedAccount, scheduledAt?}` | `201 Post` |
-| POST | `/posts/:id/publish` | — | publish now / retry a FAILED post |
+| POST | `/posts` | `{artifactId, version?, connectedAccount}` | `201 DRAFT` |
+| PATCH | `/posts/:id` | `{artifactId, version?}` | change selected artifact |
+| POST | `/posts/:id/media/uploads[/complete]` | declarations / ids | direct-to-R2 media flow |
+| PATCH/DELETE | `/posts/:postId/media/:mediaId` | metadata / — | edit/remove media |
+| GET | `/posts/:postId/media/:mediaId/preview` | — | READY image/video preview |
+| POST | `/posts/:id/publish` | — | publish DRAFT/SCHEDULED/FAILED |
 | POST | `/posts/:id/schedule` | `{scheduledAt}` | reschedule |
+| POST | `/posts/:id/unschedule` | — | return to DRAFT |
 | DELETE | `/posts/:id` | — | cancel a SCHEDULED post + remove job |
 | GET | `/posts` | `?status&month&connectedAccount&page` | list + `filters` |
 | GET | `/posts/:id` | — | one post, with resolved artifact refs |
@@ -1404,10 +1434,11 @@ New global env, added to `.env.example` (no hardcoded values — repo rule):
 | Key | Purpose | Default |
 |---|---|---|
 | `CREDITS_PER_USD` | credit peg | `1000` |
-| `CREDIT_MARKUP` | margin multiplier | `1.0` |
+| `CREDIT_MARKUP` | margin multiplier | `2.0` |
 | `FALLBACK_CREDITS_PER_1K_TOKENS` | safety net when `usage.cost` is missing | — |
-| `CREDIT_SURCHARGE_WEB_SEARCH` | flat surcharge per Tavily call | `8` |
-| `CREDIT_SURCHARGE_PDF_RENDER` | flat surcharge per Browserless render | `5` |
+| `CREDIT_SURCHARGE_WEB_SEARCH` | surcharge per successful Tavily lookup | `32` |
+| `CREDIT_SURCHARGE_PDF_RENDER` | surcharge per Browserless 30-second unit | `4` |
+| `CREDIT_MINIMUM_PDF_RENDER` | minimum successful Browserless render charge | `8` |
 | `RESEARCH_MODEL` | fast model for tool-loop turns | — |
 | `GENERATION_MODEL` | stronger model for final content | — |
 | `RESEARCH_MAX_STEPS` | agent iteration cap | `5` |
@@ -1462,9 +1493,10 @@ leaves the tree green. `Blocked by` declares hard ordering.
 > **T1 — LLM layer: single-turn primitives + typed errors.**
 > Extend `LLMStrategy` with `complete` / `completeWithTools` / reserved `stream`. Add
 > `ToolDefinition`, `ToolCall`, `Usage`, and the assistant-with-tool-calls and `role:'tool'`
-> message variants. Implement in the OpenRouter strategy over `@openrouter/sdk`'s `tool()` +
-> `chat.send`, surfacing `usage.cost`. Add typed `LLMError { retryable }` (429/5xx/network →
-> retryable; 4xx/auth → terminal). *Blocked by: none.*
+> message variants. Implement in the OpenRouter strategy over `@openrouter/sdk` (≥ `0.13.x`)
+> using `z.toJSONSchema` + `chat.send`, surfacing `usage.cost`. Add typed
+> `LLMError { retryable }` (429/408/5xx/network → retryable; 4xx/auth → terminal).
+> *Blocked by: none.*
 
 > **T2 — `Artifact` schema + the POST arm of the content union.**
 > New `Artifact`/`ArtifactVersion` schema (§4) with `ArtifactType`, `VersionStatus`,
@@ -1480,7 +1512,7 @@ leaves the tree green. `Blocked by` declares hard ordering.
 > `assertBalance` (headroom check); `incrementMarkTokenUsage` → `debit`. New
 > `CreditMeterService` with pure `toCredits` (llm/cost path + token fallback + warn). Update
 > `getDashboardUsage` to the `credits` shape. Config: `CREDITS_PER_USD`, `CREDIT_MARKUP`,
-> `FALLBACK_CREDITS_PER_1K_TOKENS`. Tests per CLAUDE.md: `credit-meter.service.spec.ts` and
+> `FALLBACK_CREDITS_PER_1K_TOKENS`. Tests per AGENTS.md: `credit-meter.service.spec.ts` and
 > an updated `feature-gating.service.spec.ts` (headroom guard, `-1`/`0` edges). *Blocked by:
 > none.*
 
@@ -1598,7 +1630,7 @@ usage.tick → run.completed`; the version is `READY`; credits are debited once.
 > `LinkedinMediaService.uploadDocument` — init → **single PUT** → `value.document` URN, **no
 > chunking, no ETags, no finalize** — plus `waitForDocumentAvailable`. Enforce ≤100 MB /
 > ≤300 pages. DOCUMENT publish sources bytes via `getFile(pdfKey)`. `MediaType` gains
-> `DOCUMENT`. Spec per CLAUDE.md: `linkedin-media.service.spec.ts` for the single-PUT path.
+> `DOCUMENT`. Spec per AGENTS.md: `linkedin-media.service.spec.ts` for the single-PUT path.
 > **Sandbox-verify the three §14 LinkedIn unknowns before merging.** *Blocked by: T14.*
 
 > **T16 — scheduling, cancel, and disconnect safety.**
@@ -1622,8 +1654,8 @@ usage.tick → run.completed`; the version is `READY`; credits are debited once.
 > *Blocked by: T12, T13, T16.*
 
 > **T18 — tier seed, `.env.example`, and the dashboard.**
-> Seed `limits.credits` per tier (free `0` or a trial grant, Starter `2000`, Pro `10000`, top
-> `-1`), sized against the §9 anchor. Add all eight §13 keys to `.env.example`. Verify
+> Seed `limits.credits` per tier (Free `120`, Starter `2,000`, Creator `10,000`, Pro Writer
+> `30,000`), sized against the §9 anchor. Add the §13 keys to `.env.example`. Verify
 > `getDashboardUsage` returns `{credits, connected_accounts, scheduled_posts}` and that
 > `limit === 0` is distinguishable from "out of credits". *Blocked by: T3, T17.*
 

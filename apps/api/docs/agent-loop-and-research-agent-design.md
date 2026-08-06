@@ -18,7 +18,7 @@ agent loop"). Interlocking tickets are referenced inline at each boundary.
   mid-run — the agent cannot ask the user questions.
 - The agent runs on the **`src/llm` OpenRouter stack**, not the Vercel AI SDK. The old
   `ai` / `@ai-sdk/gateway` deps were deliberately removed when `src/mark` was stripped;
-  only `@openrouter/sdk` (^0.5.1), `@tavily/core` (^0.7.3) and `zod` (^4) remain.
+  only `@openrouter/sdk` (^0.13.39), `@tavily/core` (^0.7.3) and `zod` (^4) remain.
 - `src/mark` is dissolved (charter #9); its `MARK_*` multi-provider abstraction is
   retired. The surviving `src/mark/search.ts` Tavily helper is the seed for the one
   research tool.
@@ -57,9 +57,11 @@ interface Usage          { promptTokens: number; completionTokens: number; total
 
 - New shared types (`ToolDefinition`, `ToolCall`, `Usage`) and the message variants
   (assistant-with-tool-calls, `role: 'tool'` result) are **owned here**.
-- The **OpenRouter strategy** implements these using `@openrouter/sdk` primitives — its
-  `tool()` Zod helper for schema conversion, `chat.send` with `tools` for the single
-  turn, and the SDK's `usage.cost` / `costDetails` for real per-call dollar cost.
+- The **OpenRouter strategy** implements these using `@openrouter/sdk` primitives
+  (floor `0.13.x`) — `z.toJSONSchema` for Zod→JSON Schema conversion, `chat.send` with
+  `tools` for the single turn, and the SDK's `usage.cost` for real per-call dollar cost.
+  Not the SDK's `tool()` helper (it builds `callModel`'s argument, rejected below), and
+  not `usage.costDetails` (upstream wholesale cost, not the account charge). See PRD §7.
 
 **Layer 2 — the `AgentRunner` loop, provider-agnostic.** It owns the multi-turn loop
 (tool registry, message accumulation, iteration cap, usage aggregation, stop
@@ -277,7 +279,7 @@ BullMQ `attempts:3`; terminal → `UnrecoverableError`):
 - **Per-role model config** via `ConfigService`: `RESEARCH_MODEL` (fast, for tool-loop
   turns) and `GENERATION_MODEL` (stronger, for final content) — no hardcoded model
   strings (retires the scattered `gemini-3-flash` / `gpt-5.4` / `gpt-5-mini` literals,
-  per CLAUDE.md's config rule).
+  per AGENTS.md's config rule).
 
 **Rejected — reinstate a multi-provider abstraction now** (port Mark's gateway/anthropic
 paths). Two+ live SDKs, more config and test surface, for a launch where OpenRouter
@@ -315,7 +317,8 @@ Per the #100 resolution this is a clean write-over (relaunch, no users):
 - **`src/llm`**: extend `LLMStrategy` with `complete` / `completeWithTools` / (reserved)
   `stream`; add the shared `ToolDefinition` / `ToolCall` / `Usage` types and tool/tool-
   result message variants; implement them in the OpenRouter strategy over
-  `@openrouter/sdk`'s `tool()` + `chat.send`; add typed `LLMError{retryable}`.
+  `@openrouter/sdk` (≥ `0.13.x`) using `z.toJSONSchema` + `chat.send`; add typed
+  `LLMError{retryable}`.
 - **New `AgentRunner`** (in `src/agent`) owning the generic loop (§2) and the
   `research` / `generate` surface (§3), plus the research/generation/refine prompts.
 - **`searchWeb` tool** wrapping `src/mark/search.ts` (Tavily); `src/mark` otherwise

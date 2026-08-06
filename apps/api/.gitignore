@@ -15,6 +15,7 @@ lerna-debug.log*
 
 # Git Worktres
 .claude/worktrees/
+.codex/worktrees/
 
 # OS
 .DS_Store

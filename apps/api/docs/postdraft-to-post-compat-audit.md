@@ -4,6 +4,12 @@
 > Author: generated for Christopher Pam.
 > Scope: audit-only. No code changes. Recommends rename-vs-new-collection and
 > enumerates every backward-compatibility hazard for a human to weigh.
+>
+> **2026-07-18 follow-up:** the final Post model deliberately restores `DRAFT` and a
+> Post-owned `media[]`, adapted to artifact references rather than embedded generated text.
+> Presigned uploads and the media worker are active again; media now keeps a stable UUID and
+> stores the LinkedIn asset separately as `linkedinUrn`. The audit below remains historical
+> evidence about the original migration and queue/storage coupling.
 
 Charter givens this audit assumes (from map #99):
 

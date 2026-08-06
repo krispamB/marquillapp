@@ -1,6 +1,6 @@
 # Handoff: Async LinkedIn Media Upload (client-side changes)
 
-**Branch:** `fix/linkedin-image-upload` · **Updated:** 2026-07-06
+**Status:** current Artifact-backed Post contract · **Updated:** 2026-07-18
 
 Media upload is now fully asynchronous **and** direct-to-storage. The client
 uploads file bytes straight to Cloudflare R2 with presigned URLs — files no
@@ -8,9 +8,8 @@ longer pass through the API server — and a background worker performs the
 LinkedIn upload. The client must request upload slots, PUT the files itself,
 confirm, then track media status and gate the publish action on it.
 
-The old `multipart/form-data` endpoint (`PUT /posts/:id/media`) still works
-during the migration (see §9) but is **deprecated** and will be removed once
-the client has switched.
+The old `multipart/form-data` endpoint (`PUT /posts/:id/media`) is removed; use the
+presigned direct-to-R2 flow below.
 
 All paths below are relative to the API prefix `api/v1`.
 
@@ -26,9 +25,9 @@ All paths below are relative to the API prefix `api/v1`.
                                             PENDING/UPLOADING entries remain
 ```
 
-File rules (unchanged from before): up to 20 files, 200 MB per-file limit,
-JPEG/PNG images **or** exactly one video, no mixing images and videos in one
-batch.
+File rules: up to 20 images across the Post, or exactly one video; 200 MB per-file
+application limit; JPEG/PNG images or MP4 video; no mixing across batches. The Post must
+be `DRAFT` or `FAILED` and select a POST artifact.
 
 ## 2. Step 1 — initiate: `POST /posts/:id/media/uploads`
 
@@ -68,10 +67,9 @@ Response `201`:
 }
 ```
 
-- `mediaId` is a **temporary UUID**; it also appears as a new entry in
-  `post.media[]` with `status: "PENDING"`. After the LinkedIn upload succeeds
-  it is replaced server-side by the LinkedIn URN (`urn:li:image:…` /
-  `urn:li:video:…`). Do not persist it beyond this upload flow.
+- `mediaId` is the media item's **stable UUID**. It remains `post.media[].id` throughout
+  polling, metadata edits, deletion, and preview. After LinkedIn upload succeeds the worker
+  writes `linkedinUrn` (`urn:li:image:…` / `urn:li:video:…`) separately.
 - Slots expire at `expiresAt` (**30 minutes**). All PUTs and the complete call
   must happen before then; afterwards, re-initiate.
 
@@ -137,7 +135,7 @@ Every entry in `post.media[]` carries a status:
 |---|---|---|
 | `PENDING` | Slot issued; waiting for the client's PUT + confirm | Treat like `UPLOADING` in the UI (it's your own in-flight upload) |
 | `UPLOADING` | Background job is transferring the file to LinkedIn | Show spinner/placeholder; disable Publish |
-| `READY` | Done; `id` is now the real LinkedIn URN | Render normally; Publish allowed |
+| `READY` | Done; stable `id` remains and `linkedinUrn` is populated | Render normally; Publish allowed |
 | `FAILED` | LinkedIn upload failed after 3 attempts | Show error state; offer re-upload (see §8) |
 | *(absent)* | Entry predates this change | Treat exactly like `READY` |
 
@@ -162,12 +160,11 @@ sane client-side ceiling before showing a "still processing" notice is ~10
 minutes for video.
 
 Stop polling when no entry is `PENDING` or `UPLOADING` anymore. Each entry
-ends as either `READY` (with its `id` swapped to the LinkedIn URN) or
+ends as either `READY` (with `linkedinUrn` populated) or
 `FAILED`.
 
-`GET /posts/linkedin/image/:urn` (thumbnail/download URL lookup) only works
-with a real URN — **do not call it with a temp UUID** (`PENDING`/`UPLOADING`
-entries).
+Use `GET /posts/:postId/media/:mediaId/preview` for READY images and videos. It resolves the
+asset through the Post's exact connected account. The old image-URN route remains for compatibility.
 
 ## 7. Publishing
 
@@ -177,10 +174,8 @@ entries).
   `"Media uploads are still in progress. Try again shortly."` Disable the
   Publish button while an upload is in flight and treat this 409 as a
   retryable state, not an error toast.
-- `FAILED` entries are **silently excluded** from the LinkedIn post payload.
-  A post with one `READY` image and one `FAILED` image publishes with just the
-  `READY` image. Surface this to the user before they publish (e.g. "1 of 2
-  images failed to upload and won't be included").
+- Any `FAILED` entry also blocks publish and schedule. Remove it with
+  `DELETE /posts/:postId/media/:mediaId` or upload a replacement.
 - Expired `PENDING` entries never block publishing (they're purged).
 
 ## 8. Error cases
@@ -190,7 +185,7 @@ entries).
 | HTTP | Message | When |
 |---|---|---|
 | `400` | class-validator errors | Missing/invalid `fileName`/`mimeType`/`sizeBytes`, >20 files, `sizeBytes` > 200 MB |
-| `400` | `Unsupported file type: …` / `Cannot mix images and videos in one post` / `Only one video per post is allowed` / `Unsupported image format: …` / `Post is already published` | Same media rules as before, now checked against declared metadata |
+| `400` | unsupported type / mixed media / too many files / non-POST artifact / Post not editable | Checked against declared metadata and the whole Post composition |
 | `403` | `You are not authorized to edit this post` | Not the owner |
 | `404` | `Post not found` | Bad post id |
 | `409` | `A media upload is already in progress for this post` | Another batch is `PENDING` (unexpired) or `UPLOADING`. Finish/confirm it first, or wait ≤30 min for the stale slot to expire. |
@@ -216,19 +211,12 @@ entries).
 **Failures after the 202** (in the background job) never surface as an HTTP
 error — they appear as `status: "FAILED"` on the media entry during polling.
 
-**Recovering from `FAILED`:** there is no endpoint to remove a media entry. A
-failed entry stays on the post but never blocks publishing (it is excluded,
-per §7). To retry, run the initiate → PUT → complete flow again — this appends
-a new entry. Hide `FAILED` entries from the composer UI once acknowledged or
-re-uploaded.
+**Recovering from `FAILED`:** remove the failed item, then optionally run initiate → PUT →
+complete again. Publishing stays blocked until no failed item remains.
 
-## 9. Deprecated: `PUT /posts/:id/media` (multipart)
+## 9. Removed: `PUT /posts/:id/media` (multipart)
 
-The old endpoint still accepts `multipart/form-data` (`files` field) and
-returns the same `202` + `UPLOADING` entries as before. It shares the
-in-progress lock with the new flow (a `PENDING`/`UPLOADING` batch from either
-path blocks both). Migrate to the presigned flow; this endpoint will be
-removed in a later release.
+The multipart endpoint is not registered. Use the presigned flow.
 
 ## 10. Suggested UI flow
 
@@ -239,17 +227,15 @@ removed in a later release.
 3. When all PUTs succeed → **complete** with all `mediaIds`. If some PUTs
    failed, complete the successful ones and offer retry for the rest.
 4. Poll `GET /posts/:id` until no entry is `PENDING`/`UPLOADING`.
-   `READY` → swap placeholder for the real media (image preview via
-   `GET /posts/linkedin/image/:urn` with the new URN).
+   `READY` → load the preview through `GET /posts/:postId/media/:mediaId/preview`.
    `FAILED` → error state + re-upload affordance.
 5. Keep Publish disabled while any entry is `PENDING`/`UPLOADING`; if the user
    races it, handle the `409` gracefully.
 
 ## 11. Compatibility notes
 
-- Old posts have media entries **without** a `status` field — treat as `READY`.
-- Media entries may now also carry `mimeType`, `sizeBytes`, and
-  `pendingExpiresAt` fields (bookkeeping for `PENDING` slots) — ignore them.
+- Media entries keep a stable `id`; never substitute or accept a client-supplied URN.
+- `mimeType`, `sizeBytes`, and `pendingExpiresAt` are lifecycle bookkeeping.
 - The response envelope (`statusCode` / `message` / `data`) is unchanged.
 - Requires the backend worker process to be running; in environments where it
   isn't, media will remain `UPLOADING` indefinitely (backend concern, but
