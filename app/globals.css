@@ -1338,12 +1338,17 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
 .mq-pdf-preview-error button:hover, .mq-pdf-preview-error a:hover { border-color: var(--accent); color: var(--accent-ink); }
 .mq-studio-document-response { min-width: 0; }
 @keyframes mq-pdf-shimmer { to { background-position-x: -200%; } }
-.mq-composition-media-grid { display: grid; aspect-ratio: 1.91 / 1; gap: 2px; margin-top: 12px; overflow: hidden; background: var(--canvas-sub); }
-.mq-composition-media-grid.count-2, .mq-composition-media-grid.count-3, .mq-composition-media-grid.count-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.mq-composition-media-grid.count-3 > :first-child { grid-row: span 2; }
-.mq-composition-media-grid img, .mq-composition-media-grid video, .mq-composition-media-image { width: 100%; height: 100%; object-fit: cover; }
-.mq-composition-media-image { position: relative; display: block; overflow: hidden; }
-.mq-composition-media-image b { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.55); color: white; font-size: 24px; }
+.mq-composition-media-grid { display: grid; aspect-ratio: 1.91 / 1; margin-top: 12px; overflow: hidden; background: var(--canvas-sub); }
+.mq-composition-media-grid img, .mq-composition-media-grid video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.mq-composition-media-carousel { position: relative; min-width: 0; margin-top: 12px; overflow: hidden; background: var(--canvas-sub); }
+.mq-composition-media-rail { display: flex; width: 100%; min-width: 0; align-items: stretch; gap: 10px; overflow-x: auto; padding: 10px 9% 12px; cursor: grab; scroll-behavior: smooth; scroll-padding-inline: 9%; scroll-snap-type: x mandatory; scrollbar-width: none; touch-action: pan-x pan-y; -webkit-overflow-scrolling: touch; }
+.mq-composition-media-rail::-webkit-scrollbar { display: none; }
+.mq-composition-media-rail:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.mq-composition-media-rail.is-dragging { cursor: grabbing; scroll-behavior: auto; scroll-snap-type: none; user-select: none; }
+.mq-composition-media-slide { aspect-ratio: 4 / 5; min-width: 0; flex: 0 0 82%; overflow: hidden; border: 1px solid color-mix(in srgb, var(--ink-900) 14%, var(--line)); border-radius: 9px; background: var(--surface); scroll-snap-align: center; scroll-snap-stop: always; }
+.mq-composition-media-slide img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+.mq-composition-media-count { position: absolute; top: 20px; right: 18px; z-index: 2; min-width: 42px; padding: 7px 9px; border-radius: 7px; background: rgba(255,255,255,.9); box-shadow: 0 1px 5px rgba(0,0,0,.16); color: #15171a; font: 700 12px/1 var(--font-inter); text-align: center; backdrop-filter: blur(5px); pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .mq-composition-media-rail { scroll-behavior: auto; } }
 .mq-artifact-picker-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 24px; background: rgba(11,12,14,.66); backdrop-filter: blur(2px); }
 .mq-artifact-picker { display: flex; width: min(760px, 100%); max-height: min(720px, calc(100vh - 48px)); flex-direction: column; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 18px; background: var(--surface); box-shadow: var(--sh-lg); }
 .mq-artifact-picker > header { display: flex; align-items: flex-start; justify-content: space-between; padding: 20px 22px 14px; }
