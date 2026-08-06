@@ -46,7 +46,6 @@ import type {
   DashboardPostsResponse,
   DisconnectAccountResponse,
   DraftStatusResponse,
-  ImageUploadResponse,
   LinkedinImageDetailsResponse,
   LinkedinAuthUrlResponse,
   PublishPostResponse,
@@ -58,8 +57,6 @@ import type {
   FeatureLimitErrorResponse,
   PaymentUsageData,
   PaymentUsageResponse,
-  VideoUploadInitResponse,
-  VideoUploadStatusResponse,
 } from "../lib/types";
 import { FeatureLimitExceededError } from "../lib/types";
 
@@ -890,48 +887,19 @@ export default function DashboardPage({
       return;
     }
 
-    // Step 2: Upload media if new images/video were attached (PUT)
-    const hasDeviceMedia = payload.mediaFiles && payload.mediaFiles.length > 0;
-    const hasStockMedia = payload.mediaUrls && payload.mediaUrls.length > 0;
-    const hasAnyMedia = hasDeviceMedia || hasStockMedia;
+    // Step 2: All media (images and video) uploads straight to R2 the moment
+    // it's attached inside the composer, so there is no submit-time upload here.
 
-    if (hasAnyMedia) {
-      try {
-        if (payload.mediaType === "video" && payload.mediaFiles?.[0]) {
-          await uploadVideoForPost(payload.postId, payload.mediaFiles[0], () => {});
-        } else {
-          // Upload device files
-          if (hasDeviceMedia) {
-            await uploadMediaForPost(payload.postId, payload.mediaFiles!);
-          }
-          // Fetch and upload stock images (Unsplash / Pexels)
-          if (hasStockMedia) {
-            const remoteFiles = await Promise.all(
-              payload.mediaUrls!.map((url, i) =>
-                buildFileFromRemoteImage(
-                  url,
-                  `${payload.mediaSource ?? "stock"}-image-${i}`,
-                ),
-              ),
-            );
-            await uploadMediaForPost(payload.postId, remoteFiles);
-          }
-        }
-      } catch (error) {
-        setConnectFeedback(
-          error instanceof Error ? error.message : "Media upload failed.",
-        );
-        return;
-      }
-    }
-
-    // Step 3: If save-only, we're done
+    // Step 3: If save-only, we're done. Any on-attach media uploads have already
+    // been awaited to READY in the composer before this point.
     if (kind === "draft") {
-      setConnectFeedback("Post saved successfully.");
+      setConnectFeedback("Post saved.");
       return;
     }
 
-    // Step 4: Publish or schedule
+    // Step 4: Publish or schedule. The composer keeps Publish/Schedule disabled
+    // until media settles; the 409 handling in publishPost/schedulePost is a
+    // safety net for any race (handoff §7).
     if (kind === "publish") {
       try {
         const response = await publishPost(payload.postId);
@@ -962,119 +930,6 @@ export default function DashboardPage({
     setConnectFeedback(message);
     closeNewPostModal();
     window.location.reload();
-  };
-
-  const uploadMediaForPost = async (postId: string, files: File[]): Promise<void> => {
-    for (const file of files) {
-      const formData = new FormData();
-      formData.append("files", file);
-
-      const response = await apiFetch(`${apiBase}/posts/${postId}/media`, {
-        method: "PUT",
-        credentials: "include",
-        body: formData,
-      });
-
-      let parsedResponse: ImageUploadResponse | null = null;
-      try {
-        parsedResponse = (await response.json()) as ImageUploadResponse;
-      } catch {
-        parsedResponse = null;
-      }
-
-      if (!response.ok) {
-        throw new Error(parsedResponse?.message || "Image upload failed.");
-      }
-    }
-    setConnectFeedback("Media uploaded successfully.");
-  };
-
-  const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB per LinkedIn spec
-
-  const uploadVideoForPost = async (
-    postId: string,
-    file: File,
-    onProgress: (pct: number) => void,
-  ): Promise<void> => {
-    // 1. Initialize upload session
-    const initRes = await apiFetch(`${apiBase}/posts/${postId}/video`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fileSize: file.size, fileName: file.name }),
-    });
-    if (!initRes.ok) {
-      const json = await initRes.json().catch(() => ({}));
-      throw new Error((json as { message?: string }).message || "Failed to initialize video upload.");
-    }
-    const { data } = (await initRes.json()) as VideoUploadInitResponse;
-    const uploadUrl = data?.uploadUrl;
-    if (!uploadUrl) throw new Error("No upload URL returned from server.");
-
-    // 2. Upload in 4 MB chunks
-    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * CHUNK_SIZE;
-      const end = Math.min(start + CHUNK_SIZE, file.size);
-      const chunk = file.slice(start, end);
-      const chunkRes = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Range": `bytes ${start}-${end - 1}/${file.size}`,
-          "Content-Type": file.type,
-        },
-        body: chunk,
-      });
-      if (!chunkRes.ok) throw new Error(`Chunk ${i + 1}/${totalChunks} upload failed.`);
-      onProgress(Math.round(((i + 1) / totalChunks) * 90)); // 0–90% = upload phase
-    }
-
-    // 3. Poll for video availability (max 60 s)
-    const deadline = Date.now() + 60_000;
-    while (Date.now() < deadline) {
-      await new Promise<void>((r) => setTimeout(r, 2000));
-      const statusRes = await apiFetch(`${apiBase}/posts/${postId}/video/status`, {
-        credentials: "include",
-      });
-      const statusJson = (await statusRes.json()) as VideoUploadStatusResponse;
-      if (statusJson.data?.status === "AVAILABLE") {
-        onProgress(100);
-        return;
-      }
-      if (statusJson.data?.status === "FAILED") {
-        throw new Error("Video processing failed on the server.");
-      }
-    }
-    throw new Error("Video availability timed out after 60 seconds.");
-  };
-
-  const buildFileFromRemoteImage = async (
-    imageUrl: string,
-    fallbackName: string,
-    fallbackMimeType?: string,
-  ): Promise<File> => {
-    const response = await fetch(imageUrl);
-    if (!response.ok) {
-      throw new Error("Unable to fetch selected stock image.");
-    }
-
-    const blob = await response.blob();
-    const buffer = await blob.arrayBuffer();
-    const contentTypeHeader = response.headers.get("Content-Type")?.split(";")[0]?.trim();
-    const mimeType = blob.type || contentTypeHeader || fallbackMimeType || "image/jpeg";
-
-    const extensionByMimeType: Record<string, string> = {
-      "image/jpeg": "jpg",
-      "image/jpg": "jpg",
-      "image/png": "png",
-      "image/webp": "webp",
-      "image/gif": "gif",
-      "image/avif": "avif",
-    };
-    const extension = extensionByMimeType[mimeType.toLowerCase()] || "jpg";
-    const fileName = `${fallbackName}.${extension}`;
-
-    return new File([buffer], fileName, { type: mimeType });
   };
 
   const updatePostContent = async (
@@ -1118,6 +973,13 @@ export default function DashboardPage({
     }
 
     if (!response.ok) {
+      // Media still uploading — retryable, not a hard failure (handoff §5).
+      if (response.status === 409) {
+        throw new Error(
+          parsedResponse?.message ||
+            "Media uploads are still in progress. Try again shortly.",
+        );
+      }
       throw new Error(parsedResponse?.message || "Unable to publish post.");
     }
 
@@ -1145,6 +1007,13 @@ export default function DashboardPage({
     }
 
     if (!response.ok) {
+      // Media still uploading — retryable, not a hard failure (handoff §5).
+      if (response.status === 409) {
+        throw new Error(
+          parsedResponse?.message ||
+            "Media uploads are still in progress. Try again shortly.",
+        );
+      }
       throw new Error(parsedResponse?.message || "Unable to schedule post.");
     }
 

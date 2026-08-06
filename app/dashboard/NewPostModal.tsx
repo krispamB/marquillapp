@@ -12,16 +12,20 @@ import {
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import {
+  AlertTriangle,
   ArrowUp,
   CalendarClock,
+  Check,
   ChevronDown,
   Clock3,
   Eye,
   Hash,
   ImagePlus,
   Info,
+  Loader2,
   MessageSquareText,
   Repeat2,
+  RotateCw,
   Search,
   Send,
   SmilePlus,
@@ -38,7 +42,19 @@ import type {
   PostMediaItem,
 } from "../lib/types";
 import { StylePreset } from "../lib/types";
+import { useMediaUploadQueue } from "../lib/useMediaUploadQueue";
 import type { NewPostMode } from "./useNewPostModal";
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3500/api/v1";
+
+// Stable per-tile key so the upload queue can address a tile independently of
+// its shifting index in the media arrays.
+let mediaKeySeq = 0;
+function makeMediaKey() {
+  mediaKeySeq += 1;
+  return `media-${mediaKeySeq}`;
+}
 
 export type NewPostModalAccount = {
   name?: string;
@@ -177,6 +193,10 @@ function extractMediaUrns(mediaItems?: PostMediaItem[]) {
     return [];
   }
   return mediaItems
+    // Only READY (or legacy, status-less) entries carry a real LinkedIn URN.
+    // UPLOADING entries still hold a temp UUID that the image-lookup endpoint
+    // rejects, and FAILED entries have no media to preview (handoff §3/§4).
+    .filter((item) => item?.status === undefined || item.status === "READY")
     .map((item) => item?.id?.trim())
     .filter((id): id is string => Boolean(id));
 }
@@ -369,6 +389,12 @@ export default function NewPostModal({
   const [mediaPreviews, setMediaPreviews] = useState<string[]>(
     initialImageUrl ? [initialImageUrl] : [],
   );
+  // Stable keys aligned index-for-index with `mediaPreviews`. New image tiles
+  // are tracked in the upload queue by their key; existing/video tiles have a
+  // key but no queue entry.
+  const [mediaKeys, setMediaKeys] = useState<string[]>(
+    initialImageUrl ? [makeMediaKey()] : [],
+  );
   const [mediaSources, setMediaSources] = useState<Array<"device" | "unsplash" | "pexels" | "existing">>(
     initialImageUrl ? ["existing"] : [],
   );
@@ -461,6 +487,24 @@ export default function NewPostModal({
     [userTimezone],
   );
 
+  // On-attach media upload queue. Images uploaded straight to R2 the moment
+  // they're attached; publish is gated on their status. Reads the current post
+  // id lazily since it resolves from either the edit `postId` or a freshly
+  // generated draft id.
+  const mediaUploads = useMediaUploadQueue({
+    apiBase: API_BASE_URL,
+    getPostId: () => postId ?? activeDraftId ?? undefined,
+    isActive: () => isOpenRef.current && !isUnmountedRef.current,
+  });
+  const {
+    uploads: mediaUploadState,
+    enqueue: enqueueMediaUploads,
+    retry: retryMediaUpload,
+    removeKey: removeMediaUploadKey,
+    reset: resetMediaUploads,
+    isUploading: isMediaUploading,
+  } = mediaUploads;
+
   useEffect(() => {
     setMounted(true);
     isUnmountedRef.current = false;
@@ -483,6 +527,8 @@ export default function NewPostModal({
     objectUrlsRef.current.clear();
     setMediaFiles([]);
     setMediaPreviews(initialImageUrl ? [initialImageUrl] : []);
+    setMediaKeys(initialImageUrl ? [makeMediaKey()] : []);
+    resetMediaUploads();
     setMediaSources(initialImageUrl ? ["existing"] : []);
     setMediaType(null);
     setMediaSource(initialImageUrl ? "existing" : undefined);
@@ -532,13 +578,14 @@ export default function NewPostModal({
       window.clearInterval(streamTimerRef.current);
       streamTimerRef.current = null;
     }
-  }, [isOpen, mode, initialContent, initialImageUrl]);
+  }, [isOpen, mode, initialContent, initialImageUrl, resetMediaUploads]);
 
   useEffect(() => {
     isOpenRef.current = isOpen;
     if (isOpen) {
       return;
     }
+    resetMediaUploads();
     pollInFlightRef.current = false;
     setIsPolling(false);
     setPollStartedAt(null);
@@ -561,7 +608,7 @@ export default function NewPostModal({
       window.clearInterval(streamTimerRef.current);
       streamTimerRef.current = null;
     }
-  }, [isOpen]);
+  }, [isOpen, resetMediaUploads]);
 
   useEffect(() => {
     if (!isOpen || mode !== "edit") {
@@ -581,6 +628,8 @@ export default function NewPostModal({
     objectUrlsRef.current.clear();
     setMediaFiles([]);
     setMediaPreviews(initialImageUrl ? [initialImageUrl] : []);
+    setMediaKeys(initialImageUrl ? [makeMediaKey()] : []);
+    resetMediaUploads();
     setMediaSources(initialImageUrl ? ["existing"] : []);
     setMediaType(null);
     setMediaSource(initialImageUrl ? "existing" : undefined);
@@ -590,7 +639,7 @@ export default function NewPostModal({
     setIsSchedulePopoverOpen(false);
     initialContentRef.current = initialContent ?? "";
     initialImageFingerprintRef.current = initialImageUrl ?? "";
-  }, [initialContent, initialImageUrl, isOpen, mode, postId]);
+  }, [initialContent, initialImageUrl, isOpen, mode, postId, resetMediaUploads]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -1273,6 +1322,7 @@ export default function NewPostModal({
   const removeMedia = (index: number) => {
     const preview = mediaPreviews[index];
     const source = mediaSources[index];
+    const key = mediaKeys[index];
 
     if (source === "device" && preview?.startsWith("blob:")) {
       URL.revokeObjectURL(preview);
@@ -1282,10 +1332,16 @@ export default function NewPostModal({
       setMediaFiles((prev) => prev.filter((_, i) => i !== deviceIndexBefore));
     }
 
+    if (key) {
+      removeMediaUploadKey(key);
+    }
+
     const newPreviews = mediaPreviews.filter((_, i) => i !== index);
     const newSources = mediaSources.filter((_, i) => i !== index);
+    const newKeys = mediaKeys.filter((_, i) => i !== index);
     setMediaPreviews(newPreviews);
     setMediaSources(newSources);
+    setMediaKeys(newKeys);
 
     if (newPreviews.length === 0) {
       setMediaType(null);
@@ -1349,15 +1405,32 @@ export default function NewPostModal({
     // All valid — create object URLs and update state
     const newUrls = incoming.map((f) => URL.createObjectURL(f));
     newUrls.forEach((url) => objectUrlsRef.current.add(url));
+    const newKeys = incoming.map(() => makeMediaKey());
 
     setMediaFiles((prev) => [...prev, ...incoming]);
     setMediaPreviews((prev) => [...prev, ...newUrls]);
     setMediaSources((prev) => [...prev, ...incoming.map(() => "device" as const)]);
+    setMediaKeys((prev) => [...prev, ...newKeys]);
     setMediaType(incomingType);
     setMediaSource("device");
     setMediaError(null);
     setResolvedLinkedinPreviewUrls([]);
     setHasUserSelectedStockImage(false);
+
+    // Both images and a single video upload straight to R2 on attach via the
+    // presigned flow (handoff §1/§2 — one unified media endpoint for both).
+    enqueueMediaUploads(
+      incoming.map((file, i) => ({
+        key: newKeys[i],
+        input: {
+          blob: file,
+          fileName: file.name,
+          mimeType:
+            file.type ||
+            (incomingType === "video" ? "video/mp4" : "image/jpeg"),
+        },
+      })),
+    );
 
     // Reset input so same file can be re-added after removal
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -1418,14 +1491,24 @@ export default function NewPostModal({
       showMediaError(`LinkedIn allows up to ${MAX_IMAGES} images per post.`);
       return;
     }
+    const key = makeMediaKey();
     setMediaPreviews((prev) => [...prev, selectedUrl]);
     setMediaSources((prev) => [...prev, "unsplash"]);
+    setMediaKeys((prev) => [...prev, key]);
     setMediaType("images");
     setMediaSource("unsplash");
     setResolvedLinkedinPreviewUrls([]);
     setIsUnsplashModalOpen(false);
     setSelectedMediaSource("unsplash");
     setHasUserSelectedStockImage(true);
+    // Stock photos upload on attach too; the queue downloads the bytes first to
+    // learn the exact size/type before requesting an R2 slot.
+    enqueueMediaUploads([
+      {
+        key,
+        input: { url: selectedUrl, fileName: `unsplash-${key}.jpg`, mimeType: "image/jpeg" },
+      },
+    ]);
     window.requestAnimationFrame(() => editorRef.current?.focus());
   };
 
@@ -1450,14 +1533,22 @@ export default function NewPostModal({
       showMediaError(`LinkedIn allows up to ${MAX_IMAGES} images per post.`);
       return;
     }
+    const key = makeMediaKey();
     setMediaPreviews((prev) => [...prev, selectedUrl]);
     setMediaSources((prev) => [...prev, "pexels"]);
+    setMediaKeys((prev) => [...prev, key]);
     setMediaType("images");
     setMediaSource("pexels");
     setResolvedLinkedinPreviewUrls([]);
     setIsPexelsModalOpen(false);
     setSelectedMediaSource("pexels");
     setHasUserSelectedStockImage(true);
+    enqueueMediaUploads([
+      {
+        key,
+        input: { url: selectedUrl, fileName: `pexels-${key}.jpg`, mimeType: "image/jpeg" },
+      },
+    ]);
     window.requestAnimationFrame(() => editorRef.current?.focus());
   };
 
@@ -1800,20 +1891,15 @@ export default function NewPostModal({
   const buildPayload = (
     overrides?: Partial<Pick<NewPostSubmitPayload, "scheduledTime" | "timezone">>,
   ): NewPostSubmitPayload => {
-    // Only send media when it differs from what's already on the server.
-    // After a save (or when editing a post with an existing image) the media
-    // is already uploaded, so a subsequent schedule/publish must not re-upload
-    // it — otherwise the same files get uploaded twice.
-    const stockUrls = isImageDirty
-      ? mediaPreviews.filter((_, i) => mediaSources[i] !== "device")
-      : [];
-    const deviceFiles = isImageDirty ? mediaFiles : [];
+    // All media (images and video) now uploads to R2 on attach inside the
+    // composer, so no media files travel with the payload — the parent only
+    // saves content and publishes/schedules.
     return {
       mode,
       postId: resolvedPostId,
       content,
-      mediaFiles: deviceFiles.length > 0 ? deviceFiles : undefined,
-      mediaUrls: stockUrls.length > 0 ? stockUrls : undefined,
+      mediaFiles: undefined,
+      mediaUrls: undefined,
       mediaSource,
       mediaType: mediaType ?? undefined,
       aiPrompt,
@@ -2079,9 +2165,17 @@ export default function NewPostModal({
                       {/* ── Thumbnail strip (editor only) ── */}
                       {mediaPreviews.length > 0 && (
                         <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                          {mediaPreviews.map((src, i) => (
+                          {mediaPreviews.map((src, i) => {
+                            const tile = mediaUploadState[mediaKeys[i]];
+                            // Removable only before its upload starts (queued) or
+                            // after it failed — READY media can't be deleted
+                            // server-side (handoff §8). Untracked (existing/video)
+                            // tiles keep prior behavior.
+                            const canRemove =
+                              !tile || tile.status === "queued" || tile.status === "failed";
+                            return (
                             <div
-                              key={i}
+                              key={mediaKeys[i] ?? i}
                               className="group/thumb relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-[#d6dae3] bg-[#f2f4f9]"
                             >
                               {mediaType === "video" ? (
@@ -2098,16 +2192,47 @@ export default function NewPostModal({
                                   className="h-full w-full object-cover"
                                 />
                               )}
-                              <button
-                                type="button"
-                                onClick={() => removeMedia(i)}
-                                className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition group-hover/thumb:bg-black/40 group-hover/thumb:opacity-100"
-                                aria-label={`Remove media ${i + 1}`}
-                              >
-                                <X className="h-4 w-4 text-white drop-shadow" />
-                              </button>
+
+                              {/* Upload status overlay for tracked image tiles */}
+                              {tile && (tile.status === "queued" || tile.status === "uploading" || tile.status === "processing") ? (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 bg-black/55 text-white">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <span className="text-[9px] font-semibold leading-none">
+                                    {tile.status === "uploading" ? `${tile.progress}%` : tile.status === "processing" ? "…" : ""}
+                                  </span>
+                                </div>
+                              ) : null}
+                              {tile && tile.status === "failed" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => retryMediaUpload(mediaKeys[i])}
+                                  title={tile.error || "Upload failed. Retry."}
+                                  aria-label={`Retry upload for media ${i + 1}`}
+                                  className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 bg-rose-600/70 text-white transition hover:bg-rose-600/85"
+                                >
+                                  <RotateCw className="h-4 w-4" />
+                                  <span className="text-[9px] font-semibold leading-none">Retry</span>
+                                </button>
+                              ) : null}
+                              {tile && tile.status === "ready" ? (
+                                <span className="absolute bottom-0.5 left-0.5 grid h-4 w-4 place-items-center rounded-full bg-emerald-500 text-white shadow">
+                                  <Check className="h-2.5 w-2.5" />
+                                </span>
+                              ) : null}
+
+                              {canRemove ? (
+                                <button
+                                  type="button"
+                                  onClick={() => removeMedia(i)}
+                                  className="absolute right-0.5 top-0.5 grid h-5 w-5 place-items-center rounded-full bg-black/50 text-white opacity-0 transition group-hover/thumb:opacity-100 hover:bg-black/75"
+                                  aria-label={`Remove media ${i + 1}`}
+                                >
+                                  <X className="h-3 w-3 drop-shadow" />
+                                </button>
+                              ) : null}
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -2344,7 +2469,12 @@ export default function NewPostModal({
                         </p>
                       ) : null}
                       {mediaPreviews.length > 0 ? (
-                        <MediaGrid srcs={mediaPreviews} type={mediaType} />
+                        <MediaGrid
+                          srcs={mediaPreviews.filter(
+                            (_, i) => mediaUploadState[mediaKeys[i]]?.status !== "failed",
+                          )}
+                          type={mediaType}
+                        />
                       ) : resolvedLinkedinPreviewUrls.length > 0 ? (
                         <MediaGrid
                           srcs={resolvedLinkedinPreviewUrls}
@@ -2405,7 +2535,7 @@ export default function NewPostModal({
               </button>
               <button
                 type="button"
-                disabled={!hasContent || isOverLimit || pendingAction !== null}
+                disabled={!hasContent || isOverLimit || pendingAction !== null || isMediaUploading}
                 onClick={() => {
                   setIsSchedulePopoverOpen(true);
                 }}
@@ -2413,17 +2543,23 @@ export default function NewPostModal({
                 aria-haspopup="dialog"
                 aria-expanded={isSchedulePopoverOpen}
                 aria-controls="schedule-popover"
+                title={isMediaUploading ? "Waiting for media to finish uploading…" : undefined}
                 className="inline-flex items-center rounded-full border border-[#DCCFA4] bg-[#F6F1DE] px-4 py-2 text-sm font-semibold text-[#7A5A00] transition hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50"
               >
                 {pendingAction === "schedule" ? "Scheduling..." : "Schedule Post"}
               </button>
               <button
                 type="button"
-                disabled={!hasContent || isOverLimit || pendingAction !== null}
+                disabled={!hasContent || isOverLimit || pendingAction !== null || isMediaUploading}
                 onClick={() => runAction("publish", onPublish)}
+                title={isMediaUploading ? "Waiting for media to finish uploading…" : undefined}
                 className="inline-flex items-center rounded-full bg-[var(--color-secondary)] px-5 py-2 text-sm font-semibold text-white shadow-[0_18px_40px_-26px_rgba(28,27,39,0.55)] transition hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50"
               >
-                {pendingAction === "publish" ? "Publishing..." : "Publish"}
+                {pendingAction === "publish"
+                  ? "Publishing..."
+                  : isMediaUploading
+                    ? "Uploading media…"
+                    : "Publish"}
               </button>
               <ReschedulePopover
                 isOpen={isSchedulePopoverOpen}
