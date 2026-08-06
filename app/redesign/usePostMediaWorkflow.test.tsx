@@ -102,7 +102,7 @@ describe("usePostMediaWorkflow preview caching", () => {
     await waitFor(() => expect(hook.result.current.previewUrls["media-1"]).toBe("https://cdn.example/cached"));
 
     await act(async () => {
-      await hook.result.current.removeMedia(media[0]);
+      await hook.result.current.removeMedia(hook.result.current.media[0]);
     });
 
     expect(readCachedMediaPreview("media-1")).toBeUndefined();
