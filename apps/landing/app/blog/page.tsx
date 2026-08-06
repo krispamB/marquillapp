@@ -21,43 +21,36 @@ export default function BlogIndex() {
   const sorted = [...posts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-[#F6F2FF] to-[#EAF1FF]">
-      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 pt-28 pb-20">
+    <div className="min-h-screen bg-canvas">
+      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 pt-16 pb-20">
         <div className="mb-12">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-2 text-xs font-semibold text-[#5B5CF6] shadow-sm mb-6">
-            <span className="h-2 w-2 rounded-full bg-[#5B5CF6]" />
-            Marquill Blog
-          </div>
-          <h1 className="text-4xl sm:text-5xl font-semibold text-text-primary leading-tight">
-            AI LinkedIn workspace
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#4F5BFF] via-[#7A5BFF] to-[#A56BFF]">
-              tips and guides.
-            </span>
+          <span className="ff-mono text-[12px] text-ink-400">_ marquill blog</span>
+          <h1 className="mt-3 text-4xl font-bold leading-tight tracking-[-0.035em] sm:text-5xl">
+            <span className="text-ink-900">AI LinkedIn workspace</span>
+            <span className="block text-ink-500">tips and guides.</span>
           </h1>
-          <p className="mt-4 text-lg text-text-secondary max-w-2xl">
+          <p className="mt-4 max-w-2xl text-lg text-ink-500">
             Practical strategies for creators, founders, and teams who publish on LinkedIn with an AI workspace.
           </p>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           {sorted.map((post) => (
             <Link
               key={post.slug}
               href={`/blog/${post.slug}`}
-              className="group block rounded-3xl border border-white/70 bg-white/80 p-8 shadow-sm hover:shadow-lg hover:border-[#CBD2FF] transition-all duration-200"
+              className="group block rounded-[18px] border border-line bg-surface p-7 shadow-sm transition-all duration-200 hover:border-line-strong hover:shadow-md"
             >
-              <div className="flex items-center gap-3 text-xs text-text-secondary mb-3">
+              <div className="mb-3 flex items-center gap-3 text-xs text-ink-500">
                 <span>{formatDate(post.date)}</span>
-                <span className="h-1 w-1 rounded-full bg-text-secondary/40" />
+                <span className="h-1 w-1 rounded-full bg-ink-300" />
                 <span>{post.readTime}</span>
               </div>
-              <h2 className="text-xl font-semibold text-text-primary group-hover:text-[#5B5CF6] transition-colors leading-snug">
+              <h2 className="text-xl font-semibold leading-snug text-ink-900 transition-colors group-hover:text-accent">
                 {post.title}
               </h2>
-              <p className="mt-3 text-sm text-text-secondary leading-relaxed">
-                {post.description}
-              </p>
-              <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#5B5CF6]">
+              <p className="mt-3 text-sm leading-relaxed text-ink-500">{post.description}</p>
+              <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-accent">
                 Read article <span aria-hidden="true">→</span>
               </span>
             </Link>

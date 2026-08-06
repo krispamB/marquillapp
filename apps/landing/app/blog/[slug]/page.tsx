@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { posts, getPostBySlug, formatDate } from '@/lib/posts';
+import { normalizeAppUrl } from '@/config/urls';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -41,61 +42,53 @@ export default async function BlogPost({ params }: Props) {
 
   if (!post) notFound();
 
+  const appUrl = normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL);
+
   return (
-    <article className="min-h-screen bg-white">
-      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 pt-28 pb-20">
+    <article className="min-h-screen bg-canvas">
+      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 pt-16 pb-20">
 
         {/* Back link */}
         <Link
           href="/blog"
-          className="inline-flex items-center gap-2 text-sm text-[#5B5CF6] font-semibold mb-10 hover:underline"
+          className="mb-10 inline-flex items-center gap-2 text-sm font-semibold text-accent hover:underline"
         >
           <span aria-hidden="true">←</span> All articles
         </Link>
 
         {/* Meta */}
-        <div className="flex items-center gap-3 text-xs text-text-secondary mb-6">
+        <div className="mb-6 flex items-center gap-3 text-xs text-ink-500">
           <span>{formatDate(post.date)}</span>
-          <span className="h-1 w-1 rounded-full bg-text-secondary/40" />
+          <span className="h-1 w-1 rounded-full bg-ink-300" />
           <span>{post.readTime}</span>
         </div>
 
         {/* Title */}
-        <h1 className="text-3xl sm:text-4xl font-semibold text-text-primary leading-tight mb-8">
+        <h1 className="mb-8 text-3xl font-bold leading-tight tracking-[-0.03em] text-ink-900 sm:text-4xl">
           {post.title}
         </h1>
 
         {/* Content */}
-        <div
-          className="prose prose-lg max-w-none
-            prose-headings:font-semibold prose-headings:text-text-primary
-            prose-p:text-text-secondary prose-p:leading-relaxed
-            prose-li:text-text-secondary
-            prose-a:text-[#5B5CF6] prose-a:no-underline hover:prose-a:underline
-            prose-strong:text-text-primary
-            prose-ul:my-4
-            prose-table:border-collapse prose-th:border prose-th:border-gray-200 prose-th:bg-gray-50 prose-th:px-4 prose-th:py-2
-            prose-td:border prose-td:border-gray-200 prose-td:px-4 prose-td:py-2"
-        >
+        <div className="article max-w-none">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {post.content}
           </ReactMarkdown>
         </div>
 
         {/* CTA */}
-        <div className="mt-16 rounded-3xl border border-[#CBD2FF] bg-gradient-to-br from-[#F0F0FF] to-[#EAF1FF] p-8 text-center">
-          <p className="text-sm font-semibold text-[#5B5CF6] mb-2">Ready to try it?</p>
-          <h2 className="text-2xl font-semibold text-text-primary mb-3">
-            Start your AI LinkedIn workspace for free
+        <div className="mt-16 rounded-[18px] border border-line bg-surface p-8 text-center shadow-sm">
+          <span className="ff-mono text-[12px] text-ink-400">_ ready to try it?</span>
+          <h2 className="mt-3 text-2xl font-bold tracking-[-0.02em] text-ink-900">
+            Get started for free with your AI LinkedIn workspace
           </h2>
-          <p className="text-sm text-text-secondary mb-6">
-            Generate posts, manage accounts, and schedule publishing — all in one place.
+          <p className="mx-auto mt-3 max-w-md text-sm text-ink-500">
+            Generate posts, design carousels, run polls, and schedule publishing — all in one place.
           </p>
           <a
-            href="https://app.marquill.com"
-            className="inline-block rounded-full bg-[#1B1C2A] px-6 py-3 text-sm font-semibold text-white shadow-lg"
+            href={appUrl}
+            className="mt-6 inline-flex min-h-12 items-center justify-center rounded-[10px] bg-ink-900 px-6 text-sm font-semibold text-surface transition-opacity hover:opacity-90"
           >
-            Get started free →
+            Get started for free →
           </a>
         </div>
 

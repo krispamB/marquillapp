@@ -1,19 +1,24 @@
-import InformateCarousel from '@/components/InformateCarousel';
+import Hero from '@/components/landing/Hero';
+import MadeWithMark from '@/components/landing/MadeWithMark';
+import WhatMarkMakes from '@/components/landing/WhatMarkMakes';
+import OneWorkspace from '@/components/landing/OneWorkspace';
+import Spotlight from '@/components/landing/Spotlight';
+import Pricing from '@/components/landing/Pricing';
+import ClosingCta from '@/components/landing/ClosingCta';
 import { normalizeAppUrl } from '@/config/urls';
 
 export const metadata = {
-  title: 'Marquill — AI LinkedIn Workspace | Post Generation & Scheduling',
+  title: 'Marquill — Meet Mark, your LinkedIn agent',
   description:
-    'Marquill is the AI LinkedIn workspace built for creators and teams. Generate posts with AI, manage multiple accounts, schedule publishing, and track analytics — all in one place.',
+    'Just tell Mark what to post. He writes it, designs the carousel, builds the poll, and ships it — in your voice, across every account. Marquill is your AI LinkedIn workspace.',
   keywords:
-    'AI LinkedIn workspace, LinkedIn AI workspace, AI LinkedIn content workspace, LinkedIn workspace AI tool, LinkedIn post generator, LinkedIn scheduling tool',
+    'AI LinkedIn agent, AI LinkedIn workspace, LinkedIn post generator, LinkedIn carousels, LinkedIn polls, content scheduling, personal branding',
   alternates: {
     canonical: 'https://marquill.com',
   },
   openGraph: {
-    title: 'Marquill — AI LinkedIn Workspace',
-    description:
-      'Generate LinkedIn posts with AI, manage accounts, and schedule publishing from one workspace.',
+    title: 'Marquill — Meet Mark, your LinkedIn agent',
+    description: 'Just tell Mark what to post. He writes it, designs it, and ships it.',
     type: 'website',
     locale: 'en_US',
     url: 'https://marquill.com',
@@ -21,89 +26,11 @@ export const metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Marquill — AI LinkedIn Workspace',
-    description:
-      'Generate LinkedIn posts with AI, manage accounts, and schedule publishing from one workspace.',
+    title: 'Marquill — Meet Mark, your LinkedIn agent',
+    description: 'Just tell Mark what to post. He writes it, designs it, and ships it.',
     images: ['/og-image.png'],
   },
 };
-
-const stats = [
-  { value: '1.2M+', label: 'Post impressions generated' },
-  { value: '850+', label: 'Active creators & founders' },
-  { value: '4,500', label: 'Posts published weekly' },
-  { value: '6 hrs', label: 'Saved on formatting per week' },
-  { value: '40%', label: 'Avg. engagement increase' },
-];
-
-const pricing = [
-  {
-    name: 'Free',
-    price: '$0',
-    description: 'Get started with core creation and publishing.',
-    features: ['1 LinkedIn account', '5 AI posts / month', '3 scheduled posts queued', '30 days post history'],
-  },
-  {
-    name: 'Starter',
-    price: '$9.99',
-    description: 'For consistent weekly posting.',
-    features: ['1 LinkedIn account', '30 AI posts / month', '10 scheduled posts queued', '90 days post history'],
-  },
-  {
-    name: 'Creator',
-    price: '$19.99',
-    description: 'Best for creators scaling output.',
-    features: ['2 LinkedIn accounts', '100 AI posts / month', '50 scheduled posts queued', '1 year post history'],
-    featured: true,
-  },
-  {
-    name: 'Pro Writer',
-    price: '$29.99',
-    description: 'High-volume teams and agencies.',
-    features: ['10 LinkedIn accounts', 'Unlimited AI posts', 'Unlimited scheduled posts', 'Unlimited post history'],
-  },
-];
-
-const techLogos: Record<string, string> = {
-  linkedin: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770729052/marquill/LinkedIn_Symbol_2_pxns94.webp',
-  claude: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770729120/marquill/claude-color_ag3brm.webp',
-  chatgpt: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770729120/marquill/openai_qrnbyx.webp',
-  perplexity: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770729120/marquill/perplexity-color_olnehj.webp',
-  youtube: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770729022/marquill/YouTube_Symbol_2_yerobm.webp',
-};
-
-const faqs = [
-  {
-    question: 'What makes Marquill different from generic AI writers?',
-    answer:
-      'Marquill turns YouTube research into LinkedIn-ready posts. You can generate, edit, schedule, and publish without leaving the platform.',
-  },
-  {
-    question: 'Can I connect multiple LinkedIn accounts?',
-    answer:
-      'Yes. Connect personal profiles and company pages, then filter drafts and schedules by account.',
-  },
-  {
-    question: 'How does YouTube research work?',
-    answer:
-      'Select a post type, add your topic, and Marquill pulls context from YouTube to build a concise, LinkedIn-length draft.',
-  },
-  {
-    question: 'Can I schedule posts in my local timezone?',
-    answer:
-      'Yes. Scheduling is timezone-aware so you can set local publish times while we store and process in UTC.',
-  },
-  {
-    question: 'What about images?',
-    answer:
-      'Search stock images or upload your own. We handle LinkedIn-ready sizing and attach assets to your post.',
-  },
-  {
-    question: 'Is Marquill an AI LinkedIn workspace?',
-    answer:
-      'Yes — Marquill is purpose-built as an AI LinkedIn workspace. Everything you need to research, draft, schedule, and publish LinkedIn content lives in one place. No tab-switching, no copy-pasting between tools.',
-  },
-];
 
 export default function Home() {
   const appUrl = normalizeAppUrl(process.env.NEXT_PUBLIC_APP_URL);
@@ -117,7 +44,7 @@ export default function Home() {
         applicationCategory: 'BusinessApplication',
         operatingSystem: 'Web',
         description:
-          'Marquill is an AI LinkedIn workspace for post generation, multi-account management, scheduling, and analytics.',
+          'Marquill is an AI LinkedIn workspace. Mark, the LinkedIn agent, drafts posts, designs carousels, builds polls, and schedules publishing across every account.',
         url: 'https://marquill.com',
         offers: [
           { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Free Plan' },
@@ -137,59 +64,6 @@ export default function Home() {
           contactType: 'customer support',
         },
       },
-      {
-        '@type': 'FAQPage',
-        mainEntity: [
-          {
-            '@type': 'Question',
-            name: 'Is Marquill an AI LinkedIn workspace?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Yes — Marquill is purpose-built as an AI LinkedIn workspace. Everything you need to research, draft, schedule, and publish LinkedIn content lives in one place. No tab-switching, no copy-pasting between tools.',
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'What makes Marquill different from generic AI writers?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Marquill turns YouTube research into LinkedIn-ready posts. You can generate, edit, schedule, and publish without leaving the platform.',
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'Can I connect multiple LinkedIn accounts?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Yes. Connect personal profiles and company pages, then filter drafts and schedules by account.',
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'How does YouTube research work?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Select a post type, add your topic, and Marquill pulls context from YouTube to build a concise, LinkedIn-length draft.',
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'Can I schedule posts in my local timezone?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Yes. Scheduling is timezone-aware so you can set local publish times while we store and process in UTC.',
-            },
-          },
-          {
-            '@type': 'Question',
-            name: 'What about images?',
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: 'Search stock images or upload your own. We handle LinkedIn-ready sizing and attach assets to your post.',
-            },
-          },
-        ],
-      },
     ],
   };
 
@@ -199,294 +73,13 @@ export default function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-    <div className="bg-gradient-to-b from-white via-[#F6F2FF] to-[#EAF1FF]">
-      <section className="relative overflow-hidden">
-        <div className="mobile-decor absolute -top-40 right-10 h-80 w-80 rounded-full bg-gradient-to-br from-[#C9D4FF] via-[#D8C8FF] to-[#F2C8FF] opacity-60 blur-3xl" />
-        <div className="mobile-decor absolute top-40 left-10 h-72 w-72 rounded-full bg-gradient-to-br from-[#B7E2FF] via-[#D4E7FF] to-[#E5D9FF] opacity-70 blur-3xl" />
-
-        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 pt-24 pb-24 text-center">
-          <div className="grid grid-cols-1 items-center">
-            <div>
-              <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-2 text-xs font-semibold text-text-secondary shadow-sm">
-                <span className="h-2 w-2 rounded-full bg-[#5B5CF6]" />
-                Built for LinkedIn creators and teams
-              </div>
-              <h1 className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-semibold text-text-primary leading-tight">
-                Your AI LinkedIn workspace,
-                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[#4F5BFF] via-[#7A5BFF] to-[#A56BFF]">
-                  built to publish and perform.
-                </span>
-              </h1>
-              <p className="mt-6 text-lg text-[#3F3E4F] max-w-2xl mx-auto">
-                Marquill is your AI LinkedIn workspace — combining intelligent post generation, multi-account management, and precision scheduling into one clean workflow. Every post you publish is sharp, on-brand, and built to perform.
-              </p>
-              <div className="mt-8 flex flex-wrap justify-center gap-4">
-                <a
-                  href={appUrl}
-                  className="rounded-full bg-[#1B1C2A] px-6 py-3 text-sm font-semibold text-white shadow-lg"
-                  aria-label="Get started now"
-                >
-                  Get started now &rarr;
-                </a>
-                <a
-                  href="#how-it-works"
-                  className="rounded-full border border-[#CBD2FF] bg-white/80 px-6 py-3 text-sm font-semibold text-text-primary"
-                >
-                  See how it works
-                </a>
-              </div>
-              <div className="mt-6 flex items-center justify-center gap-3 text-sm text-text-secondary">
-                <div className="flex -space-x-2">
-                  {['#C8D1FF', '#E1D5FF', '#BBDCFD'].map((color) => (
-                    <span
-                      key={color}
-                      className="h-8 w-8 rounded-full border-2 border-white"
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-                Mobile-optimized for creators on the move.
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="perf-section relative" id="informate">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-20">
-          <InformateCarousel />
-        </div>
-      </section>
-
-      <section id="how-it-works" className="perf-section py-20">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h2 className="text-3xl sm:text-4xl font-semibold text-text-primary">How Marquill Works</h2>
-            <p className="mt-4 text-text-secondary max-w-2xl mx-auto">
-              Three focused steps to go from idea to published LinkedIn post — inside your AI workspace.
-            </p>
-          </div>
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              {
-                title: 'AI post generation',
-                copy: 'A trained workflow that researches, drafts, and refines posts for your voice and audience.',
-                gif: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770688525/marquill/ai-draft_iwqson.gif',
-              },
-              {
-                title: 'Multi-account control',
-                copy: 'Manage and publish across multiple LinkedIn profiles from a single dashboard.',
-                gif: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770688525/marquill/account-linking_cfzuku.gif',
-              },
-              {
-                title: 'Post scheduling',
-                copy: 'Queue and auto-publish at selected times. Your pipeline keeps moving even when you\'re not.',
-                gif: 'https://res.cloudinary.com/dnpvndlmy/image/upload/v1770688525/marquill/publishing_arxvh0.gif',
-              },
-              {
-                title: 'Post analytics',
-                copy: 'Track what lands. Real performance data that feeds back into your next post.',
-                gif: '/images/doodle-outline-317-decrease-hover-pinch.gif',
-              },
-            ].map((card, index) => (
-              <div key={card.title} className="rounded-3xl bg-white/80 p-6 shadow-lg border border-white/70">
-                <div className="h-48 overflow-hidden rounded-2xl border border-slate-200/60 bg-white">
-                  <img
-                    src={card.gif}
-                    alt={`${card.title} demo`}
-                    className="h-full w-full object-contain p-2"
-                    loading="lazy"
-                    decoding="async"
-                    fetchPriority="low"
-                    width={400}
-                    height={400}
-                  />
-                </div>
-                <div className="text-xs font-semibold text-[#5B5CF6]">0{index + 1}</div>
-                <h3 className="mt-3 text-lg font-semibold text-text-primary">{card.title}</h3>
-                <p className="mt-3 text-sm text-text-secondary">{card.copy}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="perf-section py-16">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-10 items-center">
-            <div>
-              <h2 className="text-3xl sm:text-4xl font-semibold text-text-primary">Everything you need to ship</h2>
-              <p className="mt-4 text-text-secondary">
-                Manage drafts, scheduling, images, and publishing inside one AI LinkedIn workspace — without hopping between tools.
-              </p>
-            </div>
-            <div className="orbit-wrap">
-              <div className="orbit-center">
-                {techLogos.linkedin ? (
-                  <img src={techLogos.linkedin} alt="LinkedIn" className="orbit-center-logo" />
-                ) : (
-                  <span className="orbit-placeholder" aria-label="LinkedIn logo placeholder" />
-                )}
-              </div>
-              <div className="orbit-ring">
-                {Object.entries(techLogos)
-                  .filter(([key]) => key !== 'linkedin')
-                  .map(([key, src], index, arr) => (
-                    <div
-                      key={key}
-                      className="orbit-item"
-                      style={{
-                        ['--orbit-angle' as string]: `${index * (360 / arr.length)}deg`,
-                        ['--float-delay' as string]: `${index * 0.5}s`,
-                      }}
-                    >
-                      <div className="orbit-badge">
-                        {src ? (
-                          <img src={src} alt={key} className="orbit-logo" />
-                        ) : (
-                          <span className="orbit-placeholder" aria-label={`${key} logo placeholder`} />
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="perf-section py-20">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-[32px] border border-white/70 bg-white/80 p-10 shadow-2xl">
-            <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 items-center">
-              <div>
-                <h3 className="text-2xl sm:text-3xl font-semibold text-text-primary">
-                  Built for founders, creators, and teams who publish at scale.
-                </h3>
-                <p className="mt-4 text-text-secondary">
-                  Manage multiple LinkedIn accounts, Create posts with a top tier workflow, schedule and publish posts and see post analytics. Marquill
-                  keeps your publishing pipeline steady as output grows.
-                </p>
-                <button className="mt-6 rounded-full bg-[#1B1C2A] px-6 py-3 text-sm font-semibold text-white">
-                  Talk to sales
-                </button>
-              </div>
-              <div className="rounded-3xl bg-[#0F111A] p-6 text-white shadow-xl">
-                <p className="text-sm text-white/70">Customer spotlight</p>
-                <p className="mt-4 text-lg font-semibold">
-                  "Not just a scheduler — an AI workflow that actually understands what makes a LinkedIn post worth reading."
-                </p>
-                <div className="mt-6 flex items-center gap-3">
-                  <span className="h-10 w-10 rounded-full bg-white/20" />
-                  <div>
-                    <div className="text-sm font-semibold">Sade Adebayo</div>
-                    <div className="text-xs text-white/70">Head of Content, Lumen Studio</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-            {stats.map((stat) => (
-              <div key={stat.value} className="rounded-2xl bg-white/80 p-5 text-center shadow-sm">
-                <div className="text-2xl font-semibold text-text-primary">{stat.value}</div>
-                <div className="mt-2 text-xs text-text-secondary">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="pricing" className="perf-section py-20">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <p className="text-sm font-semibold text-[#5B5CF6]">Simple, Transparent Pricing</p>
-            <h2 className="mt-4 text-3xl sm:text-4xl font-semibold text-text-primary">
-              Pick a plan that matches your output
-            </h2>
-            <p className="mt-4 text-text-secondary">
-              Start free. Upgrade as you add accounts and volume.
-            </p>
-          </div>
-
-          <div className="mt-12 grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {pricing.map((plan) => (
-              <div
-                key={plan.name}
-                className={`rounded-3xl border ${
-                  plan.featured
-                    ? 'border-[#5B5CF6] bg-white shadow-2xl scale-[1.02]'
-                    : 'border-white/80 bg-white/80 shadow-lg'
-                } p-8`}
-              >
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-text-primary">{plan.name}</h3>
-                  {plan.featured && (
-                    <span className="rounded-full bg-[#EEF0FF] px-3 py-1 text-xs font-semibold text-[#5B5CF6]">
-                      Most popular
-                    </span>
-                  )}
-                </div>
-                <div className="mt-4 flex items-end gap-2">
-                  <span className="text-3xl font-semibold text-text-primary">{plan.price}</span>
-                  {plan.price !== '$0' && <span className="text-sm text-text-secondary">/month</span>}
-                </div>
-                <p className="mt-3 text-sm text-text-secondary">{plan.description}</p>
-                {plan.featured ? (
-                  <button
-                    className="mt-6 w-full rounded-full bg-[#1B1C2A] px-4 py-3 text-sm font-semibold text-white"
-                  >
-                    Start creator plan
-                  </button>
-                ) : (
-                  <a
-                    href={appUrl}
-                    className="mt-6 block w-full rounded-full border border-[#D8DCFF] px-4 py-3 text-center text-sm font-semibold text-text-primary"
-                    aria-label="Get started now"
-                  >
-                    Get started now &rarr;
-                  </a>
-                )}
-                <ul className="mt-6 space-y-3 text-sm text-text-secondary">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-[#5B5CF6]" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="faq" className="perf-section py-20">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h2 className="text-3xl sm:text-4xl font-semibold text-text-primary">
-              Frequently Asked Questions
-            </h2>
-            <p className="mt-3 text-text-secondary">Everything you need to know before you launch.</p>
-          </div>
-          <div className="mt-10 space-y-4">
-            {faqs.map((faq) => (
-              <details
-                key={faq.question}
-                className="group rounded-2xl border border-white/70 bg-white/80 p-6 shadow-sm"
-              >
-                <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold text-text-primary">
-                  {faq.question}
-                  <span className="text-[#5B5CF6] group-open:rotate-180 transition-transform">⌃</span>
-                </summary>
-                <p className="mt-4 text-sm text-text-secondary">{faq.answer}</p>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
-    </div>
+      <Hero />
+      <MadeWithMark />
+      <WhatMarkMakes />
+      <OneWorkspace />
+      <Spotlight />
+      <Pricing appUrl={appUrl} />
+      <ClosingCta appUrl={appUrl} />
     </>
   );
 }

@@ -1,15 +1,238 @@
 @import "tailwindcss";
 
-@theme {
-  --color-primary: #5B5CF6;
-  --color-secondary: #1C1B27;
-  --color-accent: #7B8CFF;
-  --color-background: #F8F7FF;
-  --color-surface: #FFFFFF;
-  --color-text-primary: #12111A;
-  --color-text-secondary: #5A5868;
+/* ============================================================
+   MARQUILL — design tokens (ported from the Pulse design system)
+   Warm-neutral monochrome canvas + a single blue accent.
+   Dark is the page default; development can opt into light via the toggle.
+   ============================================================ */
+
+:root {
+  /* Type families — wired to the next/font variables set on <html> */
+  --font-sans: var(--font-inter), "Helvetica Neue", Helvetica, "Inter", Arial, sans-serif;
+  --font-mono: var(--font-jbmono), "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  /* Wordmark candidate faces (all Google Fonts via next/font) */
+  --font-special-elite:   var(--font-special-elite-raw), "Courier New", monospace;
+  --font-courier-prime:   var(--font-courier-prime-raw), "Courier New", monospace;
+  --font-source-code-pro: var(--font-source-code-pro-raw), ui-monospace, monospace;
+
+  /* Brand mark — tile / glyph flip with the theme; dot stays LinkedIn blue */
+  --mq-tile:  #0a0a0a;
+  --mq-glyph: #ffffff;
+  --mq-dot:   #0a66c2;
+
+  /* Neutral ink + canvas */
+  --canvas:      #f6f6f4;
+  --canvas-sub:  #efefec;
+  --surface:     #ffffff;
+  --surface-2:   #fbfbfa;
+
+  --ink-900:     #0a0a0a;
+  --ink-800:     #1a1a19;
+  --ink-700:     #3a3a38;
+  --ink-500:     #76766f;
+  --ink-400:     #9a9a93;
+  --ink-300:     #c2c2bb;
+
+  --line:        #e7e7e3;
+  --line-strong: #dcdcd6;
+  --line-faint:  #f0f0ec;
+
+  /* Inverse (spotlight panel / dark surfaces) */
+  --inverse-bg:   #111110;
+  --inverse-fg:   #f4f4f1;
+  --inverse-fg-2: #a0a09a;
+  --inverse-line: #2c2c29;
+
+  /* Single brand accent — blue (the design's default preset) */
+  --accent:      #2a6fdb;
+  --accent-soft: rgba(42, 111, 219, 0.12);
+  --accent-ink:  #1f56b0;
+
+  /* Elevation */
+  --sh-xs: 0 1px 2px rgba(16,16,15,.04);
+  --sh-sm: 0 1px 2px rgba(16,16,15,.05), 0 1px 3px rgba(16,16,15,.04);
+  --sh-md: 0 2px 4px rgba(16,16,15,.04), 0 4px 12px rgba(16,16,15,.06);
+  --sh-lg: 0 8px 24px rgba(16,16,15,.10), 0 2px 6px rgba(16,16,15,.05);
+  --sh-pop: 0 12px 32px rgba(16,16,15,.18), 0 4px 10px rgba(16,16,15,.10);
+
+  --ease: cubic-bezier(.2, .6, .2, 1);
 }
 
+[data-theme="dark"] {
+  --mq-tile:  #ffffff;
+  --mq-glyph: #0a0a0a;
+
+  --canvas:      #0c0c0b;
+  --canvas-sub:  #181816;
+  --surface:     #161614;
+  --surface-2:   #1e1e1b;
+
+  --ink-900:     #f4f4f1;
+  --ink-800:     #e4e4df;
+  --ink-700:     #c6c6bf;
+  --ink-500:     #8f8f88;
+  --ink-400:     #6d6d66;
+  --ink-300:     #45453f;
+
+  --line:        #262624;
+  --line-strong: #34342f;
+  --line-faint:  #1d1d1a;
+
+  --inverse-bg:   #f4f4f1;
+  --inverse-fg:   #0a0a0a;
+  --inverse-fg-2: #57574f;
+  --inverse-line: #d8d8d2;
+
+  --accent:      #5a90f2;
+  --accent-soft: rgba(90, 144, 242, 0.16);
+  --accent-ink:  #5a90f2;
+
+  --sh-xs: 0 1px 2px rgba(0,0,0,.40);
+  --sh-sm: 0 1px 2px rgba(0,0,0,.40), 0 1px 3px rgba(0,0,0,.30);
+  --sh-md: 0 2px 4px rgba(0,0,0,.40), 0 4px 12px rgba(0,0,0,.45);
+  --sh-lg: 0 8px 24px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.40);
+  --sh-pop: 0 12px 32px rgba(0,0,0,.65), 0 4px 10px rgba(0,0,0,.50);
+}
+
+/* ------------------------------------------------------------
+   Expose tokens to Tailwind utilities. `inline` keeps the
+   var() reference so utilities re-resolve when the theme flips.
+   ------------------------------------------------------------ */
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --color-canvas: var(--canvas);
+  --color-canvas-sub: var(--canvas-sub);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+
+  --color-ink-900: var(--ink-900);
+  --color-ink-800: var(--ink-800);
+  --color-ink-700: var(--ink-700);
+  --color-ink-500: var(--ink-500);
+  --color-ink-400: var(--ink-400);
+  --color-ink-300: var(--ink-300);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-line-faint: var(--line-faint);
+
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+
+  --color-inverse-bg: var(--inverse-bg);
+  --color-inverse-fg: var(--inverse-fg);
+  --color-inverse-fg-2: var(--inverse-fg-2);
+  --color-inverse-line: var(--inverse-line);
+
+  /* Legacy names kept so the other pages adopt the new brand palette */
+  --color-primary: var(--accent);
+  --color-secondary: var(--ink-800);
+  --color-background: var(--canvas);
+  --color-text-primary: var(--ink-900);
+  --color-text-secondary: var(--ink-500);
+
+  --shadow-xs: var(--sh-xs);
+  --shadow-sm: var(--sh-sm);
+  --shadow-md: var(--sh-md);
+  --shadow-lg: var(--sh-lg);
+  --shadow-pop: var(--sh-pop);
+}
+
+@layer utilities {
+  .ff-mono { font-family: var(--font-mono); }
+  .ff-sans { font-family: var(--font-sans); }
+}
+
+/* The mark assets are static SVGs; layer the dark-theme variation only when
+   the component is allowed to follow the active theme. */
+.mq-mark { display: inline-grid; flex: none; }
+.mq-mark > img { grid-area: 1 / 1; width: 100%; height: 100%; }
+.mq-mark__light { display: none; }
+[data-theme="dark"] .mq-mark--auto > img:first-child { display: none; }
+[data-theme="dark"] .mq-mark--auto > .mq-mark__light { display: block; }
+
+/* ============================================================
+   Article / long-form markdown (blog posts, legal copy)
+   Token-driven so it adapts to light + dark.
+   ============================================================ */
+.article { color: var(--ink-700); font-size: 17px; line-height: 1.7; }
+.article > * + * { margin-top: 1rem; }
+.article h2 {
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink-900);
+}
+.article h3 {
+  margin-top: 2rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ink-900);
+}
+.article p { color: var(--ink-700); }
+.article a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.article a:hover { text-decoration: underline; }
+.article strong { color: var(--ink-900); font-weight: 600; }
+.article ul, .article ol { padding-left: 1.5rem; margin-top: 1rem; }
+.article ul { list-style: disc; }
+.article ol { list-style: decimal; }
+.article li { color: var(--ink-700); margin-top: 0.5rem; }
+.article li::marker { color: var(--ink-400); }
+.article blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 1rem;
+  color: var(--ink-500);
+  font-style: italic;
+}
+.article code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--canvas-sub);
+  color: var(--ink-900);
+  padding: 0.15em 0.4em;
+  border-radius: 6px;
+}
+.article pre {
+  background: var(--canvas-sub);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem;
+  overflow-x: auto;
+}
+.article pre code { background: none; padding: 0; }
+.article table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 0.95rem; }
+.article th, .article td { border: 1px solid var(--line); padding: 0.5rem 1rem; text-align: left; }
+.article th { background: var(--canvas-sub); color: var(--ink-900); font-weight: 600; }
+.article td { color: var(--ink-700); }
+.article hr { border: none; border-top: 1px solid var(--line); margin: 2rem 0; }
+
+/* ============================================================
+   Animations
+   ============================================================ */
+@keyframes mqPulse   { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.55); opacity: .5; } }
+@keyframes mqBlink   { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+@keyframes mqMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes mqFloat   { 0%,100% { transform: translateY(-7px); } 50% { transform: translateY(7px); } }
+
+.animate-mq-pulse   { animation: mqPulse 1.8s var(--ease) infinite; }
+.animate-mq-blink   { animation: mqBlink 1.05s step-end infinite; }
+.animate-mq-marquee { animation: mqMarquee 46s linear infinite; }
+.animate-mq-float   { animation: mqFloat 8s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-mq-pulse, .animate-mq-blink, .animate-mq-marquee, .animate-mq-float { animation: none; }
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
 @layer base {
   html {
     scroll-behavior: smooth;
@@ -17,44 +240,38 @@
   }
 
   body {
-    font-family: var(--font-sofia-sans), sans-serif;
-    color: var(--color-text-primary);
-    background-color: var(--color-background);
+    font-family: var(--font-sans);
+    color: var(--ink-800);
+    background-color: var(--canvas);
+    -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     overflow-x: hidden;
   }
 
+  ::selection { background: var(--accent-soft); }
+
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-sora), sans-serif;
+    font-family: var(--font-sans);
+    color: var(--ink-900);
     letter-spacing: -0.02em;
   }
 
-  /* Skip to content link - hidden by default, visible on focus */
   .skip-to-content {
     position: absolute;
-    top: -40px;
+    top: -48px;
     left: 0;
-    background: var(--color-primary);
-    color: white;
+    background: var(--ink-900);
+    color: var(--surface);
     padding: 8px 16px;
     text-decoration: none;
     z-index: 100;
-    border-radius: 0 0 4px 0;
+    border-radius: 0 0 8px 0;
   }
+  .skip-to-content:focus { top: 0; }
 
-  .skip-to-content:focus {
-    top: 0;
-  }
-
-  /* Enhanced focus visible styles for keyboard navigation */
   *:focus-visible {
-    outline: 2px solid var(--color-primary);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
-  }
-
-  .informate-carousel {
-    position: relative;
-    height: 100%;
   }
 
   .perf-section {
@@ -62,256 +279,12 @@
     contain-intrinsic-size: 800px;
   }
 
-  .informate-card {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    width: min(300px, 90vw);
-    transform: translateX(calc(-50% + var(--offset))) scale(var(--scale));
-    opacity: var(--opacity);
-    z-index: var(--z);
-    transition: transform 0.8s ease, opacity 0.8s ease;
-  }
-
-  .informate-card-shell {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    border-radius: 24px;
-    border: 1px solid rgba(226, 232, 240, 0.7);
-    background: rgba(255, 255, 255, 0.9);
-    padding: 16px;
-    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
-  }
-
-  .informate-media {
-    height: 176px;
-  }
-
-  @media (max-width: 768px) {
-    .informate-card {
-      width: min(92vw, 360px);
-      height: 70vh;
-    }
-
-    .informate-media {
-      flex: 1;
-      min-height: 260px;
-    }
-  }
-
-  .reaction-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    border-radius: 999px;
-    background: white;
-    padding: 6px 10px;
-    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
-  }
-
-  .reaction-dot {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    color: white;
-    font-size: 12px;
-  }
-
-  .reaction-comment {
-    display: inline-flex;
-    align-items: center;
-    border-radius: 999px;
-    background: white;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #3f3e4f;
-    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
-  }
-
-  @keyframes floatUp {
-    0% {
-      transform: translateY(20px);
-      opacity: 0;
-    }
-    15% {
-      opacity: 1;
-    }
-    80% {
-      opacity: 0.9;
-    }
-    100% {
-      transform: translateY(-120px);
-      opacity: 0;
-    }
-  }
-
-  .float-reaction {
-    animation: floatUp 6s ease-in-out infinite;
-  }
-
-  .float-delay-1 {
-    animation-delay: 0s;
-  }
-
-  .float-delay-2 {
-    animation-delay: 1.4s;
-  }
-
-  .float-delay-3 {
-    animation-delay: 2.8s;
-  }
-
-  .float-delay-4 {
-    animation-delay: 4.2s;
-  }
-
-  .orbit-wrap {
-    position: relative;
-    height: 320px;
-    display: grid;
-    place-items: center;
-  }
-
-  .orbit-center {
-    position: relative;
-    z-index: 2;
-    height: 88px;
-    width: 88px;
-    border-radius: 50%;
-    background: white;
-    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
-    display: grid;
-    place-items: center;
-  }
-
-  .orbit-center-logo {
-    height: 48px;
-    width: 48px;
-    object-fit: contain;
-  }
-
-  .orbit-placeholder {
-    height: 24px;
-    width: 24px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, rgba(226, 232, 240, 0.9), rgba(199, 210, 254, 0.8));
-    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.35);
-  }
-
-  .orbit-ring {
-    position: absolute;
-    inset: 0;
-    animation: orbitSpin 18s linear infinite;
-  }
-
-  .orbit-item {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: rotate(var(--orbit-angle)) translateX(120px);
-  }
-
-  .orbit-badge {
-    height: 56px;
-    width: 56px;
-    border-radius: 50%;
-    background: white;
-    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
-    display: grid;
-    place-items: center;
-    animation: orbitFloat 4s ease-in-out infinite;
-    animation-delay: var(--float-delay);
-  }
-
-  .orbit-logo {
-    height: 32px;
-    width: 32px;
-    object-fit: contain;
-  }
-
-  @keyframes orbitSpin {
-    from {
-      transform: rotate(0deg);
-    }
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  @keyframes orbitFloat {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-6px);
-    }
-  }
-
-  @media (max-width: 768px) {
-    .orbit-wrap {
-      height: 260px;
-    }
-
-    .orbit-item {
-      transform: rotate(var(--orbit-angle)) translateX(95px);
-    }
-
-    .orbit-badge {
-      height: 48px;
-      width: 48px;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .informate-card {
-      transition: none;
-    }
-
-    .float-reaction {
-      animation: none;
-    }
-  }
-
-  @media (max-width: 768px) {
-    .mobile-blur-off {
-      backdrop-filter: none !important;
-      -webkit-backdrop-filter: none !important;
-      background-color: rgba(255, 255, 255, 0.9);
-    }
-
-    .mobile-decor {
-      filter: blur(12px);
-      opacity: 0.4;
-    }
-
-    .informate-card-shell {
-      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.12);
-    }
-
-    .float-reaction {
-      animation: none;
-      opacity: 0.9;
-    }
-  }
-
-  .informate-carousel[data-ios='true'] .informate-card {
-    transition: none;
-  }
-
-  /* Ensure minimum touch target size for mobile */
   @media (max-width: 768px) {
     button,
     a[role="button"],
     input[type="button"],
     input[type="submit"] {
       min-height: 44px;
-      min-width: 44px;
     }
   }
 }

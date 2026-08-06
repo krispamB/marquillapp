@@ -11,8 +11,8 @@ export const metadata: Metadata = {
 
 export default function RefundPolicyPage() {
   return (
-    <article className="min-h-screen bg-white">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16">
+    <article className="min-h-screen bg-canvas">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-16">
         <h1 className="text-4xl font-bold text-text-primary mb-4">Refund Policy</h1>
         <p className="text-sm text-text-secondary mb-12">Last Updated: 12 April 2026</p>
 
@@ -74,9 +74,9 @@ export default function RefundPolicyPage() {
             <p className="text-text-secondary leading-relaxed mb-4">
               Questions about our refund policy? We&apos;re happy to help.
             </p>
-            <div className="bg-surface p-6 rounded-lg mt-4">
+            <div className="bg-canvas-sub border border-line p-6 rounded-xl mt-4">
               <p className="text-text-secondary">
-                <strong>Email:</strong> hello@marquill.com
+                <strong className="text-text-primary">Email:</strong> hello@marquill.com
               </p>
             </div>
           </section>
