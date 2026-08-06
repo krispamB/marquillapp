@@ -4,7 +4,7 @@
 import { ChangeEvent, useRef } from "react";
 import Image from "next/image";
 import { ImagePlus, LoaderCircle, RefreshCw, Trash2, Upload } from "lucide-react";
-import type { PostMediaItem } from "../lib/types";
+import type { ComposerPostMediaItem } from "./postMedia";
 import { mediaStatusLabel, type MediaWorkflowPhase } from "./usePostMediaWorkflow";
 
 type VisibleMediaWorkflowPhase = MediaWorkflowPhase | "preparing";
@@ -26,12 +26,12 @@ export default function PostMediaControls({
   isBusy: boolean;
   phase: VisibleMediaWorkflowPhase;
   readOnly?: boolean;
-  media: PostMediaItem[];
+  media: ComposerPostMediaItem[];
   previewUrls: Record<string, string>;
   uploadProgress: number | null;
   onChooseStock: (provider: "pexels" | "unsplash") => void;
   onRefresh: () => void;
-  onRemove: (item: PostMediaItem) => void;
+  onRemove: (item: ComposerPostMediaItem) => void;
   onUpload: (files: File[]) => Promise<boolean>;
 }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);

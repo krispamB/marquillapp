@@ -10,6 +10,10 @@ import type {
 import type { ArtifactType } from "./artifactTypes";
 import { API_BASE, jsonRequest, readApi, sleep } from "./api";
 import {
+  normalizePostMedia,
+  type ComposerPostMediaItem,
+} from "./postMedia";
+import {
   deleteCachedMediaPreview,
   readCachedMediaPreview,
   writeCachedMediaPreview,
@@ -23,7 +27,7 @@ import {
 const MAX_FILE_BYTES = 200 * 1024 * 1024;
 const allowedTypes = new Set(["image/jpeg", "image/png", "video/mp4"]);
 
-function validateFiles(files: File[], media: PostMediaItem[]) {
+function validateFiles(files: File[], media: ComposerPostMediaItem[]) {
   if (!files.length) throw new Error("Choose at least one file.");
   const invalid = files.find((file) => !allowedTypes.has(file.type));
   if (invalid) throw new Error(`${invalid.name} must be a JPEG, PNG, or MP4 file.`);
@@ -36,7 +40,7 @@ function validateFiles(files: File[], media: PostMediaItem[]) {
   if (!containsVideo && media.length + files.length > 20) throw new Error("A post can contain at most 20 images.");
 }
 
-export function mediaStatusLabel(item: PostMediaItem) {
+export function mediaStatusLabel(item: ComposerPostMediaItem) {
   if (item.status === "FAILED") return "Upload failed";
   if (item.status === "READY") return item.type === "VIDEO" ? "Video ready" : "Image ready";
   return item.status === "PENDING" ? "Waiting to upload" : "Processing for LinkedIn";
@@ -59,7 +63,7 @@ export default function usePostMediaWorkflow({
   request?: typeof readApi;
   upload?: UploadFileToUrl;
 }) {
-  const [media, setMedia] = useState<PostMediaItem[]>(initialMedia);
+  const [media, setMedia] = useState<ComposerPostMediaItem[]>(() => normalizePostMedia(initialMedia));
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [isMutating, setIsMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +94,7 @@ export default function usePostMediaWorkflow({
   async function refreshMedia() {
     if (!postId) return [];
     const response = await request<PostDetailResponse>(`${API_BASE}/posts/${postId}`);
-    const next = response.data?.media ?? [];
+    const next = normalizePostMedia(response.data?.media ?? []);
     setMedia(next);
     return next;
   }
@@ -105,7 +109,7 @@ export default function usePostMediaWorkflow({
         if (cancelled) return;
         try {
           const response = await request<PostDetailResponse>(`${API_BASE}/posts/${postId}`);
-          const next = response.data?.media ?? [];
+          const next = normalizePostMedia(response.data?.media ?? []);
           if (cancelled) return;
           setMedia(next);
           if (!next.some((item) => item.status === "PENDING" || item.status === "UPLOADING")) return;
@@ -172,7 +176,7 @@ export default function usePostMediaWorkflow({
       const slots = declared.data?.uploads ?? [];
       if (slots.length !== files.length) throw new Error("The upload service did not return a slot for every file.");
       declaredMediaIds = slots.map((slot) => slot.mediaId);
-      setMedia((current) => [...current, ...slots.map((slot, index): PostMediaItem => ({ id: slot.mediaId, type: files[index].type === "video/mp4" ? "VIDEO" : "IMAGE", status: "PENDING", title: files[index].name, mimeType: files[index].type, sizeBytes: files[index].size }))]);
+      setMedia((current) => [...current, ...slots.map((slot, index): ComposerPostMediaItem => ({ id: slot.mediaId, type: files[index].type === "video/mp4" ? "VIDEO" : "IMAGE", status: "PENDING", title: files[index].name, mimeType: files[index].type, sizeBytes: files[index].size }))]);
       const loadedBytesByFile = files.map(() => 0);
       setUploadProgress(0);
       setIsUploading(true);
@@ -207,13 +211,13 @@ export default function usePostMediaWorkflow({
     }
   }
 
-  async function removeMedia(item: PostMediaItem) {
+  async function removeMedia(item: ComposerPostMediaItem) {
     if (!postId) return;
     setIsMutating(true);
     setError(null);
     try {
       const response = await request<{ data?: PostMediaItem[] }>(`${API_BASE}/posts/${postId}/media/${item.id}`, { method: "DELETE" });
-      setMedia((current) => Array.isArray(response.data) ? response.data : current.filter((candidate) => candidate.id !== item.id));
+      setMedia((current) => Array.isArray(response.data) ? normalizePostMedia(response.data) : current.filter((candidate) => candidate.id !== item.id));
       previewRequestedRef.current.delete(item.id);
       setPreviewUrls((current) => { const next = { ...current }; delete next[item.id]; return next; });
       deleteCachedMediaPreview(item.id);
@@ -242,7 +246,7 @@ export default function usePostMediaWorkflow({
       }
     },
     removeMedia,
-    replaceMedia: setMedia,
+    replaceMedia: (items: PostMediaItem[]) => setMedia(normalizePostMedia(items)),
     uploadFiles,
   };
 }

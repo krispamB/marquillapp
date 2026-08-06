@@ -2,9 +2,10 @@
 /* eslint-disable @next/next/no-img-element -- account and media previews use dynamic external URLs. */
 
 import { MoreHorizontal } from "lucide-react";
-import type { ConnectedAccount, PostMediaItem, UserProfile } from "../lib/types";
+import type { ConnectedAccount, UserProfile } from "../lib/types";
 import type { ArtifactDetailData } from "./artifactTypes";
 import { ArtifactContentView } from "./ArtifactCompositionContent";
+import type { ComposerPostMediaItem } from "./postMedia";
 
 export default function PostCompositionPreview({
   user,
@@ -16,7 +17,7 @@ export default function PostCompositionPreview({
   user: UserProfile;
   account?: ConnectedAccount;
   artifact: ArtifactDetailData;
-  media: PostMediaItem[];
+  media: ComposerPostMediaItem[];
   previewUrls: Record<string, string>;
 }) {
   const displayName = account?.displayName ?? user.name;
