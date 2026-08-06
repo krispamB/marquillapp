@@ -1,3 +1,5 @@
+import type { ArtifactContent } from "./artifact-content";
+
 export type TierLimits = {
   postsPerMonth?: number;
   toneAnalysis?: boolean;
@@ -6,6 +8,7 @@ export type TierLimits = {
 
 export type TierMetadata = {
   description?: string;
+  features?: string[];
   limits?: TierLimits;
 };
 
@@ -16,6 +19,7 @@ export type Tier = {
   yearlyPrice: number;
   isDefault: boolean;
   isActive: boolean;
+  paddleMonthlyPriceId?: string;
   metadata?: TierMetadata;
   createdAt?: string;
   updatedAt?: string;
@@ -28,6 +32,11 @@ export type UserProfile = {
   email: string;
   avatar?: string;
   tier?: Tier | null;
+};
+
+export type SubscriptionTier = {
+  name: string;
+  isDefault?: boolean;
 };
 
 export type UserApiResponse = UserProfile & {
@@ -74,6 +83,7 @@ export type ConnectedAccountsResponse = {
   data?: Array<{
     _id: string;
     provider: ConnectedAccountProvider;
+    accountType?: ConnectedAccountType;
     accessTokenExpiresAt?: string;
     displayName?: string;
     avatarUrl?: string;
@@ -106,6 +116,11 @@ export type PaymentUsageData = {
     source: string;
   };
   usage: Record<string, PaymentUsageMetric>;
+  artifactsCreated: {
+    posts: number;
+    polls: number;
+    documents: number;
+  };
 };
 
 export type PaymentUsageResponse = {
@@ -130,7 +145,9 @@ export type PostMetricsResponse = {
 
 export type DashboardPost = {
   _id: string;
+  title?: string;
   connectedAccount?: string;
+  connectedAccountName?: string;
   status?: string;
   type?: "quickPostLinkedin" | "insightPostLinkedin" | string;
   content?: string;
@@ -142,6 +159,7 @@ export type DashboardPost = {
     publishedAt?: string;
   }>;
   scheduledAt?: string;
+  publishedAt?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -156,7 +174,27 @@ export type DashboardPostsResponse = {
   };
 };
 
-export type PostStatus = "DRAFT" | "SCHEDULED" | "PUBLISHED";
+export type PostComparisonData = {
+  current: { month: string; count: number };
+  previous: { month: string; count: number };
+  difference: number;
+  percentageChange: number | null;
+};
+
+export type PostComparisonResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: PostComparisonData;
+};
+
+export type DashboardInitialData = {
+  usage: PaymentUsageData | null;
+  comparison: PostComparisonData | null;
+  scheduledPosts: DashboardPost[];
+  errors: string[];
+};
+
+export type PostStatus = "DRAFT" | "SCHEDULED" | "PUBLISHED" | "FAILED";
 
 export enum StylePreset {
   PROFESSIONAL = 'professional',
@@ -228,12 +266,43 @@ export class FeatureLimitExceededError extends Error {
 
 export type PostDetailData = {
   _id?: string;
+  title?: string;
   type?: string;
   status?: string;
   content?: string;
   media?: PostMediaItem[];
+  scheduledAt?: string;
+  failureReason?: string;
   createdAt?: string;
   updatedAt?: string;
+  connectedAccount?: {
+    _id?: string;
+    provider?: ConnectedAccountProvider;
+    displayName?: string;
+    accountType?: ConnectedAccountType | "PERSON";
+    avatarUrl?: string;
+    vanityName?: string;
+    headline?: string;
+    profile?: ConnectedAccountProfile;
+    isActive?: boolean;
+  };
+  artifacts?: Array<{
+    artifact?: {
+      _id?: string;
+      type?: string;
+      title?: string;
+      source?: {
+        prompt?: string;
+      };
+    };
+    version?: {
+      version?: number;
+      status?: string;
+      content?: ArtifactContent;
+      createdAt?: string;
+      editedAt?: string;
+    };
+  }>;
 };
 
 export type PostDetailResponse = {
@@ -313,20 +382,58 @@ export type PostMediaItem = {
   title?: string;
   altText?: string;
   _id?: string;
+  linkedinUrn?: string;
   type?: "IMAGE" | "VIDEO";
   // Absent on entries that predate async uploads — treat absent as "READY".
   status?: MediaUploadStatus;
+  mimeType?: string;
+  sizeBytes?: number;
+  pendingExpiresAt?: string;
 };
 
 export type LinkedinImageDetailsData = {
   downloadUrl?: string;
-  downloadUrlExpiresAt?: number;
+  downloadUrlExpiresAt?: number | string;
 };
 
 export type LinkedinImageDetailsResponse = {
   statusCode?: number;
   message?: string;
   data?: LinkedinImageDetailsData;
+};
+
+export type CreatePostRequest = {
+  title?: string;
+  artifactId: string;
+  version?: number;
+  connectedAccount: string;
+};
+
+export type PostMutationResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: PostDetailData;
+};
+
+export type PostMediaUploadSlot = {
+  mediaId: string;
+  uploadUrl: string;
+  requiredHeaders: Record<string, string>;
+};
+
+export type CreatePostMediaUploadsResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: {
+    expiresAt: string;
+    uploads: PostMediaUploadSlot[];
+  };
+};
+
+export type CompletePostMediaUploadsResponse = {
+  statusCode?: number;
+  message?: string;
+  data?: PostMediaItem[] | PostDetailData;
 };
 
 // ─── LinkedIn Organization / Company Page ────────────────────────────────────

@@ -1,17 +1,26 @@
 import type { Metadata } from "next";
-import { Sora, Sofia_Sans } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { ClerkProvider } from "@clerk/nextjs";
+import { Courier_Prime, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const sora = Sora({
-  variable: "--font-sora",
+const inter = Inter({
   subsets: ["latin"],
+  variable: "--font-inter-raw",
+  display: "swap",
 });
 
-const sofiaSans = Sofia_Sans({
-  variable: "--font-sofia-sans",
+const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
+  variable: "--font-jetbrains-mono-raw",
+  display: "swap",
+});
+
+const courierPrime = Courier_Prime({
+  subsets: ["latin"],
+  variable: "--font-courier-prime-raw",
+  weight: ["400", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -19,6 +28,9 @@ export const metadata: Metadata = {
   description:
     'Marquill helps LinkedIn creators generate posts from YouTube research, schedule content, and publish faster.',
   keywords: 'LinkedIn content, AI post generator, YouTube research, scheduling, publishing',
+  icons: {
+    icon: '/icon-light.svg',
+  },
   openGraph: {
     title: 'Marquill - AI-Powered LinkedIn Content Platform',
     description: 'Generate LinkedIn posts from YouTube research, schedule, and publish in one place.',
@@ -39,8 +51,19 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en">
-        <body suppressHydrationWarning className={`${sora.variable} ${sofiaSans.variable} antialiased`}>
+      <html
+        lang="en"
+        suppressHydrationWarning
+        className={`${inter.variable} ${jetbrainsMono.variable} ${courierPrime.variable}`}
+      >
+        <head>
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `(function(){try{var t=localStorage.getItem('marquill-theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}})()`,
+            }}
+          />
+        </head>
+        <body suppressHydrationWarning className="antialiased">
           {children}
           <Analytics />
         </body>

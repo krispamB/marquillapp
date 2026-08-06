@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { User, Briefcase, PlusCircle, CheckCircle2, ArrowRight, ShieldCheck, EyeOff, Settings2 } from "lucide-react";
 import { apiFetch } from "../lib/api";
-import { RadioTile, GoalTile, Chip, Icon } from "./components";
+import { RadioTile, GoalTile, Chip } from "./components";
 import type { OnboardingData } from "./OnboardingClient";
 import { CADENCE_DEFAULTS } from "./OnboardingClient";
 import { DayOfWeek } from "./types";
@@ -18,7 +18,7 @@ export const PERSONA_OPTIONS = [
 ] as const;
 
 export const EXPERIENCE_OPTIONS = [
-  { key: "new",      icon: "sparkles",    title: "Just getting started", sub: "Under 500 followers — finding my voice." },
+  { key: "new",      icon: "rocket",      title: "Just getting started", sub: "Under 500 followers — finding my voice." },
   { key: "building", icon: "trending-up", title: "Building momentum",    sub: "500 – 5,000 followers — posting semi-regularly." },
   { key: "seasoned", icon: "badge-check", title: "Seasoned creator",     sub: "5,000+ followers — I want to stay consistent." },
 ] as const;
@@ -34,14 +34,14 @@ export const GOALS_CREATOR = [
   { key: "followers",   icon: "users",          title: "Grow my audience",       sub: "Reach more people in my space." },
   { key: "leadership",  icon: "lightbulb",      title: "Thought leadership",     sub: "Be known for a point of view." },
   { key: "leads",       icon: "target",         title: "Generate leads",         sub: "Turn attention into pipeline." },
-  { key: "brand",       icon: "sparkles",       title: "Build personal brand",   sub: "Show up as myself, consistently." },
+  { key: "brand",       icon: "megaphone",      title: "Build personal brand",   sub: "Show up as myself, consistently." },
   { key: "hiring",      icon: "briefcase",      title: "Hiring & opportunities", sub: "Attract talent or roles." },
   { key: "community",   icon: "message-circle", title: "Build community",        sub: "Conversation, not broadcast." },
 ];
 
 export const GOALS_WRITER = [
   { key: "volume",      icon: "layers",         title: "Scale output",     sub: "Serve more clients without burning out." },
-  { key: "quality",     icon: "sparkles",       title: "Sharper drafts",   sub: "Client-ready first drafts, faster." },
+  { key: "quality",     icon: "pen-line",       title: "Sharper drafts",   sub: "Client-ready first drafts, faster." },
   { key: "consistency", icon: "calendar-check", title: "Hit schedules",    sub: "Never miss a client's posting day." },
   { key: "handoff",     icon: "send",           title: "Cleaner handoff",  sub: "Drafts clients actually approve." },
   { key: "voice",       icon: "mic",            title: "Match each voice", sub: "Adapt tone per client." },
@@ -443,8 +443,8 @@ export function StepConnect({ data, update }: StepConnectProps) {
         type="button"
         className="connect-card"
         style={{
-          borderColor: data.connected ? "var(--color-primary)" : "var(--color-border)",
-          boxShadow: data.connected ? "0 0 0 4px rgba(91,92,246,0.10)" : "none",
+          borderColor: data.connected ? "var(--accent)" : "var(--color-border)",
+          boxShadow: data.connected ? "0 0 0 4px var(--accent-soft)" : "none",
           opacity: isConnecting ? 0.7 : 1,
           cursor: data.connected || isConnecting ? "default" : "pointer",
         }}
@@ -460,7 +460,7 @@ export function StepConnect({ data, update }: StepConnectProps) {
           <span className="c-sub">{subLine[data.persona] ?? subLine.creator}</span>
         </span>
         {data.connected
-          ? <CheckCircle2 size={22} color="#5B5CF6" />
+          ? <CheckCircle2 size={22} color="var(--accent)" />
           : <ArrowRight size={18} />}
       </button>
 
@@ -472,7 +472,7 @@ export function StepConnect({ data, update }: StepConnectProps) {
 
       {isWriter && data.connected && (
         <div className="multi-hint">
-          <PlusCircle size={16} color="#5B5CF6" />
+          <PlusCircle size={16} color="var(--accent)" />
           <span>Add more clients from the dashboard — each gets its own workspace, voice, and schedule.</span>
         </div>
       )}

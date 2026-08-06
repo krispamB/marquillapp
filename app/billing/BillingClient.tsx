@@ -256,7 +256,7 @@ export default function BillingClient({
 
                                             <div className="shrink-0 pt-2 lg:pt-0">
                                                 <Link
-                                                    href="/pricing"
+                                                    href="/billing#change-plan"
                                                     className="inline-flex w-full sm:w-auto items-center justify-center rounded-full bg-[#1C1B27] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_8px_20px_-8px_rgba(28,27,39,0.55)] transition-all hover:bg-slate-800 hover:-translate-y-0.5"
                                                 >
                                                     Upgrade plan

@@ -6,7 +6,10 @@ import { apiFetch } from "../lib/api";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import "./onboarding.css";
 import { revalidateUserCache } from "../lib/actions";
-import { BrandRow, LocalOrbs, Progress, SuccessToast } from "./components";
+import type { OnboardingProfile } from "../lib/onboarding";
+import { Progress, SuccessToast } from "./components";
+import MarquillLockup from "../../components/brand/MarquillLockup";
+import ThemeToggle from "../redesign/ThemeToggle";
 import {
   StepPersona,
   StepProfile,
@@ -96,59 +99,60 @@ const INITIAL_DATA: OnboardingData = {
 // ── Validation ──
 
 function canAdvance(step: number, data: OnboardingData): boolean {
-  if (step === 1) return !!data.persona;
-  if (step === 2) {
+  if (step === 1) return true;
+  if (step === 2) return !!data.persona;
+  if (step === 3) {
     if (!data.firstName.trim()) return false;
     if (data.persona === "creator") return !!data.experience;
     if (data.persona === "writer") return data.clientCount !== "";
     return false;
   }
-  if (step === 3) return data.goals.length > 0;
-  if (step === 4) return !!data.cadence && data.postingDays.length > 0;
-  if (step === 5) return data.topics.length >= 2;
-  if (step === 6) return true;
+  if (step === 4) return data.goals.length > 0;
+  if (step === 5) return !!data.cadence && data.postingDays.length > 0;
+  if (step === 6) return data.topics.length >= 2;
   return false;
 }
 
 // ── API calls ──
 
 async function callStepApi(step: number, data: OnboardingData): Promise<void> {
-  if (step === 6) return; // no API for LinkedIn connect
+  if (step === 1) return; // LinkedIn connection is handled by its own OAuth flow
+  const apiStep = step - 1;
 
-  const isPost = step === 1;
+  const isPost = apiStep === 1;
   const method = isPost ? "POST" : "PATCH";
 
   let body: Record<string, unknown>;
 
-  if (step === 1) {
+  if (apiStep === 1) {
     body = {
       userType: data.persona === "creator" ? UserType.CREATOR : UserType.PRO_WRITER,
     };
-  } else if (step === 2 && data.persona === "creator") {
+  } else if (apiStep === 2 && data.persona === "creator") {
     body = {
       step: 2,
       name: data.firstName,
       creatorLevel: EXPERIENCE_MAP[data.experience],
     };
-  } else if (step === 2 && data.persona === "writer") {
+  } else if (apiStep === 2 && data.persona === "writer") {
     body = {
       step: 2,
       name: data.firstName,
       ...(data.agencyName.trim() && { agencyName: data.agencyName.trim() }),
       numberOfClients: data.clientCount,
     };
-  } else if (step === 3) {
+  } else if (apiStep === 3) {
     body = {
       step: 3,
       goals: data.goals.map(k => GOAL_MAP[k]).filter(Boolean),
     };
-  } else if (step === 4) {
+  } else if (apiStep === 4) {
     body = {
       step: 4,
       postingFrequency: CADENCE_MAP[data.cadence],
       postingDays: data.postingDays,
     };
-  } else if (step === 5) {
+  } else if (apiStep === 5) {
     body = {
       step: 5,
       topics: data.topics,
@@ -191,19 +195,16 @@ function restoreData(serverData: Record<string, any>): Partial<OnboardingData> {
 
 // ── Component ──
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type OnboardingSession = { userType?: string; currentStep?: number; isComplete?: boolean; data?: Record<string, any> };
-
-export default function OnboardingClient({ initialSession }: { initialSession: OnboardingSession | null }) {
+export default function OnboardingClient({ initialProfile }: { initialProfile: OnboardingProfile | null }) {
   const router = useRouter();
   const [data, setData] = useState<OnboardingData>(() => {
-    if (!initialSession) return INITIAL_DATA;
-    const serverPayload = { userType: initialSession.userType, ...(initialSession.data ?? {}) };
+    if (!initialProfile) return INITIAL_DATA;
+    const serverPayload = { userType: initialProfile.userType, ...(initialProfile.data ?? {}) };
     return { ...INITIAL_DATA, ...restoreData(serverPayload) };
   });
   const [step, setStep] = useState(() => {
-    if (!initialSession?.currentStep) return initialSession?.userType ? 2 : 1;
-    return Math.max(initialSession.currentStep, initialSession.userType ? 2 : 1);
+    if (!initialProfile?.userType) return 1;
+    return Math.min((initialProfile.currentStep ?? 1) + 1, TOTAL_STEPS);
   });
   const [toast, setToast] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -231,7 +232,7 @@ export default function OnboardingClient({ initialSession }: { initialSession: O
   };
 
   const skip = () => {
-    finish();
+    setStep(2);
   };
 
   const finish = () => {
@@ -246,58 +247,44 @@ export default function OnboardingClient({ initialSession }: { initialSession: O
 
   const primaryLabel = () => {
     if (step < TOTAL_STEPS) return isLoading ? "Saving…" : "Continue";
-    if (data.connected) return "Enter Marquill";
-    return isLoading ? "Saving…" : "Connect & finish";
+    return isLoading ? "Saving…" : "Enter Marquill";
   };
 
   return (
     <>
       <div className="ob-page">
-        <LocalOrbs />
-        <div className="ob-wrap">
-          {/* <BrandRow right={<span>Setup</span>} /> */}
-          <Progress step={step} total={TOTAL_STEPS} style="steps" />
+        <ThemeToggle compact className="ob-theme-toggle" />
+        <main className="ob-shell">
+          <header className="ob-header">
+            <MarquillLockup size={32} theme="auto" />
+            <h1>Let&apos;s get Mark working for you.</h1>
+            <p>A few quick steps and Mark starts drafting, designing, and scheduling in your voice.</p>
+          </header>
+          <section className="ob-workspace">
+            <Progress step={step === 1 ? 2 : 3} total={3} style="steps" />
+            <div className="ob-wrap">
+              <div className="ob-card">
+                {step === 1 && <StepConnect data={data} update={update} />}
+                {step === 2 && <StepPersona data={data} update={update} />}
+                {step === 3 && <StepProfile data={data} update={update} />}
+                {step === 4 && <StepGoals data={data} update={update} />}
+                {step === 5 && <StepCadence data={data} update={update} />}
+                {step === 6 && <StepTopics data={data} update={update} />}
+              </div>
 
-          <div className="ob-card">
-            {step === 1 && <StepPersona data={data} update={update} />}
-            {step === 2 && <StepProfile data={data} update={update} />}
-            {step === 3 && <StepGoals data={data} update={update} />}
-            {step === 4 && <StepCadence data={data} update={update} />}
-            {step === 5 && <StepTopics data={data} update={update} />}
-            {step === 6 && <StepConnect data={data} update={update} />}
-          </div>
-
-          <div className="ob-actions">
-            <div>
-              {step > 1 && (
-                <button className="btn ghost" onClick={back} disabled={isLoading}>
-                  <ArrowLeft size={14} /> Back
-                </button>
-              )}
+              <div className="ob-actions">
+                <div>{step > 1 && <button className="btn ghost" onClick={back} disabled={isLoading}><ArrowLeft size={14} /> Back</button>}</div>
+                <div className="ob-actions-right">
+                  {step === 1 && !data.connected && <button className="btn ghost" onClick={skip} disabled={isLoading}>Skip for now</button>}
+                  <button className="btn primary" disabled={!canAdvance(step, data) || isLoading} onClick={advance}>
+                    {primaryLabel()}{!isLoading && <ArrowRight size={15} strokeWidth={2.5} />}
+                  </button>
+                </div>
+              </div>
+              {apiError && <p className="ob-error">{apiError}</p>}
             </div>
-            <div className="ob-actions-right">
-              {step === TOTAL_STEPS && !data.connected && (
-                <button className="btn ghost" onClick={skip} disabled={isLoading}>
-                  Skip for now
-                </button>
-              )}
-              <button
-                className="btn primary"
-                disabled={!canAdvance(step, data) || isLoading}
-                onClick={advance}
-              >
-                {primaryLabel()}
-                {!isLoading && <ArrowRight size={15} strokeWidth={2.5} />}
-              </button>
-            </div>
-          </div>
-
-          {apiError && (
-            <p style={{ textAlign: "center", color: "var(--color-danger)", fontSize: 13, margin: 0 }}>
-              {apiError}
-            </p>
-          )}
-        </div>
+          </section>
+        </main>
       </div>
 
       {toast && <SuccessToast name={data.firstName} />}

@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-
-const BRAND_WORDMARK = "/marquill-logo.svg";
+import MarquillLockup from "../components/brand/MarquillLockup";
 
 // Branded background used by the sign-in / sign-up pages.
 export default function AuthShell({ children }: { children: ReactNode }) {
@@ -12,7 +11,7 @@ export default function AuthShell({ children }: { children: ReactNode }) {
 
       <main className="relative flex min-h-screen flex-col items-center justify-center gap-6 px-6 py-16">
         <div className="flex flex-col items-center text-center">
-          <img src={BRAND_WORDMARK} alt="Marquill" className="h-8 w-auto" />
+          <MarquillLockup size={32} theme="light" />
           <p className="mt-4 max-w-sm text-sm text-[var(--color-text-secondary)]">
             Stay consistent on LinkedIn with AI-backed research and scheduling.
           </p>
