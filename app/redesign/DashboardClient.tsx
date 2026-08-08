@@ -330,7 +330,7 @@ export default function DashboardRedesignClient({
                 return (
                   <Link href={`/posts/${post._id}/edit`} className="mq-schedule-row" key={post._id}>
                     <span className="mq-date-block"><b>{date?.toLocaleDateString(undefined, { month: "short" }) ?? "—"}</b><strong>{date?.getDate() ?? "—"}</strong></span>
-                    <span className="mq-row-copy"><strong>{getPostTitle(post.content)}</strong><small><span className="mq-live-dot" />{formatScheduledDate(post.scheduledAt)} · {accountName}</small></span>
+                    <span className="mq-row-copy"><strong>{post.title?.trim() || getPostTitle(post.content)}</strong><small><span className="mq-live-dot" />{formatScheduledDate(post.scheduledAt)} · {accountName}</small></span>
                   </Link>
                 );
               })}
@@ -384,7 +384,7 @@ export default function DashboardRedesignClient({
                 return (
                   <Link href={`/posts/${post._id}/edit`} className="mq-schedule-row" key={post._id}>
                     <span className="mq-date-block"><b>{date?.toLocaleDateString(undefined, { month: "short" }) ?? "—"}</b><strong>{date?.getDate() ?? "—"}</strong></span>
-                    <span className="mq-row-copy"><strong>{getPostTitle(post.content)}</strong><small><span className="mq-live-dot" />{formatScheduledDate(post.scheduledAt)}</small></span>
+                    <span className="mq-row-copy"><strong>{post.title?.trim() || getPostTitle(post.content)}</strong><small><span className="mq-live-dot" />{formatScheduledDate(post.scheduledAt)}</small></span>
                   </Link>
                 );
               })}
