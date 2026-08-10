@@ -9,6 +9,7 @@ type LinkedInAuthResponse = { data?: string };
 interface LinkedInConnectButtonProps {
   children: ReactNode;
   className?: string;
+  disabled?: boolean;
   title?: string;
   "aria-label"?: string;
 }
@@ -17,6 +18,7 @@ interface LinkedInConnectButtonProps {
 export default function LinkedInConnectButton({
   children,
   className,
+  disabled = false,
   title,
   "aria-label": ariaLabel,
 }: LinkedInConnectButtonProps) {
@@ -35,7 +37,7 @@ export default function LinkedInConnectButton({
   useEffect(() => clearWatcher, []);
 
   async function connectLinkedIn() {
-    if (isConnecting) return;
+    if (disabled || isConnecting) return;
 
     const width = 560;
     const height = 700;
@@ -84,7 +86,7 @@ export default function LinkedInConnectButton({
         title={title}
         aria-label={ariaLabel}
         aria-busy={isConnecting}
-        disabled={isConnecting}
+        disabled={disabled || isConnecting}
         onClick={() => void connectLinkedIn()}
       >
         {children}

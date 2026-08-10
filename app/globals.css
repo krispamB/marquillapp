@@ -1004,6 +1004,19 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
 .mq-setting-row .mq-row-copy small { font-size: 11px; }
 .mq-setting-connect { margin: 14px 18px 0; }
 .mq-settings-provider { display: inline-flex; margin-left: auto; }
+.mq-setting-account-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }
+.mq-setting-account-copy { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.mq-setting-account-name { display: flex; min-width: 0; align-items: center; gap: 8px; }
+.mq-setting-account-name > strong { overflow: hidden; color: var(--ink-900); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.mq-setting-account-name .mq-status { flex: none; }
+.mq-setting-account-meta { display: flex; min-width: 0; align-items: center; gap: 7px; color: var(--ink-500); }
+.mq-setting-account-meta small { font-size: 10.5px; }
+.mq-setting-account-meta small + small::before { margin-right: 7px; color: var(--ink-300); content: "\00b7"; }
+.mq-setting-account-meta small.is-urgent { color: var(--neg); font-weight: 600; }
+.mq-status-expired { background: color-mix(in srgb, var(--neg) 10%, var(--surface)); color: var(--neg); }
+.mq-status-inactive { background: var(--canvas-sub); color: var(--ink-500); }
+.mq-setting-disconnect { flex: none; }
+.mq-setting-account-actions { display: flex; align-items: center; gap: 8px; padding: 14px 18px 0; }
 .mq-preference-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 70px; padding: 12px 18px; border-bottom: 1px solid var(--line-faint); }
 .mq-preference-row > span { display: flex; align-items: flex-start; gap: 10px; color: var(--ink-700); }
 .mq-preference-row > span > span { display: flex; flex-direction: column; gap: 3px; }
@@ -1190,6 +1203,13 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
   .mq-invoice-card { overflow-x: auto; }
   .mq-invoice-card .mq-card-heading, .mq-invoice-row { min-width: 620px; }
   .mq-settings-grid { gap: 12px; }
+  .mq-setting-account-row { min-height: 82px; padding: 14px; }
+  .mq-setting-account-name { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .mq-setting-account-meta { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .mq-setting-account-meta small + small::before { display: none; }
+  .mq-setting-account-actions { align-items: stretch; flex-direction: column; padding: 14px 14px 0; }
+  .mq-setting-account-actions > .mq-secondary-button { width: 100%; }
+  .mq-setting-disconnect { width: 38px; height: 38px; }
   .mq-mobile-tabbar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 30; display: flex; align-items: center; height: 64px; padding: 0 8px; border-top: 1px solid var(--line); background: var(--surface); box-shadow: 0 -2px 10px rgba(16,16,15,.04); }
   .mq-mobile-tabbar a { display: flex; flex: 1; align-items: center; justify-content: center; flex-direction: column; gap: 3px; min-width: 0; color: var(--ink-400); font-size: 10px; font-weight: 500; text-decoration: none; }
   .mq-mobile-tabbar a.is-active { color: var(--ink-900); font-weight: 600; }

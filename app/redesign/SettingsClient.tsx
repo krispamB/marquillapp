@@ -2,13 +2,28 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Check, Link2, LogOut, ShieldCheck, SlidersHorizontal, Trash2 } from "lucide-react";
+import { Bell, Check, Link2, LogOut, RefreshCw, ShieldCheck, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useClerk } from "@clerk/nextjs";
 import RedesignShell from "./Shell";
+import LinkedInConnectButton from "./LinkedInConnectButton";
 import OrganizationConnectModal from "./OrganizationConnectModal";
 import { API_BASE, readApi } from "./api";
 import type { ConnectedAccount, SubscriptionTier, UserProfile } from "../lib/types";
 import LinkedInIcon from "../../components/brand/LinkedInIcon";
+import { getAccountInitials } from "./types";
+
+function accessExpiryLabel(expiresAt?: string) {
+  if (!expiresAt) return null;
+  const timestamp = new Date(expiresAt).getTime();
+  if (Number.isNaN(timestamp)) return null;
+  const days = Math.ceil((timestamp - Date.now()) / 86_400_000);
+  if (days <= 0) return { text: "Access expired", isExpired: true, isUrgent: true };
+  return {
+    text: `Access ends in ${days} day${days === 1 ? "" : "s"}`,
+    isExpired: false,
+    isUrgent: days <= 7,
+  };
+}
 
 export default function SettingsRedesignClient({
   user,
@@ -33,6 +48,9 @@ export default function SettingsRedesignClient({
     ? selectedAccountId
     : accounts[0]?.id;
   const hasPersonalAccount = accounts.some((account) => account.accountType !== "ORGANIZATION");
+  const personalAccessExpiry = accounts.find(
+    (account) => account.accountType !== "ORGANIZATION" && account.accessTokenExpiresAt,
+  )?.accessTokenExpiresAt;
   const connectedOrganizationIds = useMemo(
     () => accounts.filter((account) => account.accountType === "ORGANIZATION").map((account) => account.id),
     [accounts],
@@ -61,7 +79,81 @@ export default function SettingsRedesignClient({
       {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}
 
       <section className="mq-settings-grid">
-        <div className="mq-card mq-settings-card"><div className="mq-card-heading"><span className="mq-title"><Link2 size={16} /> Connected accounts</span><span className="mq-mono">{accounts.length} connected</span></div>{accounts.length ? accounts.map((account) => <div className="mq-setting-row" key={account.id}><span className="mq-post-avatar">{account.displayName?.slice(0, 2).toUpperCase() ?? "IN"}</span><span className="mq-row-copy"><strong>{account.displayName ?? "LinkedIn account"}</strong><small>{account.accountType === "ORGANIZATION" ? "Company page" : "Personal account"}</small></span><span className="mq-status mq-status-published"><i />Active</span><span className="mq-settings-provider"><LinkedInIcon /></span><button type="button" className="mq-icon-button mq-icon-danger" onClick={() => void disconnect(account)} disabled={isDisconnecting === account.id} title="Disconnect account"><Trash2 size={15} /></button></div>) : <p className="mq-empty">No LinkedIn account connected.</p>}<button type="button" className="mq-secondary-button mq-button-small mq-setting-connect" onClick={() => setIsOrganizationModalOpen(true)} disabled={!hasPersonalAccount} title={hasPersonalAccount ? "Connect an organization page" : "Connect a personal LinkedIn account first"}><Link2 size={14} /> Connect another account</button></div>
+        <div className="mq-card mq-settings-card">
+          <div className="mq-card-heading">
+            <span className="mq-title"><Link2 size={16} /> Connected accounts</span>
+            <span className="mq-mono">{accounts.length} connected</span>
+          </div>
+          {accounts.length ? accounts.map((account) => {
+            const expiry = accessExpiryLabel(
+              account.accessTokenExpiresAt
+                ?? (account.accountType === "ORGANIZATION" ? personalAccessExpiry : undefined),
+            );
+            const isInactive = account.isActive === false;
+            const statusLabel = expiry?.isExpired ? "Expired" : isInactive ? "Inactive" : "Active";
+            const statusClass = expiry?.isExpired
+              ? "mq-status-expired"
+              : isInactive
+                ? "mq-status-inactive"
+                : "mq-status-published";
+
+            return (
+              <div className="mq-setting-row mq-setting-account-row" key={account.id}>
+                <span className="mq-account-avatar-wrap">
+                  {account.avatarUrl ? (
+                    // Avatar hosts are supplied by the backend and are not constrained to configured Next image hosts.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={account.avatarUrl} alt="" className="mq-avatar mq-avatar-md" />
+                  ) : (
+                    <span className="mq-avatar mq-avatar-md">{getAccountInitials(account) || "IN"}</span>
+                  )}
+                  <span className="mq-avatar-provider"><LinkedInIcon size={14} /></span>
+                </span>
+
+                <span className="mq-setting-account-copy">
+                  <span className="mq-setting-account-name">
+                    <strong>{account.displayName?.trim() || "LinkedIn account"}</strong>
+                    <span className={`mq-status ${statusClass}`}><i />{statusLabel}</span>
+                  </span>
+                  <span className="mq-setting-account-meta">
+                    <small>{account.accountType === "ORGANIZATION" ? "Company page" : "Personal account"}</small>
+                    {expiry ? <small className={expiry.isUrgent ? "is-urgent" : ""}>{expiry.text}</small> : null}
+                  </span>
+                </span>
+
+                <button
+                  type="button"
+                  className="mq-icon-button mq-icon-danger mq-setting-disconnect"
+                  onClick={() => void disconnect(account)}
+                  disabled={isDisconnecting === account.id}
+                  title={`Disconnect ${account.displayName?.trim() || "LinkedIn account"}`}
+                  aria-label={`Disconnect ${account.displayName?.trim() || "LinkedIn account"}`}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            );
+          }) : <p className="mq-empty">No LinkedIn account connected.</p>}
+
+          <div className="mq-setting-account-actions">
+            <LinkedInConnectButton
+              className="mq-secondary-button mq-button-small"
+              disabled={!hasPersonalAccount}
+              title={hasPersonalAccount ? "Re-authenticate your LinkedIn account" : "Connect a personal LinkedIn account first"}
+            >
+              <RefreshCw size={14} /> Reconnect LinkedIn
+            </LinkedInConnectButton>
+            <button
+              type="button"
+              className="mq-secondary-button mq-button-small"
+              onClick={() => setIsOrganizationModalOpen(true)}
+              disabled={!hasPersonalAccount}
+              title={hasPersonalAccount ? "Connect an organization page" : "Connect a personal LinkedIn account first"}
+            >
+              <Link2 size={14} /> Connect another account
+            </button>
+          </div>
+        </div>
 
         <div className="mq-card mq-settings-card"><div className="mq-card-heading"><span className="mq-title"><SlidersHorizontal size={16} /> Preferences</span><span className="mq-mono">Unavailable</span></div><div className="mq-preference-row"><span><Bell size={16} /><span><strong>Publishing notifications</strong><small>Get a reminder before scheduled posts publish.</small></span></span><button type="button" className="mq-toggle" disabled aria-label="Publishing notifications unavailable"><i /></button></div><div className="mq-preference-row"><span><ShieldCheck size={16} /><span><strong>Timezone</strong><small>WAT (GMT+1) · inferred from your browser.</small></span></span><button type="button" className="mq-secondary-button mq-button-small" disabled>Set timezone</button></div><p className="mq-missing-note">Notification and timezone preference endpoints are not present in the current backend contract.</p></div>
       </section>
