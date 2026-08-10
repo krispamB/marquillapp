@@ -253,9 +253,10 @@ export class PostService {
       }
       const data: ILinkedInPost = {
         author,
-        ...(typeof version.content.commentary === 'string'
-          ? { commentary: formatLinkedinContent(version.content.commentary) }
-          : {}),
+        commentary:
+          typeof version.content.commentary === 'string'
+            ? formatLinkedinContent(version.content.commentary)
+            : '',
         ...(content ? { content } : {}),
         visibility: 'PUBLIC',
         distribution: {

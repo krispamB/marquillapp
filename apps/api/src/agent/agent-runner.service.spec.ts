@@ -31,6 +31,7 @@ import { z } from 'zod';
 import { LLMError } from '../llm/errors';
 import { LLMProvider, MessageRole } from '../llm/interfaces';
 import type {
+  CompletionOptions,
   CompletionResult,
   LLMMessage,
   ToolTurnResult,
@@ -49,6 +50,7 @@ import { StylePreset } from './style-presets.config';
 const GENERATION_MODEL = 'test/generation-model';
 const RESEARCH_MODEL = 'test/research-model';
 const TAVILY_API_KEY = 'test/tavily-key';
+const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 
 const CONFIG: Record<string, string> = {
   GENERATION_MODEL,
@@ -83,7 +85,19 @@ const toolTurn = (
   usage: usage(cost),
 });
 
-const makeService = (maxSteps?: number, maxSuccessfulSearches?: number) => {
+interface ServiceConfig {
+  maxSteps?: number;
+  maxSuccessfulSearches?: number;
+  researchMaxOutputTokens?: string | number;
+  generationMaxOutputTokens?: string | number;
+}
+
+const makeService = ({
+  maxSteps,
+  maxSuccessfulSearches,
+  researchMaxOutputTokens,
+  generationMaxOutputTokens,
+}: ServiceConfig = {}) => {
   const llmService = { complete: jest.fn(), completeWithTools: jest.fn() };
   const configService = {
     getOrThrow: jest.fn((key: string) => CONFIG[key]),
@@ -91,6 +105,12 @@ const makeService = (maxSteps?: number, maxSuccessfulSearches?: number) => {
       if (key === 'RESEARCH_MAX_STEPS') return maxSteps;
       if (key === 'RESEARCH_MAX_SUCCESSFUL_SEARCHES') {
         return maxSuccessfulSearches;
+      }
+      if (key === 'RESEARCH_MAX_OUTPUT_TOKENS') {
+        return researchMaxOutputTokens;
+      }
+      if (key === 'GENERATION_MAX_OUTPUT_TOKENS') {
+        return generationMaxOutputTokens;
       }
       return undefined;
     }),
@@ -116,9 +136,33 @@ let service: AgentRunnerService;
 let mocks: ReturnType<typeof makeService>['mocks'];
 let fixtures: ReturnType<typeof makeService>['fixtures'];
 
+type CompleteCall = [LLMProvider, LLMMessage[], CompletionOptions | undefined];
+type CompleteWithToolsCall = [
+  LLMProvider,
+  LLMMessage[],
+  unknown[],
+  CompletionOptions | undefined,
+];
+
+const completeCalls = (): CompleteCall[] =>
+  mocks.llmService.complete.mock.calls as unknown as CompleteCall[];
+
+const completeWithToolsCalls = (): CompleteWithToolsCall[] =>
+  mocks.llmService.completeWithTools.mock
+    .calls as unknown as CompleteWithToolsCall[];
+
 /** The messages passed to `llmService.complete` on its nth (1-based) call. */
-const messagesOfCall = (n: number): LLMMessage[] =>
-  mocks.llmService.complete.mock.calls[n - 1][1] as LLMMessage[];
+const messagesOfCall = (n: number): LLMMessage[] => completeCalls()[n - 1][1];
+
+const expectGenerationOptions = (
+  options: CompletionOptions | undefined,
+  maxTokens = DEFAULT_MAX_OUTPUT_TOKENS,
+): void => {
+  expect(options?.model).toBe(GENERATION_MODEL);
+  expect(options?.max_tokens).toBe(maxTokens);
+  expect(options?.responseSchema?.name).toBe('artifact_generation');
+  expect(options?.responseSchema?.schema).toBeInstanceOf(z.ZodType);
+};
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -172,11 +216,22 @@ describe('AgentRunnerService', () => {
 
       await service.generate(fixtures.input);
 
-      expect(mocks.llmService.complete).toHaveBeenCalledWith(
-        LLMProvider.OPENROUTER,
-        expect.any(Array),
-        { model: GENERATION_MODEL },
+      const [provider, , options] = completeCalls()[0];
+      expect(provider).toBe(LLMProvider.OPENROUTER);
+      expectGenerationOptions(options);
+    });
+
+    it('should cap generation with GENERATION_MAX_OUTPUT_TOKENS', async () => {
+      ({ service, mocks, fixtures } = makeService({
+        generationMaxOutputTokens: 4096,
+      }));
+      mocks.llmService.complete.mockResolvedValue(
+        completion(generatedJson({ commentary: 'Write more.' })),
       );
+
+      await service.generate(fixtures.input);
+
+      expectGenerationOptions(completeCalls()[0][2], 4096);
     });
 
     it('should strip markdown fences before validating', async () => {
@@ -255,6 +310,7 @@ describe('AgentRunnerService', () => {
       expect(user.content).toContain('Make the hook sharper.');
       expect(messagesOfCall(1)[0].content).not.toContain('TITLE:');
       expect(generated).toEqual({ content: { commentary: 'Revised.' } });
+      expectGenerationOptions(completeCalls()[0][2]);
     });
 
     it('should report usage per LLM turn, tagged with the model', async () => {
@@ -312,6 +368,8 @@ describe('AgentRunnerService', () => {
           content: { commentary: 'Repaired.' },
         });
         expect(mocks.llmService.complete).toHaveBeenCalledTimes(2);
+        expect(completeCalls()[1][0]).toBe(LLMProvider.OPENROUTER);
+        expectGenerationOptions(completeCalls()[1][2]);
 
         const repair = messagesOfCall(2);
         expect(repair).toHaveLength(4);
@@ -432,6 +490,53 @@ describe('AgentRunnerService', () => {
         expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
       });
 
+      it('should constrain both attempts when repairing over-limit slide copy', async () => {
+        const overLimitDeck = generatedJson({
+          document: {
+            templateId: 'minimal',
+            slides: [
+              { type: 'cover', fields: { title: 'A carousel' } },
+              {
+                type: 'list',
+                fields: {
+                  heading: 'Three ideas',
+                  items: [
+                    'Valid item',
+                    'a'.repeat(81),
+                    'b'.repeat(81),
+                    'c'.repeat(81),
+                  ],
+                },
+              },
+              {
+                type: 'cta',
+                fields: {
+                  headline: 'Keep learning',
+                  action: 'Follow',
+                  handle: 'h'.repeat(41),
+                },
+              },
+            ],
+          },
+        });
+        mocks.llmService.complete
+          .mockResolvedValueOnce(completion(overLimitDeck))
+          .mockResolvedValueOnce(completion(deckJson('minimal')));
+
+        await expect(service.generate(documentInput)).resolves.toMatchObject({
+          content: { document: { templateId: 'minimal' } },
+        });
+
+        expect(mocks.llmService.complete).toHaveBeenCalledTimes(2);
+        for (const [, , options] of completeCalls()) {
+          expectGenerationOptions(options);
+        }
+        const repairPrompt = messagesOfCall(2).at(-1)?.content ?? '';
+        expect(repairPrompt).toContain('maximum');
+        expect(repairPrompt).toContain('80');
+        expect(repairPrompt).toContain('40');
+      });
+
       it('should keep the model-chosen theme when the user supplied none', async () => {
         mocks.llmService.complete.mockResolvedValue(
           completion(deckJson('gradient')),
@@ -441,6 +546,56 @@ describe('AgentRunnerService', () => {
 
         expect(generated.content).toMatchObject({
           document: { templateId: 'gradient' },
+        });
+      });
+
+      it('should remove provider null placeholders from optional document fields', async () => {
+        mocks.llmService.complete.mockResolvedValue(
+          completion(
+            generatedJson({
+              commentary: null,
+              document: {
+                templateId: 'minimal',
+                slides: [
+                  {
+                    type: 'cover',
+                    fields: {
+                      eyebrow: null,
+                      title: 'A carousel',
+                      subtitle: null,
+                    },
+                  },
+                  {
+                    type: 'cta',
+                    fields: {
+                      headline: 'Keep learning',
+                      action: 'Follow',
+                      handle: null,
+                    },
+                  },
+                ],
+              },
+            }),
+          ),
+        );
+
+        await expect(service.generate(documentInput)).resolves.toEqual({
+          title: 'Artifact title',
+          content: {
+            document: {
+              templateId: 'minimal',
+              slides: [
+                { type: 'cover', fields: { title: 'A carousel' } },
+                {
+                  type: 'cta',
+                  fields: {
+                    headline: 'Keep learning',
+                    action: 'Follow',
+                  },
+                },
+              ],
+            },
+          },
         });
       });
 
@@ -527,8 +682,7 @@ describe('AgentRunnerService', () => {
       expect(result.steps[0].toolResults).toEqual([{ answer: 42 }]);
 
       // The tool output is fed back as a role:'tool' message on the 2nd turn.
-      const secondTurnMessages = mocks.llmService.completeWithTools.mock
-        .calls[1][1] as LLMMessage[];
+      const secondTurnMessages = completeWithToolsCalls()[1][1];
       const toolMessage = secondTurnMessages.find(
         (m) => m.role === MessageRole.Tool,
       );
@@ -615,8 +769,11 @@ describe('AgentRunnerService', () => {
       expect(result.steps).toHaveLength(2);
 
       // The finalization turn is passed no tools.
-      const [, , finalOptions] = mocks.llmService.complete.mock.calls[0];
-      expect(finalOptions).toEqual({ model: RESEARCH_MODEL });
+      const [, , finalOptions] = completeCalls()[0];
+      expect(finalOptions).toEqual({
+        model: RESEARCH_MODEL,
+        max_tokens: DEFAULT_MAX_OUTPUT_TOKENS,
+      });
     });
 
     it('should accumulate usage across every turn including finalization', async () => {
@@ -788,7 +945,9 @@ describe('AgentRunnerService', () => {
     });
 
     it('should clamp configured successful Tavily lookups to the five-search safety ceiling', async () => {
-      ({ service, mocks, fixtures } = makeService(undefined, 6));
+      ({ service, mocks, fixtures } = makeService({
+        maxSuccessfulSearches: 6,
+      }));
       tavilySearch.mockResolvedValue(tavilyResults([]));
       const calls = Array.from({ length: 6 }, (_, index) => ({
         id: `c${index + 1}`,
@@ -852,14 +1011,46 @@ describe('AgentRunnerService', () => {
 
       await service.research({ prompt: 'topic', type: ArtifactType.POST });
 
-      const [, , tools, options] =
-        mocks.llmService.completeWithTools.mock.calls[0];
-      expect(options).toEqual({ model: RESEARCH_MODEL });
+      const [, , tools, options] = completeWithToolsCalls()[0];
+      expect(options).toEqual({
+        model: RESEARCH_MODEL,
+        max_tokens: DEFAULT_MAX_OUTPUT_TOKENS,
+      });
       expect(tools).toEqual([expect.objectContaining({ name: 'searchWeb' })]);
     });
 
+    it('should cap every research turn with RESEARCH_MAX_OUTPUT_TOKENS', async () => {
+      ({ service, mocks, fixtures } = makeService({
+        maxSteps: 2,
+        researchMaxOutputTokens: 4096,
+      }));
+      tavilySearch.mockResolvedValue(tavilyResults([]));
+      mocks.llmService.completeWithTools.mockResolvedValue(
+        toolTurn([{ id: 'c', name: 'searchWeb', input: { query: 'x' } }]),
+      );
+      mocks.llmService.complete.mockResolvedValue(
+        completion('forced synthesis'),
+      );
+
+      await service.research({
+        prompt: 'topic',
+        type: ArtifactType.POST,
+      });
+
+      for (const call of completeWithToolsCalls()) {
+        expect(call[3]).toEqual({
+          model: RESEARCH_MODEL,
+          max_tokens: 4096,
+        });
+      }
+      expect(completeCalls()[0][2]).toEqual({
+        model: RESEARCH_MODEL,
+        max_tokens: 4096,
+      });
+    });
+
     it('should stop at RESEARCH_MAX_STEPS and finalize when the model keeps searching', async () => {
-      ({ service, mocks, fixtures } = makeService(2));
+      ({ service, mocks, fixtures } = makeService({ maxSteps: 2 }));
       tavilySearch.mockResolvedValue(tavilyResults([]));
       mocks.llmService.completeWithTools.mockResolvedValue(
         toolTurn([{ id: 'c', name: 'searchWeb', input: { query: 'x' } }]),
@@ -876,5 +1067,35 @@ describe('AgentRunnerService', () => {
       expect(mocks.llmService.completeWithTools).toHaveBeenCalledTimes(2);
       expect(result.findings).toBe('forced synthesis');
     });
+  });
+
+  describe('output-token configuration', () => {
+    it.each([undefined, '', 0, -1, 1.5, 'not-a-number'])(
+      'should fall back to 8192 when output-token settings are invalid (%p)',
+      async (configuredValue) => {
+        ({ service, mocks, fixtures } = makeService({
+          researchMaxOutputTokens: configuredValue,
+          generationMaxOutputTokens: configuredValue,
+        }));
+        mocks.llmService.complete.mockResolvedValue(
+          completion(generatedJson({ commentary: 'Generated.' })),
+        );
+        mocks.llmService.completeWithTools.mockResolvedValue(
+          toolTurn([], 0.01, 'Researched.'),
+        );
+
+        await service.generate(fixtures.input);
+        await service.research({
+          prompt: 'topic',
+          type: ArtifactType.POST,
+        });
+
+        expectGenerationOptions(completeCalls()[0][2]);
+        expect(completeWithToolsCalls()[0][3]).toEqual({
+          model: RESEARCH_MODEL,
+          max_tokens: DEFAULT_MAX_OUTPUT_TOKENS,
+        });
+      },
+    );
   });
 });

@@ -577,7 +577,10 @@ them, so absence is a bug, and re-running cannot fix it.
 surfaces as `WorkflowError { retryable }` per `src/llm`'s classification.
 
 **`GENERATE`** — calls `ctx.agent.generate(...)` → `{ title?, content }`, one `complete`
-call with no tools, validated against the §4 Zod union with **one inline repair retry**.
+call with no tools. Its concrete per-type Zod object is sent to OpenRouter as a strict
+JSON-Schema response format with parameter-compatible routing, then validated locally
+against the same schema. A local failure receives **one inline repair retry**, also
+provider-constrained and locally validated.
 Initial runs require a trimmed 1–100 character title; refine runs produce content only.
 Dispatch on `type`. For DOCUMENT, `templateId` resolution happens **inside this step**: a
 user-supplied `theme` is stamped authoritatively (the model cannot override it); if omitted
@@ -724,10 +727,11 @@ interface GenerateInput {
 ```
 
 **Generation is not a loop.** `generate()` has all its inputs already; it emits typed
-`ArtifactContent` via Layer 1's `complete` (no tools), validated by
-`ResponseParserService.parseWithSchema` against the §4 union, with one inline repair retry
-re-prompting with the validation error. Prompt selection per type and per revision is
-`AgentRunner`'s internal concern.
+`ArtifactContent` via Layer 1's `complete` (no tools). The concrete generation Zod object
+is both the provider's strict JSON-Schema response format and
+`ResponseParserService.parseWithSchema`'s local contract. One inline repair retry
+re-prompts with the validation error and reuses that constraint. Prompt selection per type
+and per revision is `AgentRunner`'s internal concern.
 
 ### The research agent
 

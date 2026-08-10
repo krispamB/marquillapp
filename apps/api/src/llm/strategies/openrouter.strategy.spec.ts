@@ -34,6 +34,15 @@ type ChatRequestPayload = {
   tools?: unknown[];
   maxTokens?: number;
   temperature?: number;
+  responseFormat?: {
+    type: string;
+    jsonSchema: {
+      name: string;
+      strict: boolean;
+      schema: Record<string, unknown>;
+    };
+  };
+  provider?: { requireParameters?: boolean };
   stream: boolean;
 };
 
@@ -151,6 +160,130 @@ describe('OpenRouterStrategy', () => {
       await strategy.complete([{ role: MessageRole.User, content: 'hi' }]);
 
       expect(lastChatRequest()).not.toHaveProperty('tools');
+    });
+
+    it('should constrain a completion to the supplied Zod response schema', async () => {
+      send.mockResolvedValue({ choices: [{ message: { content: '{}' } }] });
+      const responseSchema = z.object({
+        document: z.object({
+          slides: z.array(
+            z.object({
+              items: z.array(z.string().max(80)),
+              handle: z.string().max(40),
+            }),
+          ),
+        }),
+      });
+
+      await strategy.complete(
+        [{ role: MessageRole.User, content: 'build a document' }],
+        {
+          responseSchema: {
+            name: 'artifact_generation',
+            schema: responseSchema,
+          },
+        },
+      );
+
+      expect(lastChatRequest()).toMatchObject({
+        responseFormat: {
+          type: 'json_schema',
+          jsonSchema: {
+            name: 'artifact_generation',
+            strict: true,
+            schema: {
+              properties: {
+                document: {
+                  properties: {
+                    slides: {
+                      items: {
+                        properties: {
+                          items: { items: { maxLength: 80 } },
+                          handle: { maxLength: 40 },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        provider: { requireParameters: true },
+      });
+      expect(
+        lastChatRequest().responseFormat?.jsonSchema.schema,
+      ).not.toHaveProperty('$schema');
+    });
+
+    it('should normalize discriminated unions to provider-supported anyOf schemas', async () => {
+      send.mockResolvedValue({ choices: [{ message: { content: '{}' } }] });
+      const responseSchema = z.object({
+        slide: z.discriminatedUnion('type', [
+          z.object({
+            type: z.literal('list'),
+            items: z.array(z.string().max(80)),
+          }),
+          z.object({
+            type: z.literal('cta'),
+            handle: z.string().max(40),
+          }),
+        ]),
+      });
+
+      await strategy.complete(
+        [{ role: MessageRole.User, content: 'build a slide' }],
+        {
+          responseSchema: {
+            name: 'artifact_generation',
+            schema: responseSchema,
+          },
+        },
+      );
+
+      const serialized = JSON.stringify(
+        lastChatRequest().responseFormat?.jsonSchema.schema,
+      );
+      expect(serialized).toContain('"anyOf"');
+      expect(serialized).not.toContain('"oneOf"');
+      expect(serialized).toContain('"maxLength":80');
+      expect(serialized).toContain('"maxLength":40');
+    });
+
+    it('should represent optional properties as required nullable fields in strict schemas', async () => {
+      send.mockResolvedValue({ choices: [{ message: { content: '{}' } }] });
+
+      await strategy.complete(
+        [{ role: MessageRole.User, content: 'build an object' }],
+        {
+          responseSchema: {
+            name: 'optional_fields',
+            schema: z.object({
+              required: z.string(),
+              optional: z.string().max(40).optional(),
+            }),
+          },
+        },
+      );
+
+      expect(lastChatRequest().responseFormat?.jsonSchema.schema).toMatchObject(
+        {
+          required: ['required', 'optional'],
+          properties: {
+            required: { type: 'string' },
+            optional: { type: ['string', 'null'], maxLength: 40 },
+          },
+        },
+      );
+    });
+
+    it('should omit response constraints for an unconstrained completion', async () => {
+      send.mockResolvedValue({ choices: [{ message: { content: 'x' } }] });
+
+      await strategy.complete([{ role: MessageRole.User, content: 'hi' }]);
+
+      expect(lastChatRequest()).not.toHaveProperty('responseFormat');
+      expect(lastChatRequest()).not.toHaveProperty('provider');
     });
 
     it('should throw a terminal LLMError when the model returns no text', async () => {

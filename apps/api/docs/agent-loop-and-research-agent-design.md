@@ -280,6 +280,11 @@ BullMQ `attempts:3`; terminal → `UnrecoverableError`):
   turns) and `GENERATION_MODEL` (stronger, for final content) — no hardcoded model
   strings (retires the scattered `gemini-3-flash` / `gpt-5.4` / `gpt-5-mini` literals,
   per AGENTS.md's config rule).
+- **Per-role output budgets** via `RESEARCH_MAX_OUTPUT_TOKENS` and
+  `GENERATION_MAX_OUTPUT_TOKENS`, both optional positive integers defaulting to 8192.
+  Every tool-loop, forced-finalization, generation, refine, and repair request sends
+  its role's cap explicitly. This bounds worst-case spend and prevents OpenRouter from
+  applying a model's full output ceiling during its affordability check.
 
 **Rejected — reinstate a multi-provider abstraction now** (port Mark's gateway/anthropic
 paths). Two+ live SDKs, more config and test surface, for a launch where OpenRouter
@@ -328,5 +333,6 @@ Per the #100 resolution this is a clean write-over (relaunch, no users):
   `getYouTubeTranscripts`, `extractInsight`, `createDraft`, `createLinkedInPost`,
   `updateDraft`) — folded into `research()` + `generate()` — and their `PostDraft`
   coupling.
-- Config: add `RESEARCH_MODEL`, `GENERATION_MODEL`, `RESEARCH_MAX_STEPS`, `TAVILY_API_KEY`;
-  retire `MARK_*`.
+- Config: add `RESEARCH_MODEL`, `GENERATION_MODEL`,
+  `RESEARCH_MAX_OUTPUT_TOKENS`, `GENERATION_MAX_OUTPUT_TOKENS`,
+  `RESEARCH_MAX_STEPS`, `TAVILY_API_KEY`; retire `MARK_*`.

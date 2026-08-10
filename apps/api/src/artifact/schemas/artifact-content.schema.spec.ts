@@ -12,9 +12,29 @@ jest.mock(
   { virtual: true },
 );
 
-import { ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 import { ArtifactType } from 'src/database/schemas';
-import { parseArtifactContent } from './artifact-content.schema';
+import {
+  generationSchemaFor,
+  parseArtifactContent,
+} from './artifact-content.schema';
+
+describe('generationSchemaFor', () => {
+  it('should expose one provider-compatible DOCUMENT object with the slide caps', () => {
+    const jsonSchema = z.toJSONSchema(
+      generationSchemaFor(ArtifactType.DOCUMENT, true),
+      { target: 'draft-7', io: 'output' },
+    );
+    const serialized = JSON.stringify(jsonSchema);
+
+    expect(jsonSchema).not.toHaveProperty('allOf');
+    expect(serialized).toContain('"maxLength":80');
+    expect(serialized).toContain('"maxLength":40');
+    expect(serialized).toContain('"maxLength":100');
+    expect(serialized).not.toContain('"pdfKey"');
+    expect(serialized).not.toContain('"pageCount"');
+  });
+});
 
 describe('parseArtifactContent', () => {
   describe('POST arm', () => {

@@ -224,9 +224,13 @@ Consequences for map #99:
   ([Poll API schema](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/poll-post-api?view=li-lms-2026-05)).
 - **Document + image: not possible.** A document post is `content.media` with a
   single document URN; you cannot also attach an image in the same post.
-- **Anything + text: yes.** `commentary` is a top-level field independent of
-  `content`, so *every* content type (poll, document, image, video, multiImage)
-  can carry accompanying text ([Posts API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api?view=li-lms-2026-04)).
+- **Every post carries the top-level `commentary` field.** The Posts schema marks
+  `commentary` required, independently of `content`, and the poll/document examples
+  both include it. The app may model framing text as optional for a poll or document,
+  but the outbound Posts request must still serialize `commentary` (as an empty
+  string when the artifact has no framing text)
+  ([Posts API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api?view=li-lms-2026-04),
+  [Poll API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/poll-post-api?view=li-lms-2026-05)).
 - **`multiImage`** (many images) and single `media` are themselves mutually
   exclusive — exactly as the app already models in `publishOnLinkedIn`
   (single → `content.media`, many → `content.multiImage`).

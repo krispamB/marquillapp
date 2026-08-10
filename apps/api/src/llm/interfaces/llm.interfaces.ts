@@ -78,6 +78,10 @@ export type CompletionOptions = {
   model?: string;
   max_tokens?: number;
   temperature?: number;
+  responseSchema?: {
+    name: string;
+    schema: ZodType;
+  };
 };
 
 export interface LLMStrategy {

@@ -104,7 +104,7 @@ export const TIER_SEEDS: TierSeed[] = [
       features: [
         '30,000 AI credits/month',
         'AI research',
-        '10 connected accounts',
+        '5 connected accounts',
         'unlimited scheduled posts',
         'unlimited post history',
       ],

@@ -1,6 +1,6 @@
 export interface ILinkedInPost {
   author: string;
-  commentary?: string;
+  commentary: string;
   content?: IContent;
   visibility: 'PUBLIC' | 'CONNECTIONS';
   distribution: {

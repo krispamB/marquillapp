@@ -149,8 +149,12 @@ upstream slot is missing — #103 §3) and **write only their own slots** via a 
 - **Reads:** `input` (`type, prompt, stylePreset`), `research?` (cached or fresh),
   `refine?` (prior content + feedback).
 - **Calls:** `ctx.agent.generate({ type, prompt, stylePreset, research?, refine? })`
-  → `ArtifactContent`, a single `complete` call (no tools), validated against #102 §4's
-  Zod discriminated union with **one inline repair retry** on Zod failure (#104 §4, §8).
+  → `ArtifactContent`, a single `complete` call (no tools). The same concrete Zod
+  object is converted to a strict OpenRouter JSON-Schema response format and then
+  validated locally after completion. OpenRouter routing requires response-format
+  support rather than allowing a provider to ignore the constraint. A local Zod
+  failure still receives **one inline repair retry**, constrained and validated by
+  that same schema (#104 §4, §8).
   Dispatch on `type`:
   - **POST** → `{ commentary }` (text is the whole artifact).
   - **POLL** → `{ commentary?, poll { question ≤140, options[2–4] ≤30 each,

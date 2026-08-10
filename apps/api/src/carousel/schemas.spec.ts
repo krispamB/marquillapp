@@ -68,6 +68,15 @@ describe('carousel schemas', () => {
       ).toBe(false);
     });
 
+    it('should accept an item at exactly the 80-character cap', () => {
+      expect(
+        slideFieldSchemas.list.safeParse({
+          heading: 'H',
+          items: ['ok', 'a'.repeat(80)],
+        }).success,
+      ).toBe(true);
+    });
+
     it('should accept 2-6 items each within the cap', () => {
       expect(
         slideFieldSchemas.list.safeParse({
@@ -96,6 +105,26 @@ describe('carousel schemas', () => {
     it('should require headline and action', () => {
       expect(
         slideFieldSchemas.cta.safeParse({ headline: 'Follow' }).success,
+      ).toBe(false);
+    });
+
+    it('should accept a handle at exactly the 40-character cap', () => {
+      expect(
+        slideFieldSchemas.cta.safeParse({
+          headline: 'Follow',
+          action: 'Read more',
+          handle: 'a'.repeat(40),
+        }).success,
+      ).toBe(true);
+    });
+
+    it('should reject a handle over the 40-character cap', () => {
+      expect(
+        slideFieldSchemas.cta.safeParse({
+          headline: 'Follow',
+          action: 'Read more',
+          handle: 'a'.repeat(41),
+        }).success,
       ).toBe(false);
     });
   });

@@ -101,6 +101,13 @@ export const documentContentSchema = z.object({
   }),
 });
 
+const documentGenerationContentSchema = documentContentSchema.extend({
+  document: documentContentSchema.shape.document.omit({
+    pdfKey: true,
+    pageCount: true,
+  }),
+});
+
 export type DocumentContent = z.infer<typeof documentContentSchema>;
 
 // Discriminated on the artifact's family-level `type`. POST/POLL carry text
@@ -129,6 +136,38 @@ export function contentSchemaFor(
     throw new Error(`No content schema implemented for artifact type ${type}`);
   }
   return schema;
+}
+
+/**
+ * The provider-facing generation contract. Initial generation adds a title by
+ * extending the concrete content object instead of intersecting two schemas:
+ * JSON-Schema structured-output providers handle a single object reliably,
+ * while an `allOf` intersection is not uniformly supported.
+ */
+export function generationSchemaFor(
+  type: ArtifactType,
+  includeTitle: boolean,
+): z.ZodType<ArtifactContent & { title?: string }> {
+  let schema: z.ZodObject;
+  switch (type) {
+    case ArtifactType.POST:
+      schema = postContentSchema;
+      break;
+    case ArtifactType.POLL:
+      schema = pollContentSchema;
+      break;
+    case ArtifactType.DOCUMENT:
+      schema = documentGenerationContentSchema;
+      break;
+    default:
+      throw new Error(
+        `No generation schema implemented for artifact type ${String(type)}`,
+      );
+  }
+
+  return (includeTitle
+    ? schema.extend({ title: artifactTitleSchema })
+    : schema) as unknown as z.ZodType<ArtifactContent & { title?: string }>;
 }
 
 export function parseArtifactContent(

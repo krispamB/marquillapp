@@ -161,12 +161,16 @@ The code resolves the pinned artifact version's **`ArtifactContent`** (#102 §4)
 folds READY uploaded media into the LinkedIn content object. It composes per type,
 using the **#101** publish facts:
 
-| Artifact `type` | `commentary` | `content` object | LinkedIn asset upload at publish |
+| Artifact `type` | Artifact framing text | `content` object | LinkedIn asset upload at publish |
 |---|---|---|---|
 | **POST** | the text | *(none)* | none |
 | **POLL** | optional | `content.poll = { question, options[], settings:{ duration, voteSelectionType:'SINGLE_VOTE', isVoterVisibleToAuthor:true } }` | **none** — poll is inline JSON (#101 §1, §5) |
 | **DOCUMENT** | optional | `content.media = { id: <documentUrn>, title }` | **yes** — upload the version's R2 `pdfUrl` → LinkedIn (#101 §2–3) |
 
+- **Wire-level commentary is always present:** LinkedIn's Posts contract requires
+  the top-level `commentary` field for every content type. POLL and DOCUMENT may
+  omit framing text in their artifact content, but `publishPost` serializes that
+  absence as `commentary: ""`.
 - **`IContent` gains a `poll` arm** (today it has only `media`/`multiImage`); document rides
   in the existing `media.id` with a `urn:li:document:*` id (no new `IContent` field — #101 §5).
 - **Duration mapping:** #102 stores `durationDays: 1|3|7|14` → LinkedIn `settings.duration`

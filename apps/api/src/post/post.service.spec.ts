@@ -1016,6 +1016,23 @@ describe('PostService artifact publishing', () => {
       expect(mocks.uploadDocument).not.toHaveBeenCalled();
     });
 
+    it('should send empty commentary when a poll has no framing text', async () => {
+      const { service, fixtures } = makeService();
+      fixtures.artifact.type = 'POLL';
+      fixtures.artifact.versions[0].content = {
+        poll: {
+          question: 'Best day?',
+          options: ['Monday', 'Friday'],
+          durationDays: 7,
+        },
+      };
+
+      await service.publishPost(fixtures.postId.toString());
+
+      const body = JSON.parse((apiFetch as jest.Mock).mock.calls[0][1].body);
+      expect(body.commentary).toBe('');
+    });
+
     it('should upload pinned PDF bytes and publish the returned urn when the artifact is a DOCUMENT', async () => {
       const { service, mocks, fixtures } = makeService();
       const pdf = Buffer.from('rendered-pdf');
@@ -1047,6 +1064,29 @@ describe('PostService artifact publishing', () => {
       expect(JSON.parse(postCall[1].body).content).toEqual({
         media: { id: 'urn:li:document:1', title: 'First slide' },
       });
+    });
+
+    it('should send empty commentary when a document has no framing text', async () => {
+      const { service, fixtures } = makeService();
+      fixtures.artifact.type = 'DOCUMENT';
+      fixtures.artifact.versions[0].content = {
+        document: {
+          templateId: 'bold',
+          slides: [
+            { type: 'cover', fields: { title: 'First slide' } },
+            { type: 'cta', fields: { headline: 'Go', action: 'Try it' } },
+          ],
+          pdfKey: 'artifacts/deck/1/document.pdf',
+          pageCount: 8,
+        },
+      };
+      (getFile as jest.Mock).mockResolvedValue(Buffer.from('rendered-pdf'));
+
+      await service.publishPost(fixtures.postId.toString());
+
+      const postCall = (apiFetch as jest.Mock).mock.calls.at(-1);
+      const body = JSON.parse(postCall[1].body);
+      expect(body.commentary).toBe('');
     });
 
     it('should fail safely when the pinned version is unavailable', async () => {

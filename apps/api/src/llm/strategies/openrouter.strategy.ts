@@ -89,6 +89,83 @@ const toChatTool = (tool: ToolDefinition): ChatFunctionTool => {
   };
 };
 
+/**
+ * Adapt Zod's JSON Schema to OpenAI's strict response-format subset:
+ * discriminated unions use `anyOf` instead of rejected `oneOf`, and optional
+ * properties become required-nullable because strict objects require every
+ * property name in `required`. Literal discriminators keep union arms mutually
+ * exclusive; the generation parser removes provider null placeholders before
+ * applying the unchanged local Zod contract.
+ */
+const nullableJsonSchema = (
+  schema: Record<string, unknown>,
+): Record<string, unknown> => {
+  const type = schema.type;
+  if (typeof type === 'string') {
+    return { ...schema, type: [type, 'null'] };
+  }
+  if (Array.isArray(type)) {
+    const types = type as unknown[];
+    return {
+      ...schema,
+      type: types.includes('null') ? types : [...types, 'null'],
+    };
+  }
+  const anyOf = schema.anyOf;
+  if (Array.isArray(anyOf)) {
+    const variants = anyOf as unknown[];
+    return { ...schema, anyOf: [...variants, { type: 'null' }] };
+  }
+  return { anyOf: [schema, { type: 'null' }] };
+};
+
+const toProviderJsonSchema = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(toProviderJsonSchema);
+  }
+  if (typeof value !== 'object' || value === null) {
+    return value;
+  }
+
+  const normalized = Object.fromEntries(
+    Object.entries(value).map(([key, nested]) => [
+      key === 'oneOf' ? 'anyOf' : key,
+      toProviderJsonSchema(nested),
+    ]),
+  );
+
+  const properties = normalized.properties;
+  if (
+    normalized.type === 'object' &&
+    typeof properties === 'object' &&
+    properties !== null &&
+    !Array.isArray(properties)
+  ) {
+    const required = new Set(
+      Array.isArray(normalized.required)
+        ? normalized.required.filter(
+            (name): name is string => typeof name === 'string',
+          )
+        : [],
+    );
+    const strictProperties = Object.fromEntries(
+      Object.entries(properties).map(([name, schema]) => [
+        name,
+        required.has(name)
+          ? schema
+          : nullableJsonSchema(schema as Record<string, unknown>),
+      ]),
+    );
+    return {
+      ...normalized,
+      properties: strictProperties,
+      required: Object.keys(strictProperties),
+    };
+  }
+
+  return normalized;
+};
+
 /** Tool arguments arrive as a JSON string the model wrote, so they can be malformed. */
 const parseToolArguments = (args: string, toolName: string): unknown => {
   if (args.trim() === '') return {};
@@ -177,6 +254,18 @@ export class OpenRouterStrategy implements LLMStrategy {
     options?: CompletionOptions,
     tools?: Array<ToolDefinition>,
   ): Promise<ChatResult> {
+    const responseJsonSchema = options?.responseSchema
+      ? (toProviderJsonSchema(
+          z.toJSONSchema(options.responseSchema.schema, {
+            target: 'draft-7',
+            io: 'output',
+          }),
+        ) as Record<string, unknown>)
+      : undefined;
+    if (responseJsonSchema) {
+      delete responseJsonSchema.$schema;
+    }
+
     // Built outside the try: a fault in our own conversion is not a provider fault.
     const chatRequest = {
       model: options?.model || DEFAULT_MODEL,
@@ -184,6 +273,19 @@ export class OpenRouterStrategy implements LLMStrategy {
       temperature: options?.temperature,
       messages: messages.map(toChatMessage),
       ...(tools?.length ? { tools: tools.map(toChatTool) } : {}),
+      ...(options?.responseSchema && responseJsonSchema
+        ? {
+            responseFormat: {
+              type: 'json_schema' as const,
+              jsonSchema: {
+                name: options.responseSchema.name,
+                strict: true,
+                schema: responseJsonSchema,
+              },
+            },
+            provider: { requireParameters: true },
+          }
+        : {}),
       stream: false as const,
     };
 
