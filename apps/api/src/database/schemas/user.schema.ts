@@ -10,10 +10,10 @@ export class User extends Document {
   @Prop({ required: true, unique: true })
   email: string;
 
-  @Prop({ unique: true })
+  @Prop()
   googleId?: string;
 
-  @Prop({ unique: true, sparse: true })
+  @Prop()
   clerkId?: string;
 
   @Prop()
@@ -28,3 +28,24 @@ export class User extends Document {
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+
+export const USER_GOOGLE_ID_INDEX_NAME = 'user_google_id_unique';
+export const USER_CLERK_ID_INDEX_NAME = 'user_clerk_id_unique';
+
+UserSchema.index(
+  { googleId: 1 },
+  {
+    name: USER_GOOGLE_ID_INDEX_NAME,
+    unique: true,
+    partialFilterExpression: { googleId: { $type: 'string' } },
+  },
+);
+
+UserSchema.index(
+  { clerkId: 1 },
+  {
+    name: USER_CLERK_ID_INDEX_NAME,
+    unique: true,
+    partialFilterExpression: { clerkId: { $type: 'string' } },
+  },
+);
