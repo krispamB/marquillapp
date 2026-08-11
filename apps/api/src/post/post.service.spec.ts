@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Types } from 'mongoose';
 
 jest.mock(
@@ -36,7 +40,15 @@ jest.mock(
   'src/common/HelperFn/apiFetch.helper',
   () => ({
     apiFetch: jest.fn(),
-    ApiError: class ApiError extends Error {},
+    ApiError: class ApiError extends Error {
+      constructor(
+        public statusCode: number,
+        public statusText: string,
+        public data: any,
+      ) {
+        super(`HTTP error! status: ${statusCode} ${statusText}`);
+      }
+    },
   }),
   { virtual: true },
 );
@@ -66,7 +78,7 @@ jest.mock(
 import { PostService } from './post.service';
 import type { User } from 'src/database/schemas';
 import { deleteFile, getFile, getSignedUploadUrl, headFile } from 'src/s3';
-import { apiFetch } from 'src/common/HelperFn/apiFetch.helper';
+import { ApiError, apiFetch } from 'src/common/HelperFn/apiFetch.helper';
 import { formatLinkedinContent } from 'src/common/HelperFn';
 
 describe('PostService.getPosts', () => {
@@ -644,6 +656,48 @@ describe('PostService.schedulePost', () => {
     expect(mocks.incrementScheduledPostUsage).not.toHaveBeenCalled();
   });
 
+  it('should reject scheduling when LinkedIn access has expired', async () => {
+    const { service, mocks } = createService();
+    const userId = new Types.ObjectId();
+    const postId = new Types.ObjectId();
+    const scheduledAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const post = {
+      _id: postId,
+      user: userId,
+      connectedAccount: new Types.ObjectId(),
+      status: 'DRAFT',
+      scheduledPostUsageCounted: false,
+      save: mocks.save,
+    } as any;
+
+    mocks.findById.mockResolvedValue(post);
+    mocks.findConnectedAccountById.mockResolvedValue({
+      user: userId,
+      provider: 'LINKEDIN',
+      isActive: true,
+      accessToken: 'encrypted-token',
+      accessTokenExpiresAt: new Date(Date.now() - 60_000),
+    });
+
+    await expect(
+      service.schedulePost({ _id: userId } as any, postId.toString(), {
+        scheduledAt,
+      } as any),
+    ).rejects.toMatchObject({
+      response: {
+        statusCode: 409,
+        message: 'Reconnect connected account to schedule posts.',
+      },
+    });
+
+    expect(mocks.getJob).not.toHaveBeenCalled();
+    expect(mocks.assertScheduledPostQuota).not.toHaveBeenCalled();
+    expect(mocks.updateArtifactPinRevision).not.toHaveBeenCalled();
+    expect(mocks.addScheduleJob).not.toHaveBeenCalled();
+    expect(mocks.incrementScheduledPostUsage).not.toHaveBeenCalled();
+    expect(mocks.save).not.toHaveBeenCalled();
+  });
+
   it('does not increment scheduling usage when queue enqueue fails', async () => {
     const { service, mocks } = createService();
     const userId = new Types.ObjectId();
@@ -825,7 +879,15 @@ describe('PostService artifact publishing', () => {
     return {
       service,
       mocks,
-      fixtures: { userId, artifactId, accountId, postId, post, artifact },
+      fixtures: {
+        userId,
+        artifactId,
+        accountId,
+        postId,
+        post,
+        artifact,
+        account,
+      },
     };
   };
 
@@ -1111,6 +1173,48 @@ describe('PostService artifact publishing', () => {
       expect(fixtures.post.status).toBe('FAILED');
       expect(fixtures.post.failureReason).toBe('Failed to publish post');
     });
+
+    it('should reject expired LinkedIn access and persist a reconnect failure', async () => {
+      const { service, mocks, fixtures } = makeService();
+      fixtures.account.accessTokenExpiresAt = new Date(Date.now() - 60_000);
+
+      await expect(
+        service.publishPost(fixtures.postId.toString()),
+      ).rejects.toMatchObject({
+        response: {
+          statusCode: 409,
+          message: 'Reconnect connected account to publish posts.',
+        },
+      });
+
+      expect(fixtures.post.status).toBe('FAILED');
+      expect(fixtures.post.failureReason).toBe(
+        'Reconnect connected account to publish posts.',
+      );
+      expect(mocks.decrypt).not.toHaveBeenCalled();
+      expect(apiFetch).not.toHaveBeenCalled();
+    });
+
+    it('should map a LinkedIn 401 response to a reconnect conflict', async () => {
+      const { service, fixtures } = makeService();
+      (apiFetch as jest.Mock).mockRejectedValue(
+        new ApiError(401, 'Unauthorized', { message: 'Expired token' }),
+      );
+
+      await expect(
+        service.publishPost(fixtures.postId.toString()),
+      ).rejects.toMatchObject({
+        response: {
+          statusCode: 409,
+          message: 'Reconnect connected account to publish posts.',
+        },
+      });
+
+      expect(fixtures.post.status).toBe('FAILED');
+      expect(fixtures.post.failureReason).toBe(
+        'Reconnect connected account to publish posts.',
+      );
+    });
   });
 
   describe('publishPostNow', () => {
@@ -1156,6 +1260,23 @@ describe('PostService artifact publishing', () => {
         ),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(mocks.getScheduleJob).not.toHaveBeenCalled();
+      expect(apiFetch).not.toHaveBeenCalled();
+    });
+
+    it('should preserve a scheduled post when LinkedIn access is already expired', async () => {
+      const { service, mocks, fixtures } = makeService();
+      fixtures.account.accessTokenExpiresAt = new Date(Date.now() - 60_000);
+
+      await expect(
+        service.publishPostNow(
+          { _id: fixtures.userId } as any,
+          fixtures.postId.toString(),
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(mocks.getScheduleJob).not.toHaveBeenCalled();
+      expect(fixtures.post.status).toBe('SCHEDULED');
+      expect(fixtures.post.save).not.toHaveBeenCalled();
       expect(apiFetch).not.toHaveBeenCalled();
     });
   });
