@@ -7,6 +7,10 @@ import RedesignShell from "./Shell";
 import { API_BASE, jsonRequest, readApi } from "./api";
 import { formatScheduledDate, getPostTitle, normalizeStatus, parseDate, toYearMonth } from "./types";
 import type { ConnectedAccount, DashboardPost, DashboardPostsResponse, SubscriptionTier, UserProfile } from "../lib/types";
+import {
+  getLinkedInAccountAccessById,
+  LINKEDIN_ACCESS_EXPIRED_MESSAGE,
+} from "./linkedinAccess";
 
 function monthCells(date: Date) {
   const first = new Date(date.getFullYear(), date.getMonth(), 1);
@@ -86,6 +90,10 @@ export default function CalendarRedesignClient({
 
   async function movePost(post: DashboardPost, date: Date) {
     if (!post._id) return;
+    if (!getLinkedInAccountAccessById(post.connectedAccount, connectedAccounts)?.isUsable) {
+      setError(LINKEDIN_ACCESS_EXPIRED_MESSAGE);
+      return;
+    }
     const current = parseDate(post.scheduledAt);
     const scheduledTime = new Date(date.getFullYear(), date.getMonth(), date.getDate(), current?.getHours() ?? 9, current?.getMinutes() ?? 0);
     try {
@@ -125,7 +133,10 @@ export default function CalendarRedesignClient({
                 <div key={dayKey(date)} className={`mq-calendar-cell ${inMonth ? "" : "is-muted"} ${isToday ? "is-today" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { const postId = event.dataTransfer.getData("text/plain"); const post = posts.find((item) => item._id === postId); if (post) void movePost(post, date); }}>
                   <span className="mq-calendar-day">{date.getDate()}</span>
                   <div className="mq-calendar-events">
-                    {items.slice(0, 3).map((post) => <Link key={post._id} href={`/posts/${post._id}/edit`} draggable onDragStart={(event) => event.dataTransfer.setData("text/plain", post._id)} className="mq-calendar-event"><i className={dotClass(post.status)} />{getPostTitle(post.content)}</Link>)}
+                    {items.slice(0, 3).map((post) => {
+                      const canReschedule = getLinkedInAccountAccessById(post.connectedAccount, connectedAccounts)?.isUsable === true;
+                      return <Link key={post._id} href={`/posts/${post._id}/edit`} draggable={canReschedule} onDragStart={(event) => { if (canReschedule) event.dataTransfer.setData("text/plain", post._id); }} className="mq-calendar-event" title={canReschedule ? undefined : LINKEDIN_ACCESS_EXPIRED_MESSAGE}><i className={dotClass(post.status)} />{getPostTitle(post.content)}</Link>;
+                    })}
                   </div>
                 </div>
               );
@@ -137,7 +148,10 @@ export default function CalendarRedesignClient({
           <div className="mq-card-heading"><span className="mq-title">Upcoming agenda</span><span className="mq-mono">{upcoming.length} scheduled</span></div>
           {isLoading ? <p className="mq-empty">Loading agenda…</p> : null}
           {!isLoading && !upcoming.length ? <p className="mq-empty">No scheduled posts in this month.</p> : null}
-          {upcoming.map((post) => <div key={post._id} className="mq-agenda-row" draggable onDragStart={(event) => event.dataTransfer.setData("text/plain", post._id)}><span className="mq-agenda-dot"><i className={dotClass(post.status)} /></span><span className="mq-row-copy"><strong>{getPostTitle(post.content)}</strong><small><Clock3 size={13} /> {formatScheduledDate(post.scheduledAt)}</small></span><Link href={`/posts/${post._id}/edit`} className="mq-secondary-button mq-button-small">Edit</Link></div>)}
+          {upcoming.map((post) => {
+            const canReschedule = getLinkedInAccountAccessById(post.connectedAccount, connectedAccounts)?.isUsable === true;
+            return <div key={post._id} className="mq-agenda-row" draggable={canReschedule} onDragStart={(event) => { if (canReschedule) event.dataTransfer.setData("text/plain", post._id); }} title={canReschedule ? undefined : LINKEDIN_ACCESS_EXPIRED_MESSAGE}><span className="mq-agenda-dot"><i className={dotClass(post.status)} /></span><span className="mq-row-copy"><strong>{getPostTitle(post.content)}</strong><small><Clock3 size={13} /> {formatScheduledDate(post.scheduledAt)}</small></span><Link href={`/posts/${post._id}/edit`} className="mq-secondary-button mq-button-small">Edit</Link></div>;
+          })}
         </div>
       )}
     </RedesignShell>

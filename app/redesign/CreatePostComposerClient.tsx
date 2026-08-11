@@ -25,6 +25,11 @@ import LinkedInConnectButton from "./LinkedInConnectButton";
 import MobileComposerSwitcher, { type MobileComposerView } from "./MobileComposerSwitcher";
 import usePostMediaWorkflow from "./usePostMediaWorkflow";
 import type { InitialPostComposerData } from "./postComposer";
+import {
+  getLinkedInAccountAccess,
+  LINKEDIN_ACCESS_EXPIRED_MESSAGE,
+  usableConnectedAccounts,
+} from "./linkedinAccess";
 
 type PendingAction = "attach" | "publish" | "schedule" | "unschedule" | null;
 type StockProvider = "pexels" | "unsplash";
@@ -44,7 +49,9 @@ export default function CreatePostComposerClient({
 }) {
   const isEditing = Boolean(initialPost || initialLoadError);
   const router = useRouter();
-  const [selectedAccountId, setSelectedAccountId] = useState(initialPost?.account.id ?? connectedAccounts[0]?.id ?? "");
+  const [selectedAccountId, setSelectedAccountId] = useState(
+    initialPost?.account.id ?? usableConnectedAccounts(connectedAccounts)[0]?.id ?? "",
+  );
   const [postId, setPostId] = useState<string | undefined>(initialPost?.id);
   const [postTitle, setPostTitle] = useState(initialPost?.title ?? "");
   const lastSavedTitle = useRef(initialPost?.title.trim() ?? "");
@@ -92,12 +99,16 @@ export default function CreatePostComposerClient({
     if (!initialPost?.account || connectedAccounts.some((item) => item.id === initialPost.account.id)) return connectedAccounts;
     return [initialPost.account, ...connectedAccounts];
   }, [connectedAccounts, initialPost]);
+  const accountAccess = account
+    ? getLinkedInAccountAccess(account, accountOptions)
+    : null;
+  const hasUsableAccount = usableConnectedAccounts(connectedAccounts).length > 0;
   const mediaBlocked = media.some((item) => item.status !== "READY");
   const isBusy = pendingAction !== null || isMediaMutating || isPreparingStock || hasPendingMedia;
   const isPublished = postStatus === "PUBLISHED";
   const isScheduled = postStatus === "SCHEDULED";
   const compositionLocked = isScheduled || isPublished;
-  const canSubmit = Boolean(postId && artifact && !mediaBlocked && !isBusy && !isPublished);
+  const canSubmit = Boolean(postId && artifact && accountAccess?.isUsable && !mediaBlocked && !isBusy && !isPublished);
 
   function saveTitle(): Promise<boolean> {
     if (titleSavePromise.current) return titleSavePromise.current;
@@ -143,6 +154,10 @@ export default function CreatePostComposerClient({
     if (compositionLocked) return;
     if (!selectedAccountId) {
       setError("Connect and select a LinkedIn account before attaching an artifact.");
+      return;
+    }
+    if (!accountAccess?.isUsable) {
+      setError(LINKEDIN_ACCESS_EXPIRED_MESSAGE);
       return;
     }
     setPendingAction("attach");
@@ -195,6 +210,10 @@ export default function CreatePostComposerClient({
   }
 
   async function publishNow() {
+    if (!accountAccess?.isUsable) {
+      setError(LINKEDIN_ACCESS_EXPIRED_MESSAGE);
+      return;
+    }
     if (!postId || !canSubmit) return;
     if (!await saveTitle()) return;
     setPendingAction("publish");
@@ -210,6 +229,10 @@ export default function CreatePostComposerClient({
   }
 
   async function confirmSchedule() {
+    if (!accountAccess?.isUsable) {
+      setError(LINKEDIN_ACCESS_EXPIRED_MESSAGE);
+      return;
+    }
     if (!postId || !canSubmit) return;
     if (!await saveTitle()) return;
     const scheduledDate = new Date(scheduleValue);
@@ -247,7 +270,7 @@ export default function CreatePostComposerClient({
 
   const topbarActions = !isPublished ? (
     <div className="mq-create-post-top-actions">
-      <button type="button" className="mq-secondary-button mq-create-post-schedule-top" disabled={!postId || isBusy} onClick={() => setScheduleMode(true)}><CalendarClock size={16} /> Schedule</button>
+      <button type="button" className="mq-secondary-button mq-create-post-schedule-top" disabled={!postId || !accountAccess?.isUsable || isBusy} onClick={() => setScheduleMode(true)} title={!accountAccess?.isUsable ? LINKEDIN_ACCESS_EXPIRED_MESSAGE : undefined}><CalendarClock size={16} /> Schedule</button>
       <button type="button" className="mq-primary-button" disabled={!canSubmit} onClick={() => void publishNow()}>{pendingAction === "publish" ? <LoaderCircle className="mq-spin" size={16} /> : <Send size={16} />}<span>Publish now</span></button>
     </div>
   ) : null;
@@ -289,6 +312,12 @@ export default function CreatePostComposerClient({
       <div className="mq-create-post-page">
         {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}
         {initialLoadError ? <div className="mq-alert mq-alert-error" role="alert">{initialLoadError}</div> : null}
+        {account && !accountAccess?.isUsable ? (
+          <div className="mq-alert mq-alert-error mq-linkedin-access-alert" role="alert">
+            <span>{LINKEDIN_ACCESS_EXPIRED_MESSAGE}</span>
+            <LinkedInConnectButton className="mq-secondary-button mq-button-small">Reconnect LinkedIn</LinkedInConnectButton>
+          </div>
+        ) : null}
 
         {initialLoadError ? null : <div className={`mq-create-post-grid mq-mobile-view-${mobileView}`}>
           {artifact ? <MobileComposerSwitcher value={mobileView} onChange={setMobileView} /> : null}
@@ -309,7 +338,14 @@ export default function CreatePostComposerClient({
                   disabled={Boolean(postId)}
                   placeholder="Choose account"
                   ariaLabel="Connected LinkedIn account"
-                  options={accountOptions.map((item) => ({ value: item.id, label: item.displayName ?? "LinkedIn account" }))}
+                  options={accountOptions.map((item) => {
+                    const access = getLinkedInAccountAccess(item, accountOptions);
+                    return {
+                      value: item.id,
+                      label: `${item.displayName ?? "LinkedIn account"}${access.isUsable ? "" : ` — ${access.statusLabel}`}`,
+                      disabled: !access.isUsable,
+                    };
+                  })}
                 />
                 {postId ? <small>Account locked to this post</small> : null}
               </label>
@@ -325,6 +361,8 @@ export default function CreatePostComposerClient({
 
             {!artifact && !connectedAccounts.length ? (
               <div className="mq-card mq-create-post-empty"><FileText size={24} /><h2>Connect LinkedIn to publish</h2><p>A connected personal account or organization page is required before attaching an artifact.</p><LinkedInConnectButton className="mq-primary-button">Connect LinkedIn</LinkedInConnectButton></div>
+            ) : !artifact && !hasUsableAccount ? (
+              <div className="mq-card mq-create-post-empty"><FileText size={24} /><h2>Reconnect LinkedIn to continue</h2><p>Your connected LinkedIn access has expired. Reconnect before creating a post.</p><LinkedInConnectButton className="mq-primary-button">Reconnect LinkedIn</LinkedInConnectButton></div>
             ) : !artifact ? (
               <button type="button" className="mq-card mq-attach-artifact-empty" onClick={() => setIsArtifactPickerOpen(true)}>
                 <span><FileText size={22} /></span><strong>Attach an artifact</strong><small>Choose one READY post, poll, or document.</small>
@@ -343,7 +381,7 @@ export default function CreatePostComposerClient({
           <aside className="mq-create-post-sidebar">
             {artifact ? <><span className="mq-mono">_ linkedin preview</span><div className="mq-desktop-composition-preview"><PostCompositionPreview key={`desktop-${artifact.id}:${artifact.version}`} user={user} account={account} artifact={artifact} media={media} previewUrls={previewUrls} /></div><div id="mq-mobile-preview-panel" className="mq-mobile-preview-wrap" role="tabpanel" aria-labelledby="mq-mobile-preview-tab"><PostCompositionPreview key={`mobile-${artifact.id}:${artifact.version}`} user={user} account={account} artifact={artifact} media={media} previewUrls={previewUrls} /></div></> : null}
 
-            {postId && !isPublished ? <PostSchedulingControls canSubmit={canSubmit} isBusy={isBusy} isScheduling={pendingAction === "schedule"} scheduleMode={scheduleMode} scheduleValue={scheduleValue} onChange={setScheduleValue} onConfirm={() => void confirmSchedule()} onModeChange={setScheduleMode} /> : null}
+            {postId && !isPublished && accountAccess?.isUsable ? <PostSchedulingControls canSubmit={canSubmit} isBusy={isBusy} isScheduling={pendingAction === "schedule"} scheduleMode={scheduleMode} scheduleValue={scheduleValue} onChange={setScheduleValue} onConfirm={() => void confirmSchedule()} onModeChange={setScheduleMode} /> : null}
           </aside>
         </div>}
 

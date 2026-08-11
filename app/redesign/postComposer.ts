@@ -57,6 +57,7 @@ function accountFromPost(post: PostDetailData): ConnectedAccount {
     id: account._id,
     provider: account.provider ?? "LINKEDIN",
     accountType: account.accountType === "PERSON" ? "PERSONAL" : account.accountType,
+    ...(account.accessTokenExpiresAt ? { accessTokenExpiresAt: account.accessTokenExpiresAt } : {}),
     displayName: account.displayName,
     avatarUrl: account.avatarUrl,
     vanityName: account.vanityName,
