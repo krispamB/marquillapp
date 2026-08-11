@@ -117,26 +117,41 @@ export default function SettingsRedesignClient({
                 </button>
               </div>
             );
-          }) : <p className="mq-empty">No LinkedIn account connected.</p>}
+          }) : null}
 
-          <div className="mq-setting-account-actions">
-            <LinkedInConnectButton
-              className="mq-secondary-button mq-button-small"
-              disabled={!hasPersonalAccount}
-              title={hasPersonalAccount ? "Re-authenticate your LinkedIn account" : "Connect a personal LinkedIn account first"}
-            >
-              <RefreshCw size={14} /> Reconnect LinkedIn
-            </LinkedInConnectButton>
-            <button
-              type="button"
-              className="mq-secondary-button mq-button-small"
-              onClick={() => setIsOrganizationModalOpen(true)}
-              disabled={!hasUsablePersonalAccount}
-              title={hasUsablePersonalAccount ? "Connect an organization page" : "Reconnect your personal LinkedIn account first"}
-            >
-              <Link2 size={14} /> Connect another account
-            </button>
-          </div>
+          {!hasPersonalAccount ? (
+            <div className="mq-account-empty-state">
+              <span className="mq-account-empty-icon" aria-hidden="true"><LinkedInIcon size={21} /></span>
+              <div>
+                <strong>Connect your LinkedIn account</strong>
+                <p>Connect once to publish and schedule posts from any device.</p>
+              </div>
+              <LinkedInConnectButton
+                className="mq-primary-button mq-account-connect-button"
+                title="Connect your LinkedIn account"
+              >
+                <Link2 size={15} /> Connect LinkedIn
+              </LinkedInConnectButton>
+            </div>
+          ) : (
+            <div className="mq-setting-account-actions">
+              <LinkedInConnectButton
+                className="mq-secondary-button mq-button-small"
+                title="Re-authenticate your LinkedIn account"
+              >
+                <RefreshCw size={14} /> Reconnect LinkedIn
+              </LinkedInConnectButton>
+              <button
+                type="button"
+                className="mq-secondary-button mq-button-small"
+                onClick={() => setIsOrganizationModalOpen(true)}
+                disabled={!hasUsablePersonalAccount}
+                title={hasUsablePersonalAccount ? "Connect an organization page" : "Reconnect your personal LinkedIn account first"}
+              >
+                <Link2 size={14} /> Add organization page
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="mq-card mq-settings-card"><div className="mq-card-heading"><span className="mq-title"><SlidersHorizontal size={16} /> Preferences</span><span className="mq-mono">Unavailable</span></div><div className="mq-preference-row"><span><Bell size={16} /><span><strong>Publishing notifications</strong><small>Get a reminder before scheduled posts publish.</small></span></span><button type="button" className="mq-toggle" disabled aria-label="Publishing notifications unavailable"><i /></button></div><div className="mq-preference-row"><span><ShieldCheck size={16} /><span><strong>Timezone</strong><small>WAT (GMT+1) · inferred from your browser.</small></span></span><button type="button" className="mq-secondary-button mq-button-small" disabled>Set timezone</button></div><p className="mq-missing-note">Notification and timezone preference endpoints are not present in the current backend contract.</p></div>
