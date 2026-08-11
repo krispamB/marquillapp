@@ -389,6 +389,7 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
 .mq-alert { margin: 0 0 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); color: var(--ink-700); font-size: 13px; }
 .mq-alert a { color: var(--accent-ink); font-weight: 600; }
 .mq-alert-error { border-color: rgba(229,72,77,.25); background: #fff7f7; color: #a62f34; }
+.mq-linkedin-access-alert { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .mq-alert-success { border-color: rgba(31,157,85,.22); background: var(--pos-bg); color: #197341; }
 .mq-feedback-backdrop { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; padding: 18px; background: rgba(10,10,10,.34); backdrop-filter: blur(4px); }
 .mq-feedback-modal { position: relative; width: min(100%, 540px); padding: 30px; border: 1px solid var(--line-strong); border-radius: 20px; background: var(--surface); box-shadow: 0 26px 80px rgba(10,10,10,.25); }

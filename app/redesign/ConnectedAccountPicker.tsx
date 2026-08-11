@@ -6,9 +6,10 @@ import LinkedInIcon from "../../components/brand/LinkedInIcon";
 import type { ConnectedAccount } from "../lib/types";
 import LinkedInConnectButton from "./LinkedInConnectButton";
 import { getAccountInitials } from "./types";
+import { usableConnectedAccounts } from "./linkedinAccess";
 
 export function activeConnectedAccounts(accounts: ConnectedAccount[]) {
-  return accounts.filter((account) => account.isActive !== false);
+  return usableConnectedAccounts(accounts);
 }
 
 export function resolveAttachAccountChoice(accounts: ConnectedAccount[]) {

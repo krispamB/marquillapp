@@ -36,6 +36,10 @@ import { getAccountInitials, getInitials } from "./types";
 import type { WorkspacePage } from "./types";
 import MarquillSelect from "../../components/ui/MarquillSelect";
 import { API_BASE, readApi } from "./api";
+import {
+  getLinkedInAccountAccess,
+  hasUsablePersonalLinkedInAccount,
+} from "./linkedinAccess";
 
 const navItems: Array<{ key: WorkspacePage; label: string; href: string; icon: ReactNode }> = [
   { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: <Home size={18} /> },
@@ -76,15 +80,6 @@ function AccountAvatar({ account, size = "md" }: { account?: ConnectedAccount; s
       {account ? <span className="mq-avatar-provider"><LinkedInIcon size={size === "sm" ? 11 : 14} /></span> : null}
     </span>
   );
-}
-
-function accessExpiryLabel(expiresAt?: string) {
-  if (!expiresAt) return null;
-  const timestamp = new Date(expiresAt).getTime();
-  if (Number.isNaN(timestamp)) return null;
-  const days = Math.ceil((timestamp - Date.now()) / 86_400_000);
-  if (days <= 0) return { text: "Access expired", isUrgent: true };
-  return { text: `Access ends in ${days} day${days === 1 ? "" : "s"}`, isUrgent: days <= 7 };
 }
 
 export default function RedesignShell({
@@ -135,14 +130,10 @@ export default function RedesignShell({
       tier.name.trim().toLowerCase().replace(/\s+plan$/, "") === "free"
     ),
   );
-  const hasPersonalAccount = accounts.some((account) => account.accountType !== "ORGANIZATION");
+  const hasUsablePersonalAccount = hasUsablePersonalLinkedInAccount(accounts);
   const connectedOrganizationIds = useMemo(
     () => accounts.filter((account) => account.accountType === "ORGANIZATION").map((account) => account.id),
     [accounts],
-  );
-  const sharedExpiry = accessExpiryLabel(
-    accounts.find((account) => account.accountType !== "ORGANIZATION" && account.accessTokenExpiresAt)?.accessTokenExpiresAt
-      ?? accounts.find((account) => account.accessTokenExpiresAt)?.accessTokenExpiresAt,
   );
 
   useEffect(() => {
@@ -211,9 +202,9 @@ export default function RedesignShell({
               <button
                 type="button"
                 className="mq-account-action"
-                title={hasPersonalAccount ? "Connect an organization page" : "Connect a personal LinkedIn account first"}
+                title={hasUsablePersonalAccount ? "Connect an organization page" : "Reconnect your personal LinkedIn account first"}
                 aria-label="Connect an organization page"
-                disabled={!hasPersonalAccount}
+                disabled={!hasUsablePersonalAccount}
                 onClick={() => setIsOrganizationModalOpen(true)}
               >
                 <Plus size={16} />
@@ -223,20 +214,23 @@ export default function RedesignShell({
           {isConnectedExpanded ? (
             <div id="mq-connected-accounts" className="mq-connected-accounts">
               {accounts.length ? (
-                accounts.map((account) => (
-                  <button
-                    type="button"
-                    key={account.id}
-                    onClick={() => onSelectAccount?.(account.id)}
-                    className={`mq-account-row ${selectedAccountId === account.id ? "is-selected" : ""}`}
-                  >
-                    <AccountAvatar account={account} />
-                    <span className="mq-account-copy">
-                      <strong>{account.displayName ?? "LinkedIn account"}</strong>
-                      <small className={sharedExpiry?.isUrgent ? "is-urgent" : ""}>{sharedExpiry?.text ?? (account.accountType === "ORGANIZATION" ? "Company page" : "Personal")}</small>
-                    </span>
-                  </button>
-                ))
+                accounts.map((account) => {
+                  const access = getLinkedInAccountAccess(account, accounts);
+                  return (
+                    <button
+                      type="button"
+                      key={account.id}
+                      onClick={() => onSelectAccount?.(account.id)}
+                      className={`mq-account-row ${selectedAccountId === account.id ? "is-selected" : ""}`}
+                    >
+                      <AccountAvatar account={account} />
+                      <span className="mq-account-copy">
+                        <strong>{account.displayName ?? "LinkedIn account"}</strong>
+                        <small className={access.isUrgent ? "is-urgent" : ""}>{access.detailLabel ?? (account.accountType === "ORGANIZATION" ? "Company page" : "Personal")}</small>
+                      </span>
+                    </button>
+                  );
+                })
               ) : (
                 <LinkedInConnectButton className="mq-empty-account">
                   Connect LinkedIn to publish

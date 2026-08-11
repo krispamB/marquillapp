@@ -11,19 +11,10 @@ import { API_BASE, readApi } from "./api";
 import type { ConnectedAccount, SubscriptionTier, UserProfile } from "../lib/types";
 import LinkedInIcon from "../../components/brand/LinkedInIcon";
 import { getAccountInitials } from "./types";
-
-function accessExpiryLabel(expiresAt?: string) {
-  if (!expiresAt) return null;
-  const timestamp = new Date(expiresAt).getTime();
-  if (Number.isNaN(timestamp)) return null;
-  const days = Math.ceil((timestamp - Date.now()) / 86_400_000);
-  if (days <= 0) return { text: "Access expired", isExpired: true, isUrgent: true };
-  return {
-    text: `Access ends in ${days} day${days === 1 ? "" : "s"}`,
-    isExpired: false,
-    isUrgent: days <= 7,
-  };
-}
+import {
+  getLinkedInAccountAccess,
+  hasUsablePersonalLinkedInAccount,
+} from "./linkedinAccess";
 
 export default function SettingsRedesignClient({
   user,
@@ -48,9 +39,7 @@ export default function SettingsRedesignClient({
     ? selectedAccountId
     : accounts[0]?.id;
   const hasPersonalAccount = accounts.some((account) => account.accountType !== "ORGANIZATION");
-  const personalAccessExpiry = accounts.find(
-    (account) => account.accountType !== "ORGANIZATION" && account.accessTokenExpiresAt,
-  )?.accessTokenExpiresAt;
+  const hasUsablePersonalAccount = hasUsablePersonalLinkedInAccount(accounts);
   const connectedOrganizationIds = useMemo(
     () => accounts.filter((account) => account.accountType === "ORGANIZATION").map((account) => account.id),
     [accounts],
@@ -85,15 +74,10 @@ export default function SettingsRedesignClient({
             <span className="mq-mono">{accounts.length} connected</span>
           </div>
           {accounts.length ? accounts.map((account) => {
-            const expiry = accessExpiryLabel(
-              account.accessTokenExpiresAt
-                ?? (account.accountType === "ORGANIZATION" ? personalAccessExpiry : undefined),
-            );
-            const isInactive = account.isActive === false;
-            const statusLabel = expiry?.isExpired ? "Expired" : isInactive ? "Inactive" : "Active";
-            const statusClass = expiry?.isExpired
+            const access = getLinkedInAccountAccess(account, accounts);
+            const statusClass = access.isExpired
               ? "mq-status-expired"
-              : isInactive
+              : access.isInactive
                 ? "mq-status-inactive"
                 : "mq-status-published";
 
@@ -113,11 +97,11 @@ export default function SettingsRedesignClient({
                 <span className="mq-setting-account-copy">
                   <span className="mq-setting-account-name">
                     <strong>{account.displayName?.trim() || "LinkedIn account"}</strong>
-                    <span className={`mq-status ${statusClass}`}><i />{statusLabel}</span>
+                    <span className={`mq-status ${statusClass}`}><i />{access.statusLabel}</span>
                   </span>
                   <span className="mq-setting-account-meta">
                     <small>{account.accountType === "ORGANIZATION" ? "Company page" : "Personal account"}</small>
-                    {expiry ? <small className={expiry.isUrgent ? "is-urgent" : ""}>{expiry.text}</small> : null}
+                    {access.detailLabel ? <small className={access.isUrgent ? "is-urgent" : ""}>{access.detailLabel}</small> : null}
                   </span>
                 </span>
 
@@ -147,8 +131,8 @@ export default function SettingsRedesignClient({
               type="button"
               className="mq-secondary-button mq-button-small"
               onClick={() => setIsOrganizationModalOpen(true)}
-              disabled={!hasPersonalAccount}
-              title={hasPersonalAccount ? "Connect an organization page" : "Connect a personal LinkedIn account first"}
+              disabled={!hasUsablePersonalAccount}
+              title={hasUsablePersonalAccount ? "Connect an organization page" : "Reconnect your personal LinkedIn account first"}
             >
               <Link2 size={14} /> Connect another account
             </button>

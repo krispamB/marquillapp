@@ -280,6 +280,7 @@ export type PostDetailData = {
     provider?: ConnectedAccountProvider;
     displayName?: string;
     accountType?: ConnectedAccountType | "PERSON";
+    accessTokenExpiresAt?: string;
     avatarUrl?: string;
     vanityName?: string;
     headline?: string;

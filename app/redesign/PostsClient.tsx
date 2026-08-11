@@ -9,6 +9,10 @@ import DeleteConfirmModal from "./DeleteConfirmModal";
 import SchedulePicker, { getDefaultScheduleDate, localDateTimeValue } from "./SchedulePicker";
 import { formatRelativeDate, formatScheduledDate, getAccountInitials, getInitials, getPostTitle, normalizeStatus, parseDate, toYearMonth } from "./types";
 import type { ConnectedAccount, DashboardPost, DashboardPostsResponse, SubscriptionTier, UserProfile } from "../lib/types";
+import {
+  getLinkedInAccountAccessById,
+  LINKEDIN_ACCESS_EXPIRED_MESSAGE,
+} from "./linkedinAccess";
 
 type PostFilter = "ALL" | "DRAFT" | "SCHEDULED" | "PUBLISHED";
 
@@ -93,6 +97,11 @@ export default function PostsRedesignClient({
   }, [filter, posts, search]);
 
   async function runAction(postId: string, action: "publish" | "delete") {
+    const post = posts.find((item) => item._id === postId);
+    if (action === "publish" && !getLinkedInAccountAccessById(post?.connectedAccount, connectedAccounts)?.isUsable) {
+      setError(LINKEDIN_ACCESS_EXPIRED_MESSAGE);
+      return false;
+    }
     setActionId(postId);
     setError(null);
     setActionMessage(null);
@@ -114,6 +123,11 @@ export default function PostsRedesignClient({
 
   async function schedulePost() {
     if (!schedulePostId || !scheduleValue) return;
+    const post = posts.find((item) => item._id === schedulePostId);
+    if (!getLinkedInAccountAccessById(post?.connectedAccount, connectedAccounts)?.isUsable) {
+      setError(LINKEDIN_ACCESS_EXPIRED_MESSAGE);
+      return;
+    }
     const scheduledDate = new Date(scheduleValue);
     if (Number.isNaN(scheduledDate.getTime())) {
       setError("Pick a valid date and time before scheduling.");
@@ -184,6 +198,8 @@ export default function PostsRedesignClient({
           const account = connectedAccounts.find((item) => item.id === post.connectedAccount);
           const accountName = post.connectedAccountName ?? account?.displayName ?? "LinkedIn account";
           const accountInitials = account ? getAccountInitials(account) : getInitials(accountName);
+          const accountAccess = getLinkedInAccountAccessById(post.connectedAccount, connectedAccounts);
+          const linkedinActionDisabled = !accountAccess?.isUsable;
           return (
             <article key={post._id} className="mq-post-row">
               {account?.avatarUrl ? (
@@ -199,8 +215,8 @@ export default function PostsRedesignClient({
               <div className="mq-post-row-status"><span className={`mq-status mq-status-${status.toLowerCase()}`}><i />{status[0] + status.slice(1).toLowerCase()}</span><span className="mq-mono">{dateLabel}</span></div>
               <div className="mq-post-row-actions">
                 {status === "DRAFT" ? <Link href={`/posts/${post._id}/edit`} className="mq-icon-button" title="Edit post"><Pencil size={15} /></Link> : null}
-                {status === "SCHEDULED" ? <button type="button" className="mq-icon-button" title="Schedule post" onClick={() => { setSchedulePostId(post._id); setScheduleValue(localDateTimeValue(parseDate(post.scheduledAt) ?? getDefaultScheduleDate())); }}><CalendarClock size={15} /></button> : null}
-                {status !== "PUBLISHED" ? <button type="button" className="mq-icon-button" title="Publish now" disabled={actionId === post._id} onClick={() => void runAction(post._id, "publish")}><Send size={15} /></button> : null}
+                {status === "SCHEDULED" ? <button type="button" className="mq-icon-button" title={linkedinActionDisabled ? LINKEDIN_ACCESS_EXPIRED_MESSAGE : "Schedule post"} disabled={linkedinActionDisabled} onClick={() => { setSchedulePostId(post._id); setScheduleValue(localDateTimeValue(parseDate(post.scheduledAt) ?? getDefaultScheduleDate())); }}><CalendarClock size={15} /></button> : null}
+                {status !== "PUBLISHED" ? <button type="button" className="mq-icon-button" title={linkedinActionDisabled ? LINKEDIN_ACCESS_EXPIRED_MESSAGE : "Publish now"} disabled={linkedinActionDisabled || actionId === post._id} onClick={() => void runAction(post._id, "publish")}><Send size={15} /></button> : null}
                 <button type="button" className="mq-icon-button mq-icon-danger" title="Delete post" disabled={actionId === post._id} onClick={() => setDeletePostId(post._id)}><Trash2 size={15} /></button>
                 <button type="button" className="mq-icon-button mq-more-button" aria-label="More actions"><MoreHorizontal size={16} /></button>
               </div>

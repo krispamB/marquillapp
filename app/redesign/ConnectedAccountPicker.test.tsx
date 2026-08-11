@@ -70,6 +70,17 @@ describe("ConnectedAccountPicker", () => {
     ]).map((account) => account.id)).toEqual(["personal-1", "organization-1"]);
   });
 
+  test("excludes accounts with expired LinkedIn access", () => {
+    expect(activeConnectedAccounts([
+      {
+        id: "expired-1",
+        provider: "LINKEDIN",
+        displayName: "Expired account",
+        accessTokenExpiresAt: "2020-01-01T00:00:00.000Z",
+      },
+    ])).toEqual([]);
+  });
+
   test("resolves zero, one, and multiple active-account paths", () => {
     expect(resolveAttachAccountChoice([]).kind).toBe("none");
 
