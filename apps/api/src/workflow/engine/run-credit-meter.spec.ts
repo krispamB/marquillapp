@@ -1,5 +1,7 @@
+import { FeatureGateForbiddenException } from '../../feature-gating/feature-gating.exception';
 import { RunCreditMeter } from './run-credit-meter';
 import { RunEventType } from './run-event.types';
+import { WorkflowError } from './workflow.error';
 
 describe('RunCreditMeter', () => {
   const userId = '665f1b2c3d4e5f6a7b8c9d0e';
@@ -134,13 +136,36 @@ describe('RunCreditMeter', () => {
       expect(checked).toBe(debited);
     });
 
-    it('should propagate the gate rejection', async () => {
+    it('should classify exhausted credits as a terminal workflow failure', async () => {
       mocks.creditMeterService.assertBalance.mockRejectedValue(
-        new Error('FEATURE_LIMIT_EXCEEDED'),
+        new FeatureGateForbiddenException({
+          code: 'FEATURE_LIMIT_EXCEEDED',
+          feature: 'credits',
+          limit: 120,
+          currentUsage: 120,
+          tier: { id: 'tier-1', name: 'Free' },
+          upgradeHint: 'You have used all your credits for this period.',
+        }),
+      );
+
+      const error: unknown = await meter
+        .assertBalance()
+        .catch((cause: unknown): unknown => cause);
+
+      expect(error).toBeInstanceOf(WorkflowError);
+      expect(error).toMatchObject({
+        reason: 'insufficient credits',
+        retryable: false,
+      });
+    });
+
+    it('should preserve an unexpected balance-check failure', async () => {
+      mocks.creditMeterService.assertBalance.mockRejectedValue(
+        new Error("Socket 'secureConnect' timed out"),
       );
 
       await expect(meter.assertBalance()).rejects.toThrow(
-        'FEATURE_LIMIT_EXCEEDED',
+        "Socket 'secureConnect' timed out",
       );
     });
   });

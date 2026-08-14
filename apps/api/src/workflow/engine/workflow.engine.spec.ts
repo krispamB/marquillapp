@@ -217,7 +217,9 @@ describe('runWorkflow', () => {
     it('should fail terminally when the balance guard rejects', async () => {
       // Guards the race where balance drained between enqueue and pickup — a
       // retry cannot refill it, so there is nothing to retry.
-      mocks.meter.assertBalance.mockRejectedValue(new Error('gate'));
+      mocks.meter.assertBalance.mockRejectedValue(
+        terminal('insufficient credits'),
+      );
 
       await expect(runWorkflow(makeInput(), deps)).rejects.toBeInstanceOf(
         UnrecoverableError,
@@ -225,11 +227,30 @@ describe('runWorkflow', () => {
     });
 
     it('should report insufficient credits as the failure reason', async () => {
-      mocks.meter.assertBalance.mockRejectedValue(new Error('gate'));
+      mocks.meter.assertBalance.mockRejectedValue(
+        terminal('insufficient credits'),
+      );
 
       await expect(runWorkflow(makeInput(), deps)).rejects.toThrow(
         'insufficient credits',
       );
+    });
+
+    it('should preserve a database timeout as a retryable failure', async () => {
+      mocks.meter.assertBalance.mockRejectedValue(
+        new Error("Socket 'secureConnect' timed out"),
+      );
+
+      const error: unknown = await runWorkflow(makeInput(), deps).catch(
+        (cause: unknown): unknown => cause,
+      );
+
+      expect(error).toBeInstanceOf(WorkflowError);
+      expect(error).toMatchObject({
+        reason: "Socket 'secureConnect' timed out",
+        retryable: true,
+      });
+      expect(mocks.emitter.flush).toHaveBeenCalledTimes(1);
     });
 
     it('should not run any step when the balance guard rejects', async () => {

@@ -108,7 +108,8 @@ export async function runWorkflow(
 
 /**
  * Guards the race where a user's balance drained between enqueue and pickup.
- * Terminal by construction: a retry cannot refill a wallet.
+ * Confirmed exhaustion is terminal because a retry cannot refill a wallet.
+ * Infrastructure and configuration failures keep their normal retry taxonomy.
  */
 async function assertBalance(
   ctx: StepContext,
@@ -116,9 +117,12 @@ async function assertBalance(
 ): Promise<void> {
   try {
     await ctx.meter.assertBalance();
-  } catch {
+  } catch (error: unknown) {
     await emitter.flush();
-    throw new UnrecoverableError('insufficient credits');
+    const workflowError = toWorkflowError(error);
+    throw workflowError.retryable
+      ? workflowError
+      : new UnrecoverableError(workflowError.reason);
   }
 }
 

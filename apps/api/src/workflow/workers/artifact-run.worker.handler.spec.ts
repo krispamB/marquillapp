@@ -13,6 +13,7 @@ jest.mock(
 
 import { ContentValidationError } from '../../agent/agent-runner.error';
 import { FeatureGateForbiddenException } from '../../feature-gating/feature-gating.exception';
+import { WorkflowError } from '../engine/workflow.error';
 import type { BuildInput } from '../engine/workflow.types';
 import {
   ArtifactRunProcessor,
@@ -204,6 +205,42 @@ describe('ArtifactRunProcessor', () => {
       await processor.process(makeJob());
 
       expect(mocks.featureGating.assertResearchAccess).not.toHaveBeenCalled();
+    });
+
+    it('should stop immediately when the worker confirms exhausted credits', async () => {
+      mocks.creditMeter.assertBalance.mockRejectedValue(
+        new FeatureGateForbiddenException({
+          code: 'FEATURE_LIMIT_EXCEEDED',
+          feature: 'credits',
+          limit: 120,
+          currentUsage: 120,
+          tier: { id: 'tier-1', name: 'Free' },
+          upgradeHint: 'You have used all your credits for this period.',
+        }),
+      );
+
+      await expect(processor.process(makeJob())).rejects.toMatchObject({
+        name: 'UnrecoverableError',
+        message: 'insufficient credits',
+      });
+      expect(mocks.agent.generate).not.toHaveBeenCalled();
+    });
+
+    it('should retry a database failure during the worker balance check', async () => {
+      mocks.creditMeter.assertBalance.mockRejectedValue(
+        new Error("Socket 'secureConnect' timed out"),
+      );
+
+      const error: unknown = await processor
+        .process(makeJob())
+        .catch((cause: unknown): unknown => cause);
+
+      expect(error).toBeInstanceOf(WorkflowError);
+      expect(error).toMatchObject({
+        reason: "Socket 'secureConnect' timed out",
+        retryable: true,
+      });
+      expect(mocks.agent.generate).not.toHaveBeenCalled();
     });
 
     it('should run a research-off POST job to a READY version', async () => {
@@ -548,11 +585,24 @@ describe('ArtifactRunProcessor', () => {
       expect(mocks.redis.xadd).not.toHaveBeenCalled();
     });
 
-    it('should still announce run.failed when the attempt ran in another process', async () => {
-      await processor.onFailed(makeJob({ attemptsMade: 3 }), new Error('boom'));
+    it('should hide an exhausted transient cause from the artifact client', async () => {
+      await processor.onFailed(
+        makeJob({ attemptsMade: 3 }),
+        new Error("Socket 'secureConnect' timed out"),
+      );
 
-      expect(mocks.runHandle.fail).toHaveBeenCalledWith('boom');
+      expect(mocks.artifacts.failVersion).toHaveBeenCalledWith(
+        'artifact-1',
+        1,
+        'Generation is temporarily unavailable. Please try again.',
+      );
+      expect(mocks.runHandle.fail).toHaveBeenCalledWith(
+        'Generation is temporarily unavailable. Please try again.',
+      );
       expect(emittedTypes(mocks.redis)).toEqual(['run.failed']);
+      expect(mocks.logger.error).toHaveBeenCalledWith(
+        expect.stringContaining("Socket 'secureConnect' timed out"),
+      );
     });
 
     it('should log and return when the job has no id', async () => {
