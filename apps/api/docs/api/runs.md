@@ -46,7 +46,7 @@ data: {"seq":4,"ts":1752500000123,"step":"GENERATE","index":2,"total":4}
 | `usage.tick` | `kind`, `credits`, `totalCredits`, optional `detail` | Update the live credit display. |
 | `step.failed` | `step`, `retryable`, `message` | When `retryable` is true, show a transient retry notice. When false, `run.failed` follows. |
 | `run.completed` | `artifactId`, `version` | The version is `READY`; refetch the artifact and close the stream. |
-| `run.failed` | `failureReason` | Show the failure and close the stream. |
+| `run.failed` | `failureReason` | Show the failure and close the stream. Retry-exhausted infrastructure failures use a client-safe generic reason. |
 
 The possible workflow steps are `RESOLVE_INPUT`, `RESEARCH`, `GENERATE`, `RENDER_PDF`, and `PERSIST_VERSION`.
 
@@ -79,6 +79,19 @@ type RunEventData =
 ```
 
 The current `step.progress` signal is `sourcesFound` for `RESEARCH`. PDF rendering is atomic and does not currently emit page-level progress.
+
+### Failure reason policy
+
+Deliberate terminal failures use their stable domain reason, such as
+`insufficient credits`. When a transient failure exhausts the worker's retry
+budget, the worker keeps the technical cause in its server logs and emits:
+
+```text
+Generation is temporarily unavailable. Please try again.
+```
+
+Clients must not depend on provider, database, or network error text appearing
+in `failureReason`.
 
 ## Reconnect and close behavior
 

@@ -38,6 +38,12 @@ export interface ArtifactRunDeps {
   logger: Logger;
 }
 
+const TEMPORARY_FAILURE_REASON =
+  'Generation is temporarily unavailable. Please try again.';
+
+const isUnrecoverableFailure = (error: Error): boolean =>
+  error instanceof UnrecoverableError || error.name === 'UnrecoverableError';
+
 /**
  * BullMQ stops retrying either because a step declared its failure terminal, or
  * because the attempt budget ran out. `UnrecoverableError` is matched by name as
@@ -45,9 +51,7 @@ export interface ArtifactRunDeps {
  * `instanceof`, and getting this wrong would silently strand a run `RUNNING`.
  */
 export const isTerminalJobFailure = (job: Job, error: Error): boolean =>
-  error instanceof UnrecoverableError ||
-  error.name === 'UnrecoverableError' ||
-  job.attemptsMade >= (job.opts.attempts ?? 1);
+  isUnrecoverableFailure(error) || job.attemptsMade >= (job.opts.attempts ?? 1);
 
 /**
  * The `workflow` queue's consumer: it builds a `StepContext` out of the six role
@@ -136,6 +140,9 @@ export class ArtifactRunProcessor {
     // Absent from the map only when the attempt ran in another process; a fresh
     // emitter restarts `seq`, a lesser evil than losing the client's `run.failed`.
     logger.error(`Artifact run ${runId} failed terminally: ${error.message}`);
+    const failureReason = isUnrecoverableFailure(error)
+      ? describeError(error)
+      : TEMPORARY_FAILURE_REASON;
 
     await handleTerminalFailure(
       {
@@ -147,7 +154,7 @@ export class ArtifactRunProcessor {
       {
         artifactId: job.data.artifactId,
         version: job.data.version,
-        failureReason: describeError(error),
+        failureReason,
       },
     );
   }

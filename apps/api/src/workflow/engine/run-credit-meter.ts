@@ -1,8 +1,9 @@
 import type { Logger } from '@nestjs/common';
 import type { UsageRecord } from '../../feature-gating/credit-meter.constants';
 import type { CreditMeterService } from '../../feature-gating/credit-meter.service';
+import { FeatureGateForbiddenException } from '../../feature-gating/feature-gating.exception';
 import { RunEventType, type EmittedEvent } from './run-event.types';
-import { describeError } from './workflow.error';
+import { describeError, terminal } from './workflow.error';
 import type { CreditMeter } from './workflow.types';
 
 /**
@@ -32,8 +33,16 @@ export class RunCreditMeter implements CreditMeter {
    * already bound: taking it again as a parameter would be a second source of
    * truth that could silently disagree with the one `commit` debits.
    */
-  assertBalance(): Promise<void> {
-    return this.creditMeterService.assertBalance(this.userId);
+  async assertBalance(): Promise<void> {
+    try {
+      await this.creditMeterService.assertBalance(this.userId);
+    } catch (error: unknown) {
+      if (error instanceof FeatureGateForbiddenException) {
+        throw terminal('insufficient credits', error);
+      }
+
+      throw error;
+    }
   }
 
   /**
