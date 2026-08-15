@@ -48,4 +48,20 @@ describe('TIER_SEEDS', () => {
       expect.arrayContaining(['30,000 AI credits/month', 'AI research']),
     );
   });
+
+  it('should map each paid tier to its current Paddle monthly price', () => {
+    expect(
+      Object.fromEntries(
+        TIER_SEEDS.map(({ name, paddleMonthlyPriceId }) => [
+          name,
+          paddleMonthlyPriceId,
+        ]),
+      ),
+    ).toEqual({
+      Free: undefined,
+      Starter: 'pri_01kp1mjq33h66h0sgwjy1sshzb',
+      Creator: 'pri_01kp1mgt8gmsnzb4cb9jndz34k',
+      'Pro Writer': 'pri_01kp1mmw9b31vxjvhs69y1q4g3',
+    });
+  });
 });
