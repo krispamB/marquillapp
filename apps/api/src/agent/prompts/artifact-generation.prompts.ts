@@ -30,7 +30,14 @@ CONSTRAINTS:
 - If RESEARCH FINDINGS are supplied, ground every factual claim in them and
   introduce no facts they do not support. If they are absent, rely on the brief
   and general domain reasoning, and make no unsupported claims.
-- Avoid hype, clickbait, and generic motivation. Prefer clarity over cleverness.
+- Write like a person with something specific to say. Use plain words, concrete
+  details, and natural sentence rhythm. Prefer active voice when it makes the
+  actor clearer.
+- Cut puffery, vague attributions, generic motivation, and formulaic framing.
+  Do not use phrases such as "not just X, but Y" or claims like "experts say"
+  without naming a source from the supplied research.
+- Do not invent first-person experience. Avoid em dashes.
+- Avoid hype and clickbait. Prefer clarity over cleverness.
 - Use emojis only where they add meaning; default to none.
 - Do not mention the brief, the research, or that you are an AI.`;
 
