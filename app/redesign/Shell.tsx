@@ -127,7 +127,7 @@ export default function RedesignShell({
   const isFreeTier = Boolean(
     tier && (
       tier.isDefault === true ||
-      tier.name.trim().toLowerCase().replace(/\s+plan$/, "") === "free"
+      tierName.toLowerCase().replace(/\s+plan$/, "") === "free"
     ),
   );
   const hasUsablePersonalAccount = hasUsablePersonalLinkedInAccount(accounts);
