@@ -32,27 +32,27 @@ html, body { margin: 0; padding: 0; }
 .body { font-size: 28px; line-height: 1.5; margin: 48px 0 0; }
 .items { list-style: none; margin: 48px 0 0; padding: 0; display: flex; flex-direction: column; gap: 24px; font-size: 28px; line-height: 1.5; }
 .spacer { flex: 1; }
-.rule { height: 4px; background: #9c3412; margin: 0 0 32px; width: 128px; }
+.rule { height: 4px; background: var(--ds-accent); margin: 0 0 32px; width: 128px; }
 .ask { display: flex; gap: 16px; }
 </style>
 </head>
 <body>
-<section class="page">
+<section class="page" data-role="cover">
   <p class="label">Field notes</p>
   <div class="spacer"></div>
   <h1 class="display">Most decks fail before the first word is read.</h1>
 </section>
-<section class="page">
+<section class="page" data-role="argument">
   <h2 class="heading">Attention is spent at the cover</h2>
   <p class="lead">A reader decides in the first swipe whether the rest is worth their thumb.</p>
   <p class="body">If the cover argues for the whole document, every page after it inherits the benefit of the doubt.</p>
 </section>
-<section class="page">
+<section class="page" data-role="quote">
   <div class="rule"></div>
   <p class="lead">Empty paper is not an unfinished page. It is the loudest thing on it.</p>
   <p class="label">Jan Tschichold</p>
 </section>
-<section class="page">
+<section class="page" data-role="closing">
   <h2 class="heading">Cut one sentence from every page you publish.</h2>
   <div class="spacer"></div>
   <p class="label ask"><svg data-icon="arrow-right" data-size="32" width="32" height="32" aria-hidden="true"></svg> Follow for more field notes</p>

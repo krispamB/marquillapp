@@ -38,6 +38,7 @@ palette:
     - { text: accentInk, on: accent }
   rules:
     externalColors: forbid
+    references: token-var-only
     minContrastRatio: 4.5
 
 typography:

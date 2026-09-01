@@ -23,8 +23,9 @@ PAGE
 - Every page is exactly ${p.width}x${p.height}px. Content stays inside a safe area of ${p.safeArea.top}px top, ${p.safeArea.right}px right, ${p.safeArea.bottom}px bottom, ${p.safeArea.left}px left.
 - The document has ${p.pages.min} to ${p.pages.max} pages. Default page ground is ${p.background}.
 
-COLOUR — use these tokens and nothing else
-${ds.palette.tokens.map((c) => `- ${c.name} ${c.hex} (${c.role})`).join('\n')}
+COLOUR — declare these tokens once in :root, then reference them only as var(--ds-<token>)
+${ds.palette.tokens.map((c) => `- ${c.name} ${c.hex} (${c.role}) -> var(--ds-${c.name})`).join('\n')}
+A raw colour value anywhere outside the :root block is rejected, even if it matches a token.
 Text/background combinations that are approved:
 ${ds.palette.pairings.map((x) => `- ${x.text} on ${x.on}`).join('\n')}
 
@@ -45,7 +46,7 @@ ICONS
 - Available: ${ds.icons.allowed.join(', ')}. Sizes: ${ds.icons.sizes.join(', ')}px. Colours: ${ds.icons.colors.join(', ')}.
 - At most ${ds.icons.rules.maxPerPage} per page, and ${ds.icons.rules.role} only — an icon never carries meaning the reader needs.
 
-PAGE ROLES
+PAGE ROLES — every page element carries data-role="<role>"
 ${ds.composition.pageRoles
   .map(
     (r) =>

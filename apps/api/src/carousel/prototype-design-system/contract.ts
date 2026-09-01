@@ -88,6 +88,10 @@ export const designSystemSchema = z
         .min(1),
       rules: z.strictObject({
         externalColors: z.enum(['forbid']),
+        // Settled on #160: the token *name* must survive into the generated
+        // CSS, so colours are referenced as var(--ds-<token>) and hex literals
+        // live only in the :root block.
+        references: z.enum(['token-var-only']),
         minContrastRatio: z.number().min(1).max(21),
       }),
     }),

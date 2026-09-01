@@ -75,6 +75,12 @@ export const ledger: {
     note: 'Rejects off-palette hex and any rgb()/hsl() literal.',
   },
   {
+    key: 'palette.rules.references',
+    teeth: 'static',
+    prompt: true,
+    note: 'Settled #160: colours are var(--ds-<token>), hex only in :root, so the role survives into the output.',
+  },
+  {
     key: 'palette.rules.minContrastRatio',
     teeth: 'seed',
     prompt: false,
@@ -146,9 +152,9 @@ export const ledger: {
 
   {
     key: 'composition.pageRoles',
-    teeth: 'guidance',
+    teeth: 'static',
     prompt: true,
-    note: 'position/required are checkable only if the source labels pages. See open question 3.',
+    note: 'Settled #160: #162 requires data-role on every page, so the role name, the first/last pins and required are all checked. The per-role guidance prose is not.',
   },
   {
     key: 'composition.principles',

@@ -23,7 +23,9 @@ const c = {
   cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
 };
 
-let strict = false;
+// Strict palette references are the settled contract (#160); the toggle exists
+// only to show what the looser alternative would have let through.
+let strict = true;
 let ds: DesignSystem;
 
 const rule = (t = '') =>
@@ -76,7 +78,9 @@ function showPrompt() {
 async function showEnforce() {
   for (const file of ['samples/conforming.html', 'samples/drifted.html']) {
     const v = enforce(ds, await read(file), { strict });
-    rule(`${file}  ${c.dim(strict ? '[strict mode]' : '[loose mode]')}`);
+    rule(
+      `${file}  ${c.dim(strict ? '[contract: strict palette]' : '[rejected alternative: loose palette]')}`,
+    );
     if (!v.length) console.log(c.green('  no violations'));
     for (const x of v)
       console.log(
@@ -115,7 +119,7 @@ ${c.bold('Design System Definition contract — prototype (#160)')}
   3  what the model reads
   4  what the backend rejects
   5  ledger: enforced vs guidance
-  6  toggle strict palette mode  ${c.dim('(tokens via var(--ds-*) only)')}
+  6  toggle the palette rule  ${c.dim('(contract = var(--ds-*) only; off = bare hex allowed)')}
   q  quit
 `;
 
@@ -132,7 +136,7 @@ for await (const line of console) {
   else if (k === '6') {
     strict = !strict;
     console.log(
-      `strict palette mode: ${strict ? c.green('on') : c.dim('off')}`,
+      `palette rule: ${strict ? c.green('token-var-only (the contract)') : c.yellow('loose hex (the rejected alternative)')}`,
     );
   } else console.log(menu);
   console.log(c.dim('\n[1-6, q]'));

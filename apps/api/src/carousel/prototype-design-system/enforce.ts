@@ -29,7 +29,7 @@ const rootBlock = (css: string) =>
 export function enforce(
   ds: DesignSystem,
   source: string,
-  opts = { strict: false },
+  opts = { strict: true },
 ): Violation[] {
   const v: Violation[] = [];
   const add = (rule: string, detail: string, page?: number) =>
@@ -77,16 +77,16 @@ export function enforce(
       'palette.rules.externalColors',
       `${m[1]}() colour bypasses the palette tokens`,
     );
-  if (opts.strict) {
+  // palette.rules.references — the token name must survive into the CSS
+  if (opts.strict)
     for (const m of outsideRoot.matchAll(/#[0-9a-fA-F]{3,8}\b/g))
       add(
-        'palette (strict)',
-        `${m[0]} used directly; strict mode allows only var(--ds-<token>)`,
+        'palette.rules.references',
+        `${m[0]} used directly; colours are referenced as var(--ds-<token>)`,
       );
-    for (const m of css.matchAll(/var\(\s*--ds-([a-zA-Z0-9]+)\s*\)/g))
-      if (!tokenNames.has(m[1]))
-        add('palette (strict)', `var(--ds-${m[1]}) resolves to no token`);
-  }
+  for (const m of css.matchAll(/var\(\s*--ds-([a-zA-Z0-9]+)\s*\)/g))
+    if (!tokenNames.has(m[1]))
+      add('palette.rules.references', `var(--ds-${m[1]}) resolves to no token`);
 
   // typography.fonts — declared families and the Google Fonts request
   const families = ds.typography.fonts.map((f) => f.family.toLowerCase());
@@ -161,6 +161,40 @@ export function enforce(
           `${m[1]}: ${n}px is not a step in the spacing scale`,
         );
     }
+  }
+
+  // composition.pageRoles — enforceable because #162 is asked to require
+  // data-role on every page element (settled on #160).
+  const labels = pages.map((p) => p.match(/data-role="([^"]+)"/)?.[1]);
+  const roleNames = new Set(ds.composition.pageRoles.map((r) => r.name));
+  labels.forEach((label, i) => {
+    if (!label)
+      add('composition.pageRoles', 'page carries no data-role label', i + 1);
+    else if (!roleNames.has(label))
+      add(
+        'composition.pageRoles',
+        `role "${label}" is not defined by the design system`,
+        i + 1,
+      );
+  });
+  for (const r of ds.composition.pageRoles) {
+    if (r.position === 'first' && r.required && labels[0] !== r.name)
+      add(
+        'composition.pageRoles',
+        `first page must be role "${r.name}", found "${labels[0] ?? 'none'}"`,
+        1,
+      );
+    if (r.position === 'last' && r.required && labels.at(-1) !== r.name)
+      add(
+        'composition.pageRoles',
+        `last page must be role "${r.name}", found "${labels.at(-1) ?? 'none'}"`,
+        pages.length,
+      );
+    if (r.required && r.position === 'any' && !labels.includes(r.name))
+      add(
+        'composition.pageRoles',
+        `required role "${r.name}" appears on no page`,
+      );
   }
 
   // icons

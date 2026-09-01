@@ -20,6 +20,7 @@ palette:
     - { text: ink, on: ghost }
   rules:
     externalColors: forbid
+    references: token-var-only
     minContrastRatio: 4.5
 typography:
   fonts:
