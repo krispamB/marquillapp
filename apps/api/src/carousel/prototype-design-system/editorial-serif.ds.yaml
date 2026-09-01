@@ -1,0 +1,153 @@
+# PROTOTYPE — Design System Definition, contract v1.
+# Candidate answer to issue #160. Throwaway; not loaded by the app.
+#
+# Every key below is annotated in the ledger (`bun ... prototype.ts` -> [5]) as
+# ENFORCED (the backend can reject a Document Source that violates it),
+# GUIDANCE (it only ever becomes prompt text), or BOTH.
+
+contract: 1
+
+id: editorial-serif
+version: 1
+name: Editorial Serif
+summary: Magazine thought-leadership. Serif display, warm paper, one idea per page.
+intent: >
+  Pages should read like a well-set print feature: a single dominant idea,
+  asymmetric placement, and enough empty paper that the eye knows where to land.
+  Restraint is the brand. When in doubt, remove an element rather than balance it.
+
+page:
+  width: 1080
+  height: 1350
+  safeArea: { top: 96, right: 96, bottom: 96, left: 96 }
+  pages: { min: 2, max: 15 }
+  background: paper
+
+palette:
+  tokens:
+    - { name: paper, hex: '#faf7f2', role: background }
+    - { name: ink, hex: '#14110f', role: text }
+    - { name: muted, hex: '#5f574e', role: text }
+    - { name: rule, hex: '#d9d0c3', role: border }
+    - { name: accent, hex: '#9c3412', role: accent }
+    - { name: accentInk, hex: '#fdf6f2', role: text }
+  pairings:
+    - { text: ink, on: paper }
+    - { text: muted, on: paper }
+    - { text: accent, on: paper }
+    - { text: accentInk, on: accent }
+  rules:
+    externalColors: forbid
+    minContrastRatio: 4.5
+
+typography:
+  fonts:
+    - name: display
+      family: Fraunces
+      source: google
+      weights: [600, 700]
+      styles: [normal, italic]
+      fallback: Georgia, 'Times New Roman', serif
+    - name: body
+      family: Inter
+      source: google
+      weights: [400, 600]
+      styles: [normal]
+      fallback: -apple-system, 'Segoe UI', sans-serif
+  scale:
+    - name: display
+      px: 92
+      lineHeight: 1.02
+      tracking: '-0.02em'
+      font: display
+      weight: 700
+      use: The one dominant line on a cover. Never two per page.
+    - name: heading
+      px: 56
+      lineHeight: 1.12
+      tracking: '-0.01em'
+      font: display
+      weight: 600
+      use: The idea a body page argues.
+    - name: lead
+      px: 34
+      lineHeight: 1.35
+      tracking: '0'
+      font: body
+      weight: 400
+      use: A standfirst under a heading, or a pull quote.
+    - name: body
+      px: 28
+      lineHeight: 1.5
+      tracking: '0'
+      font: body
+      weight: 400
+      use: Running prose and list items.
+    - name: label
+      px: 22
+      lineHeight: 1.2
+      tracking: '0.08em'
+      font: body
+      weight: 600
+      use: Eyebrows, page numbers, attributions. Uppercase is allowed here only.
+  rules:
+    sizes: scale-only
+    minPx: 22
+    maxLineLengthCh: 54
+    transforms: [none, uppercase]
+
+spacing:
+  base: 4
+  scale: [4, 8, 12, 16, 24, 32, 48, 64, 96, 128, 160]
+  rules:
+    values: scale-only
+    appliesTo: [margin, padding, gap]
+
+icons:
+  catalog: app-inline-v1
+  allowed: [arrow-right, check, minus, quote, circle-dot, spark]
+  sizes: [24, 32, 48]
+  colors: [ink, accent]
+  rules:
+    maxPerPage: 3
+    role: decorative
+
+composition:
+  pageRoles:
+    - name: cover
+      position: first
+      required: true
+      guidance: >
+        One display line, set low-left against a wide empty top. A label eyebrow
+        above it may name the subject. No supporting paragraph.
+    - name: argument
+      guidance: >
+        A heading, then at most one short paragraph or a list of up to five
+        items. The heading owns the top third; the body sits below the fold of
+        the page, not centred in it.
+    - name: quote
+      guidance: >
+        A lead-sized pull quote on paper, an accent rule above it, a label
+        attribution beneath. Nothing else on the page.
+    - name: closing
+      position: last
+      required: true
+      guidance: >
+        A heading-sized ask and one label line. An arrow-right icon may sit
+        beside the ask. No new argument is introduced here.
+  principles:
+    - Anchor each page on exactly one dominant element and let the rest recede.
+    - Place content asymmetrically; a centred block should be a deliberate exception.
+    - Treat the safe area as a hard edge. Only a flat background colour may reach the page bleed.
+    - Let a page be short. Empty paper is the house style, not an unfinished page.
+  antiPatterns:
+    - avoid: Filling the page because it looks empty.
+      instead: Cut a sentence and raise the remaining line into the space.
+    - avoid: Stacking three or more type sizes on one page.
+      instead: Use two, and separate the third idea onto its own page.
+    - avoid: Decorating text with shadows, outlines, gradients, or letter-spaced body copy.
+      instead: Let the serif and the paper carry the character.
+    - avoid: Boxing every block in a card with a border and a radius.
+      instead: Use whitespace and a single hairline rule to separate ideas.
+    - avoid: Using an icon to carry meaning a reader needs.
+      instead: Say it in words; keep icons decorative.
