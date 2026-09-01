@@ -1,8 +1,9 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
-import type { PostMediaItem, UserProfile } from "../lib/types";
+import type { UserProfile } from "../lib/types";
 import PostCompositionPreview from "./PostCompositionPreview";
+import type { ComposerPostMediaItem } from "./postMedia";
 import type { ArtifactDetailData } from "./artifactTypes";
 
 GlobalRegistrator.register();
@@ -23,7 +24,7 @@ const artifact: ArtifactDetailData = {
   content: { commentary: "A post with attached media." },
 };
 
-function image(id: string, status: PostMediaItem["status"] = "READY"): PostMediaItem {
+function image(id: string, status: ComposerPostMediaItem["status"] = "READY"): ComposerPostMediaItem {
   return {
     id,
     type: "IMAGE",
@@ -33,7 +34,7 @@ function image(id: string, status: PostMediaItem["status"] = "READY"): PostMedia
   };
 }
 
-function previewUrls(media: PostMediaItem[]) {
+function previewUrls(media: ComposerPostMediaItem[]) {
   return Object.fromEntries(media.map((item) => [item.id, `https://cdn.example/${item.id}`]));
 }
 
@@ -168,7 +169,7 @@ describe("PostCompositionPreview media", () => {
   });
 
   test("preserves the single-video preview", () => {
-    const media: PostMediaItem[] = [{
+    const media: ComposerPostMediaItem[] = [{
       id: "video-1",
       type: "VIDEO",
       status: "READY",
