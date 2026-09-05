@@ -515,6 +515,115 @@ describe('AuthService.disconnectConnectedAccount', () => {
   });
 });
 
+describe('AuthService.getLinkedinOrganizations', () => {
+  const makeService = () => {
+    const connectedAccountModel = { findOne: jest.fn() };
+    const encryptionService = {
+      decrypt: jest.fn().mockResolvedValue('decrypted-token'),
+    };
+    const featureGatingService = {
+      assertCompanyPagesAccess: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new AuthService(
+      {} as any,
+      {} as any,
+      connectedAccountModel as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      encryptionService as any,
+      featureGatingService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+
+    return {
+      service,
+      mocks: {
+        connectedAccountModel,
+        encryptionService,
+        featureGatingService,
+      },
+    };
+  };
+
+  const usableAccount = () => ({
+    user: new Types.ObjectId(),
+    provider: AccountProvider.LINKEDIN,
+    accountType: LinkedinAccountType.PERSON,
+    externalId: 'person-1',
+    isActive: true,
+    accessToken: 'encrypted-token',
+    accessTokenExpiresAt: new Date(Date.now() + 60_000),
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should reject organization fetching when LinkedIn access has expired', async () => {
+    const { service, mocks } = makeService();
+    mocks.connectedAccountModel.findOne.mockResolvedValue({
+      ...usableAccount(),
+      accessTokenExpiresAt: new Date(Date.now() - 60_000),
+    });
+
+    await expect(
+      service.getLinkedinOrganizations(new Types.ObjectId().toString()),
+    ).rejects.toMatchObject({
+      response: {
+        statusCode: 409,
+        message: 'Reconnect your LinkedIn account to fetch organizations.',
+      },
+    });
+
+    expect(mocks.encryptionService.decrypt).not.toHaveBeenCalled();
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it('should map a LinkedIn ACL 401 response to a reconnect conflict', async () => {
+    const { service, mocks } = makeService();
+    mocks.connectedAccountModel.findOne.mockResolvedValue(usableAccount());
+    (apiFetch as jest.Mock).mockRejectedValue(
+      new ApiError(401, 'Unauthorized', { message: 'Expired token' }),
+    );
+
+    await expect(
+      service.getLinkedinOrganizations(new Types.ObjectId().toString()),
+    ).rejects.toMatchObject({
+      response: {
+        statusCode: 409,
+        message: 'Reconnect your LinkedIn account to fetch organizations.',
+      },
+    });
+  });
+
+  it('should map an organization detail 401 response to a reconnect conflict', async () => {
+    const { service, mocks } = makeService();
+    mocks.connectedAccountModel.findOne.mockResolvedValue(usableAccount());
+    (apiFetch as jest.Mock)
+      .mockResolvedValueOnce({
+        data: {
+          elements: [
+            {
+              organization: 'urn:li:organization:123',
+              role: 'ADMINISTRATOR',
+              state: 'APPROVED',
+            },
+          ],
+        },
+      })
+      .mockRejectedValueOnce(
+        new ApiError(401, 'Unauthorized', { message: 'Expired token' }),
+      );
+
+    await expect(
+      service.getLinkedinOrganizations(new Types.ObjectId().toString()),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+});
+
 describe('AuthService.getLinkedinUser', () => {
   const createService = () =>
     new AuthService(

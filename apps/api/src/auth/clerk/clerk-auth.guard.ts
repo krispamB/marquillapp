@@ -40,17 +40,18 @@ export class ClerkAuthGuard implements CanActivate {
       return this.legacyFallback(context);
     }
 
+    let claims: Awaited<ReturnType<typeof verifyToken>>;
     try {
-      const claims = await verifyToken(token, this.verifyOptions());
-
-      const user = await this.userProvisioning.findOrCreate(claims.sub);
-      (request as Request & { user: unknown }).user = user;
-      return true;
+      claims = await verifyToken(token, this.verifyOptions());
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.debug(`Clerk token verification failed: ${message}`);
       return this.legacyFallback(context);
     }
+
+    const user = await this.userProvisioning.findOrCreate(claims.sub);
+    (request as Request & { user: unknown }).user = user;
+    return true;
   }
 
   private async legacyFallback(context: ExecutionContext): Promise<boolean> {
@@ -59,11 +60,12 @@ export class ClerkAuthGuard implements CanActivate {
   }
 
   private extractClerkToken(request: Request): string | null {
-    const cookieToken = (
-      request as Request & { cookies?: Record<string, string> }
-    ).cookies?.__session;
-    if (cookieToken) {
-      return cookieToken;
+    const cookies: unknown = request.cookies;
+    if (typeof cookies === 'object' && cookies !== null) {
+      const cookieToken = (cookies as Record<string, unknown>).__session;
+      if (typeof cookieToken === 'string' && cookieToken) {
+        return cookieToken;
+      }
     }
 
     const authHeader = request.headers?.authorization;

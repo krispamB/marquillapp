@@ -19,6 +19,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "start:worker": "node dist/workflow/workers/workflow.worker.js",
+    "db:migrate:user-indexes": "ts-node src/scripts/migrate-user-identity-indexes.ts",
     "review:credit-economics": "ts-node src/scripts/run-credit-economics-review.ts",
     "seed:tiers:temp": "ts-node src/scripts/temp-seed-tiers.ts"
   },

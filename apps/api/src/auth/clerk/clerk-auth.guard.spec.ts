@@ -122,5 +122,23 @@ describe('ClerkAuthGuard', () => {
       expect(mocks.userProvisioning.findOrCreate).not.toHaveBeenCalled();
       expect(mocks.jwtAuthGuard.canActivate).toHaveBeenCalledTimes(1);
     });
+
+    it('should propagate provisioning failures without using the legacy fallback', async () => {
+      const request: any = {
+        cookies: { __session: 'valid.jwt' },
+        headers: {},
+      };
+      const provisioningError = new Error('database unavailable');
+      verifyToken.mockResolvedValueOnce({ sub: 'user_clerk_4' });
+      mocks.userProvisioning.findOrCreate.mockRejectedValueOnce(
+        provisioningError,
+      );
+
+      await expect(guard.canActivate(makeContext(request))).rejects.toBe(
+        provisioningError,
+      );
+
+      expect(mocks.jwtAuthGuard.canActivate).not.toHaveBeenCalled();
+    });
   });
 });

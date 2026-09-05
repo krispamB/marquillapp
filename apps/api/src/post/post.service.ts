@@ -47,6 +47,7 @@ import { LinkedinMediaService } from './linkedin-media.service';
 import type { DocumentContent, PollContent } from '../artifact/schemas';
 import { CONTENT_TITLE_MAX_LENGTH } from '../common/constants';
 import { randomUUID } from 'crypto';
+import { isLinkedinAccessUsable } from '../common/HelperFn/linkedin-access.helper';
 
 interface PostFilters {
   availableMonths: string[];
@@ -54,6 +55,8 @@ interface PostFilters {
 }
 
 const POST_PAGE_SIZE = 20;
+const PUBLISH_RECONNECT_MESSAGE =
+  'Reconnect connected account to publish posts.';
 
 export interface PostArtifactMetadata {
   _id: Types.ObjectId;
@@ -178,6 +181,20 @@ export class PostService {
       throw new BadRequestException('Post is already published');
     }
 
+    let connectedAccount: ConnectedAccount;
+    try {
+      connectedAccount = await this.getOwnedUsableLinkedinConnectedAccount(
+        this.referenceId(post.user),
+        this.referenceId(post.connectedAccount),
+        'publish posts',
+      );
+    } catch (error) {
+      if (error instanceof ConflictException) {
+        await this.failPost(post, PUBLISH_RECONNECT_MESSAGE);
+      }
+      throw error;
+    }
+
     const source = post.artifacts[0];
     if (source) {
       await this.bumpArtifactPinRevision(source.artifact, source.version);
@@ -201,12 +218,6 @@ export class PostService {
     await this.assertMediaReadyForPublication(post, artifact.type);
 
     try {
-      const connectedAccount =
-        await this.getOwnedUsableLinkedinConnectedAccount(
-          this.referenceId(post.user),
-          this.referenceId(post.connectedAccount),
-          'publish posts',
-        );
       const accessToken = await this.encryptionService.decrypt(
         connectedAccount.accessToken!,
       );
@@ -289,15 +300,20 @@ export class PostService {
       return post;
     } catch (error) {
       this.logger.error(error);
+      const accessExpired =
+        error instanceof ApiError && error.statusCode === 401;
       const reconnectRequired =
         error instanceof ApiError &&
         error.statusCode === 400 &&
         typeof error.data?.message === 'string' &&
         error.data.message.includes('Organization permissions must be used');
-      const failureReason = reconnectRequired
-        ? 'Your LinkedIn account needs to be reconnected to enable company page posting. Please disconnect and reconnect your LinkedIn account.'
-        : 'Failed to publish post';
+      const failureReason = accessExpired
+        ? PUBLISH_RECONNECT_MESSAGE
+        : reconnectRequired
+          ? 'Your LinkedIn account needs to be reconnected to enable company page posting. Please disconnect and reconnect your LinkedIn account.'
+          : 'Failed to publish post';
       await this.failPost(post, failureReason);
+      if (accessExpired) throw new ConflictException(failureReason);
       if (reconnectRequired) throw new BadRequestException(failureReason);
       throw new InternalServerErrorException(failureReason);
     }
@@ -637,6 +653,12 @@ export class PostService {
     ) {
       throw new BadRequestException('Post cannot be published');
     }
+
+    await this.getOwnedUsableLinkedinConnectedAccount(
+      user._id.toString(),
+      this.referenceId(post.connectedAccount),
+      'publish posts',
+    );
 
     const scheduledJob = await this.scheduleQueue.queue.getJob(postId);
     if (scheduledJob) await scheduledJob.remove();
@@ -1334,7 +1356,7 @@ export class PostService {
   }
 
   private isLinkedinAccountUsable(connectedAccount: ConnectedAccount): boolean {
-    return Boolean(connectedAccount.isActive && connectedAccount.accessToken);
+    return isLinkedinAccessUsable(connectedAccount);
   }
 
   private resolveLinkedinAuthorUrn(connectedAccount: ConnectedAccount): string {

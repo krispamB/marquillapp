@@ -1,6 +1,12 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, ModifyResult } from 'mongoose';
 import type { ClerkClient, User as ClerkUser } from '@clerk/backend';
 import { User } from '../../database/schemas/user.schema';
 import { Tier } from '../../database/schemas/tier.schema';
@@ -38,27 +44,48 @@ export class UserProvisioningService {
     const avatar = clerkUser.imageUrl ?? undefined;
 
     if (email) {
-      const linked = await this.userModel.findOne({ email });
-      if (linked) {
-        linked.clerkId = clerkUserId;
-        if (!linked.avatar && avatar) {
-          linked.avatar = avatar;
-        }
-        await linked.save();
-        return linked;
+      const emailOwner = await this.userModel.findOne({ email });
+      if (emailOwner) {
+        return this.linkEmailOwner(emailOwner, clerkUserId, avatar);
       }
     }
 
     const defaultTier = await this.tierModel.findOne({ isDefault: true });
-    const created = await this.userModel.create({
-      clerkId: clerkUserId,
-      email,
-      name,
-      avatar,
-      tier: defaultTier ? defaultTier._id : undefined,
-    });
+    let result: ModifyResult<User>;
+    try {
+      result = await this.userModel.findOneAndUpdate(
+        { clerkId: clerkUserId },
+        {
+          $setOnInsert: {
+            clerkId: clerkUserId,
+            email,
+            name,
+            avatar,
+            tier: defaultTier ? defaultTier._id : undefined,
+          },
+        },
+        {
+          includeResultMetadata: true,
+          new: true,
+          setDefaultsOnInsert: true,
+          upsert: true,
+        },
+      );
+    } catch (error) {
+      if (!this.isDuplicateKeyError(error)) {
+        throw error;
+      }
+      return this.resolveDuplicateRace(clerkUserId, email, avatar);
+    }
 
-    if (email) {
+    const user = result.value;
+    if (!user) {
+      throw new InternalServerErrorException(
+        'Clerk user provisioning did not return a user',
+      );
+    }
+
+    if (email && result.lastErrorObject?.upserted) {
       try {
         await this.emailQueue.addWelcomeEmailJob(email, name);
       } catch (error) {
@@ -70,7 +97,86 @@ export class UserProvisioningService {
       }
     }
 
-    return created;
+    return user;
+  }
+
+  private async linkEmailOwner(
+    emailOwner: User,
+    clerkUserId: string,
+    avatar?: string,
+  ): Promise<User> {
+    if (emailOwner.clerkId && emailOwner.clerkId !== clerkUserId) {
+      throw this.emailOwnershipConflict();
+    }
+
+    const update: { clerkId: string; avatar?: string } = {
+      clerkId: clerkUserId,
+    };
+    if (!emailOwner.avatar && avatar) {
+      update.avatar = avatar;
+    }
+
+    const linked = await this.userModel.findOneAndUpdate(
+      {
+        _id: emailOwner._id,
+        $or: [
+          { clerkId: { $exists: false } },
+          { clerkId: null },
+          { clerkId: clerkUserId },
+        ],
+      },
+      { $set: update },
+      { new: true },
+    );
+    if (linked) {
+      return linked;
+    }
+
+    const winner = await this.userModel.findOne({ clerkId: clerkUserId });
+    if (winner) {
+      return winner;
+    }
+    throw this.emailOwnershipConflict();
+  }
+
+  private async resolveDuplicateRace(
+    clerkUserId: string,
+    email: string,
+    avatar?: string,
+  ): Promise<User> {
+    const clerkWinner = await this.userModel.findOne({
+      clerkId: clerkUserId,
+    });
+    if (clerkWinner) {
+      return clerkWinner;
+    }
+
+    if (email) {
+      const emailWinner = await this.userModel.findOne({ email });
+      if (emailWinner) {
+        return this.linkEmailOwner(emailWinner, clerkUserId, avatar);
+      }
+    }
+
+    throw new InternalServerErrorException(
+      'Unable to resolve concurrent Clerk user provisioning',
+    );
+  }
+
+  private isDuplicateKeyError(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 11000
+    );
+  }
+
+  private emailOwnershipConflict(): ConflictException {
+    return new ConflictException({
+      message: 'This email is already linked to another Clerk identity.',
+      code: 'CLERK_EMAIL_ALREADY_LINKED',
+    });
   }
 
   private resolvePrimaryEmail(clerkUser: ClerkUser): string {

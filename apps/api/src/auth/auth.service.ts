@@ -24,6 +24,7 @@ import { FeatureGatingService } from '../feature-gating/feature-gating.service';
 import { LinkedinAvatarRefreshQueue } from '../workflow/linkedin-avatar-refresh.queue';
 import { ScheduleQueue } from '../workflow/schedule.queue';
 import { EmailQueue } from '../workflow/email.queue';
+import { isLinkedinAccessUsable } from '../common/HelperFn/linkedin-access.helper';
 
 interface LinkedinUserInfo {
   memberId: string;
@@ -221,60 +222,71 @@ export class AuthService {
     if (!connectedAccount) {
       throw new NotFoundException('LinkedIn account not connected');
     }
-    if (!connectedAccount.isActive || !connectedAccount.accessToken) {
-      throw new BadRequestException(
-        'Reconnect your LinkedIn account to fetch organizations',
+    if (!isLinkedinAccessUsable(connectedAccount)) {
+      throw new ConflictException(
+        'Reconnect your LinkedIn account to fetch organizations.',
       );
     }
 
-    const accessToken = await this.encryptionService.decrypt(
-      connectedAccount.accessToken,
-    );
-    const memberUrn = this.resolveMemberUrn(connectedAccount);
-    if (!memberUrn) {
-      throw new BadRequestException(
-        'Unable to resolve LinkedIn member identity from connected account',
+    try {
+      const accessToken = await this.encryptionService.decrypt(
+        connectedAccount.accessToken!,
       );
-    }
-
-    interface OrganizationAclResponse {
-      elements: LinkedinOrganizationAclElement[];
-    }
-
-    const aclUrl = `${this.LINKEDIN_API_BASE}/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED`;
-    const { data } = await apiFetch<OrganizationAclResponse>(aclUrl, {
-      method: 'GET',
-      headers: {
-        'X-Restli-Protocol-Version': '2.0.0',
-        'LinkedIn-Version': '202601',
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    const filtered = (data.elements ?? []).filter((element) =>
-      this.LINKEDIN_ALLOWED_ORG_ROLES.has(element.role),
-    );
-
-    const enriched = await Promise.all(
-      filtered.map(async (element) => {
-        const organizationId = this.extractOrganizationId(element.organization);
-        const orgDetails = await this.fetchLinkedinOrganizationDetails(
-          organizationId,
-          accessToken,
+      const memberUrn = this.resolveMemberUrn(connectedAccount);
+      if (!memberUrn) {
+        throw new BadRequestException(
+          'Unable to resolve LinkedIn member identity from connected account',
         );
+      }
 
-        return {
-          id: organizationId,
-          urn: `urn:li:organization:${organizationId}`,
-          role: element.role,
-          state: element.state,
-          name: orgDetails?.localizedName ?? `Organization ${organizationId}`,
-          logoUrl: this.extractOrgLogoUrl(orgDetails),
-        };
-      }),
-    );
+      interface OrganizationAclResponse {
+        elements: LinkedinOrganizationAclElement[];
+      }
 
-    return enriched;
+      const aclUrl = `${this.LINKEDIN_API_BASE}/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED`;
+      const { data } = await apiFetch<OrganizationAclResponse>(aclUrl, {
+        method: 'GET',
+        headers: {
+          'X-Restli-Protocol-Version': '2.0.0',
+          'LinkedIn-Version': '202601',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const filtered = (data.elements ?? []).filter((element) =>
+        this.LINKEDIN_ALLOWED_ORG_ROLES.has(element.role),
+      );
+
+      const enriched = await Promise.all(
+        filtered.map(async (element) => {
+          const organizationId = this.extractOrganizationId(
+            element.organization,
+          );
+          const orgDetails = await this.fetchLinkedinOrganizationDetails(
+            organizationId,
+            accessToken,
+          );
+
+          return {
+            id: organizationId,
+            urn: `urn:li:organization:${organizationId}`,
+            role: element.role,
+            state: element.state,
+            name: orgDetails?.localizedName ?? `Organization ${organizationId}`,
+            logoUrl: this.extractOrgLogoUrl(orgDetails),
+          };
+        }),
+      );
+
+      return enriched;
+    } catch (error) {
+      if (error instanceof ApiError && error.statusCode === 401) {
+        throw new ConflictException(
+          'Reconnect your LinkedIn account to fetch organizations.',
+        );
+      }
+      throw error;
+    }
   }
 
   private async fetchLinkedinOrganizationDetails(
@@ -293,6 +305,9 @@ export class AuthService {
       });
       return data;
     } catch (error) {
+      if (error instanceof ApiError && error.statusCode === 401) {
+        throw error;
+      }
       this.logger.warn(
         `Failed to fetch details for organization ${organizationId}: ${error?.message}`,
       );
@@ -339,17 +354,14 @@ export class AuthService {
     if (!personalConnectedAccount) {
       throw new NotFoundException('LinkedIn account not connected');
     }
-    if (
-      !personalConnectedAccount.isActive ||
-      !personalConnectedAccount.accessToken
-    ) {
-      throw new BadRequestException(
-        'Reconnect your LinkedIn account before connecting organizations',
+    if (!isLinkedinAccessUsable(personalConnectedAccount)) {
+      throw new ConflictException(
+        'Reconnect your LinkedIn account before connecting organizations.',
       );
     }
 
     const accessToken = await this.encryptionService.decrypt(
-      personalConnectedAccount.accessToken,
+      personalConnectedAccount.accessToken!,
     );
     const encryptedAccessToken =
       await this.encryptionService.encrypt(accessToken);

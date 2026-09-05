@@ -108,11 +108,13 @@ The older `GET /posts/linkedin/image/:urn` route remains available for compatibi
 
 ### `POST /posts/:id/publish`
 
-Publishes a `DRAFT`, `FAILED`, or `SCHEDULED` Post immediately. A pending schedule job is removed first. `PUBLISHED` is terminal.
+Publishes a `DRAFT`, `FAILED`, or `SCHEDULED` Post immediately. After the connected-account preflight succeeds, a pending schedule job is removed. `PUBLISHED` is terminal.
 
 Publishing is blocked with `409` while any media item is `PENDING`, `UPLOADING`, or `FAILED`; failed media must be removed or uploaded again. READY media is composed as one `content.media` object or an ordered `content.multiImage` object.
 
 LinkedIn failures persist `status: "FAILED"` and `failureReason`. The Post may be edited, retried, or scheduled again.
+
+Expired or revoked LinkedIn access returns `409` with `Reconnect connected account to publish posts.` A known local expiry is rejected before a pending schedule is removed or the Post is changed. If LinkedIn returns `401` during an actual publish attempt, the Post moves to `FAILED` with the same reconnect reason.
 
 ### `POST /posts/:id/schedule`
 
@@ -123,6 +125,8 @@ Schedules a `DRAFT` or `FAILED` Post, or reschedules a `SCHEDULED` Post.
 ```
 
 The date must be in the future. The same media-readiness rules as immediate publishing apply. First-time scheduling consumes the existing scheduled-post quota; rescheduling and unscheduling do not refund or charge it again.
+
+Expired LinkedIn access returns `409` with `Reconnect connected account to schedule posts.` before quota usage, artifact pinning, queue changes, or Post mutation.
 
 ### `POST /posts/:id/unschedule`
 
