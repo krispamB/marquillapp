@@ -7,11 +7,7 @@ import {
 import { RequestLoggerMiddleware } from './common/middleware';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { AgentModule } from './agent/agent.module';
-import { LlmModule } from './llm/llm.module';
 import { ConfigModule } from '@nestjs/config';
-import { ApifyModule } from './apify/apify.module';
-import { ActorsModule } from './actors/actors.module';
 import { WorkflowModule } from './workflow/workflow.module';
 import { WorkflowRunModule } from './workflow/workflow-run.module';
 import { DatabaseModule } from './database/database.module';
@@ -30,6 +26,11 @@ import { DiagnosticsModule } from './diagnostics/diagnostics.module';
 import { ArtifactModule } from './artifact';
 import { CarouselModule } from './carousel';
 
+// The HTTP server's root. The LLM stack (`LlmModule`, `AgentModule`) and its
+// scraping siblings (`ApifyModule`, `ActorsModule`) live in `WorkerModule`
+// instead: nothing on the HTTP surface injects them, and `@openrouter/sdk`
+// alone retains ~129MB of zod schemas per process. `WorkerModule` imports this
+// module, so anything added here is still paid for twice.
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -38,12 +39,6 @@ import { CarouselModule } from './carousel';
     FeedbackModule,
     PaymentModule,
     MailModule,
-    AgentModule,
-    LlmModule,
-    ApifyModule.register({
-      apiKey: process.env.APIFY_API_TOKEN!,
-    }),
-    ActorsModule,
     WorkflowModule,
     WorkflowRunModule,
     DatabaseModule,

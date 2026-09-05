@@ -9,7 +9,7 @@ import {
 import 'dotenv/config';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from '../../app.module';
+import { WorkerModule } from './worker.module';
 import { PostService } from '../../post/post.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -40,7 +40,7 @@ async function bootstrapWorker() {
       bootstrapWorker.name.slice(1),
   );
   logger.log('Bootstrapping workflow context...');
-  const app = await NestFactory.createApplicationContext(AppModule);
+  const app = await NestFactory.createApplicationContext(WorkerModule);
 
   const postService = app.get(PostService);
   const authService = app.get(AuthService);
