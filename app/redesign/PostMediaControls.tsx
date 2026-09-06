@@ -45,6 +45,7 @@ export default function PostMediaControls({
 
   return (
     <div className="mq-post-media-section">
+      <header><span className="mq-mono">_ media</span>{media.length ? <span className="mq-mono mq-post-media-count">{media.length}</span> : null}</header>
       {error ? <div className="mq-media-inline-error"><span>{error}</span><button type="button" onClick={onRefresh} disabled={isBusy}><RefreshCw size={13} /> Refresh</button></div> : null}
       {media.length ? <div className="mq-post-media-list">{media.map((item) => <div key={item.id} className={`mq-post-media-item is-${item.status.toLowerCase()}`}>{previewUrls[item.id] && item.type === "IMAGE" ? <img src={previewUrls[item.id]} alt="" /> : <span><ImagePlus size={17} /></span>}<div><strong>{item.title ?? (item.type === "VIDEO" ? "Video" : "Image")}</strong><small>{mediaStatusLabel(item)}</small></div>{!readOnly ? <button type="button" className="mq-icon-button" disabled={isBusy} onClick={() => onRemove(item)} aria-label={`Remove ${item.title ?? "media"}`}><Trash2 size={15} /></button> : null}</div>)}</div> : null}
       {phase !== "idle" ? (

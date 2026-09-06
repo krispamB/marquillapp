@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   ArrowLeft,
   CalendarDays,
   ChevronDown,
@@ -52,6 +53,9 @@ const navItems: Array<{ key: WorkspacePage; label: string; href: string; icon: R
 const mobileNavItems = navItems.filter((item) =>
   ["dashboard", "artifacts", "posts", "settings"].includes(item.key),
 );
+
+const subscribeToNothing = () => () => {};
+const useHasHydrated = () => useSyncExternalStore(subscribeToNothing, () => true, () => false);
 
 export const WORKSPACE_SELECTOR_VALUE = "__marquill_workspace__";
 
@@ -135,6 +139,22 @@ export default function RedesignShell({
     () => accounts.filter((account) => account.accountType === "ORGANIZATION").map((account) => account.id),
     [accounts],
   );
+  // Access windows are derived from the current time, so they are only rendered after hydration.
+  const hasHydrated = useHasHydrated();
+  const accessAlert = useMemo(() => {
+    const urgent = accounts
+      .map((account) => ({ account, access: getLinkedInAccountAccess(account, accounts) }))
+      .filter((entry) => entry.access.isUrgent);
+    if (!urgent.length) return null;
+    const isCritical = urgent.some((entry) => !entry.access.isUsable);
+    if (urgent.length > 1) return { isCritical, label: `${urgent.length} accounts need attention` };
+    const [{ account, access }] = urgent;
+    const detail = access.detailLabel ?? "Needs attention";
+    return {
+      isCritical,
+      label: accounts.length > 1 ? `${account.displayName ?? "LinkedIn account"} — ${detail}` : detail,
+    };
+  }, [accounts]);
 
   useEffect(() => {
     if (initialUsage && creditRefreshKey === undefined) return;
@@ -211,6 +231,17 @@ export default function RedesignShell({
               </button>
             </div>
           </div>
+          {!isConnectedExpanded && hasHydrated && accessAlert ? (
+            <button
+              type="button"
+              className={`mq-connected-alert${accessAlert.isCritical ? " is-critical" : ""}`}
+              title={`${accessAlert.label}. Open connected accounts.`}
+              onClick={() => setIsConnectedExpanded(true)}
+            >
+              <AlertTriangle size={14} />
+              <span>{accessAlert.label}</span>
+            </button>
+          ) : null}
           {isConnectedExpanded ? (
             <div id="mq-connected-accounts" className="mq-connected-accounts">
               {accounts.length ? (
