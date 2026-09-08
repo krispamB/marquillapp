@@ -32,6 +32,10 @@ function dotClass(status?: string) {
   return `mq-calendar-dot-${normalized}`;
 }
 
+function postLabel(post: DashboardPost) {
+  return post.title?.trim() || getPostTitle(post.content);
+}
+
 export default function CalendarRedesignClient({
   user,
   connectedAccounts,
@@ -98,7 +102,7 @@ export default function CalendarRedesignClient({
     const scheduledTime = new Date(date.getFullYear(), date.getMonth(), date.getDate(), current?.getHours() ?? 9, current?.getMinutes() ?? 0);
     try {
       await readApi(`${API_BASE}/posts/${post._id}/schedule`, jsonRequest({ scheduledTime: scheduledTime.toISOString() }, { method: "POST" }));
-      setMessage(`Moved “${getPostTitle(post.content)}” to ${scheduledTime.toLocaleDateString(undefined, { month: "short", day: "numeric" })}.`);
+      setMessage(`Moved “${postLabel(post)}” to ${scheduledTime.toLocaleDateString(undefined, { month: "short", day: "numeric" })}.`);
       await loadPosts();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to reschedule post.");
@@ -135,7 +139,8 @@ export default function CalendarRedesignClient({
                   <div className="mq-calendar-events">
                     {items.slice(0, 3).map((post) => {
                       const canReschedule = getLinkedInAccountAccessById(post.connectedAccount, connectedAccounts)?.isUsable === true;
-                      return <Link key={post._id} href={`/posts/${post._id}/edit`} draggable={canReschedule} onDragStart={(event) => { if (canReschedule) event.dataTransfer.setData("text/plain", post._id); }} className="mq-calendar-event" title={canReschedule ? undefined : LINKEDIN_ACCESS_EXPIRED_MESSAGE}><i className={dotClass(post.status)} />{getPostTitle(post.content)}</Link>;
+                      const label = postLabel(post);
+                      return <Link key={post._id} href={`/posts/${post._id}/edit`} draggable={canReschedule} onDragStart={(event) => { if (canReschedule) event.dataTransfer.setData("text/plain", post._id); }} className="mq-calendar-event" title={canReschedule ? label : `${label} — ${LINKEDIN_ACCESS_EXPIRED_MESSAGE}`}><i className={dotClass(post.status)} /><span>{label}</span></Link>;
                     })}
                   </div>
                 </div>
@@ -150,7 +155,7 @@ export default function CalendarRedesignClient({
           {!isLoading && !upcoming.length ? <p className="mq-empty">No scheduled posts in this month.</p> : null}
           {upcoming.map((post) => {
             const canReschedule = getLinkedInAccountAccessById(post.connectedAccount, connectedAccounts)?.isUsable === true;
-            return <div key={post._id} className="mq-agenda-row" draggable={canReschedule} onDragStart={(event) => { if (canReschedule) event.dataTransfer.setData("text/plain", post._id); }} title={canReschedule ? undefined : LINKEDIN_ACCESS_EXPIRED_MESSAGE}><span className="mq-agenda-dot"><i className={dotClass(post.status)} /></span><span className="mq-row-copy"><strong>{getPostTitle(post.content)}</strong><small><Clock3 size={13} /> {formatScheduledDate(post.scheduledAt)}</small></span><Link href={`/posts/${post._id}/edit`} className="mq-secondary-button mq-button-small">Edit</Link></div>;
+            return <div key={post._id} className="mq-agenda-row" draggable={canReschedule} onDragStart={(event) => { if (canReschedule) event.dataTransfer.setData("text/plain", post._id); }} title={canReschedule ? undefined : LINKEDIN_ACCESS_EXPIRED_MESSAGE}><span className="mq-agenda-dot"><i className={dotClass(post.status)} /></span><span className="mq-row-copy"><strong>{postLabel(post)}</strong><small><Clock3 size={13} /> {formatScheduledDate(post.scheduledAt)}</small></span><Link href={`/posts/${post._id}/edit`} className="mq-secondary-button mq-button-small">Edit</Link></div>;
           })}
         </div>
       )}

@@ -1,21 +1,21 @@
 "use client";
 
-export type MobileComposerView = "compose" | "preview";
+export type ComposerView = "compose" | "preview";
 
-export default function MobileComposerSwitcher({
+export default function ComposerViewSwitcher({
   value,
   onChange,
 }: {
-  value: MobileComposerView;
-  onChange: (value: MobileComposerView) => void;
+  value: ComposerView;
+  onChange: (value: ComposerView) => void;
 }) {
   return (
-    <div className="mq-mobile-composer-switcher mq-segmented" role="tablist" aria-label="Post composer view">
+    <div className="mq-composer-switcher mq-segmented" role="tablist" aria-label="Post composer view">
       <button
         type="button"
-        id="mq-mobile-compose-tab"
+        id="mq-composer-compose-tab"
         role="tab"
-        aria-controls="mq-mobile-compose-panel"
+        aria-controls="mq-composer-compose-panel"
         aria-selected={value === "compose"}
         className={value === "compose" ? "is-active" : ""}
         onClick={() => onChange("compose")}
@@ -24,9 +24,9 @@ export default function MobileComposerSwitcher({
       </button>
       <button
         type="button"
-        id="mq-mobile-preview-tab"
+        id="mq-composer-preview-tab"
         role="tab"
-        aria-controls="mq-mobile-preview-panel"
+        aria-controls="mq-composer-preview-panel"
         aria-selected={value === "preview"}
         className={value === "preview" ? "is-active" : ""}
         onClick={() => onChange("preview")}

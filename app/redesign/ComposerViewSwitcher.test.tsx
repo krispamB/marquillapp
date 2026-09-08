@@ -2,18 +2,18 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterAll, afterEach, describe, expect, test } from "bun:test";
 import { useState } from "react";
-import MobileComposerSwitcher, { type MobileComposerView } from "./MobileComposerSwitcher";
+import ComposerViewSwitcher, { type ComposerView } from "./ComposerViewSwitcher";
 
 GlobalRegistrator.register();
 afterEach(cleanup);
 afterAll(() => GlobalRegistrator.unregister());
 
 function SwitcherHarness() {
-  const [view, setView] = useState<MobileComposerView>("compose");
-  return <MobileComposerSwitcher value={view} onChange={setView} />;
+  const [view, setView] = useState<ComposerView>("compose");
+  return <ComposerViewSwitcher value={view} onChange={setView} />;
 }
 
-describe("MobileComposerSwitcher", () => {
+describe("ComposerViewSwitcher", () => {
   test("switches between artifact and media inputs and the LinkedIn preview", () => {
     const view = render(<SwitcherHarness />);
     const composeTab = view.getByRole("tab", { name: "Artifact & media" });
