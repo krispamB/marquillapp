@@ -446,12 +446,12 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
 .mq-artifact-month-filter:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
 .mq-create-artifact-button { min-height: 38px; padding: 0 17px; white-space: nowrap; }
 .mq-artifact-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.mq-artifact-card { display: flex; min-width: 0; min-height: 258px; flex-direction: column; overflow: hidden; transition: border-color .25s ease, box-shadow .25s ease, transform .25s cubic-bezier(.2,.9,.3,1.2); }
+.mq-artifact-card { position: relative; display: flex; min-width: 0; min-height: 258px; flex-direction: column; overflow: hidden; transition: border-color .25s ease, box-shadow .25s ease, transform .25s cubic-bezier(.2,.9,.3,1.2); }
 .mq-artifact-card:not(.mq-artifact-card-skeleton):hover, .mq-artifact-card:not(.mq-artifact-card-skeleton):focus-within { border-color: var(--line-strong); box-shadow: 0 22px 48px -28px color-mix(in srgb, var(--ink-900) 35%, transparent); transform: translateY(-6px); }
 .mq-artifact-card-header, .mq-artifact-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 15px; }
 .mq-artifact-card-header { padding-bottom: 8px; }
 .mq-artifact-card-actions { display: flex; align-items: center; gap: 7px; }
-.mq-artifact-card-delete { display: inline-flex; width: 28px; height: 28px; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--ink-400); cursor: pointer; transition: border-color .18s ease, background .18s ease, color .18s ease; }
+.mq-artifact-card-delete { position: relative; z-index: 1; display: inline-flex; width: 28px; height: 28px; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--ink-400); cursor: pointer; transition: border-color .18s ease, background .18s ease, color .18s ease; }
 .mq-artifact-card-delete:hover, .mq-artifact-card-delete:focus-visible { border-color: color-mix(in srgb, var(--neg) 22%, var(--line)); background: color-mix(in srgb, var(--neg) 7%, var(--surface)); color: var(--neg); }
 .mq-artifact-type, .mq-artifact-state { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
 .mq-artifact-type { padding: 4px 9px; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--accent-ink); }
@@ -463,7 +463,7 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
 .mq-artifact-state-generating { color: var(--accent-ink); }
 .mq-artifact-state-generating i { animation: mq-pulse 1.8s ease infinite; }
 .mq-artifact-state-failed { background: color-mix(in srgb, #b3353a 10%, var(--surface)); color: #b3353a; }
-.mq-artifact-motion { position: relative; height: 142px; flex: none; overflow: visible; margin: 3px 15px 10px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface-2); }
+.mq-artifact-motion { position: relative; height: 142px; pointer-events: none; flex: none; overflow: visible; margin: 3px 15px 10px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface-2); }
 .mq-artifact-motion-post { display: flex; flex-direction: column; justify-content: center; gap: 9px; padding: 23px 34px; }
 .mq-artifact-motion-post > i { display: block; height: 5px; border-radius: 8px; background: var(--ink-900); }
 .mq-artifact-motion-post > i:nth-of-type(1) { width: 71%; }
@@ -503,10 +503,14 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
 .mq-artifact-card-document:hover .mq-artifact-motion-sheet-2, .mq-artifact-card-document:focus-within .mq-artifact-motion-sheet-2 { background: var(--accent); color: var(--surface); transform: translateX(-50%) rotate(0) translateY(-7px) !important; }
 .mq-artifact-card-document:hover .mq-artifact-motion-sheet-3, .mq-artifact-card-document:focus-within .mq-artifact-motion-sheet-3 { transform: translateX(-12%) rotate(8deg) translateY(5px) !important; }
 .mq-artifact-card-title { display: -webkit-box; min-height: 39px; margin: 2px 15px 14px; overflow: hidden; color: var(--ink-900); font-size: 14px; font-weight: 650; letter-spacing: -.015em; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.mq-artifact-card-link { color: inherit; text-decoration: none; }
+.mq-artifact-card-link::after { position: absolute; inset: 0; content: ""; }
+.mq-artifact-card:hover .mq-artifact-card-link { text-decoration: underline; text-underline-offset: 2px; }
+.mq-artifact-card-link:focus-visible { border-radius: 4px; outline: 2px solid var(--accent); outline-offset: 2px; }
 .mq-artifact-card-footer { min-height: 47px; margin-top: auto; border-top: 1px solid var(--line-faint); color: var(--ink-500); font-size: 10.5px; }
 .mq-artifact-card-footer > span::before { display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; background: var(--ink-300); vertical-align: 1px; content: ""; }
 .mq-artifact-card-footer time { font: 10px/1 var(--font-jetbrains-mono); }
-.mq-artifact-card-attach { display: flex; flex-direction: column; gap: 8px; padding: 11px 14px 14px; border-top: 1px solid var(--line-faint); }
+.mq-artifact-card-attach { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 8px; padding: 11px 14px 14px; border-top: 1px solid var(--line-faint); }
 .mq-artifact-card-attach button { display: inline-flex; width: 100%; min-height: 44px; align-items: center; justify-content: center; border: 0; border-radius: 11px; background: var(--ink-900); color: var(--surface); font: 650 12.5px var(--font-sofia-sans); cursor: pointer; transition: background-color .18s ease, transform .18s ease, opacity .18s ease; }
 .mq-artifact-card-attach button:hover:not(:disabled) { background: var(--ink-800); transform: translateY(-1px); }
 .mq-artifact-card-attach button:disabled { cursor: not-allowed; opacity: .55; }
