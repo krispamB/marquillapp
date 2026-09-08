@@ -202,7 +202,9 @@ export function ArtifactCard({
       <ArtifactMotionPreview type={artifact.type} />
 
       <h2 className="mq-artifact-card-title">
-        {artifact.title?.trim() || `Untitled ${format.label.toLowerCase()}`}
+        <Link href={`/artifacts/${encodeURIComponent(artifact.id)}`} className="mq-artifact-card-link">
+          {artifact.title?.trim() || `Untitled ${format.label.toLowerCase()}`}
+        </Link>
       </h2>
 
       <footer className="mq-artifact-card-footer">
