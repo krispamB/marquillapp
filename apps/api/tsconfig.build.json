@@ -5,7 +5,8 @@
     "test",
     "dist",
     "**/*spec.ts",
-    "src/carousel/prototype-design-system"
+    "src/carousel/prototype-design-system",
+    "src/carousel/prototype-render-validation"
   ],
   "compilerOptions": {
     "types": ["node", "express", "multer"]
