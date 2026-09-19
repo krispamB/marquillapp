@@ -172,9 +172,17 @@ browser and returns JSON plus the PDF, with no per-call round trip. The judge
 stays in Node either way.
 
 The render timeout is also a billing guard: a hang costs units until the
-session limit closes it (the `networkidle0` run cost 3 units for nothing).
+session limit closes it (the `networkidle0` run cost 3 units for nothing). In
+the prototype it covers only `setContent`; `fonts.ready`, the font pass and
+`page.pdf` fall back to Browserless's 60s session limit. Production should put
+one deadline on the whole session.
 
 ## Handed on
+
+- **Definition resolution** — the render step takes its definition from the
+  status-blind `resolve(designSystemId, designSystemVersion)` with the
+  artifact's pinned pair, never `getActive` (#161). The prototype reads the
+  YAML directly; `judge()` only needs a parsed definition, so nothing changes.
 
 - **#162** — add `contain: strict` to the frame's `.page` rule. Also consider
   reserving box properties on `html`/`body` in the static grammar. The PDF
@@ -183,7 +191,11 @@ session limit closes it (the `networkidle0` run cost 3 units for nothing).
   `render.fonts.failed` and `render.timeout` are retries of the render step,
   and `render.egress` is a terminal defect. Static and render findings share
   one bounded list.
-- **#167** — record every finding with its remedy per run. Watch per-document
+- **#167** — record every finding with its remedy per run. #159 asks for each
+  check's *outcome*, not just its failures: the judge returns failures only,
+  and skips silently in two places (pairings over a gradient or image
+  background; fallbacks during an outage). Production should record pass/fail
+  and skipped counts per check so miss rates can be measured. Watch per-document
   Browserless time at 15 pages (font pass and PDF streaming scale with it).
   Fallback fonts are platform-specific (the same Devanagari painted in Kohinoor
   locally and FreeSans on Browserless), so a fallback finding's detail
@@ -205,6 +217,10 @@ session limit closes it (the `networkidle0` run cost 3 units for nothing).
   palette token", not blended.
 - **`maxLineLengthCh`** is measurable here (characters per line box) but stays
   guidance, per #160's ledger.
+- Script execution is not a check: with JavaScript disabled nothing can run,
+  and `scriptRan` is a demo sentinel set only by `hostile.html`.
+- Pairings are judged for text only; a coloured box or icon over a background
+  is not paired.
 - A real `render.timeout` could not be produced: with scripts off and only
   Google allowed, nothing left can hang except Google. The rule is unit-tested.
 - Icons are a hand-copied stub of Lucide, and assembly uses string insertion

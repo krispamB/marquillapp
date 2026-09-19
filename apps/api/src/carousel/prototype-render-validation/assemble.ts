@@ -11,7 +11,7 @@ import type { DesignSystem } from '../prototype-design-system/contract';
 import { DESIGN_SYSTEM_FONT_ALLOWLIST } from './font-allowlist';
 import { ICON_CATALOG } from './icons';
 
-/** Geometry and pagination only — never `display`, never colour or type. */
+/** #162's frame: geometry, pagination, page background and overflow — never `display` or type. */
 export function frameCss(ds: DesignSystem): string {
   const { width, height, safeArea: s, background } = ds.page;
   return [
