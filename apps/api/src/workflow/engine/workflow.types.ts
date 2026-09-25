@@ -68,12 +68,12 @@ export type StepHandler = (
 
 export type StepHandlerMap = Partial<Record<WorkflowStep, StepHandler>>;
 
-/** DOCUMENT-only. `CarouselRendererService` (#121) consumes it. */
+/** DOCUMENT-only. `CarouselRendererService` (#116) consumes it. */
 export interface CarouselRenderInput {
   artifactId: string;
   version: number;
   templateId: CarouselTheme;
-  // Typed with the DOCUMENT content arm (#122). The engine never inspects them.
+  // Typed with the DOCUMENT content arm (#117). The engine never inspects them.
   slides: unknown[];
 }
 

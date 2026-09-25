@@ -1,6 +1,6 @@
 # LinkedIn Poll & Document (Carousel) Post API Research
 
-> Status: research report for wayfinder map #99, ticket #101.
+> Status: research report for wayfinder map #94, ticket #96.
 > Author: generated for Christopher Pam.
 > Scope: primary-source API research only. No code changes. Every factual claim
 > cites the first-party LinkedIn doc page (learn.microsoft.com/linkedin) that owns it.
@@ -217,7 +217,7 @@ image / video / **document**), `content.multiImage`, `content.poll`,
 "Content Types" rows in its support matrix and never shows two set together
 ([Posts API content-type table](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api?view=li-lms-2026-04)).
 
-Consequences for map #99:
+Consequences for map #94:
 
 - **Poll + image / poll + document: not possible.** A poll post carries only
   `content.poll`; there is no field to attach media to a poll

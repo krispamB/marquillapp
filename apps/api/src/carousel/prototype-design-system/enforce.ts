@@ -1,8 +1,8 @@
 /**
- * PROTOTYPE — what the backend can actually reject. Throwaway (issue #160).
+ * PROTOTYPE — what the backend can actually reject. Throwaway (issue #134).
  *
  * Static text checks only. This is deliberately dumber than the real thing:
- * #162 owns the Document Source envelope and sanitisation, #163 owns the
+ * #136 owns the Document Source envelope and sanitisation, #137 owns the
  * Browserless geometry pass. The point here is only to show which Design System
  * keys have teeth without a browser, and which need one.
  *
@@ -163,8 +163,8 @@ export function enforce(
     }
   }
 
-  // composition.pageRoles — enforceable because #162 is asked to require
-  // data-role on every page element (settled on #160).
+  // composition.pageRoles — enforceable because #136 is asked to require
+  // data-role on every page element (settled on #134).
   const labels = pages.map((p) => p.match(/data-role="([^"]+)"/)?.[1]);
   const roleNames = new Set(ds.composition.pageRoles.map((r) => r.name));
   labels.forEach((label, i) => {

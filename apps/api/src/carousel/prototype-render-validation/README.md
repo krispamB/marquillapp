@@ -1,12 +1,12 @@
 # PROTOTYPE — render validation and repair diagnostics
 
-Throwaway. Answers issue #163: *how should Browserless load, inspect and render
+Throwaway. Answers issue #137: *how should Browserless load, inspect and render
 a candidate Document Source so it can prove page count and geometry, font
 readiness, overflow safety and PDF page count, then return useful bounded
 repair diagnostics without executing untrusted content?*
 
-Builds on #160's prototype (`../prototype-design-system`, whose `contract.ts`
-and `editorial-serif.ds.yaml` it imports) and #162's settled contract. Not wired
+Builds on #134's prototype (`../prototype-design-system`, whose `contract.ts`
+and `editorial-serif.ds.yaml` it imports) and #136's settled contract. Not wired
 into the app; excluded from `tsconfig.build.json` because it is Bun-only.
 
 ```
@@ -17,7 +17,7 @@ bun test src/carousel/prototype-render-validation                         # the 
 
 | file | what it is |
 |---|---|
-| `assemble.ts` | Candidate Source → Document Source: frame CSS, font `<link>`, icons (#162) |
+| `assemble.ts` | Candidate Source → Document Source: frame CSS, font `<link>`, icons (#136) |
 | `session.ts` | one hardened browser session: load, probe, CDP font pass, print |
 | `probe.ts` | the in-page measurement — facts only, no policy |
 | `judge.ts` | facts + definition → `Violation[]`. Pure; every rule lives here |
@@ -58,10 +58,10 @@ inside one 30s unit (more in [What it cost](#what-it-cost)).
 **The probe measures; the judge decides.** The code that runs in the browser
 holds no policy at all, and the judge is a pure function
 `(definition, facts) => Violation[]`, so every rule is unit-tested against
-fixtures without a browser. This is the same seam #162 chose for the static
+fixtures without a browser. This is the same seam #136 chose for the static
 checker.
 
-**What it checks, and under which code.** Codes follow #162's two namespaces: a
+**What it checks, and under which code.** Codes follow #136's two namespaces: a
 finding a Design System key owns keeps the key path, and a finding about the
 render itself is `render.*`.
 
@@ -80,7 +80,7 @@ render itself is `render.*`.
 | `render.timeout` | the document loaded within the budget | **retry** |
 | `render.egress` | the session refused nothing | **defect** |
 
-That covers #162's three handed-on render checks (`page.safeArea`,
+That covers #136's three handed-on render checks (`page.safeArea`,
 `palette.pairings`, `icons.colors`), font readiness, and the research's six
 deterministic defect classes (`docs/ai-document-visual-review-research.md`
 §4.2). Contrast is reported as part of a `palette.pairings` finding
@@ -95,13 +95,13 @@ That is what the model wrote, so it can find the element. Render findings carry
 no `line`: a laid-out element has no source position. The snippet does that job.
 
 **Only repairable findings reach the model.** Every finding has a remedy.
-`repair` findings go to the model under #162's bound, unchanged: ≤3 per code
+`repair` findings go to the model under #136's bound, unchanged: ≤3 per code
 with a count of the rest, ≤40 in total, one list shared with the static checker.
 A font outage or a timeout is `retry`, fixed by rendering again; a repair round
 trip there spends a provider call on something the model did not do. A refused
 request is `defect`: the static checker let a `url(` through, which is a bug to
-alert on, never a prompt. All findings are recorded on the run regardless (#159,
-#167).
+alert on, never a prompt. All findings are recorded on the run regardless (#133,
+#141).
 
 ## Found by building it
 
@@ -124,7 +124,7 @@ alert on, never a prompt. All findings are recorded on the run regardless (#159,
    `top: 6000px` adds PDF pages. `position: relative`, `overflow: clip` and
    `contain: paint` each leave the extra pages; only size + layout + paint
    containment stops fragmentation carrying the box to another sheet. Menu
-   item 8 shows both frames side by side. **This amends #162's frame.**
+   item 8 shows both frames side by side. **This amends #136's frame.**
 4. **The frame cannot close everything; the PDF count is the net.**
    `body { height: 20000px }` prints 15 pages from 4 page elements under every
    frame variant. `body` is outside the pages, so no `.page` rule reaches it.
@@ -137,7 +137,7 @@ alert on, never a prompt. All findings are recorded on the run regardless (#159,
    converts each glyph box to its line box (removing the half-leading from both
    sides), and that is what CSS lays out. What remains is Blink rounding
    ascent and descent separately (0.86px measured), hence a 1px tolerance.
-   #162 predicted this failure: false positives are what hurt, because the
+   #136 predicted this failure: false positives are what hurt, because the
    model cannot fix a finding against valid CSS.
 6. **Clipped text is reported once.** A line hidden by `overflow: hidden` is
    `render.overflow.clipped`, and it is excluded from the safe-area and overlap
@@ -146,7 +146,7 @@ alert on, never a prompt. All findings are recorded on the run regardless (#159,
    element falls back. Those are symptoms, so when a face failed the judge
    reports `render.fonts.failed` only.
 8. **The render catches what on-scale CSS hides.** `overflow.html` passes every
-   #160 static check: `transform: translateX(-48px)` is open CSS, the
+   #134 static check: `transform: translateX(-48px)` is open CSS, the
    `height: 128px` box is on the spacing scale. It still breaks the safe area
    and clips a quote. `colour.html` uses only valid `var(--ds-*)` tokens and
    still sets accent on accent.
@@ -181,17 +181,17 @@ one deadline on the whole session.
 
 - **Definition resolution** — the render step takes its definition from the
   status-blind `resolve(designSystemId, designSystemVersion)` with the
-  artifact's pinned pair, never `getActive` (#161). The prototype reads the
+  artifact's pinned pair, never `getActive` (#135). The prototype reads the
   YAML directly; `judge()` only needs a parsed definition, so nothing changes.
 
-- **#162** — add `contain: strict` to the frame's `.page` rule. Also consider
+- **#136** — add `contain: strict` to the frame's `.page` rule. Also consider
   reserving box properties on `html`/`body` in the static grammar. The PDF
   page count catches `body { height }`, but only after a render.
-- **#165** — the remedy split: only `repair` codes cost a repair attempt;
+- **#139** — the remedy split: only `repair` codes cost a repair attempt;
   `render.fonts.failed` and `render.timeout` are retries of the render step,
   and `render.egress` is a terminal defect. Static and render findings share
   one bounded list.
-- **#167** — record every finding with its remedy per run. #159 asks for each
+- **#141** — record every finding with its remedy per run. #133 asks for each
   check's *outcome*, not just its failures: the judge returns failures only,
   and skips silently in two places (pairings over a gradient or image
   background; fallbacks during an outage). Production should record pass/fail
@@ -216,7 +216,7 @@ one deadline on the whole session.
 - **Translucent colours** (`opacity`, `rgba`) are reported as "not an opaque
   palette token", not blended.
 - **`maxLineLengthCh`** is measurable here (characters per line box) but stays
-  guidance, per #160's ledger.
+  guidance, per #134's ledger.
 - Script execution is not a check: with JavaScript disabled nothing can run,
   and `scriptRan` is a demo sentinel set only by `hostile.html`.
 - Pairings are judged for text only; a coloured box or icon over a background

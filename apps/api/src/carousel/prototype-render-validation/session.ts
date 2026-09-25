@@ -1,6 +1,6 @@
 /**
  * PROTOTYPE — one browser session that renders, inspects and prints a Document
- * Source. Throwaway (issue #163).
+ * Source. Throwaway (issue #137).
  *
  * Today `htmlToPdf` POSTs to Browserless's REST `/pdf`, which returns bytes and
  * nothing else: no geometry, no font state, no way to inspect. This drives the
@@ -38,7 +38,7 @@ export async function openBrowser(mode: BrowserMode): Promise<Browser> {
 }
 
 /**
- * The network policy. #162 makes `url(` a rule about the Candidate Source; this
+ * The network policy. #136 makes `url(` a rule about the Candidate Source; this
  * is the second wall, for whatever the checker misses. Only the Google Fonts
  * stylesheet and the font files it points at may load.
  */

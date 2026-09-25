@@ -1,5 +1,5 @@
 /**
- * PROTOTYPE tests (issue #163). `bun test src/carousel/prototype-render-validation`
+ * PROTOTYPE tests (issue #137). `bun test src/carousel/prototype-render-validation`
  * — `.test.ts`, not `.spec.ts`, so Jest never loads Bun-only code.
  */
 import { beforeAll, describe, expect, test } from 'bun:test';

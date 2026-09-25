@@ -1,7 +1,7 @@
 # AI Document Visual Review: Feasibility, Cost, and Value
 
-> Status: research report for wayfinder ticket [#158](https://github.com/krispamB/linkgenserver/issues/158), part of map [#157](https://github.com/krispamB/linkgenserver/issues/157).
-> Scope: what visual review is buildable on the OpenRouter and Browserless stack this repository already uses, and what incremental cost, latency, and defect-detection value the backend specification should expect from always-on, conditional, sampled, and omitted visual review of 2–15-page documents. No application code is changed by this document, and no policy is decided here — ticket #159 makes the call.
+> Status: research report for wayfinder ticket [#132](https://github.com/krispamB/linkgenserver/issues/158), part of map [#131](https://github.com/krispamB/linkgenserver/issues/157).
+> Scope: what visual review is buildable on the OpenRouter and Browserless stack this repository already uses, and what incremental cost, latency, and defect-detection value the backend specification should expect from always-on, conditional, sampled, and omitted visual review of 2–15-page documents. No application code is changed by this document, and no policy is decided here — ticket #133 makes the call.
 > Provider access date: **2026-08-29**. Every price below is a spot reading on that date and will go stale.
 > Codebase facts were read against `main` at commit `569b4bc`. This research branch is based on an earlier commit, so a few line numbers in `src/llm/` differ from the checkout you are reading; the citations follow `main`.
 
@@ -191,7 +191,7 @@ Plans as published **2026-08-29** ([Browserless pricing](https://www.browserless
 | Starter | $140/mo | 180,000 | $0.0017/unit | 40 | 30 min |
 | Scale | $350/mo | 500,000 | $0.0015/unit | 100 | 60 min |
 
-> **Drift note.** [credit-allocation-pricing-research.md](./credit-allocation-pricing-research.md) recorded the same page on 2026-07-13 with Prototyping concurrency 5 (monthly) / 10 (yearly), Starter 30/40, Scale 80/100, and a 1-minute Free session cap. The 2026-08-29 reading shows single concurrency figures of 15/40/100 and a 2-minute Free cap. Unit allowances and overage rates are unchanged. Whichever policy #159 picks, the Browserless plan figures should be re-read before they enter a costing.
+> **Drift note.** [credit-allocation-pricing-research.md](./credit-allocation-pricing-research.md) recorded the same page on 2026-07-13 with Prototyping concurrency 5 (monthly) / 10 (yearly), Starter 30/40, Scale 80/100, and a 1-minute Free session cap. The 2026-08-29 reading shows single concurrency figures of 15/40/100 and a 2-minute Free cap. Unit allowances and overage rates are unchanged. Whichever policy #133 picks, the Browserless plan figures should be re-read before they enter a costing.
 
 Because the worker runs one job at a time (§1.3), plan concurrency is not the binding constraint at current scale — worker concurrency is.
 
@@ -306,7 +306,7 @@ Evidence pointing the other way is thinner and less direct:
 
 - 1D-Bench, on iterative UI code generation with visual feedback, reports that "iterative editing generally improves final performance by increasing rendering success and often improving visual similarity" ([arXiv:2602.18548](https://arxiv.org/abs/2602.18548)). This supports a *repair* loop that uses a rendered screenshot, not a *detection* gate — and "rendering success" is a coarser signal than "this page has a 3px clip".
 - "MLLM as a UI Judge" benchmarked GPT-4o, Claude, and Llama across 30 interfaces and found they "approximate human preferences on some dimensions but diverge on others" ([arXiv:2510.08783](https://arxiv.org/abs/2510.08783)). Aesthetic preference prediction is a different task from defect detection, and 30 interfaces is a small base.
-- "Can LLMs Detect Display Issues? Uncovering the Impact of Prompting Techniques" (UIST '25, [10.1145/3746058.3758415](https://dl.acm.org/doi/pdf/10.1145/3746058.3758415)) is directly on topic, but the ACM full text returned HTTP 403 to this research and **its numbers were not verified here.** Anyone acting on this report should read it before finalising #159.
+- "Can LLMs Detect Display Issues? Uncovering the Impact of Prompting Techniques" (UIST '25, [10.1145/3746058.3758415](https://dl.acm.org/doi/pdf/10.1145/3746058.3758415)) is directly on topic, but the ACM full text returned HTTP 403 to this research and **its numbers were not verified here.** Anyone acting on this report should read it before finalising #133.
 
 **No primary evidence was found** for: vision-model detection rates on *print-style document pages* (as opposed to mobile/web UI), on **blank or near-blank page** detection, on **broken font fallback**, or on **misaligned grids**. All published evaluations located are UI-screenshot benchmarks.
 
@@ -411,7 +411,7 @@ The reasoning, in order of weight:
 
 A third, smaller lever: if the PDF `native` file path (§2.2) turns out to tokenise pages *cheaper* than the per-page raster estimates — plausible, since it skips a rasterisation round-trip — every figure in §3.2 is an overestimate. OpenRouter does not publish that conversion, so it must be measured.
 
-This is input to ticket #159, not the decision.
+This is input to ticket #133, not the decision.
 
 ---
 
@@ -420,7 +420,7 @@ This is input to ticket #159, not the decision.
 1. **PDF-page-to-token conversion under OpenRouter's `native` engine.** Undocumented by OpenRouter and by OpenAI. Blocks a firm costing of the cheapest raster path (§2.2). *Closeable by one metered API call.*
 2. **Image-prefill latency.** No provider publishes time-to-first-token as a function of image-token count; the §3.4 table uses text-workload p50s and is a lower bound. *Closeable by measurement.*
 3. **Raster byte size for a real rendered page.** Not measured here (it would need live Browserless credentials). Matters only for payload limits and upload time, not billing, but it decides whether `deviceScaleFactor: 2` is viable against Gemini's 20 MB inline cap (§2.1).
-4. **UIST '25 "Can LLMs Detect Display Issues?"** — directly on topic, ACM full text returned HTTP 403. Its numbers should be read before #159 is decided.
+4. **UIST '25 "Can LLMs Detect Display Issues?"** — directly on topic, ACM full text returned HTTP 403. Its numbers should be read before #133 is decided.
 5. **Vision-model performance on print-style document pages.** Every located benchmark is mobile or web UI. Whether a 1080 × 1350 designed document page behaves like a UI screenshot for these models is unknown.
 6. **`P(cheap check fires)` in production.** Determines whether the conditional policy's expected cost is 10% or 90% of always-on. Unknowable before launch.
 7. **Reasoning-token behaviour on a visual-review prompt.** All three candidate models support `reasoning_effort`; nothing here measures how many reasoning tokens a defect-detection prompt actually draws, and on `gpt-5.4` at $15/M output that term could dominate the whole model (§2.5).

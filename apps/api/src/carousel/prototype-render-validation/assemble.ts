@@ -1,6 +1,6 @@
 /**
  * PROTOTYPE — Candidate Source + definition -> Document Source. Throwaway
- * (issue #163; the contract is #162's).
+ * (issue #137; the contract is #136's).
  *
  * Adds exactly the three backend-derived parts and nothing else: the frame
  * stylesheet, the Google Fonts <link>, and icon path data. The input has already
@@ -11,7 +11,7 @@ import type { DesignSystem } from '../prototype-design-system/contract';
 import { DESIGN_SYSTEM_FONT_ALLOWLIST } from './font-allowlist';
 import { ICON_CATALOG } from './icons';
 
-/** #162's frame: geometry, pagination, page background and overflow — never `display` or type. */
+/** #136's frame: geometry, pagination, page background and overflow — never `display` or type. */
 export function frameCss(ds: DesignSystem): string {
   const { width, height, safeArea: s, background } = ds.page;
   return [

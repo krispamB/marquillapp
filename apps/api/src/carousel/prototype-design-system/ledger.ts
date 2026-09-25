@@ -1,5 +1,5 @@
 /**
- * PROTOTYPE — the answer to #160 in one table. Throwaway.
+ * PROTOTYPE — the answer to #134 in one table. Throwaway.
  *
  * Every key in the contract is classified by who consumes it. A key that is
  * neither enforceable nor worth prompt tokens does not belong in the YAML.
@@ -16,7 +16,7 @@ export const ledger: {
     key: 'contract / id / version',
     teeth: 'seed',
     prompt: false,
-    note: 'Identity and the immutable snapshot. Semantics belong to #161.',
+    note: 'Identity and the immutable snapshot. Semantics belong to #135.',
   },
   {
     key: 'name / summary',
@@ -35,7 +35,7 @@ export const ledger: {
     key: 'page.width / page.height',
     teeth: 'render',
     prompt: true,
-    note: 'Statically visible in the .page rule; proved by #163 from the real page box.',
+    note: 'Statically visible in the .page rule; proved by #137 from the real page box.',
   },
   {
     key: 'page.safeArea',
@@ -47,7 +47,7 @@ export const ledger: {
     key: 'page.pages',
     teeth: 'static',
     prompt: true,
-    note: 'Page-element count now, PDF page count at #163.',
+    note: 'Page-element count now, PDF page count at #137.',
   },
   {
     key: 'page.background',
@@ -78,7 +78,7 @@ export const ledger: {
     key: 'palette.rules.references',
     teeth: 'static',
     prompt: true,
-    note: 'Settled #160: colours are var(--ds-<token>), hex only in :root, so the role survives into the output.',
+    note: 'Settled #134: colours are var(--ds-<token>), hex only in :root, so the role survives into the output.',
   },
   {
     key: 'palette.rules.minContrastRatio',
@@ -109,7 +109,7 @@ export const ledger: {
     key: 'typography.rules.maxLineLengthCh',
     teeth: 'guidance',
     prompt: true,
-    note: 'Depends on rendered glyph widths. Prompt-only unless #163 measures it.',
+    note: 'Depends on rendered glyph widths. Prompt-only unless #137 measures it.',
   },
   {
     key: 'typography.rules.transforms',
@@ -154,7 +154,7 @@ export const ledger: {
     key: 'composition.pageRoles',
     teeth: 'static',
     prompt: true,
-    note: 'Settled #160: #162 requires data-role on every page, so the role name, the first/last pins and required are all checked. The per-role guidance prose is not.',
+    note: 'Settled #134: #136 requires data-role on every page, so the role name, the first/last pins and required are all checked. The per-role guidance prose is not.',
   },
   {
     key: 'composition.principles',
@@ -172,7 +172,7 @@ export const ledger: {
 
 export const teethLabel: Record<Teeth, string> = {
   static: 'ENFORCED  (text checks, no browser)',
-  render: 'ENFORCED  (needs the #163 render pass)',
+  render: 'ENFORCED  (needs the #137 render pass)',
   seed: 'ENFORCED  (at seed time, on the definition itself)',
   guidance: 'GUIDANCE  (prompt only, unenforceable)',
 };

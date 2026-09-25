@@ -1,5 +1,5 @@
 # PROTOTYPE — Design System Definition, contract v1.
-# Candidate answer to issue #160. Throwaway; not loaded by the app.
+# Candidate answer to issue #134. Throwaway; not loaded by the app.
 #
 # Every key below is annotated in the ledger (`bun ... prototype.ts` -> [5]) as
 # ENFORCED (the backend can reject a Document Source that violates it),

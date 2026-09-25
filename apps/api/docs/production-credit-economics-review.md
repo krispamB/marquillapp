@@ -2,7 +2,7 @@
 
 Use this workflow only after either one complete paid billing cycle or a cohort
 of 100–200 paid users. It turns a normalized production export plus a named
-owner's pricing decision into the evidence record required by issue #148. The
+owner's pricing decision into the evidence record required by issue #130. The
 command rejects an ineligible cohort, incomplete artifact coverage, missing
 provider invoices, unowned decisions, approved changes without implementation
 issues, and unlimited paid credit allowances.

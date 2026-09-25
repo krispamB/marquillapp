@@ -1,6 +1,6 @@
 # Client API handoff
 
-This is the client-facing API surface introduced or reworked by the artifact workflow branch described in [issue #111](https://github.com/krispamB/linkgenserver/issues/111).
+This is the client-facing API surface introduced or reworked by the artifact workflow branch described in [issue #106](https://github.com/krispamB/linkgenserver/issues/111).
 
 The API is versioned under `/api/v1`:
 

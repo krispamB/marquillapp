@@ -1,37 +1,37 @@
 # Carousel Template System — Design
 
-> Status: design spec for wayfinder map #99, ticket #108 (grilling outcome).
+> Status: design spec for wayfinder map #94, ticket #103 (grilling outcome).
 > Author: generated for Christopher Pam. Decisions settled in a grilling session
 > on 2026-07-09; **revised 2026-07-09 (v2)** — same settled decisions, with the
 > render mechanics corrected (blank trailing page, pagination invariants), the
 > schema/registry split fixed (field schemas are per slide *type*, not per
 > theme), and the PDF-storage contract grounded in how the app actually serves
 > R2 objects (private bucket → store the key, sign on read).
-> Blocked by: #102 (artifact schema), which is closed. This ticket owns the
-> `Slide` shape #102 §4 deliberately left opaque, plus how slides become a
+> Blocked by: #97 (artifact schema), which is closed. This ticket owns the
+> `Slide` shape #97 §4 deliberately left opaque, plus how slides become a
 > LinkedIn document PDF.
 
-Feeds the final spec assembly (#110). Interlocking tickets are referenced inline
+Feeds the final spec assembly (#105). Interlocking tickets are referenced inline
 at each boundary.
 
 ## Framing (charter-derived givens)
 
-- **A carousel is a LinkedIn *document* post.** #101 §2 established the channel:
+- **A carousel is a LinkedIn *document* post.** #96 §2 established the channel:
   a multi-page PDF uploaded as a document (≤100 MB, ≤300 pages, formats
   PPT/PPTX/DOC/DOCX/PDF), shown as a swipeable page-by-page card in the feed. So
   "carousel" = a PDF where **one page = one slide**. The 1080×1350 canvas is the
   4:5 portrait ratio the format is built around.
-- **#102 fixed the surrounding contract.** A `DOCUMENT` artifact version stores
-  `content.document = { slides: Slide[]; pdfUrl?; pageCount? }` (#102 §4); the
-  render output gates `READY` (#102 §2); the R2 key is
-  `artifacts/${artifactId}/${version}/document.pdf` (#102 §8); `slides` is the
-  editable source of truth, the rendered PDF the disposable derived output. #102
+- **#97 fixed the surrounding contract.** A `DOCUMENT` artifact version stores
+  `content.document = { slides: Slide[]; pdfUrl?; pageCount? }` (#97 §4); the
+  render output gates `READY` (#97 §2); the R2 key is
+  `artifacts/${artifactId}/${version}/document.pdf` (#97 §8); `slides` is the
+  editable source of truth, the rendered PDF the disposable derived output. #97
   §4 explicitly parked the **internal `Slide` shape** here, guessing
   `{ templateId, fields }`.
-- **This slots into the engine's `RENDER_PDF` step.** #103 §2 runs `RENDER_PDF`
+- **This slots into the engine's `RENDER_PDF` step.** #98 §2 runs `RENDER_PDF`
   for documents only; it "calls the existing Browserless→PDF path and writes the
-  R2 `pdfUrl`." #108 owns what that step *renders* (templates + field schema +
-  assembly); #103 owns *when* it runs and its retry semantics.
+  R2 `pdfUrl`." #103 owns what that step *renders* (templates + field schema +
+  assembly); #98 owns *when* it runs and its retry semantics.
 - **The infra already exists and fits.** `htmlToPdf()`
   (`src/mark/utils/html_to_pdf.util.ts`) defaults to **width `1080px`, height
   `1350px`, zero margins, `printBackground: true`**, and sets the Browserless
@@ -39,7 +39,7 @@ at each boundary.
   buffer, mimeType)` (`src/s3/s3.client.ts`) PUTs to R2; `getSignedUrl(key)` and
   `getFile(key)` already exist for reads. Handlebars is already a dependency,
   used via a **typed template registry** + `.hbs` files in `assets/`
-  (`src/mail/templates.ts` + `assets/mail/templates/`). #108 composes these,
+  (`src/mail/templates.ts` + `assets/mail/templates/`). #103 composes these,
   inventing no new infra.
 
 The pipeline this ticket defines:
@@ -59,22 +59,22 @@ and an ordered list of typed slides:
 
 ```ts
 // Terminology: "theme" in prose = a StylePreset value, stored as document.templateId.
-// Both identifiers are #102's fixed contract (§6 create input / §4 content field);
+// Both identifiers are #97's fixed contract (§6 create input / §4 content field);
 // this doc does not mint a third name.
 type StylePreset = 'bold' | 'minimal' | 'editorial' | 'gradient';   // = theme id (§5)
 type SlideType   = 'cover' | 'content' | 'list' | 'quote' | 'cta';
 
-// document content (refines #102 §4)
+// document content (refines #97 §4)
 { commentary?: string;
   document: { templateId: StylePreset;   // the theme — one per deck
               slides: Slide[];           // 2–15 for launch (§3)
-              pdfKey?: string;           // R2 key of the render (§7; #102 §4's `pdfUrl`, renamed)
+              pdfKey?: string;           // R2 key of the render (§7; #97 §4's `pdfUrl`, renamed)
               pageCount?: number } }
 
 Slide = { type: SlideType; fields: <type-specific, Zod-validated §3> };
 ```
 
-**This refines #102 §4's `{ templateId, fields }` guess** deliberately:
+**This refines #97 §4's `{ templateId, fields }` guess** deliberately:
 
 - **Theme is document-level, not per-slide.** A carousel's whole point is a
   consistent brand look across pages; letting each slide pick a different theme
@@ -85,10 +85,10 @@ Slide = { type: SlideType; fields: <type-specific, Zod-validated §3> };
   under the theme.
 - **Field schemas attach to the slide type, not the theme** (§3). Every theme
   renders the same five typed shapes; themes differ only in how those shapes
-  look. This is what lets one Zod contract serve #102's content union, #104's
+  look. This is what lets one Zod contract serve #97's content union, #99's
   generation, and all four launch themes simultaneously.
 
-**Rejected — per-slide `templateId` (#102's literal guess).** Maximum freedom,
+**Rejected — per-slide `templateId` (#97's literal guess).** Maximum freedom,
 but invites a Frankendeck of clashing styles and gives the AI a selection
 problem it shouldn't have. Theme-once + typed-slides is the constraint that
 keeps output on-brand.
@@ -157,7 +157,7 @@ host, so the assembled document must resolve **zero network requests**:
 - **Emoji:** LLM copy may contain emoji; whether they render depends on the
   Browserless image shipping a color-emoji font (Noto Color Emoji is standard
   but unverified). The fixture deck (§3) includes an emoji sample; if it renders
-  as tofu, the generation prompt (#104) bans emoji rather than us embedding a
+  as tofu, the generation prompt (#99) bans emoji rather than us embedding a
   multi-megabyte emoji font.
 
 ### Layered CSS, structural markup
@@ -177,7 +177,7 @@ banned and enforced at boot (§6). Multi-line fields (`content.body`,
 `quote.quote`) render inside an element styled `white-space: pre-line` so
 intentional line breaks survive; all other fields are single-line.
 
-**Rejected — raw HTML authored by the AI (no template).** #102 §4 already ruled
+**Rejected — raw HTML authored by the AI (no template).** #97 §4 already ruled
 this out ("structured content that fills a curated template, *not* raw HTML").
 It would be an XSS vector, produce inconsistent layouts, and make overflow
 unmanageable. The AI fills **fields**, never markup.
@@ -189,7 +189,7 @@ authoring surface and the lowest-friction path to a launch set.
 ## 3. Structured content schema (what the AI fills)
 
 Each slide **type** has one **Zod field schema** — shared by all themes — that
-is the contract the agent (#104) fills and the boundary at which output is
+is the contract the agent (#99) fills and the boundary at which output is
 validated (repo split: Zod for LLM data):
 
 ```ts
@@ -211,7 +211,7 @@ export const slideSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('cta'),     fields: slideFieldSchemas.cta }),
 ]);
 
-// document.slides — plugs into #102 §4's DOCUMENT content schema
+// document.slides — plugs into #97 §4's DOCUMENT content schema
 export const slidesSchema = z.array(slideSchema).min(2).max(15);
 ```
 
@@ -219,7 +219,7 @@ export const slidesSchema = z.array(slideSchema).min(2).max(15);
   1080×1350 slide has no scroll; overflow is the enemy. Character count is a
   *proxy* for rendered width (70 "W"s are wider than 70 "i"s), so the caps are
   calibrated against the theme with the largest type scale, and enforced
-  **three ways, defence in depth:** (1) the agent prompt (#104) states the caps
+  **three ways, defence in depth:** (1) the agent prompt (#99) states the caps
   so the model aims within them; (2) Zod rejects over-cap output at the
   generation boundary; (3) the `.slide` frame's `overflow: hidden` +
   `overflow-wrap: anywhere` (§2) is the last-resort clamp so a slip degrades to
@@ -232,16 +232,16 @@ export const slidesSchema = z.array(slideSchema).min(2).max(15);
   before launch (and would surface any pagination regression as a page-count
   mismatch or blank page). Caps are only trustworthy because the fixtures
   prove them.
-- **A Zod failure never renders a broken deck.** #104 §8 gives `generate()`
+- **A Zod failure never renders a broken deck.** #99 §8 gives `generate()`
   one inline repair retry (re-prompt with the validation error); if the output
   is still invalid the step throws and the version ends `FAILED` — never a
-  half-valid deck. *Interlock note for #110:* the siblings disagree on the
-  classification of that throw — #103 §7 lists "Zod-invalid LLM output after a
-  step's own internal retries" as **terminal**, while #104 §8 says "still
+  half-valid deck. *Interlock note for #105:* the siblings disagree on the
+  classification of that throw — #98 §7 lists "Zod-invalid LLM output after a
+  step's own internal retries" as **terminal**, while #99 §8 says "still
   invalid → throw `retryable`" (a fresh attempt re-samples cheaply, research
-  cached). #108 doesn't own that seam; #110 must reconcile it. In practice the
+  cached). #103 doesn't own that seam; #105 must reconcile it. In practice the
   prompt caps make the case rare either way.
-- **Slide count 2–15 for launch.** LinkedIn allows ≤300 pages (#101), but a
+- **Slide count 2–15 for launch.** LinkedIn allows ≤300 pages (#96), but a
   good carousel is short; 2–15 bounds UX, render time, and worst-case LLM
   output size. `pageCount = slides.length` — true by construction of the §2
   pagination invariant, which the fixture decks guard.
@@ -251,8 +251,8 @@ export const slidesSchema = z.array(slideSchema).min(2).max(15);
   `image` slide type is a new arm, touching no existing one (§10).
 
 **Rejected — per-theme field schemas** (caps varying with each theme's type
-scale). Tighter per-theme fit, but the schema is shared with #102's content
-union and #104's generation contract, neither of which can vary by theme — a
+scale). Tighter per-theme fit, but the schema is shared with #97's content
+union and #99's generation contract, neither of which can vary by theme — a
 per-theme schema would fork the single source of truth. One schema, calibrated
 to the tightest theme, keeps the contract whole at the cost of slightly
 conservative caps in roomier themes.
@@ -261,26 +261,26 @@ conservative caps in roomier themes.
 
 Two distinct decisions, split by who's better placed to make them:
 
-- **Theme (`templateId`) — user-picked, else AI-picked.** #102 §6's create
+- **Theme (`templateId`) — user-picked, else AI-picked.** #97 §6's create
   input already carries `stylePreset?: StylePreset`.
   - **User supplied it** → it is authoritative: the `GENERATE` step **stamps**
     `document.templateId = stylePreset` after generation; the model is not
     asked to choose and its output cannot override the user.
-  - **Omitted** → the generation prompt (#104) asks the model to pick a
+  - **Omitted** → the generation prompt (#99) asks the model to pick a
     `templateId` from the `StylePreset` enum based on the prompt/topic (e.g.
     `editorial` for a thought-piece, `bold` for a punchy hook); the Zod
     boundary validates it is a real preset.
   - Either way the chosen `templateId` is persisted on `document`, so a refine
-    (#103 §11) keeps the same theme unless the user changes it.
+    (#98 §11) keeps the same theme unless the user changes it.
 - **Slide structure (count, per-slide `type`, field values) — always AI.** The
   narrative arc — how many slides, which is a `cover` vs `list` vs `cta`, and
   what each says — is authored by the agent as it composes the deck. The user
   does not hand-assemble slides at generation time (they can manually `PATCH`
-  afterward per #102 §5; a slide edit re-renders the PDF per #102 §4).
+  afterward per #97 §5; a slide edit re-renders the PDF per #97 §4).
 
 **Rejected — user hand-builds the deck slide-by-slide up front.** That's a
-page-builder product, not the AI-generation flow #99 is about. Manual editing
-is the post-generation `PATCH` path (#102 §5), not the create path.
+page-builder product, not the AI-generation flow #94 is about. Manual editing
+is the post-generation `PATCH` path (#97 §5), not the create path.
 
 **Rejected — AI free-picks any CSS/colours.** Off-brand, unbounded, and defeats
 the point of a *curated* template set. The AI picks *within* the curated
@@ -330,57 +330,57 @@ moved to init.)
    `<head>` inlines `base.css` + the theme's `theme.css`.
 2. **Render** — `htmlToPdf(html)` (existing util, defaults untouched) →
    `Buffer`. The util already throws a descriptive error on Browserless
-   failure; the step surfaces it as a **retryable** `WorkflowError` (#103 §7 —
+   failure; the step surfaces it as a **retryable** `WorkflowError` (#98 §7 —
    Browserless timeouts are transient).
 3. **Store** — `uploadFile('artifacts/${artifactId}/${version}/document.pdf',
    buffer, 'application/pdf')` (§7).
 4. **Write back** — the step returns
-   `render = { pdfKey, pageCount: slides.length }` into `RunState` (#103 §3);
+   `render = { pdfKey, pageCount: slides.length }` into `RunState` (#98 §3);
    `PERSIST_VERSION` writes both onto the version, flipping it `READY`
-   (#102 §2).
+   (#97 §2).
 
 An unknown `slide.type` or `templateId` at assembly is a **terminal** error
 (should never occur — Zod validated the content at generation), not a retry:
 re-running cannot fix invalid input.
 
-**`RENDER_PDF` emits no `step.progress` for launch.** #107's boundaries table
-assigns render-progress signals to #108, floating a per-page `pageRendered`
+**`RENDER_PDF` emits no `step.progress` for launch.** #102's boundaries table
+assigns render-progress signals to #103, floating a per-page `pageRendered`
 example — but the render is a single atomic `htmlToPdf` call with nothing
 observable between request and buffer, so there is no honest per-page signal
-to emit. The core's `step.started`/`step.completed` (#103 §5) bracket it;
+to emit. The core's `step.started`/`step.completed` (#98 §5) bracket it;
 `step.progress` for render stays empty until a streaming render path exists.
-This supersedes #107's speculative example.
+This supersedes #102's speculative example.
 
 ## 7. PDF storage in R2 — store the key, sign on read
 
-- **Key:** `artifacts/${artifactId}/${version}/document.pdf` (#102 §8) —
-  verbatim. **Version-scoped**, so a refine (new version, #103 §11) renders to
+- **Key:** `artifacts/${artifactId}/${version}/document.pdf` (#97 §8) —
+  verbatim. **Version-scoped**, so a refine (new version, #98 §11) renders to
   a fresh key and never clobbers a prior version's PDF.
 - **Persist the key (`pdfKey`), not a raw URL.** `uploadFile` returns a
   `…r2.cloudflarestorage.com` URL, but the bucket is **private** — nothing in
   the app serves that URL to clients today; the existing media flow stores an
   `r2Key` and reads server-side via `getFile`. So the version stores the
   **key**, and:
-  - **Client reads** (#102's GET/list, where the render is the document's
+  - **Client reads** (#97's GET/list, where the render is the document's
     preview/thumbnail) exchange it for a short-lived **signed URL** via the
     existing `getSignedUrl(key)` at response time.
-  - **Publish** (#106) fetches the buffer server-side via `getFile(key)` to
+  - **Publish** (#101) fetches the buffer server-side via `getFile(key)` to
     upload to LinkedIn — which needs the key anyway, and is exactly how
     `linkedin-media.service.ts` already handles media.
-  - *Interlock note for #110:* this renames `pdfUrl` → `pdfKey` everywhere the
-    siblings mention it — #102 §4's `pdfUrl?` content field, #103 §2/§3
+  - *Interlock note for #105:* this renames `pdfUrl` → `pdfKey` everywhere the
+    siblings mention it — #97 §4's `pdfUrl?` content field, #98 §2/§3
     (`render: { pdfUrl, pageCount }` in `RunState` and "writes the R2
-    `pdfUrl`"), #106's publish source ("the artifact version's R2 `pdfUrl`"),
-    and #107's READY note. Same slot, same READY-gating semantics, corrected to
+    `pdfUrl`"), #101's publish source ("the artifact version's R2 `pdfUrl`"),
+    and #102's READY note. Same slot, same READY-gating semantics, corrected to
     what a private bucket can actually serve. (The key is also derivable from
     `(artifactId, version)`; storing it keeps reads convention-free.)
-- **Overwrite-on-retry is safe.** A whole-job retry (#103 §7–8) targets the
+- **Overwrite-on-retry is safe.** A whole-job retry (#98 §7–8) targets the
   *same* `(artifactId, version)`, so re-rendering PUTs the same key —
-  idempotent, no orphans (#103 §8's "retry overwrites rather than appends").
+  idempotent, no orphans (#98 §8's "retry overwrites rather than appends").
 - **`pdfKey` gates `READY`.** Until the upload returns and `pdfKey` is
-  written, the version stays `GENERATING` (#102 §2). The rendered PDF *is* the
+  written, the version stays `GENERATING` (#97 §2). The rendered PDF *is* the
   preview; no separate thumbnail asset for launch.
-- **Cleanup** stays a later background sweep (#102 §8, and its §9 boundaries
+- **Cleanup** stays a later background sweep (#97 §8, and its §9 boundaries
   table), not inline — a
   soft-deleted or superseded version's PDF is reclaimed by that sweep, not by
   the renderer.
@@ -421,8 +421,8 @@ export const carouselTemplates: Record<
 ```
 
 - **The Zod schemas in `schemas.ts` are the single source of truth** for the
-  slide contract, consumed by (a) #102's `ArtifactContent` document union and
-  (b) #104's `generate()` output validation. The registry deliberately does
+  slide contract, consumed by (a) #97's `ArtifactContent` document union and
+  (b) #99's `generate()` output validation. The registry deliberately does
   **not** carry schemas — keying them by theme (v1 of this doc did) would
   invite per-theme divergence of a contract that must stay uniform (§3).
 - Assembly is pure string-in/string-out, so `carousel-renderer.service.spec.ts`
@@ -458,22 +458,22 @@ Every slide field is **LLM-generated**, i.e. untrusted text flowing into HTML.
 
 | Concern | Owner |
 |---|---|
-| *When* `RENDER_PDF` runs; retry/idempotency of the render step | #103 |
-| The agent that fills slide fields / picks theme+types; prompt wording (caps, emoji policy, theme-choice guidance) | #104 |
-| `DOCUMENT` artifact/version schema, READY gate, R2 key convention (with the §7 `pdfKey` rename) | #102 |
-| Signed-URL exchange on GET/list responses | #102 |
-| Credit surcharge for a Browserless render | #105 |
-| `step.progress` transport/framing (render emits none for launch — §6) | #107 |
-| Fetching the PDF and uploading it as a LinkedIn document on publish | #106 |
+| *When* `RENDER_PDF` runs; retry/idempotency of the render step | #98 |
+| The agent that fills slide fields / picks theme+types; prompt wording (caps, emoji policy, theme-choice guidance) | #99 |
+| `DOCUMENT` artifact/version schema, READY gate, R2 key convention (with the §7 `pdfKey` rename) | #97 |
+| Signed-URL exchange on GET/list responses | #97 |
+| Credit surcharge for a Browserless render | #100 |
+| `step.progress` transport/framing (render emits none for launch — §6) | #102 |
+| Fetching the PDF and uploading it as a LinkedIn document on publish | #101 |
 | Future: `image` slide type; per-slide PNG thumbnails; background R2 cleanup; re-render on manual slide `PATCH` mechanics | future |
 
 ## 11. Migration note
 
-Per the #100 clean write-over (relaunch, no users): **new surface, no
+Per the #95 clean write-over (relaunch, no users): **new surface, no
 migration.** This adds `assets/carousel/**` and the `src/carousel/` module
 (§8), and reuses the existing `htmlToPdf` and `uploadFile`/`getSignedUrl`/
 `getFile` utilities with their logic untouched. `src/mark/utils/
-html_to_pdf.util.ts` currently lives under `src/mark`, which #103/charter #9
+html_to_pdf.util.ts` currently lives under `src/mark`, which #98/charter krispamB/linkgenserver#9
 dissolves — on implementation the util moves to `src/carousel/utils/` and is
 renamed **`html-to-pdf.util.ts`** (the current snake_case name violates the
 repo's kebab-case file convention). No `PostDraft`-era carousel code exists to

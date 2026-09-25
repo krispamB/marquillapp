@@ -1,6 +1,6 @@
 /**
  * PROTOTYPE — the facts the render probe collects, and the findings the judge
- * makes from them. Throwaway (issue #163).
+ * makes from them. Throwaway (issue #137).
  *
  * The split is the design: the probe runs inside the browser and only measures;
  * the judge runs in Node, is pure, and is the only thing that knows the Design
@@ -8,7 +8,7 @@
  * the code that crosses into the browser holds no policy at all.
  */
 
-/** #162's shape, unchanged. Render findings have no `line`: see README. */
+/** #136's shape, unchanged. Render findings have no `line`: see README. */
 export type Violation = {
   code: string;
   detail: string;

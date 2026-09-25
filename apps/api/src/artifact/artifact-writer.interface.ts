@@ -26,7 +26,7 @@ export interface RefineContext {
   feedback: string;
 }
 
-// Narrow role interface consumed by the workflow engine's StepContext (#115):
+// Narrow role interface consumed by the workflow engine's StepContext (#110):
 // steps depend on this, not on the full ArtifactService surface.
 export interface ArtifactWriter {
   setVersionContent(
@@ -37,7 +37,7 @@ export interface ArtifactWriter {
   ): Promise<void>;
   readCurrent(artifactId: string): Promise<CurrentVersionRead>;
   readRefineInput(artifactId: string, version: number): Promise<RefineContext>;
-  // Called only by the engine's terminal-failure handler (#115). FAILED
+  // Called only by the engine's terminal-failure handler (#110). FAILED
   // versions stay visible in the library, so the user can refine from one.
   failVersion(
     artifactId: string,

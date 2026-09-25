@@ -1,5 +1,5 @@
 /**
- * PROTOTYPE — Design System Definition contract (issue #160). Throwaway.
+ * PROTOTYPE — Design System Definition contract (issue #134). Throwaway.
  *
  * Run:  bun src/carousel/prototype-design-system/prototype.ts
  *
@@ -23,7 +23,7 @@ const c = {
   cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
 };
 
-// Strict palette references are the settled contract (#160); the toggle exists
+// Strict palette references are the settled contract (#134); the toggle exists
 // only to show what the looser alternative would have let through.
 let strict = true;
 let ds: DesignSystem;
@@ -90,7 +90,7 @@ async function showEnforce() {
   rule();
   console.log(
     c.dim(
-      'Still invisible to these checks: safe-area overflow, actual contrast used, line length, and every composition rule. Those are #163 render checks or nothing.',
+      'Still invisible to these checks: safe-area overflow, actual contrast used, line length, and every composition rule. Those are #137 render checks or nothing.',
     ),
   );
 }
@@ -113,7 +113,7 @@ function showLedger() {
 }
 
 const menu = `
-${c.bold('Design System Definition contract — prototype (#160)')}
+${c.bold('Design System Definition contract — prototype (#134)')}
   1  the YAML
   2  parse boundary + contrast check
   3  what the model reads

@@ -11,10 +11,10 @@
 > PUBLISHED Posts cannot be patched in place. See `docs/post-schema-and-publish-flow-design.md`
 > and `docs/api/posts.md` for the current normative contract.
 
-> Status: **build-ready specification.** Assembled for wayfinder map #99, ticket #110.
-> Compiled 2026-07-10 from the closed design tickets #100–#109 and their reports in `docs/`.
+> Status: **build-ready specification.** Assembled for wayfinder map #94, ticket #105.
+> Compiled 2026-07-10 from the closed design tickets #95–#104 and their reports in `docs/`.
 >
-> This document is the **destination** of map #99. It supersedes the individual design
+> This document is the **destination** of map #94. It supersedes the individual design
 > reports wherever they conflict: §2 records every cross-ticket seam this ticket ratified,
 > and the sibling docs are henceforth read *through* §2. Everything below is a given for
 > the build effort; the implementation tickets in §12 are the units of work.
@@ -52,7 +52,7 @@ Generation is metered in **credits** backed by real provider cost. Research is a
 optional per-run toggle served by a from-scratch agent loop with a single web-search
 tool.
 
-### Charter decisions (settled while charting map #99 — givens, not open questions)
+### Charter decisions (settled while charting map #94 — givens, not open questions)
 
 1. **Artifacts are the library.** Content lives as an `Artifact` until the user chooses to
    post it.
@@ -89,27 +89,27 @@ cutoff. Artifact version revert. Background R2 cleanup sweep.
 ## 2. Ratified resolutions
 
 The design tickets were grilled in parallel and left seven seams open or contradictory.
-**#110 closes all seven.** Where a sibling doc disagrees with this section, this section
+**#105 closes all seven.** Where a sibling doc disagrees with this section, this section
 wins.
 
 ### R1 — `pdfUrl` is renamed `pdfKey` everywhere
 
-**Conflict.** #102 §4 stores `document.pdfUrl?`; #103 §2–3 writes `render: { pdfUrl }`;
-#106 §5 publishes from "the artifact version's R2 `pdfUrl`"; #107 §3 gates READY on it.
-#108 §7 discovered the R2 bucket is **private** — `uploadFile` returns an
+**Conflict.** #97 §4 stores `document.pdfUrl?`; #98 §2–3 writes `render: { pdfUrl }`;
+#101 §5 publishes from "the artifact version's R2 `pdfUrl`"; #102 §3 gates READY on it.
+#103 §7 discovered the R2 bucket is **private** — `uploadFile` returns an
 `…r2.cloudflarestorage.com` URL nothing can serve to a client — and renamed the field.
 
 **Ratified: `pdfKey`.** The artifact version stores the R2 **object key**, not a URL.
 Clients receive a short-lived signed URL minted via the existing `getSignedUrl(key)` at
 response-serialization time. Publish fetches bytes server-side via `getFile(key)`, exactly
-as `linkedin-media.service.ts` already does. Propagate the rename to #102 §4, #103 §2–3,
-#106 §5, #107 §3. Semantics are unchanged: `pdfKey` still gates `READY`.
+as `linkedin-media.service.ts` already does. Propagate the rename to #97 §4, #98 §2–3,
+#101 §5, #102 §3. Semantics are unchanged: `pdfKey` still gates `READY`.
 
 ### R2 — a post-repair Zod failure at `GENERATE` is terminal
 
-**Conflict.** #103 §7 classes "Zod-invalid LLM output after a step's own internal retries"
-as terminal. #104 §8 says "still invalid → throw `retryable`." #108 §3 flagged the seam;
-#109 §8 resolved it and asked #110 to ratify.
+**Conflict.** #98 §7 classes "Zod-invalid LLM output after a step's own internal retries"
+as terminal. #99 §8 says "still invalid → throw `retryable`." #103 §3 flagged the seam;
+#104 §8 resolved it and asked #105 to ratify.
 
 **Ratified: terminal.** `GENERATE` gets two failure arms:
 
@@ -121,21 +121,21 @@ as terminal. #104 §8 says "still invalid → throw `retryable`." #108 §3 flagg
 The reasoning that decided it: `generate()` already performs one **inline repair retry**
 re-prompting with the exact Zod error — a warm resample with the failure context in the
 prompt. A BullMQ whole-job retry restarts cold from step 1 with that context gone, so it is
-a *worse*-informed resample than the one that just failed. #104 §8's counter-argument
+a *worse*-informed resample than the one that just failed. #99 §8's counter-argument
 ("cheap, because research is cached") is **false for INITIAL runs**: a retried INITIAL
 research run re-executes `RESEARCH` (the builder keeps the step for `kind === INITIAL`;
 only REFINE reads cached research), so the retry buys a full fresh Tavily pass plus a cold
 generation. And the user is not stuck — `FAILED` versions stay visible in the library
-(#102 §2), so a human-in-the-loop refine with adjusted feedback is strictly more useful
+(#97 §2), so a human-in-the-loop refine with adjusted feedback is strictly more useful
 than a blind retry.
 
-**Amend #104 §8's migration note accordingly.**
+**Amend #99 §8's migration note accordingly.**
 
 ### R3 — `StepContext` gains a `renderer` role
 
-**Gap.** #103 §10's `StepContext` exposes `agent / artifacts / meter / emit / run / logger`
-— no renderer. But #108 §6 and #109 §2 both have `RENDER_PDF` call
-`CarouselRendererService`. #109 §9 handed the placement to #110.
+**Gap.** #98 §10's `StepContext` exposes `agent / artifacts / meter / emit / run / logger`
+— no renderer. But #103 §6 and #104 §2 both have `RENDER_PDF` call
+`CarouselRendererService`. #104 §9 handed the placement to #105.
 
 **Ratified: a narrow `renderer` role interface,** consistent with the engine's
 "depend on interfaces, not concrete services" principle:
@@ -148,10 +148,10 @@ interface CarouselRenderer {
 
 interface StepContext {
   logger:    Logger;
-  agent:     AgentRunner;       // #104
-  artifacts: ArtifactWriter;    // #102
-  meter:     CreditMeter;       // #105
-  renderer:  CarouselRenderer;  // #108 — added by R3
+  agent:     AgentRunner;       // #99
+  artifacts: ArtifactWriter;    // #97
+  meter:     CreditMeter;       // #100
+  renderer:  CarouselRenderer;  // #103 — added by R3
   emit:      (e: { type: RunEventType; data: unknown }) => void;  // step.progress only
   run:       RunRecordHandle;
 }
@@ -167,8 +167,8 @@ the repo's manual-construction test style.
 exists** in the repo (`src/agent/style-presets.config.ts`) as a **writing-voice** enum —
 `professional | storytelling | educational | bold | contrarian | founder` — driving
 `STYLE_PRESET_INSTRUCTIONS` in the generation prompts and already persisted on
-`PostDraft.stylePreset`. #108 §1 redefined the same name as a **carousel visual theme**
-(`bold | minimal | editorial | gradient`), and #102 §6 / #109 §2 thread `stylePreset?`
+`PostDraft.stylePreset`. #103 §1 redefined the same name as a **carousel visual theme**
+(`bold | minimal | editorial | gradient`), and #97 §6 / #104 §2 thread `stylePreset?`
 through the create input to be stamped onto `document.templateId`. Only `bold` appears in
 both value sets, meaning one literal would carry two unrelated meanings.
 
@@ -184,24 +184,24 @@ both value sets, meaning one literal would carry two unrelated meanings.
 Consequences:
 
 ```ts
-// create input (#102 §6), amended
+// create input (#97 §6), amended
 { type: ArtifactType; prompt: string; withResearch: boolean;
   stylePreset?: StylePreset;   // voice   — any type
   theme?: CarouselTheme }      // look    — DOCUMENT only
 
-// Artifact.source (#102 §3), amended
+// Artifact.source (#97 §3), amended
 source: { prompt: string; withResearch: boolean; stylePreset?: StylePreset; theme?: CarouselTheme }
 
-// DOCUMENT content (#102 §4 + #108 §1), amended
+// DOCUMENT content (#97 §4 + #103 §1), amended
 { commentary?: string;
   document: { templateId: CarouselTheme; slides: Slide[]; pdfKey?: string; pageCount?: number } }
 ```
 
-The #108 §4 selection rule now reads on `theme`, not `stylePreset`: **user-supplied
+The #103 §4 selection rule now reads on `theme`, not `stylePreset`: **user-supplied
 `theme` is stamped authoritatively** by `GENERATE` (the model cannot override it); if
 omitted, the model picks a `CarouselTheme` and Zod validates it is a real theme. Voice is
 handled the way it is today — `resolveStylePresetInstruction(stylePreset)` injected into
-the prompt — for all three types. Everywhere #108 says "`StylePreset` = theme id," read
+the prompt — for all three types. Everywhere #103 says "`StylePreset` = theme id," read
 `CarouselTheme`. `RunState.input` and `ResearchInput`/`GenerateInput` carry both fields.
 
 Rejected — *repurpose `StylePreset` as the theme.* Every artifact type would carry a field
@@ -210,16 +210,16 @@ for no gain.
 
 ### R5 — the `UsageKind` for a render is `pdf_render`
 
-**Conflict.** #103 §9 and #109 §2 write `ctx.meter.record({ kind: 'render', amount: 1 })`.
-#105 §3 defines `type UsageKind = 'llm' | 'web_search' | 'pdf_render'`.
+**Conflict.** #98 §9 and #104 §2 write `ctx.meter.record({ kind: 'render', amount: 1 })`.
+#100 §3 defines `type UsageKind = 'llm' | 'web_search' | 'pdf_render'`.
 
-**Ratified: `pdf_render`.** #105 owns the `UsageKind` enum; the engine and the
+**Ratified: `pdf_render`.** #100 owns the `UsageKind` enum; the engine and the
 `RENDER_PDF` step conform. The surcharge constant is `CREDIT_SURCHARGE_PDF_RENDER`.
 
 ### R6 — Redis Streams only; the pub/sub channel is dropped
 
-**Conflict.** #103 §6 has the emitter "both publish [to a pub/sub channel] and append [to a
-durable log]." #107 §4 adopts the Redis Stream as the single source and drops the pub/sub
+**Conflict.** #98 §6 has the emitter "both publish [to a pub/sub channel] and append [to a
+durable log]." #102 §4 adopts the Redis Stream as the single source and drops the pub/sub
 relay entirely, because `XREAD BLOCK` unifies replay, live tail, and heartbeat cadence in
 one mechanism with no subscribe-race.
 
@@ -230,8 +230,8 @@ one mechanism with no subscribe-race.
 
 ### R7 — `RENDER_PDF` emits no `step.progress`
 
-**Conflict.** #107 §3 floats a `pageRendered` progress signal from the render step. #108 §6
-and #109 §2 both say there is nothing honest to emit: the render is a single atomic
+**Conflict.** #102 §3 floats a `pageRendered` progress signal from the render step. #103 §6
+and #104 §2 both say there is nothing honest to emit: the render is a single atomic
 `htmlToPdf` call with no observable intermediate state.
 
 **Ratified: none.** The core's `step.started` / `step.completed` bracket the render. The
@@ -248,13 +248,13 @@ against `HEAD` on 2026-07-10.
 
 | Claim | Where | Reality |
 |---|---|---|
-| "the `MarkRun` doc" is prior art; "the `MarkRun` collection is deleted with the rest of `src/mark`" | #105 §5, §11 | **No `MarkRun` collection exists.** Nothing to delete. The prior art for a per-period consumption meter is `FeatureGatingService.assertMarkTokenQuota` / `incrementMarkTokenUsage` + the `mark_tokens` `FeatureKey`, and that is all. |
-| "mirroring how `MarkUsageService` sat above the gating service today" | #105 §4 | **No `MarkUsageService` exists.** The layering it describes (a conversion service above `FeatureGatingService`) is sound, but it is new construction, not a mirror. |
-| "retire all `MARK_*` config" | #104 §9, §12; #105 §5, §11 | **No `MARK_*` keys remain in `.env.example`.** The retirement is already done. What *does* remain is `FEATURE_KEYS.MARK_TOKENS` and the `'mark_tokens'` arm of the `Feature` union — those are R-renamed to `credits` (§9). |
-| "add `TAVILY_API_KEY`" | #104 §12 | Already present in `.env.example:34`. No-op. |
-| "the `compression` filter already excludes the streaming `/mark/chat` route … add the SSE route to the same exclusion" | #107 §7 | The exclusion at `main.ts:20` is **dead** — no `/mark/chat` route or Mark controller exists. **Replace** that line with the SSE exclusion rather than adding a second one. |
-| `src/mark/utils/index.ts` exports the html/pdf utils | implied by #108 §11 | It exports only `html.utils` and `post.util`. `html_to_pdf.util.ts` and `poll.util.ts` are unexported and have **no callers anywhere**. |
-| "`src/mark/artifact.service.ts` … rebuilt to this design" | #102 §10 | Correct, but note `ArtifactService` is the *only* provider `MarkModule` supplies, and `src/database/schemas/artifact.schema.ts` imports `postArtifact`/`pollArtifact` from `src/mark/types/`. That import is the last hard edge binding `src/mark` into the app. |
+| "the `MarkRun` doc" is prior art; "the `MarkRun` collection is deleted with the rest of `src/mark`" | #100 §5, §11 | **No `MarkRun` collection exists.** Nothing to delete. The prior art for a per-period consumption meter is `FeatureGatingService.assertMarkTokenQuota` / `incrementMarkTokenUsage` + the `mark_tokens` `FeatureKey`, and that is all. |
+| "mirroring how `MarkUsageService` sat above the gating service today" | #100 §4 | **No `MarkUsageService` exists.** The layering it describes (a conversion service above `FeatureGatingService`) is sound, but it is new construction, not a mirror. |
+| "retire all `MARK_*` config" | #99 §9, §12; #100 §5, §11 | **No `MARK_*` keys remain in `.env.example`.** The retirement is already done. What *does* remain is `FEATURE_KEYS.MARK_TOKENS` and the `'mark_tokens'` arm of the `Feature` union — those are R-renamed to `credits` (§9). |
+| "add `TAVILY_API_KEY`" | #99 §12 | Already present in `.env.example:34`. No-op. |
+| "the `compression` filter already excludes the streaming `/mark/chat` route … add the SSE route to the same exclusion" | #102 §7 | The exclusion at `main.ts:20` is **dead** — no `/mark/chat` route or Mark controller exists. **Replace** that line with the SSE exclusion rather than adding a second one. |
+| `src/mark/utils/index.ts` exports the html/pdf utils | implied by #103 §11 | It exports only `html.utils` and `post.util`. `html_to_pdf.util.ts` and `poll.util.ts` are unexported and have **no callers anywhere**. |
+| "`src/mark/artifact.service.ts` … rebuilt to this design" | #97 §10 | Correct, but note `ArtifactService` is the *only* provider `MarkModule` supplies, and `src/database/schemas/artifact.schema.ts` imports `postArtifact`/`pollArtifact` from `src/mark/types/`. That import is the last hard edge binding `src/mark` into the app. |
 
 Two further pre-existing defects the build must clear:
 
@@ -316,7 +316,7 @@ stream's job, so the *persisted* status stays coarse.
 // POST — text is the whole artifact
 { commentary: string }                                    // ≤ 3000 LinkedIn-counted chars
 
-// POLL — commentary + inline poll (constraints from #101)
+// POLL — commentary + inline poll (constraints from #96)
 { commentary?: string;
   poll: { question: string;          // ≤ 140 chars
           options: string[];         // 2–4, each ≤ 30 chars, mutually unique
@@ -342,7 +342,7 @@ those files are deleted (§12) and both now **part of the Zod union**:
   `post.util.ts` is the reference implementation and survives the dissolution for exactly
   this reason. Applies to all three types.
 - **Poll options must be mutually unique** (case-insensitive, trimmed). `poll.util.ts`
-  enforces this today; #101 does not state it and #102's schema omitted it. LinkedIn's
+  enforces this today; #96 does not state it and #97's schema omitted it. LinkedIn's
   behavior on duplicate options is untested, and a poll with two identical options is a
   product defect regardless.
 
@@ -377,8 +377,8 @@ times before then. If the pinned version becomes unresolvable at fire time, the 
 fails the post gracefully (`FAILED`, reason `"source artifact unavailable"`) rather than
 publishing stale or empty content.
 
-The schema's `artifacts` array is real (charter #2) but **publish-composition enforces
-LinkedIn's one-content-object rule** (#101 §4). For v1 a post binds exactly one artifact.
+The schema's `artifacts` array is real (charter #68) but **publish-composition enforces
+LinkedIn's one-content-object rule** (#96 §4). For v1 a post binds exactly one artifact.
 
 ### `WorkflowRun` — the durable run record
 
@@ -497,7 +497,7 @@ The emitter's **only** side effect is `XADD workflow:run:{runId} MAXLEN ~ 1000` 
 ### Error and retry semantics
 
 A retry re-runs the **whole** job from step 1 — there are no per-step checkpoints, because
-charter #5 fixed no mid-run resume.
+charter #70 fixed no mid-run resume.
 
 - **BullMQ:** `attempts: 3`, `backoff: { type: 'exponential' }`.
 - **Taxonomy:** `WorkflowError { retryable: boolean; reason: string }`. Transient
@@ -1399,7 +1399,7 @@ edges: `app.module.ts` imports `MarkModule` (lines 30, 56), and
 | `utils/html_to_pdf.util.spec.ts` | **move** | alongside |
 | `utils/post.util.ts` | **salvage, then delete** | Extract `linkedInCharCount` → `src/artifact/utils/linkedin-char-count.util.ts`; it is the reference implementation for the §4 3000-char `commentary` cap (LinkedIn counts by UTF-16 code unit). The `validateLinkedInPost` validator/preview half has no caller — see the open question below |
 | `utils/post.util.spec.ts` | **salvage, then delete** | keep the `linkedInCharCount` cases |
-| `utils/poll.util.ts` | **absorb, then delete** | Its constraints (≤140 question, 2–4 options, ≤30 chars each, **options mutually unique**) become the §4 Zod poll schema. The uniqueness rule is the one thing #101/#102 missed — carry it forward |
+| `utils/poll.util.ts` | **absorb, then delete** | Its constraints (≤140 question, 2–4 options, ≤30 chars each, **options mutually unique**) become the §4 Zod poll schema. The uniqueness rule is the one thing #96/#97 missed — carry it forward |
 | `utils/poll.util.spec.ts` | **absorb, then delete** | port cases into the artifact schema spec |
 | `utils/html.utils.ts` | **delete** | `validateHtml`/`correctHtml`/`strictParseHtml` (parse5). Under §8 the AI never authors HTML — it fills fields — so these have no consumer |
 | `utils/html.utils.spec.ts` | **delete** | |

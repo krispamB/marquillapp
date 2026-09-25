@@ -1,6 +1,6 @@
 /**
  * PROTOTYPE — the other half of the contract: what the model reads.
- * Throwaway (issue #160).
+ * Throwaway (issue #134).
  *
  * The same parsed object that feeds `enforce()` feeds this. That is the claim
  * the ticket is testing: one YAML, two consumers, no second source of truth.

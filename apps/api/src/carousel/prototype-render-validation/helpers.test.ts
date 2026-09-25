@@ -1,4 +1,4 @@
-/** PROTOTYPE tests (issue #163) for the pure helpers around the render pass. */
+/** PROTOTYPE tests (issue #137) for the pure helpers around the render pass. */
 import { beforeAll, describe, expect, test } from 'bun:test';
 import {
   parseDesignSystem,

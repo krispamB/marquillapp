@@ -1,25 +1,25 @@
 # Agent Loop & Research Agent — Design
 
-> Status: design spec for wayfinder map #99, ticket #104 (grilling outcome).
+> Status: design spec for wayfinder map #94, ticket #99 (grilling outcome).
 > Author: generated for Christopher Pam. Decisions settled in a grilling session
 > on 2026-07-09.
 > Supersedes the ad-hoc LLM calls in `src/agent/agent.service.ts` and recovers the
 > intent of the deleted `src/mark/mark-agent.service.ts` tool loop — rebuilt on the
 > `src/llm` abstraction instead of the Vercel AI SDK.
 
-Feeds the final spec assembly (#110). This ticket owns the **`AgentRunner`** that
-#103 hands to steps as `ctx.agent` ("research + generation via the tool-calling
+Feeds the final spec assembly (#105). This ticket owns the **`AgentRunner`** that
+#98 hands to steps as `ctx.agent` ("research + generation via the tool-calling
 agent loop"). Interlocking tickets are referenced inline at each boundary.
 
 ## Framing (charter-derived givens)
 
-- The build flow is **async and non-interactive** (#102/#103: `POST /artifacts` →
+- The build flow is **async and non-interactive** (#97/#98: `POST /artifacts` →
   `202 {artifactId, runId}` → progress via SSE). There is **no live user channel**
   mid-run — the agent cannot ask the user questions.
 - The agent runs on the **`src/llm` OpenRouter stack**, not the Vercel AI SDK. The old
   `ai` / `@ai-sdk/gateway` deps were deliberately removed when `src/mark` was stripped;
   only `@openrouter/sdk` (^0.13.39), `@tavily/core` (^0.7.3) and `zod` (^4) remain.
-- `src/mark` is dissolved (charter #9); its `MARK_*` multi-provider abstraction is
+- `src/mark` is dissolved (charter krispamB/linkgenserver#9); its `MARK_*` multi-provider abstraction is
   retired. The surviving `src/mark/search.ts` Tavily helper is the seed for the one
   research tool.
 - **Prior art:** the deleted `mark-agent.service.ts` ran a `ToolLoopAgent` with a
@@ -124,14 +124,14 @@ answer now"). This guarantees a usable `text` instead of a dangling tool call an
 bounds worst-case spend at `maxSteps + 1` LLM calls.
 
 **Rejected — hard stop / throw on cap.** Turns "the model was being thorough" into a
-failed run, which #103 would retry into the same cap — wasted spend.
+failed run, which #98 would retry into the same cap — wasted spend.
 
 **Rejected — return the last assistant text as-is.** May be empty or half-formed if the
 final turn was a pure tool call.
 
 ## 3. Public surface — `AgentRunner`
 
-#103 §10 expects `ctx.agent` to provide **research and generation**. Research is
+#98 §10 expects `ctx.agent` to provide **research and generation**. Research is
 agentic (calls out to the web); generation is not.
 
 ```ts
@@ -146,10 +146,10 @@ interface AgentRunner {
 
 ```ts
 interface GenerateInput {
-  type: ArtifactType;                     // #102 — POST | POLL | DOCUMENT
+  type: ArtifactType;                     // #97 — POST | POLL | DOCUMENT
   prompt: string;
   stylePreset?: StylePreset;
-  research?: ResearchResult;              // cached findings (#103 research slot)
+  research?: ResearchResult;              // cached findings (#98 research slot)
   refine?: { priorContent: ArtifactContent; feedback: string };
 }
 ```
@@ -161,16 +161,16 @@ interface GenerateInput {
 
 `generate` has all its inputs already (prompt + cached research + type); it just emits
 **typed `ArtifactContent`** — commentary, a poll object, or document slides —
-validated by `ResponseParserService.parseWithSchema` against #102's Zod discriminated
+validated by `ResponseParserService.parseWithSchema` against #97's Zod discriminated
 union. It uses Layer 1's `complete` (no tools). This mirrors today's
 `createLinkedInPost` / `createDraft` plain completions.
 
 - **Prompt selection per type / per revision is `AgentRunner`'s internal concern**
-  (#104 owns the prompts). Refine feeds `priorContent + feedback` into a revision
+  (#99 owns the prompts). Refine feeds `priorContent + feedback` into a revision
   prompt; initial feeds `prompt + research`.
 
 **Rejected — generation as an agent loop** (self-validate / self-critique tools).
-Unbounded spend and nondeterminism for no launch benefit; #102 already gates `READY`
+Unbounded spend and nondeterminism for no launch benefit; #97 already gates `READY`
 on a valid render. Parked as future work.
 
 ## 5. The research agent
@@ -197,7 +197,7 @@ interface ResearchInput { prompt: string; type: ArtifactType; stylePreset?: Styl
 
 **Rejected — port YouTube + Reddit + web as three tools now.** Triples the tool
 surface, cost, and prompt-tuning for launch; the heavy legacy YouTube pipeline
-(search→transcript→compress) dies with the old engine (#100 resolution).
+(search→transcript→compress) dies with the old engine (#95 resolution).
 
 **Rejected — keep a clarification path.** No channel to surface the question in the
 fire-and-forget flow.
@@ -205,7 +205,7 @@ fire-and-forget flow.
 ## 6. Research output shape
 
 `research()` reduces the raw `AgentRunResult` into the "findings + sources" object the
-issue names — what GENERATE reads and #103 caches on `WorkflowRun.researchContext`.
+issue names — what GENERATE reads and #98 caches on `WorkflowRun.researchContext`.
 
 ```ts
 interface ResearchSource { title: string; url: string }
@@ -222,15 +222,15 @@ interface ResearchResult {
   the distilled `findings`, not a dump of five 5-result payloads, keeping the generation
   prompt tight. `sources` travels forward so a post can optionally cite/attribute.
 - Zod-validated (repo convention for structured data). Stored verbatim on
-  `researchContext`, so **refine reuses it with zero re-search** (the #103 §11 cache;
+  `researchContext`, so **refine reuses it with zero re-search** (the #98 §11 cache;
   no web-search surcharge on refine).
 
 **Rejected — forward raw results** (`sources` with `content`/`score`). Bloats the
 generation prompt and the run record with text the `findings` already distilled.
 
-## 7. Usage & cost accounting (→ #105)
+## 7. Usage & cost accounting (→ #100)
 
-`AgentRunner` must **not** hold the meter (that couples the loop to #105). The seam is
+`AgentRunner` must **not** hold the meter (that couples the loop to #100). The seam is
 a **per-turn hook the step bridges to `ctx.meter`**:
 
 - The loop invokes `hooks.onUsage(usage)` after **each** `completeWithTools` / `complete`
@@ -239,12 +239,12 @@ a **per-turn hook the step bridges to `ctx.meter`**:
 - The RESEARCH / GENERATE step wires those to `ctx.meter.record(...)`:
   - each LLM turn → `record({ kind: 'llm', amount: usage.cost, detail: { model, totalTokens } })`
   - each web-search call → `record({ kind: 'web_search', amount: 1 })` — the *signal*
-    #105 turns into a surcharge.
+    #100 turns into a surcharge.
 - `AgentRunner` also returns aggregate `usage` on `AgentRunResult` for the run record /
   logging.
 
-Live per-turn emission lets #107's SSE show a running token/credit count during a long
-research run. **`AgentRunner` emits raw signals (cost per turn, tool fired); #105 owns
+Live per-turn emission lets #102's SSE show a running token/credit count during a long
+research run. **`AgentRunner` emits raw signals (cost per turn, tool fired); #100 owns
 converting them to credit amounts and surcharge rates** — clean boundary.
 
 **Rejected — return aggregate usage only, record once after `run()`.** No live ticks
@@ -253,18 +253,18 @@ lost.
 
 ## 8. Error taxonomy
 
-Three failure modes, each mapped onto #103's retry model (`WorkflowError{retryable}` →
+Three failure modes, each mapped onto #98's retry model (`WorkflowError{retryable}` →
 BullMQ `attempts:3`; terminal → `UnrecoverableError`):
 
 | Failure | Handling | Engine effect |
 |---|---|---|
 | **Tool execution error** (Tavily down / timeout / throws) | caught, returned to the model as tool-result `{ error }`; loop continues (agent adapts, bounded by `maxSteps`) | none — absorbed in-loop |
 | **LLM transport error** (429 / 5xx / network) | `src/llm` classifies and throws typed `LLMError{ retryable }` (429/5xx/network = retryable; 4xx/auth = terminal); `AgentRunner` propagates | step maps to `WorkflowError{retryable}` → whole run retried, or terminal |
-| **Bad structured output** (generation fails #102 Zod) | **one inline repair retry** in `generate()` (re-prompt with the validation error); still invalid → throw `retryable` | #103 `attempts` re-runs (research cached, so cheap) |
+| **Bad structured output** (generation fails #97 Zod) | **one inline repair retry** in `generate()` (re-prompt with the validation error); still invalid → throw `retryable` | #98 `attempts` re-runs (research cached, so cheap) |
 
 - The `src/llm` layer owns retryable classification because it knows provider error
   semantics.
-- Nothing here charges the user (#103 §9: commit-on-success only; failed/retried runs
+- Nothing here charges the user (#98 §9: commit-on-success only; failed/retried runs
   cost the user nothing).
 
 ## 9. Provider scope & model selection
@@ -295,29 +295,29 @@ covers every model we'd reach for.
 - **Token streaming is deferred.** v1 `AgentRunner` uses only non-streaming `complete` /
   `completeWithTools`. `stream()` stays an **optional, unimplemented method on the
   strategy interface** — the seam is reserved, nothing calls it.
-- Live progress comes entirely from #103/#107 events (step started/completed, live
+- Live progress comes entirely from #98/#102 events (step started/completed, live
   `usage.tick` from §7's hook) — enough for a "researching… generating…" UI with a
   running token/credit count, without token-level plumbing.
 
 **Rejected — implement token streaming now.** Forces backpressure/buffering in the
-loop, a token-delta event type into #107's contract, and breaks the
+loop, a token-delta event type into #102's contract, and breaks the
 validate-after-completion model (you cannot Zod-validate a half-streamed object).
 
 ## 11. Boundaries (owned by other tickets)
 
 | Concern | Owner |
 |---|---|
-| `ctx.agent` wiring, `WorkflowRun` record, retry/`WorkflowError` semantics, `ctx.meter` interface | #103 |
-| `ArtifactContent` Zod discriminated union, `ArtifactWriter`, version status | #102 |
-| Credit denomination, `cost`/tool signals → credit conversion, surcharge rates, optional mid-run cutoff | #105 |
-| SSE endpoint, client event schema, `usage.tick` framing, `Last-Event-ID` replay | #107 |
-| `Slide` internal shape / carousel templates (what DOCUMENT generation emits per slide) | #108 |
-| Post binding, connected-account, publish | #106 |
+| `ctx.agent` wiring, `WorkflowRun` record, retry/`WorkflowError` semantics, `ctx.meter` interface | #98 |
+| `ArtifactContent` Zod discriminated union, `ArtifactWriter`, version status | #97 |
+| Credit denomination, `cost`/tool signals → credit conversion, surcharge rates, optional mid-run cutoff | #100 |
+| SSE endpoint, client event schema, `usage.tick` framing, `Last-Event-ID` replay | #102 |
+| `Slide` internal shape / carousel templates (what DOCUMENT generation emits per slide) | #103 |
+| Post binding, connected-account, publish | #101 |
 | Additional research sources (YouTube-transcript, Reddit tools); token streaming; multi-provider strategies | future |
 
 ## 12. Migration note
 
-Per the #100 resolution this is a clean write-over (relaunch, no users):
+Per the #95 resolution this is a clean write-over (relaunch, no users):
 
 - **`src/llm`**: extend `LLMStrategy` with `complete` / `completeWithTools` / (reserved)
   `stream`; add the shared `ToolDefinition` / `ToolCall` / `Usage` types and tool/tool-

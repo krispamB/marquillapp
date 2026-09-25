@@ -10,7 +10,7 @@ import type { StepHandler } from '../engine/workflow.types';
 
 /**
  * The render-relevant slice of DOCUMENT content. The full arm joins the §4 Zod
- * union in T11 (#122); `RENDER_PDF` needs only `templateId` + `slides`, and reads
+ * union in T11 (#117); `RENDER_PDF` needs only `templateId` + `slides`, and reads
  * them structurally so it compiles — and renders — ahead of that arm landing.
  */
 interface DocumentRenderContent {

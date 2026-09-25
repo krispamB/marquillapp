@@ -1,6 +1,6 @@
 # PROTOTYPE — Design System Definition contract
 
-Throwaway. Answers issue #160: *what should the versioned YAML contract for an
+Throwaway. Answers issue #134: *what should the versioned YAML contract for an
 app-owned Design System contain so that it is expressive for the AI while
 remaining parseable and enforceable by the backend?*
 
@@ -29,7 +29,7 @@ prompt constant, which is the property that makes a Design System a *contract*
 rather than a prompt fragment with extra steps.
 
 **The contract splits four ways, and the split is the answer.** 13 keys are
-enforceable with text checks alone, 3 need the #163 render pass, 4 only ever
+enforceable with text checks alone, 3 need the #137 render pass, 4 only ever
 validate the definition itself at seed time, and 5 are pure prompt guidance.
 Menu item 5 prints it. A key that lands in none of those columns does not belong
 in the file.
@@ -65,7 +65,7 @@ It costs the model discipline, so expect it in the repair statistics.
 
 - **Strict palette references.** `palette.rules.references: token-var-only`, as
   above. Bare hex outside `:root` is a violation even when it matches a token.
-- **Page roles are labelled and therefore enforced.** #162's envelope must
+- **Page roles are labelled and therefore enforced.** #136's envelope must
   require `data-role="<role>"` on every page element. That moved
   `composition.pageRoles` out of the guidance column: the role name, the
   `first`/`last` pins and `required` are all static checks now, and a repair
@@ -79,14 +79,14 @@ It costs the model discipline, so expect it in the repair statistics.
 
 ## Open questions this hands on
 
-1. **Are icons mandatory?** (→ #166). `icons.allowed` is `min(1)`, so a system
+1. **Are icons mandatory?** (→ #140). `icons.allowed` is `min(1)`, so a system
    that wants no icons at all cannot express it. Needs a real fourth-system
    answer before the schema hardens.
-2. **Where the Google Fonts allowlist lives** (→ #161). The definition declares
+2. **Where the Google Fonts allowlist lives** (→ #135). The definition declares
    `source: google`; something must check the family against the app-wide
    allowlist at seed time. Assumed to be seeding's job, not the contract's.
 3. **Two version numbers.** `contract: 1` is the shape; `version: N` is the
-   immutable snapshot (#161 owns its semantics). Recommend the app support
+   immutable snapshot (#135 owns its semantics). Recommend the app support
    exactly one contract version at a time and migrate seeds, rather than
    branching the parser.
 4. **Do `typography.rules.minPx` and `spacing.base` earn their place?** They
@@ -98,7 +98,7 @@ It costs the model discipline, so expect it in the repair statistics.
 ## Boundaries respected
 
 The Document Source envelope, CSS capabilities, size limits and sanitisation are
-#162's — with one constraint handed to it: page elements carry `data-role`.
-Persistence, identity, activation and seeding are #161's. The four launch
-systems are #166's. Render-time geometry proof is #163's. This prototype only
+#136's — with one constraint handed to it: page elements carry `data-role`.
+Persistence, identity, activation and seeding are #135's. The four launch
+systems are #140's. Render-time geometry proof is #137's. This prototype only
 asks what the definition holds and who can act on each part of it.

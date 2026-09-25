@@ -1,6 +1,6 @@
 # Compat Audit: What Breaks When `PostDraft` Becomes `Post`
 
-> Status: research report for wayfinder map #99, ticket #100.
+> Status: research report for wayfinder map #94, ticket #95.
 > Author: generated for Christopher Pam.
 > Scope: audit-only. No code changes. Recommends rename-vs-new-collection and
 > enumerates every backward-compatibility hazard for a human to weigh.
@@ -11,13 +11,13 @@
 > stores the LinkedIn asset separately as `linkedinUrn`. The audit below remains historical
 > evidence about the original migration and queue/storage coupling.
 
-Charter givens this audit assumes (from map #99):
+Charter givens this audit assumes (from map #94):
 
-- **#2** — a new `Post` schema replaces `PostDraft`; a post references **multiple**
+- **#68** — a new `Post` schema replaces `PostDraft`; a post references **multiple**
   artifacts. "Rename/evolve if viable; backward compatibility must be audited."
-- **#3** — the existing workflow engine and `quickPostLinkedin`/`insightPostLinkedin`
+- **krispamB/linkgenserver#3** — the existing workflow engine and `quickPostLinkedin`/`insightPostLinkedin`
   stay **untouched**.
-- **#8** — usage gating moves from feature counters to token-backed **credits**.
+- **krispamB/linkgenserver#8** — usage gating moves from feature counters to token-backed **credits**.
 
 The single most important structural fact this audit surfaces: **a `PostDraft`'s
 Mongo `_id` is used verbatim as the BullMQ `jobId` (or job payload key) across all
@@ -43,7 +43,7 @@ backfill, no `_id` preservation, no coexistence window, no versioned endpoints.
    **"research / no research" toggle the user picks before the build starts**
    (research-on ≈ today's insight post; research-off ≈ today's quick post — the two
    `ContentType`s already map exactly onto that split). ⚠️ **This reverses charter
-   decision #3** ("the existing engine and `quickPostLinkedin`/`insightPostLinkedin`
+   decision krispamB/linkgenserver#3** ("the existing engine and `quickPostLinkedin`/`insightPostLinkedin`
    stay untouched") **and the map's out-of-scope line** ("Migrating
    `quickPostLinkedin`/`insightPostLinkedin` onto the new engine"). The old engine
    can now be **deleted**, not just left alone.
@@ -52,7 +52,7 @@ backfill, no `_id` preservation, no coexistence window, no versioned endpoints.
 
 **Residual work** (engineering, not compat risk): **H2** (rename the `'PostDraft'`
 DI string token in `auth.service`), **H3** (redesign the `type` field), **H7**
-(re-home usage triggers → credits per map #8), **H8** (keep the account-disconnect
+(re-home usage triggers → credits per map krispamB/linkgenserver#8), **H8** (keep the account-disconnect
 cancel logic working against the new status model). The rest of this document is
 the original audit, retained for the design of the new schema.
 
@@ -170,7 +170,7 @@ Hazards:
 - **H7 (Medium).** Counters are **monotonic** — `deletePost` and unscheduling
   (`auth` disconnect resets `SCHEDULED→DRAFT`) never decrement. Any new flow must
   consciously preserve or intentionally change this behavior.
-- The new engine + credits system (map #8) must **re-home these trigger points**;
+- The new engine + credits system (map krispamB/linkgenserver#8) must **re-home these trigger points**;
   if the new `Post` creation path forgets them, gating silently stops enforcing.
 - `getUsageSummary` (feature-gating.service ~L364) hardcodes `ai_drafts` and
   `scheduled_posts` keys in its response shape — a client contract of its own,
@@ -224,13 +224,13 @@ Rationale:
    (no artifact refs, `media` in the wrong place) makes reads/serialization
    inconsistent and forces defensive branching everywhere. Clean separation +
    backfill is less error-prone.
-2. **Two writers during the window.** Charter #3 keeps the legacy engine and its
+2. **Two writers during the window.** Charter krispamB/linkgenserver#3 keeps the legacy engine and its
    `quickPostLinkedin`/`insightPostLinkedin` workflows untouched — and those write
    `PostDraft` today. So `postdrafts` **cannot simply vanish** at cutover unless
-   the legacy flow is also migrated (which #3 says it is not). Coexistence with two
-   collections is the honest model. **→ This is the #1 decision for the human: does
+   the legacy flow is also migrated (which krispamB/linkgenserver#3 says it is not). Coexistence with two
+   collections is the honest model. **→ This is the #67 decision for the human: does
    the legacy generation flow keep producing `PostDraft`s (argues for coexistence),
-   or is it repointed at `Post` (contradicts charter #3)?**
+   or is it repointed at `Post` (contradicts charter krispamB/linkgenserver#3)?**
 3. **Identity preservation is mandatory regardless.** Because `_id` is the BullMQ
    job key (§3, §4) and the R2 key prefix, the backfill **must copy `_id`
    verbatim** so any in-flight jobs at cutover still resolve. Fresh `_id`s = silent
@@ -260,7 +260,7 @@ Ranked most-severe first. "Preserve `_id`" resolves several at once.
 | H4 | High | Embedded `media[]` lifecycle; worker mutates via `media.$` positional path; `id` overwritten with URN. | `media` moves into `Artifact`; in-flight `UPLOADING` items stranded → publish permanently blocked. | Drain `media-upload` queue before cutover; migrate media→artifact with status carried over. |
 | H5 | High | `posts` API response shape + `_id`-addressed routes. | Reshape renames fields / moves `content` out / changes `status` enum. | Read-adapter serving legacy shape, or versioned endpoints, until SPA migrates. |
 | H6 | Medium | R2 keys `media-uploads/${draftId}/${mediaId}` + already-issued presigned URLs. | `_id` change orphans objects; worker `getFile`/`deleteFile` miss them. | Preserve `_id`, or re-key + reissue presigned slots. |
-| H7 | Medium | `ai_drafts`/`scheduled_posts` counters incremented only in `PostService`; monotonic (no decrement on delete/unschedule). | New `Post` creation path forgets to re-home triggers → gating silently off. | Re-home triggers (or replace with credits per #8) as an explicit migration task; decide decrement semantics. |
+| H7 | Medium | `ai_drafts`/`scheduled_posts` counters incremented only in `PostService`; monotonic (no decrement on delete/unschedule). | New `Post` creation path forgets to re-home triggers → gating silently off. | Re-home triggers (or replace with credits per krispamB/linkgenserver#8) as an explicit migration task; decide decrement semantics. |
 | H8 | Medium | Account-disconnect safety (`auth.service`) queries `status: 'SCHEDULED'` and cancels jobs. | New status model / field name → query no-ops → posts publish to a **disconnected** account. | Keep a compatible status query; add a regression test for disconnect→cancel. |
 | H9 | Low | Aggregations: `getPosts` `availableMonths`/`distinct(connectedAccount)`, `getPostMetrics`. | Collection split without re-pointing → months/metrics wrong or empty. | Re-point aggregations at `posts`; verify counts across coexistence. |
 | H10 | Low | No migration framework; no explicit collection name; global `MongooseModule` registration. | Backfill is greenfield; two-writer window is operationally fiddly. | Add a scripted, idempotent, `_id`-preserving backfill; document the coexistence runbook. |
@@ -276,9 +276,9 @@ Ranked most-severe first. "Preserve `_id`" resolves several at once.
 1. **Legacy flow fate (blocks the migration model).** Does
    `quickPostLinkedin`/`insightPostLinkedin` keep writing `PostDraft` (→ true
    coexistence, two collections) or get repointed at `Post` (→ contradicts charter
-   #3)? Everything in §7 hinges on this.
+   krispamB/linkgenserver#3)? Everything in §7 hinges on this.
 2. **`_id` preservation** is treated here as mandatory — confirm no requirement
    forces fresh ids.
 3. **API coexistence strategy**: read-adapter vs versioned endpoints for the SPA.
-4. **Counter → credit cutover** (#8): are historical `ai_drafts`/`scheduled_posts`
+4. **Counter → credit cutover** (krispamB/linkgenserver#8): are historical `ai_drafts`/`scheduled_posts`
    counts discarded at the credit switch, or mapped forward?

@@ -1,30 +1,30 @@
 # SSE Progress Contract — Design
 
-> Status: design spec for wayfinder map #99, ticket #107 (grilling outcome).
+> Status: design spec for wayfinder map #94, ticket #102 (grilling outcome).
 > Author: generated for Christopher Pam. Decisions settled in a grilling session
 > on 2026-07-09.
-> Blocked by: #103 (workflow engine), which is closed. This ticket turns the
-> engine's **internal** emission contract (#103 §5–6) into the **client-facing**
+> Blocked by: #98 (workflow engine), which is closed. This ticket turns the
+> engine's **internal** emission contract (#98 §5–6) into the **client-facing**
 > SSE contract.
 
-Feeds the final spec assembly (#110). Interlocking tickets are referenced inline
+Feeds the final spec assembly (#105). Interlocking tickets are referenced inline
 at each boundary.
 
 ## Framing (charter-derived givens)
 
-- **The engine is the producer; #107 is the transport.** #103 fixed the internal
+- **The engine is the producer; #102 is the transport.** #98 fixed the internal
   emission contract: a `RunEvent { runId, seq, type, ts, data }` envelope
-  (#103 §6), a per-run channel/log keyed `workflow:run:{runId}`, an
+  (#98 §6), a per-run channel/log keyed `workflow:run:{runId}`, an
   engine-assigned monotonic `seq` starting at 1, and the event vocabulary in
-  #103 §5. **#107 owns everything client-facing:** the SSE endpoint, wire format
+  #98 §5. **#102 owns everything client-facing:** the SSE endpoint, wire format
   and event naming, `Last-Event-ID` replay, heartbeats, retention, and the
   proxy/compression concerns. This doc does **not** redesign the vocabulary — it
-  adopts #103 §5 verbatim as the client schema and specifies how it reaches the
+  adopts #98 §5 verbatim as the client schema and specifies how it reaches the
   browser.
 - **Two processes, one relay hop** (AGENTS.md architecture). The engine runs in
   the **BullMQ worker**; the SSE endpoint lives on the **HTTP server**. They
   share Redis (`ioredis`, `REDIS_URL`, `RedisService`). So the wire is:
-  `worker step → Redis (per-run log) → HTTP-server relay → EventSource`. #103 §6
+  `worker step → Redis (per-run log) → HTTP-server relay → EventSource`. #98 §6
   already put the durable per-run event log in Redis precisely so the HTTP server
   can relay without a direct worker link.
 - **Native `EventSource`, cookie auth.** The client is a browser `EventSource`,
@@ -32,7 +32,7 @@ at each boundary.
   **auto-reconnects** with a `Last-Event-ID` header. Both facts drive the design.
   The existing `ClerkAuthGuard` already reads the `__session` **cookie**
   first (`clerk-auth.guard.ts:62`), so it works with `EventSource` unchanged — no
-  header-token scheme needed. *(The #107 issue says "JWT cookie"; the repo has
+  header-token scheme needed. *(The #102 issue says "JWT cookie"; the repo has
   since moved to the Clerk `__session` cookie with a legacy `access_token`
   fallback. The guard is cookie-first either way, which is what matters here.)*
 
@@ -52,15 +52,15 @@ The lifecycle a single connection streams:
 
 - **Keyed by `runId`, not artifact.** The kickoff responses already hand the
   client a `runId` (`202 {artifactId, runId}` on create, `202 {artifactId,
-  version, runId}` on refine — #102 §6/§8, #103 §11). `runId` is the `_id` of the
-  `WorkflowRun` (#103 §4) and the Redis log key, so it is the natural, minimal
+  version, runId}` on refine — #97 §6/§8, #98 §11). `runId` is the `_id` of the
+  `WorkflowRun` (#98 §4) and the Redis log key, so it is the natural, minimal
   handle. A run belongs to exactly one artifact/version, so nothing is lost.
 - **Guard:** `@UseGuards(ClerkAuthGuard)` — the `__session` cookie rides along
   automatically on the `EventSource` request (same-origin, or cross-origin with
   `withCredentials: true` + CORS `credentials`).
 - **Owner scoping:** load the `WorkflowRun` by `:runId`; **403** if
   `run.user !== req.user._id` (same owner-check pattern as `PostService` /
-  #102 §8). **404** if no such run. Do this *before* opening the stream so
+  #97 §8). **404** if no such run. Do this *before* opening the stream so
   auth/ownership failures are ordinary JSON HTTP errors, not mid-stream events.
 - **Transport handler style — raw `@Res()`, not `@Sse()`.** NestJS's `@Sse()`
   wraps an `Observable<MessageEvent>` and is lovely for a fixed rxjs source, but
@@ -73,7 +73,7 @@ The lifecycle a single connection streams:
      heartbeats.
 
   A raw `@Res({ passthrough: false })` handler maps cleanly onto all four
-  (`res.writeHead(...)`, `res.write(...)`, `req.on('close', …)`), so #107 uses
+  (`res.writeHead(...)`, `res.write(...)`, `req.on('close', …)`), so #102 uses
   raw `res`. `@Sse()` is the rejected alternative below.
 
 **Rejected — `@Sse()` Observable handler.** Simpler for the happy path, but it
@@ -94,7 +94,7 @@ the progress transport.)
 
 ## 2. Wire format & the SSE envelope
 
-Each `RunEvent` (#103 §6) is serialized to one SSE message:
+Each `RunEvent` (#98 §6) is serialized to one SSE message:
 
 ```
 id: <redis-stream-entry-id>
@@ -103,17 +103,17 @@ data: <JSON of the event body>   # single line; see §3
                                  # (blank line terminates the message)
 ```
 
-- **`event:`** = the `RunEventType` from #103 §5 verbatim (`run.started`,
+- **`event:`** = the `RunEventType` from #98 §5 verbatim (`run.started`,
   `step.started`, …). The client attaches typed listeners
   (`es.addEventListener('step.completed', …)`) instead of switching inside a
   single `onmessage`.
 - **`data:`** = `JSON.stringify` of `{ seq, ts, ...data }` — the engine's
-  per-event `data` payload (#103 §5) plus `seq` and `ts` lifted in so the client
+  per-event `data` payload (#98 §5) plus `seq` and `ts` lifted in so the client
   gets ordering/timing without a separate envelope. JSON is emitted on a **single
   `data:` line** (no embedded newlines) to stay within one SSE record.
 - **`id:` = the Redis Stream entry ID**, not the raw `seq`. This is the one
-  refinement of #103 §6, which flagged `seq` as "the natural basis for
-  `Last-Event-ID`" but explicitly left the `seq ↔ stream-ID` mapping to #107.
+  refinement of #98 §6, which flagged `seq` as "the natural basis for
+  `Last-Event-ID`" but explicitly left the `seq ↔ stream-ID` mapping to #102.
   Using the **stream entry ID as the SSE `id`** makes replay a trivial native
   `XREAD ... STREAMS <key> <lastEventId>` (§4/§5) with **no seq→offset index** to
   maintain. `seq` still travels **inside `data`** as the app-level monotonic
@@ -129,7 +129,7 @@ IDs already encode order and are the argument `XREAD` wants.
 
 ## 3. Event vocabulary (client-facing schema)
 
-Adopted from #103 §5 **unchanged** — the engine's internal names *are* the
+Adopted from #98 §5 **unchanged** — the engine's internal names *are* the
 client's event names (no translation layer to drift). The `data` shapes below are
 the client contract:
 
@@ -138,15 +138,15 @@ the client contract:
 | `run.started` | Run accepted; step plan known | `{ kind, type, steps: WorkflowStep[] }` |
 | `step.started` | A step began | `{ step, index, total }` |
 | `step.completed` | A step finished | `{ step, index, total }` |
-| `step.progress` | Fine-grained within a step (optional) | `{ step, ...signal }` e.g. `{ sourcesFound }` (#104 §7) |
-| `usage.tick` | Credits consumed | `{ kind, credits, detail? }` (#105 `UsageKind`) |
+| `step.progress` | Fine-grained within a step (optional) | `{ step, ...signal }` e.g. `{ sourcesFound }` (#99 §7) |
+| `usage.tick` | Credits consumed | `{ kind, credits, detail? }` (#100 `UsageKind`) |
 | `step.failed` | Step failed **but will retry** (non-terminal) | `{ step, retryable: true, message }` |
 | `run.completed` | Terminal ✔ — version is now `READY` | `{ artifactId, version }` |
 | `run.failed` | Terminal ✘ | `{ failureReason }` |
 
 - **"Artifact ready" = `run.completed`.** The issue lists "artifact ready" in the
   vocabulary; there is deliberately **no separate `artifact.ready` event**. A run
-  completing *is* the target version reaching `READY` (#102 §2 — a document only
+  completing *is* the target version reaching `READY` (#97 §2 — a document only
   reaches `READY` once its `pdfUrl` is rendered), so `run.completed
   {artifactId, version}` is the single, non-ambiguous "go look at it now" signal.
   The client refetches `GET /artifacts/:id?version=<version>` on this event.
@@ -155,13 +155,13 @@ the client contract:
   (research `sourcesFound`, PDF `pageRendered`). Clients must treat it as
   best-effort UI polish, never as a required checkpoint.
 - **Progress-bar math** is `index/total` from `step.started/completed`, where
-  `total = steps.length` from `run.started`. Because #103 §2's builder emits an
+  `total = steps.length` from `run.started`. Because #98 §2's builder emits an
   **honest** step list (only steps that actually run), `total` is exact — no
   skipped-step gaps in the bar.
 - **Two terminal events, `run.completed` | `run.failed`.** Exactly one fires per
   run; it is always the last data event before the close handshake (§6).
   `step.failed` (`retryable: true`) is **not** terminal — it announces a
-  transient blip while BullMQ retries the whole job (#103 §7), and the client
+  transient blip while BullMQ retries the whole job (#98 §7), and the client
   should show "retrying…", not "failed".
 
 **Client-side discriminated union** (the consumable schema, for a typed frontend):
@@ -183,9 +183,9 @@ type ProgressEvent =
 
 ## 4. Transport — one Redis Stream per run, `XREAD BLOCK` relay
 
-#103 §6 recommended (and deferred the final choice to #107) a **bounded Redis
+#98 §6 recommended (and deferred the final choice to #102) a **bounded Redis
 Stream per run** as the durable log, with the emitter both publishing to a
-pub/sub channel *and* appending to the stream. **#107 adopts the Stream as the
+pub/sub channel *and* appending to the stream. **#102 adopts the Stream as the
 single source and drops the separate pub/sub relay:**
 
 - **Key:** `workflow:run:{runId}` — a Redis **Stream** (`XADD`). Each event's
@@ -202,10 +202,10 @@ single source and drops the separate pub/sub relay:**
   cadence at once: entries returned → write them as SSE events; a block **timeout
   with no entries** → write a heartbeat comment (§6) and loop.
 - **Why this beats pub/sub for SSE:** `XREAD` from a durable log has **no
-  subscribe-race** (the #103 §6 hazard — events fired before a late subscriber
+  subscribe-race** (the #98 §6 hazard — events fired before a late subscriber
   attaches are simply still in the stream) and **unifies replay + live** (pub/sub
   can't replay, so it would need a *second* `XRANGE` path stitched to a live
-  subscription, with a seam between them). The pub/sub channel #103 §6 mentioned
+  subscription, with a seam between them). The pub/sub channel #98 §6 mentioned
   becomes unnecessary; the engine only needs to `XADD`.
 - **Per-connection Redis connection.** A blocking `XREAD` monopolizes its
   `ioredis` connection, so the relay uses `RedisService.getClient().duplicate()`
@@ -213,17 +213,17 @@ single source and drops the separate pub/sub relay:**
   the accepted cost of blocking reads; connection count is bounded by concurrent
   viewers of in-flight runs (small — a user watches their own generation).
 
-**Engine-side note (informs #103's implementation, not a re-decision):** #103 §6
+**Engine-side note (informs #98's implementation, not a re-decision):** #98 §6
 said "the emitter both publishes and appends." Under this doc the append (`XADD`
 to `workflow:run:{runId}` with `MAXLEN ~ 1000`) is the *only* required
 side-effect; the pub/sub publish can be dropped.
 
 **Rejected — pub/sub for live + `XRANGE` for replay.** Two code paths and a
 hand-off seam (which events belong to replay vs live?) reintroducing exactly the
-subscribe-race #103 §6 wanted gone. `XREAD BLOCK` collapses both.
+subscribe-race #98 §6 wanted gone. `XREAD BLOCK` collapses both.
 
 **Rejected — poll the `WorkflowRun` Mongo doc.** The run record only holds coarse
-`currentStep` (#103 §4), not the event stream; polling it can't deliver
+`currentStep` (#98 §4), not the event stream; polling it can't deliver
 `usage.tick`/`step.progress` and adds DB load. It is used **only** as the
 cold-start fallback (§5), not the live path.
 
@@ -252,11 +252,11 @@ branches:
   hit the 204.
 - **Cold-start fallback (stream gone, run still known):** if the stream key has
   expired (§8) but the `WorkflowRun` doc exists, synthesize a **single snapshot**
-  from the durable record (#103 §4: `status`, `currentStep`) — emit a
+  from the durable record (#98 §4: `status`, `currentStep`) — emit a
   `run.started` (reconstructed `steps` from `buildWorkflow(input)`) and, if
   terminal, the matching `run.completed`/`run.failed` — then close. The client
   reaches a correct final UI state even after the fine-grained log is reclaimed.
-  This is exactly the "reconnect fallback" #103 §4 parked `currentStep` for.
+  This is exactly the "reconnect fallback" #98 §4 parked `currentStep` for.
 
 ## 6. Heartbeats & the terminal/close handshake
 
@@ -318,7 +318,7 @@ for **this** codebase:
 ## 8. Retention / TTL
 
 - **`MAXLEN` on `XADD`** — the stream is capped (`XADD ... MAXLEN ~ 1000`, the
-  approximate trim #103 §6 recommended). A single run emits well under 1000 events
+  approximate trim #98 §6 recommended). A single run emits well under 1000 events
   (5 steps × a few events + usage ticks), so the cap only bounds pathological
   runs; it is the safety valve, not the normal retention.
 - **`EXPIRE` on terminal** — when the terminal event is appended, set
@@ -328,7 +328,7 @@ for **this** codebase:
   the durable `WorkflowRun`) still yields a correct final state.
 - **No separate cleanup job** — `MAXLEN` bounds live size and `EXPIRE` reclaims
   finished runs, so Redis self-manages. (The `WorkflowRun` Mongo doc persists
-  independently per #103 §4; SSE retention does not touch it.)
+  independently per #98 §4; SSE retention does not touch it.)
 
 ## 9. Error & edge cases
 
@@ -381,20 +381,20 @@ es.onerror = () => {/* transient; EventSource auto-reconnects with Last-Event-ID
 
 | Concern | Owner |
 |---|---|
-| Event vocabulary, `RunEvent` envelope, `seq` assignment, `XADD` to the per-run log | #103 |
-| `usage.tick` payload (`UsageKind`, credit amounts) | #105 |
-| `step.progress` signals per step (e.g. `sourcesFound`) | #104 (research) / #108 (render) |
-| Artifact version → `READY` semantics the `run.completed` refetch targets | #102 |
-| Kickoff endpoints returning `runId` | #102 (`POST /artifacts`, `/refine`) |
-| Where credit hooks fire (source of `usage.tick`) | #103 §9 / #105 |
+| Event vocabulary, `RunEvent` envelope, `seq` assignment, `XADD` to the per-run log | #98 |
+| `usage.tick` payload (`UsageKind`, credit amounts) | #100 |
+| `step.progress` signals per step (e.g. `sourcesFound`) | #99 (research) / #103 (render) |
+| Artifact version → `READY` semantics the `run.completed` refetch targets | #97 |
+| Kickoff endpoints returning `runId` | #97 (`POST /artifacts`, `/refine`) |
+| Where credit hooks fire (source of `usage.tick`) | #98 §9 / #100 |
 
 ## 12. Migration note
 
-Per the #100 clean write-over (relaunch, no users): this is **new surface**, no
+Per the #95 clean write-over (relaunch, no users): this is **new surface**, no
 migration. A new SSE controller (`GET /runs/:runId/events`) is added on the HTTP
-server, backed by the per-run Redis Stream #103's engine already `XADD`s to.
+server, backed by the per-run Redis Stream #98's engine already `XADD`s to.
 Nothing legacy is replaced — the `PostDraft`-era flow had no progress stream (the
-open issue #31 "remove draft step and change to stream" is *subsumed* by this
+open issue #85 "remove draft step and change to stream" is *subsumed* by this
 design). The only cross-cutting edit outside the new controller is the one-line
 `compression` `filter` exclusion in `main.ts` (§7), mirroring the existing
 `/mark/chat` exclusion.

@@ -1,6 +1,6 @@
 # Artifact Schema, Versioning & Library API — Design
 
-> Status: design spec for wayfinder map #99, ticket #102 (grilling outcome).
+> Status: design spec for wayfinder map #94, ticket #97 (grilling outcome).
 > Author: generated for Christopher Pam. Decisions settled in a grilling session
 > on 2026-07-09.
 > Supersedes the current `src/database/schemas/artifact.schema.ts` (which has a
@@ -13,15 +13,15 @@
 > and a concurrent schedule/publish action. This preserves the approved scheduled preview
 > and published history.
 
-Feeds the final spec assembly (#110). Interlocking tickets are referenced inline
+Feeds the final spec assembly (#105). Interlocking tickets are referenced inline
 at each boundary.
 
 ## Framing (charter-derived givens)
 
 - An **`Artifact` is a standalone, user-owned library entity** with its own
-  collection and stable `_id` (charter #1). A `Post` (#106) *references* artifacts;
+  collection and stable `_id` (charter #67). A `Post` (#101) *references* artifacts;
   this ticket designs the library in isolation from posting.
-- Content types map to LinkedIn's model (per the #101 API research): a post is
+- Content types map to LinkedIn's model (per the #96 API research): a post is
   **commentary (text) + at most one mutually-exclusive content object** (poll *or*
   document). Poll+media / document+media are **not possible** — so an artifact is
   single-type.
@@ -55,14 +55,14 @@ GENERATING → FAILED
 
 - A version reaches `READY` only when its content is complete — for **documents**,
   that means the Browserless-rendered `pdfUrl` is populated. No separate `RENDERING`
-  state; fine-grained progress is the SSE stream's job (#107), so the *persisted*
+  state; fine-grained progress is the SSE stream's job (#102), so the *persisted*
   status stays coarse.
 - **No family-level status enum.** An artifact's library state derives from
   `currentVersion.status`, avoiding drift between two enums.
 - **Soft-delete** via a family-level `deletedAt`, not a status value (deletion is
   orthogonal to generation).
 - **Publish state is deliberately absent** — whether an artifact has been posted is a
-  `Post` concern (#106); referencing an artifact from a post doesn't mutate it.
+  `Post` concern (#101); referencing an artifact from a post doesn't mutate it.
 - **Pinned versions are immutable** — the Post reference does not mutate the artifact, but
   it prevents in-place edits while any SCHEDULED or PUBLISHED Post depends on that version.
 
@@ -109,7 +109,7 @@ ArtifactVersion {                   // embedded subdocument
 // POST — text-only (the degenerate case; commentary is the whole thing)
 { commentary: string }
 
-// POLL — commentary + poll (constraints from the #101 API research)
+// POLL — commentary + poll (constraints from the #96 API research)
 { commentary?: string;
   poll: { question: string;            // ≤ 140 chars
           options: string[];           // 2–4 options, each ≤ 30 chars
@@ -117,15 +117,15 @@ ArtifactVersion {                   // embedded subdocument
 
 // DOCUMENT — commentary + structured slides + rendered PDF
 { commentary?: string;
-  document: { slides: Slide[];         // Slide internals defined by #108
+  document: { slides: Slide[];         // Slide internals defined by #103
               pdfUrl?: string;         // R2 URL, populated on render → gates READY
               pageCount?: number } }
 ```
 
-- `Slide` is intentionally opaque here — **the carousel-template ticket (#108)**
+- `Slide` is intentionally opaque here — **the carousel-template ticket (#103)**
   owns its shape (a slide is expected to be `{ templateId, fields }`, i.e. structured
-  content that fills a curated HTML/CSS template, *not* raw HTML). #102 stores
-  `slides` as an ordered array and lets #108's Zod schema validate the internals.
+  content that fills a curated HTML/CSS template, *not* raw HTML). #97 stores
+  `slides` as an ordered array and lets #103's Zod schema validate the internals.
 - The relationship is source→derived: `slides` is the editable source of truth;
   `pdfUrl` is the disposable Browserless render output (re-rendered on every refine
   or slide edit).
@@ -153,19 +153,19 @@ history and muddies what "version" means.
 `POST /artifacts` is not hand-authoring; it kicks off a generation run.
 
 - Creates the `Artifact` immediately (`currentVersion=1`, version 1 `GENERATING`) and
-  **enqueues a generation run on the new engine** (#103); responds `202
-  {artifactId, runId}`. The client watches progress via SSE (#107) and/or polls
+  **enqueues a generation run on the new engine** (#98); responds `202
+  {artifactId, runId}`. The client watches progress via SSE (#102) and/or polls
   `GET /artifacts/:id`.
 - Initial `GENERATE` returns a trimmed 1–100 character title alongside content;
   `PERSIST_VERSION` stores it at family level when version 1 becomes `READY`.
   Refinements never replace the family title.
 - **Input:** `{ type, prompt, withResearch, stylePreset? }`.
-  - `withResearch` is the research/no-research toggle from the #100 resolution — this
+  - `withResearch` is the research/no-research toggle from the #95 resolution — this
     is exactly where `quickPostLinkedin`/`insightPostLinkedin` collapse into one flow
     (research-off ≈ quick post, research-on ≈ insight post).
 - **No `connectedAccount` at creation** — an artifact is account-agnostic until the
-  user chooses to post it (charter #1). Account binding happens in the `Post` flow
-  (#106). This is a deliberate change from today's `PostDraft`.
+  user chooses to post it (charter #67). Account binding happens in the `Post` flow
+  (#101). This is a deliberate change from today's `PostDraft`.
 
 **Rejected:** synchronous create — research + LLM + PDF render take tens of seconds;
 would hold the HTTP connection and bypass the SSE design.
@@ -179,7 +179,7 @@ Keep the *request*, drop the research guts (avoid the `PostDraft` bloat where
   request; gives refine runs base context and the UI a "generated from…" line.
 - **Version-level `refineFeedback?`** — the feedback that spawned each version.
 - **Research/intermediate context is NOT stored on the artifact** — it's a **run
-  concern**, living on the engine's run record (#103) / research agent (#104). If a
+  concern**, living on the engine's run record (#98) / research agent (#99). If a
   refine needs cached research, that belongs on the run record, not the library doc.
 
 ## 8. HTTP surface
@@ -217,16 +217,16 @@ artifact isn't the caller's — same pattern as `PostService`).
 
 | Concern | Owner |
 |---|---|
-| `Slide` internal shape / carousel templates | #108 |
-| Generation engine internals + the run record (holds research context) | #103 |
-| Research agent (`withResearch`) | #104 |
-| Post binding, connected-account, publish | #106 |
-| SSE progress-event contract | #107 |
-| Credit gating on create/refine | #105 |
+| `Slide` internal shape / carousel templates | #103 |
+| Generation engine internals + the run record (holds research context) | #98 |
+| Research agent (`withResearch`) | #99 |
+| Post binding, connected-account, publish | #101 |
+| SSE progress-event contract | #102 |
+| Credit gating on create/refine | #100 |
 | Revert; background R2 cleanup sweep | future |
 
 ## 10. Migration note
 
-Per the #100 resolution this is a clean write-over (relaunch, no users): the current
+Per the #95 resolution this is a clean write-over (relaunch, no users): the current
 `Artifact`/`postArtifact`/`pollArtifact` types and `src/mark/artifact.service.ts`
-are rebuilt to this design; no data migration. `src/mark` is dissolved (charter #9).
+are rebuilt to this design; no data migration. `src/mark` is dissolved (charter krispamB/linkgenserver#9).

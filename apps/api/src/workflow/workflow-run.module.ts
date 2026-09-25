@@ -3,7 +3,7 @@ import { WorkflowRunService } from './workflow-run.service';
 
 /**
  * The durable run record, kept apart from `WorkflowModule`'s queue producers.
- * Only the artifact HTTP surface (#117) and the worker need it, so it stays out
+ * Only the artifact HTTP surface (#112) and the worker need it, so it stays out
  * of the widely-imported queue module's graph.
  */
 @Module({

@@ -84,7 +84,7 @@ export interface AgentTurnUsage extends Usage {
  */
 export interface AgentHooks {
   onUsage?: (usage: AgentTurnUsage) => void;
-  // Fired by the research tool loop (#117); `generate` calls no tools.
+  // Fired by the research tool loop (#112); `generate` calls no tools.
   onToolCall?: (tool: { name: string }) => void;
 }
 

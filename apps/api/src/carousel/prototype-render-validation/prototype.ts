@@ -1,5 +1,5 @@
 /**
- * PROTOTYPE — render validation and repair diagnostics (issue #163). Throwaway.
+ * PROTOTYPE — render validation and repair diagnostics (issue #137). Throwaway.
  *
  * Run:  bun src/carousel/prototype-render-validation/prototype.ts [--browserless]
  *
@@ -156,7 +156,7 @@ async function pagination() {
 }
 
 const menu = `
-${c.bold('Render validation and repair diagnostics — prototype (#163)')}  ${c.dim(`[${mode}]`)}
+${c.bold('Render validation and repair diagnostics — prototype (#137)')}  ${c.dim(`[${mode}]`)}
   1  conforming            the baseline: every check silent
   2  overflow              on-scale CSS the static checker passes, that the render does not
   3  collision             overlap and a blank page
@@ -176,7 +176,7 @@ try {
     if (k === '1')
       await show(
         'conforming',
-        'A Candidate Source that obeys #162 and the Design System.',
+        'A Candidate Source that obeys #136 and the Design System.',
       );
     else if (k === '2')
       await show(

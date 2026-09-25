@@ -1,5 +1,5 @@
 /**
- * PROTOTYPE — the in-page measurement. Throwaway (issue #163).
+ * PROTOTYPE — the in-page measurement. Throwaway (issue #137).
  *
  * This function is serialised and evaluated inside the render page over CDP. It
  * must stay self-contained (no imports, no closures) and it holds no policy: it

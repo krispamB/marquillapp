@@ -1,31 +1,31 @@
 # Credit-Based Usage System — Design
 
-> Status: design spec for wayfinder map #99, ticket #105 (grilling outcome).
+> Status: design spec for wayfinder map #94, ticket #100 (grilling outcome).
 > Author: generated for Christopher Pam. Decisions settled 2026-07-09.
-> Implements the `CreditMeter` interface #103 defines and consumes the raw usage
-> signals #104 emits. Generalizes the existing `mark_tokens` per-period budget into
+> Implements the `CreditMeter` interface #98 defines and consumes the raw usage
+> signals #99 emits. Generalizes the existing `mark_tokens` per-period budget into
 > a cost-backed **credit** meter that gates *all* artifact generation.
 
-Feeds the final spec assembly (#110). This ticket owns **credit denomination, the
+Feeds the final spec assembly (#105). This ticket owns **credit denomination, the
 token/cost→credit exchange, surcharge amounts, the `Tier`/`Usage` schema changes, the
 enforcement points, and the Paddle/tier-config implications**. The engine's hook timing
-(#103 §9) and the agent's raw signals (#104 §7) are givens.
+(#98 §9) and the agent's raw signals (#99 §7) are givens.
 
 ## Framing (charter-derived givens)
 
-- **Charter #8:** usage gating moves to token-backed **credits** per tier per period;
+- **Charter krispamB/linkgenserver#8:** usage gating moves to token-backed **credits** per tier per period;
   non-LLM actions (web search, Browserless render) carry **fixed credit surcharges**.
-- **Charter #9 / #104:** `src/mark` is dissolved. The existing `mark_tokens` budget
+- **Charter krispamB/linkgenserver#9 / #99:** `src/mark` is dissolved. The existing `mark_tokens` budget
   (`FeatureGatingService.assertMarkTokenQuota` / `incrementMarkTokenUsage`, the `MarkRun`
   doc) is the **prior art and the seed** — credits are its generalization, not a
   greenfield build.
-- **Clean write-over (#100):** relaunch, no users. No migration/backfill of usage rows,
+- **Clean write-over (#95):** relaunch, no users. No migration/backfill of usage rows,
   no coexistence window — `mark_tokens` is renamed/reshaped in place and `ai_drafts`
   retired outright.
-- **#103 §9 owns hook *timing*; #105 owns *conversion + amounts*.** #105 does **not**
+- **#98 §9 owns hook *timing*; #100 owns *conversion + amounts*.** #100 does **not**
   move where the meter fires; it defines what a recorded signal is worth in credits, the
   balance guard, and the debit.
-- **#104 §7 emits raw signals, not credits:** each LLM turn → `record({ kind: 'llm',
+- **#99 §7 emits raw signals, not credits:** each LLM turn → `record({ kind: 'llm',
   amount: usage.cost, detail: { model, totalTokens } })` where `usage.cost` is the
   **real per-call USD cost OpenRouter charged the account**; each web search →
   `record({ kind: 'web_search', amount: 1 })`. Converting those to credits is this
@@ -92,7 +92,7 @@ under-charged to zero:
 credits = ceil(totalTokens / 1000 * FALLBACK_CREDITS_PER_1K_TOKENS)   // FALLBACK_… is env
 ```
 
-This is a coarse safety net (one flat rate, not per-model). For OpenRouter v1 (#104 §9),
+This is a coarse safety net (one flat rate, not per-model). For OpenRouter v1 (#99 §9),
 `cost` is always present, so the fallback should effectively never fire; it exists so a
 future provider without cost reporting can't slip through free. Log a warning when it does.
 
@@ -114,27 +114,27 @@ pdf render credits = max(CREDIT_MINIMUM_PDF_RENDER,
                          measured units * CREDIT_SURCHARGE_PDF_RENDER)
 ```
 
-`UsageKind` is defined here (the enum #103 §9 references):
+`UsageKind` is defined here (the enum #98 §9 references):
 
 ```ts
 type UsageKind = 'llm' | 'web_search' | 'pdf_render';
 ```
 
 So **`record`'s `amount` is polymorphic by `kind`** — USD for `llm`, a unit count for
-surcharges. This asymmetry is inherited from #103/#104's committed `record({ kind, amount })`
-shape; #105 pins the interpretation in one conversion table (§4) rather than reshaping the
+surcharges. This asymmetry is inherited from #98/#99's committed `record({ kind, amount })`
+shape; #100 pins the interpretation in one conversion table (§4) rather than reshaping the
 upstream signal.
 
 **Rejected — a separate `record` overload per kind (dollars vs count).** Splits the one
-narrow hook #103 deliberately kept, for no gain; a `switch (kind)` in the converter is
+narrow hook #98 deliberately kept, for no gain; a `switch (kind)` in the converter is
 enough.
 
 **Rejected — surcharge as a % of the run's LLM credits.** A web search's cost is fixed and
 independent of how expensive the generation model is; a flat credit charge models reality.
 
-## 4. `CreditMeterService` — realizing #103's `CreditMeter`
+## 4. `CreditMeterService` — realizing #98's `CreditMeter`
 
-#103 §9/§10 hands each run a `ctx.meter: CreditMeter`:
+#98 §9/§10 hands each run a `ctx.meter: CreditMeter`:
 
 ```ts
 interface CreditMeter {
@@ -144,9 +144,9 @@ interface CreditMeter {
 }
 ```
 
-**Split of ownership.** #103 owns the *stateful, per-run* half (the attempt-scoped
+**Split of ownership.** #98 owns the *stateful, per-run* half (the attempt-scoped
 `creditsUsed` accumulator on `WorkflowRun`, per-attempt reset, `usage.tick` emission).
-#105 owns the *stateless* half — a singleton injectable `CreditMeterService` the engine
+#100 owns the *stateless* half — a singleton injectable `CreditMeterService` the engine
 composes into `ctx.meter`:
 
 ```ts
@@ -160,18 +160,18 @@ class CreditMeterService {
 
 - `record` (engine-side) calls `toCredits(...)`, adds the result to the attempt-scoped
   `creditsUsed`, and emits `usage.tick` carrying the credit delta + running total (the
-  detail #107's SSE renders live).
+  detail #102's SSE renders live).
 - `commit(runId)` (engine-side) reads the winning attempt's `creditsUsed` and calls
   `debit(userId, creditsUsed)` — the **only** real write to the period aggregate.
 - `assertBalance` delegates straight to `CreditMeterService`.
 
 `toCredits` is pure and synchronous (config in, integer out) — trivially unit-testable per
-the repo's manual-construction style, and it keeps `record` non-async (#103 requires
+the repo's manual-construction style, and it keeps `record` non-async (#98 requires
 `record` to return `void`).
 
 **Rejected — put the attempt-scoped accumulator in `CreditMeterService`.** It is per-run
 state that belongs on the `WorkflowRun` the engine already owns and resets per attempt
-(#103 §9); duplicating it here invites double-count and a second source of truth.
+(#98 §9); duplicating it here invites double-count and a second source of truth.
 
 **Rejected — fold everything into `FeatureGatingService`.** The meter needs the run
 record and the engine's emit; `FeatureGatingService` owns tier/period/`Usage` primitives
@@ -222,7 +222,7 @@ That covers dashboard, SSE, and provider-cost audit without a third store.
 
 ## 6. Enforcement points
 
-Three touch points, matching #103 §9's commit-on-success timing:
+Three touch points, matching #98 §9's commit-on-success timing:
 
 1. **HTTP pre-check (fast 4xx).** `POST /artifacts` calls `assertBalance(userId)` before
    enqueueing the run, so an out-of-credits user gets an immediate
@@ -230,29 +230,29 @@ Three touch points, matching #103 §9's commit-on-success timing:
    `limit`/`currentUsage`, `upgradeHint`) instead of a queued run that fails. This is the
    same exception shape the frontend already handles.
 2. **Worker pre-run guard (defensive).** The engine calls `ctx.meter.assertBalance(userId)`
-   before the step loop (#103 §9). Insufficient → **terminal** `WorkflowError` → run/version
+   before the step loop (#98 §9). Insufficient → **terminal** `WorkflowError` → run/version
    `FAILED`, reason `"insufficient credits"`. Guards the race where balance drained between
    enqueue and pickup.
 3. **Post-run debit (commit-on-success).** On `run.completed`, `commit(runId)` debits the
    winning attempt's `creditsUsed`. Failed/retried attempts debit **nothing** — the operator
-   absorbs transient-failure spend (#103 §8). Settlement is **best-effort** (try/catch + log;
+   absorbs transient-failure spend (#98 §8). Settlement is **best-effort** (try/catch + log;
    never fail a user's *completed* run over an accounting write, carried over from the Mark
    settlement rule).
 
 **Balance semantics — headroom check, not fit check.** `assertBalance` passes iff
 `used < limit` (or `limit === -1`). It does **not** verify the whole run will fit, because
-commit-on-success has no pre-run estimate to fit against (#103 rejected pre-authorization —
+commit-on-success has no pre-run estimate to fit against (#98 rejected pre-authorization —
 no estimator, no hold). A user with 5 credits left may start a run that settles at 60 and
 overshoot the period; the **next** run's guard blocks (`used ≥ limit`). Bounded overshoot
-is accepted and intentional — the agent's max-iteration cap (#104 §2) caps a single run's
+is accepted and intentional — the agent's max-iteration cap (#99 §2) caps a single run's
 worst case, and this mirrors the current Mark gate ("the allowed run may overshoot; next
 run's gate catches it").
 
-**No mid-run cutoff in v1.** #103's hooks accumulate live `creditsUsed`, so a cutoff
+**No mid-run cutoff in v1.** #98's hooks accumulate live `creditsUsed`, so a cutoff
 (abort when `used + creditsUsed ≥ limit` mid-loop) is a *later* addition needing no new
 plumbing — explicitly left as room, not built.
 
-**Refine runs.** Refine reuses cached research (#104 §6/#103 §11) → **no `web_search`
+**Refine runs.** Refine reuses cached research (#99 §6/#98 §11) → **no `web_search`
 surcharge**, only the generation LLM call (+ a `pdf_render` surcharge for DOCUMENT). Refine
 is metered and gated identically; it is just cheaper.
 
@@ -270,8 +270,8 @@ counters**:
 
 So generation moves entirely onto credits; the two remaining counters stay exactly as they
 are (`assertScheduledPostQuota`, `assertConnectedAccountCapacity`, `assertCompanyPagesAccess`
-untouched). There is **no coexistence window** for `ai_drafts` — the clean write-over (#100)
-deletes the draft path that gated it (#104 §12 removes `createDraft`/`createLinkedInPost`),
+untouched). There is **no coexistence window** for `ai_drafts` — the clean write-over (#95)
+deletes the draft path that gated it (#99 §12 removes `createDraft`/`createLinkedInPost`),
 so the counter has no remaining caller.
 
 `getDashboardUsage` returns `credits` (used/limit/remaining, `-1` for unlimited)
@@ -315,7 +315,7 @@ metered billing is a later pricing decision, not a launch blocker.
   (`remaining === -1` when unlimited), for the plan/usage screen.
 - **Artifact breakdown** — `getDashboardUsage.artifactsCreated = { posts, polls,
 documents }`, counted over the returned billing cycle.
-- **Live (SSE, #107)** — `usage.tick` events carry the per-signal credit delta and running
+- **Live (SSE, #102)** — `usage.tick` events carry the per-signal credit delta and running
   `creditsUsed`, so a long research run shows a climbing credit count; the terminal
   `run.completed` / dashboard reflects the committed total. `limit === 0` lets the frontend
   distinguish "AI not on your plan" from "out of credits this period" (carried over from the
@@ -330,10 +330,10 @@ documents }`, counted over the returned billing cycle.
 | Debit write fails post-run | `commit` | best-effort: caught + logged; the completed run is **not** failed |
 | Missing `usage.cost` | `toCredits` | §2 token fallback + warn log (never charge 0) |
 
-Failed and retried runs debit nothing (#103 §8) — users are charged **once, only for
+Failed and retried runs debit nothing (#98 §8) — users are charged **once, only for
 successful runs**.
 
-## 11. Migration note (clean write-over, #100)
+## 11. Migration note (clean write-over, #95)
 
 - **Rename** `FEATURE_KEYS.MARK_TOKENS` → `CREDITS` (`'mark_tokens'` → `'credits'`);
   drop `AI_DRAFTS` from `FEATURE_KEYS`, the `Feature`/`Tier.limits` union, and
@@ -341,12 +341,12 @@ successful runs**.
 - **`FeatureGatingService`:** `assertMarkTokenQuota` → `assertBalance` (headroom check, §6),
   `incrementMarkTokenUsage` → `incrementCreditUsage`/`debit`, `getMarkTokenBudget` folded
   into the `credits` slot of `getDashboardUsage`. Remove `assertAiDraftQuota` /
-  `incrementAiDraftUsage` and their callers (the deleted draft path, #104 §12).
+  `incrementAiDraftUsage` and their callers (the deleted draft path, #99 §12).
 - **New `CreditMeterService`** (§4) in the feature-gating module (or a thin `src/credits`
   module importing `FeatureGatingModule`) implementing `toCredits` / `assertBalance` /
-  `debit`; the engine composes it + per-run state into `ctx.meter` (#103 §10).
+  `debit`; the engine composes it + per-run state into `ctx.meter` (#98 §10).
 - **Delete** `src/mark` entirely, including the `MarkRun` collection and all `MARK_*` config
-  (charter #9); the Tavily helper's surcharge signal is now `web_search` via #104's tool.
+  (charter krispamB/linkgenserver#9); the Tavily helper's surcharge signal is now `web_search` via #99's tool.
 - **Config:** add `CREDITS_PER_USD`, `CREDIT_MARKUP`, `FALLBACK_CREDITS_PER_1K_TOKENS`,
   `CREDIT_SURCHARGE_WEB_SEARCH`, `CREDIT_SURCHARGE_PDF_RENDER`, and
   `CREDIT_MINIMUM_PDF_RENDER` to `.env.example`; remove all `MARK_*`.
@@ -359,9 +359,9 @@ successful runs**.
 
 | Concern | Owner |
 |---|---|
-| `CreditMeter` hook *timing*, attempt-scoped `creditsUsed`, per-attempt reset, `commit` call site, `usage.tick` emission | #103 |
-| Raw usage signals (`usage.cost` per turn, tool-fired), agent max-step cap | #104 |
-| `usage.tick` SSE framing / client credit-counter rendering | #107 |
-| `pdf_render` surcharge fire site (RENDER_PDF step) | #103 / #108 |
-| Concrete per-tier credit allowances, Paddle price↔tier mapping (values) | operator / #110 tier seed |
+| `CreditMeter` hook *timing*, attempt-scoped `creditsUsed`, per-attempt reset, `commit` call site, `usage.tick` emission | #98 |
+| Raw usage signals (`usage.cost` per turn, tool-fired), agent max-step cap | #99 |
+| `usage.tick` SSE framing / client credit-counter rendering | #102 |
+| `pdf_render` surcharge fire site (RENDER_PDF step) | #98 / #103 |
+| Concrete per-tier credit allowances, Paddle price↔tier mapping (values) | operator / #105 tier seed |
 | Credit top-ups, overage billing, rollover, mid-run cutoff | future |

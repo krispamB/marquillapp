@@ -1,5 +1,5 @@
 /**
- * PROTOTYPE — count the pages of the PDF Chromium printed. Throwaway (issue #163).
+ * PROTOTYPE — count the pages of the PDF Chromium printed. Throwaway (issue #137).
  *
  * No PDF library: Skia writes the page tree uncompressed, so the root `/Pages`
  * node's `/Count` is readable as text, and it is the largest `/Count` in the

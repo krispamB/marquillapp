@@ -3,7 +3,7 @@
 > Status: accepted.
 > Date: 2026-07-13.
 > Decision owner: product and engineering.
-> Implements: #143.
+> Implements: #125.
 
 ## Decision
 

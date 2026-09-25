@@ -1,7 +1,7 @@
 /**
- * PROTOTYPE — the repair diagnostic the model sees. Throwaway (issue #163).
+ * PROTOTYPE — the repair diagnostic the model sees. Throwaway (issue #137).
  *
- * #162's rule, applied to render findings unchanged: every violation is recorded
+ * #136's rule, applied to render findings unchanged: every violation is recorded
  * on the run, and the model gets at most 3 per code (with a count of the rest)
  * and 40 in total — of the findings it can act on. The render pass shares the static checker's vocabulary and
  * its budget, so a repair prompt is one list, not two.

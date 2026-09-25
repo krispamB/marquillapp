@@ -1,7 +1,7 @@
 /**
- * PROTOTYPE — render facts in, violations out. Pure. Throwaway (issue #163).
+ * PROTOTYPE — render facts in, violations out. Pure. Throwaway (issue #137).
  *
- * Codes follow #162's two namespaces: a finding a Design System key owns keeps
+ * Codes follow #136's two namespaces: a finding a Design System key owns keeps
  * that key's path (`page.safeArea`, `palette.pairings`, `icons.colors`), and a
  * finding about the render itself is `render.*`.
  */

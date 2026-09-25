@@ -1,5 +1,5 @@
 /**
- * PROTOTYPE — the Design System Definition contract, v1. Throwaway (issue #160).
+ * PROTOTYPE — the Design System Definition contract, v1. Throwaway (issue #134).
  *
  * This is the parse boundary: YAML text in, a typed, cross-referenced Design
  * System out. Everything a Document Source is later checked against comes from
@@ -88,7 +88,7 @@ export const designSystemSchema = z
         .min(1),
       rules: z.strictObject({
         externalColors: z.enum(['forbid']),
-        // Settled on #160: the token *name* must survive into the generated
+        // Settled on #134: the token *name* must survive into the generated
         // CSS, so colours are referenced as var(--ds-<token>) and hex literals
         // live only in the :root block.
         references: z.enum(['token-var-only']),

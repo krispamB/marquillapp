@@ -1,7 +1,7 @@
 /**
- * PROTOTYPE stand-in for the pinned `lucide-static` catalog #162 settled on.
+ * PROTOTYPE stand-in for the pinned `lucide-static` catalog #136 settled on.
  * Inner SVG only; assembly supplies the root attributes. `spark` is drawn by
- * hand — the real catalog would have rejected the name at seed (#161).
+ * hand — the real catalog would have rejected the name at seed (#135).
  */
 export const ICON_CATALOG: Readonly<Record<string, string>> = {
   'arrow-right': '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
