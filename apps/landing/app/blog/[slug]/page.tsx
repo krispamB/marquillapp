@@ -82,7 +82,7 @@ export default async function BlogPost({ params }: Props) {
             Get started for free with your AI LinkedIn workspace
           </h2>
           <p className="mx-auto mt-3 max-w-md text-sm text-ink-500">
-            Generate posts, design carousels, run polls, and schedule publishing — all in one place.
+            Give Mark a topic. He drafts the post, builds the carousel or poll, and publishes on your schedule.
           </p>
           <a
             href={appUrl}

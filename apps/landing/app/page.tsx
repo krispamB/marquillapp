@@ -10,7 +10,7 @@ import { normalizeAppUrl } from '@/config/urls';
 export const metadata = {
   title: 'Marquill — Meet Mark, your LinkedIn agent',
   description:
-    'Just tell Mark what to post. He writes it, designs the carousel, builds the poll, and ships it — in your voice, across every account. Marquill is your AI LinkedIn workspace.',
+    'Give Mark a topic. He reads the top videos and threads on it, drafts the post in your voice, and publishes on your schedule.',
   keywords:
     'AI LinkedIn agent, AI LinkedIn workspace, LinkedIn post generator, LinkedIn carousels, LinkedIn polls, content scheduling, personal branding',
   alternates: {

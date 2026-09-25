@@ -2,14 +2,14 @@ import { steps, Icon, Eyebrow } from './data';
 
 export default function WhatMarkMakes() {
   return (
-    <section id="meet-mark" className="perf-section bg-canvas px-5 py-16 sm:px-6 sm:py-20 lg:px-16 lg:py-[72px]">
+    <section id="what-mark-makes" className="perf-section bg-canvas px-5 py-16 sm:px-6 sm:py-20 lg:px-16 lg:py-[72px]">
       <div className="mx-auto max-w-[640px] text-center">
         <Eyebrow>_ what mark makes</Eyebrow>
         <h2 className="mt-3 text-[28px] font-bold leading-[1.05] tracking-[-0.03em] text-ink-900 sm:text-[36px] lg:text-[40px]">
-          One agent. Every LinkedIn format.
+          One agent. Four jobs.
         </h2>
         <p className="mt-3.5 text-[16px] leading-[1.5] text-ink-500 sm:text-[17px]">
-          Ask in plain words. Mark researches, drafts, and designs — then queues it across your accounts.
+          Name a topic. Mark pulls the top videos and threads on it, then drafts from what he found.
         </p>
       </div>
 

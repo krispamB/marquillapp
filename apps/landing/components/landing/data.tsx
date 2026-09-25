@@ -57,9 +57,9 @@ export const posts: Post[] = [
 export type Step = { n: string; title: string; paths: string[]; body: string };
 
 export const steps: Step[] = [
-  { n: '01', title: 'Posts', paths: ['M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z', 'M14 2v6h6', 'M8 13h8', 'M8 17h5'], body: 'Give Mark a hook or a half-formed thought. He drafts the full post in your voice, ready to publish.' },
-  { n: '02', title: 'Carousels', paths: ['M3 5h13v14H3z', 'M19 7v10', 'M22 9v6'], body: 'Describe the idea once. Mark designs a multi-slide document post — cover, points, and a closing CTA.' },
-  { n: '03', title: 'Polls', paths: ['M18 20V10', 'M12 20V4', 'M6 20v-6'], body: 'Mark frames the question and the options to pull replies — and push your post into more feeds.' },
+  { n: '01', title: 'Posts', paths: ['M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z', 'M14 2v6h6', 'M8 13h8', 'M8 17h5'], body: 'A half-formed thought is enough. Mark drafts the full post in your voice, ready to publish.' },
+  { n: '02', title: 'Carousels', paths: ['M3 5h13v14H3z', 'M19 7v10', 'M22 9v6'], body: 'Describe the idea once. Mark builds the slides, from cover to closing CTA.' },
+  { n: '03', title: 'Polls', paths: ['M18 20V10', 'M12 20V4', 'M6 20v-6'], body: 'Mark writes the question and the options, framed to pull replies.' },
   { n: '04', title: 'Schedule & publish', paths: ['M3 4h18v18H3z', 'M16 2v4', 'M8 2v4', 'M3 10h18', 'm9 16 2 2 4-4'], body: 'Queue across every account. Mark publishes at peak time and reads the numbers back to you.' },
 ];
 
@@ -94,8 +94,15 @@ export type Plan = {
 };
 
 export const plans: Plan[] = [
-  { name: 'Free', price: '$0', period: '', blurb: 'Create and publish the essentials.', cta: 'Get started for free', popular: false, features: ['120 shared AI credits/month', '1 connected account', '1 scheduled post', '30 day history'] },
+  { name: 'Free', price: '$0', period: '', blurb: 'One account, one post in the queue.', cta: 'Get started for free', popular: false, features: ['120 shared AI credits/month', '1 connected account', '1 scheduled post', '30 day history'] },
   { name: 'Starter', price: '$9.99', period: '/mo', blurb: 'For consistent weekly posting.', cta: 'Get started', popular: false, features: ['2,000 AI credits/month', 'AI research', '1 connected account', '5 scheduled posts', '90 day history'] },
-  { name: 'Creator', price: '$19.99', period: '/mo', blurb: 'Best for creators scaling output.', cta: 'Start creator plan', popular: true, features: ['10,000 AI credits/month', 'AI research', '1 connected account', '15 scheduled posts', '1 year post history'] },
+  { name: 'Creator', price: '$19.99', period: '/mo', blurb: 'For daily posting on one account.', cta: 'Start creator plan', popular: true, features: ['10,000 AI credits/month', 'AI research', '1 connected account', '15 scheduled posts', '1 year post history'] },
   { name: 'Pro Writer', price: '$29.99', period: '/mo', blurb: 'High-volume teams and agencies.', cta: 'Get started', popular: false, features: ['30,000 AI credits/month', 'AI research', '5 connected accounts', 'unlimited scheduled posts', 'unlimited post history'] },
+];
+
+export type Faq = { q: string; a: string };
+
+export const faqs: Faq[] = [
+  { q: 'Can I change plans later?', a: 'Yes. Upgrades and downgrades take effect immediately, and we prorate the charge.' },
+  { q: 'Do you offer refunds?', a: 'First-time subscribers get a full refund within 30 days of the charge. Email hello@marquill.com and we will process it.' },
 ];

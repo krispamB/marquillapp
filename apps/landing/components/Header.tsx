@@ -8,8 +8,8 @@ import ThemeToggle from './ThemeToggle';
 import { normalizeAppUrl } from '@/config/urls';
 
 const NAV_LINKS = [
-  { label: 'Meet Mark', href: '/#meet-mark' },
   { label: 'What Mark makes', href: '/#what-mark-makes' },
+  { label: 'One workspace', href: '/#one-workspace' },
   { label: 'Pricing', href: '/#pricing' },
 ];
 
