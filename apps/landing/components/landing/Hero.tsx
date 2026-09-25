@@ -39,7 +39,7 @@ export default function Hero() {
       <div className="relative z-10 mx-auto max-w-[840px]">
         {/* Eyebrow badge */}
         <span className="ff-mono inline-flex items-center gap-2 rounded-full border border-line bg-surface px-[13px] py-1.5 text-[12.5px] font-medium text-ink-700 shadow-xs">
-          meet mark, your linkedin agent
+          mark reads the research, then writes
           <MarkCursor />
         </span>
 
@@ -52,8 +52,8 @@ export default function Hero() {
 
         {/* Sub-copy */}
         <p className="mx-auto mt-5 max-w-[600px] text-[16px] leading-[1.5] tracking-[-0.006em] text-ink-500 text-pretty sm:mt-6 sm:text-[19px]">
-          Marquill is your AI LinkedIn workspace. Mark drafts posts, designs carousels, and builds
-          polls — in your voice, across every account, ready to publish.
+          Mark reads the top videos and threads on your topic, then drafts the post in your voice.
+          You approve it and pick the time.
         </p>
 
         {/* Prompt bar */}
@@ -107,8 +107,8 @@ export default function Hero() {
 
           <div className="px-[18px] py-4">
             <p className="text-[15.5px] leading-[1.55] text-ink-800">
-              We just closed our Series A. Here are the three lessons from the last 90 days that
-              actually moved the needle — and the one mistake I&apos;d never make again. 🧵
+              We closed our Series A last week. The diligence question I could not answer, and what I
+              do differently now.
             </p>
             <p className="mt-2.5 text-[15.5px] leading-[1.55] text-ink-500">
               Most teams optimize for launch day. We optimized for the week after…

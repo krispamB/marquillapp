@@ -1,4 +1,4 @@
-import { plans, Eyebrow } from './data';
+import { plans, faqs, Eyebrow } from './data';
 
 export default function Pricing({ appUrl }: { appUrl: string }) {
   return (
@@ -6,10 +6,10 @@ export default function Pricing({ appUrl }: { appUrl: string }) {
       <div className="mx-auto max-w-[640px] text-center">
         <Eyebrow>_ pricing</Eyebrow>
         <h2 className="mt-3 text-[28px] font-bold leading-[1.05] tracking-[-0.03em] text-ink-900 sm:text-[36px] lg:text-[40px]">
-          Choose the plan that fits your workflow
+          Pay for the volume you post.
         </h2>
         <p className="mt-3.5 text-[16px] leading-[1.5] text-ink-500 sm:text-[17px]">
-          Start free. Upgrade as you add accounts and volume.
+          Credits, connected accounts, and post history. That is all that changes between plans.
         </p>
       </div>
 
@@ -58,6 +58,20 @@ export default function Pricing({ appUrl }: { appUrl: string }) {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="mx-auto mt-16 max-w-3xl sm:mt-20">
+        <h3 className="text-center text-[22px] font-bold tracking-[-0.025em] text-ink-900 sm:text-[26px]">
+          Questions before you start
+        </h3>
+        <dl className="mt-8 space-y-7">
+          {faqs.map((faq) => (
+            <div key={faq.q}>
+              <dt className="text-[17px] font-semibold text-ink-900 sm:text-[18px]">{faq.q}</dt>
+              <dd className="mt-2 text-[15px] leading-[1.6] text-ink-500">{faq.a}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
     </section>
   );

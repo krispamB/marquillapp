@@ -2,8 +2,8 @@ export default function ClosingCta({ appUrl }: { appUrl: string }) {
   return (
     <section className="bg-surface px-5 pb-16 pt-16 text-center sm:px-6 lg:px-16">
       <h2 className="mx-auto max-w-[640px] text-[28px] font-bold leading-[1.06] tracking-[-0.03em] sm:text-[34px] lg:text-[38px]">
-        <span className="text-ink-900">Get started for free.</span>{' '}
-        <span className="text-ink-500">Upgrade as you grow.</span>
+        <span className="text-ink-900">Give Mark a topic.</span>{' '}
+        <span className="text-ink-500">Read the draft before you decide.</span>
       </h2>
       <a
         href={appUrl}

@@ -9,26 +9,26 @@ const FEATURES = [
   },
   {
     title: 'Timezone-aware scheduling',
-    body: 'Queue locally, Mark publishes at peak.',
+    body: 'Queue any time. Mark publishes at peak.',
     paths: ['M3 4h18v18H3z', 'M16 2v4', 'M8 2v4', 'M3 10h18'],
   },
   {
     title: 'Post analytics',
-    body: 'Mark reads what lands and learns from it.',
+    body: 'Views, reactions, and comments on every post.',
     paths: ['M18 20V10', 'M12 20V4', 'M6 20v-6'],
   },
 ];
 
 export default function OneWorkspace() {
   return (
-    <section id="what-mark-makes" className="perf-section border-t border-line bg-surface px-5 py-16 sm:px-6 sm:py-20 lg:px-16 lg:py-[72px]">
+    <section id="one-workspace" className="perf-section border-t border-line bg-surface px-5 py-16 sm:px-6 sm:py-20 lg:px-16 lg:py-[72px]">
       <div className="mx-auto max-w-[640px] text-center">
         <Eyebrow>_ one workspace</Eyebrow>
         <h2 className="mt-3 text-[28px] font-bold leading-[1.05] tracking-[-0.03em] text-ink-900 sm:text-[36px] lg:text-[40px]">
-          Mark works where you already post
+          Every account, one queue.
         </h2>
         <p className="mt-3.5 text-[16px] leading-[1.5] text-ink-500 sm:text-[17px]">
-          Drafts, carousels, polls, scheduling, and analytics — without hopping between tools.
+          Run five LinkedIn accounts from one calendar, each in its own voice.
         </p>
       </div>
 
@@ -49,11 +49,11 @@ export default function OneWorkspace() {
       <div className="mx-auto mt-11 grid max-w-[1100px] items-center gap-6 rounded-[18px] border border-line bg-canvas p-7 sm:p-10 lg:grid-cols-2">
         <div>
           <h3 className="text-[22px] font-bold leading-[1.12] tracking-[-0.022em] text-ink-900 sm:text-[26px]">
-            Built for founders, creators, and teams who publish at scale.
+            Five accounts. Five voices. One person running them.
           </h3>
           <p className="mt-3.5 text-[16px] leading-[1.55] text-ink-500">
-            Hand Mark multiple LinkedIn accounts. He drafts in each voice, schedules, publishes, and
-            reads the analytics back — so your pipeline stays steady as output grows.
+            Connect up to five accounts. Mark keeps a separate voice profile for each, so the agency
+            client and your own profile never sound alike.
           </p>
           <a
             href="mailto:hello@marquill.com"
