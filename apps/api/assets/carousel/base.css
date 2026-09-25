@@ -1,0 +1,147 @@
+/*
+ * Shared frame and layout for every carousel deck. Themes (theme.css) change
+ * only the look — colour, typeface, decoration. Box metrics and the type scale
+ * live here so a field that fits under one theme fits under all four, which is
+ * what makes the schema caps a trustworthy fit contract.
+ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/*
+ * The one-slide-one-page invariant. A fixed 1080x1350 box with no scroll:
+ * overflow is clipped so nothing spills onto the next page, and one long token
+ * cannot blow the box out sideways. Puppeteer paginates on `break-after: page`.
+ */
+.slide {
+  box-sizing: border-box; /* theme padding never inflates the box */
+  width: 1080px;
+  height: 1350px;
+  overflow: hidden; /* nothing ever spills onto the next page */
+  overflow-wrap: anywhere; /* one long token can't blow the box sideways */
+  break-after: page;
+  break-inside: avoid;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 100px 96px;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  line-height: 1.3;
+}
+
+/*
+ * Load-bearing, not cosmetic: a break after the final slide emits an empty page
+ * LinkedIn would show as a blank last card.
+ */
+.slide:last-child {
+  break-after: auto;
+}
+
+/* --- Per-role layout (shared across themes) --- */
+
+.slide--cover {
+  justify-content: center;
+}
+
+.slide--content,
+.slide--list {
+  justify-content: flex-start;
+}
+
+.slide--quote,
+.slide--cta {
+  justify-content: center;
+}
+
+/* --- Type scale (shared across themes; themes reface, never resize) --- */
+
+.eyebrow {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 28px;
+}
+
+.title {
+  font-size: 92px;
+  font-weight: 800;
+  line-height: 1.04;
+}
+
+.subtitle {
+  font-size: 38px;
+  font-weight: 400;
+  line-height: 1.35;
+  margin-top: 32px;
+}
+
+.heading {
+  font-size: 62px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 40px;
+}
+
+.body {
+  font-size: 40px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.list-item {
+  font-size: 38px;
+  font-weight: 400;
+  line-height: 1.35;
+  padding-left: 44px;
+  position: relative;
+}
+
+.quote {
+  font-size: 60px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.attribution {
+  font-size: 32px;
+  font-weight: 500;
+  margin-top: 44px;
+}
+
+.headline {
+  font-size: 78px;
+  font-weight: 800;
+  line-height: 1.08;
+}
+
+.action {
+  font-size: 46px;
+  font-weight: 600;
+  margin-top: 40px;
+}
+
+.handle {
+  font-size: 32px;
+  font-weight: 500;
+  margin-top: 28px;
+  opacity: 0.85;
+}

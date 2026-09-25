@@ -1,0 +1,134 @@
+{
+  "theme": "editorial",
+  "slides": [
+    {
+      "type": "cover",
+      "fields": {
+        "eyebrow": "THE EDITORIAL the quickx",
+        "title": "Ship a carousel that fits 🚀  the quick brown fox jumps over a remarka",
+        "subtitle": "A cover subtitle stretched to the very last character the quick brown fox jumps over a remarkably lazy sleeping dog agai"
+      }
+    },
+    {
+      "type": "content",
+      "fields": {
+        "heading": "Content heading number 1 the quick brown fox jumps over a re",
+        "body": "Body copy with an emoji 🔥 pushed to the maximum allowed length so we can prove the fit the quick brown fox jumps over a remarkably lazy sleeping dog again the quick brown fox jumps over a remarkably lazy sleeping dog again the quick brown fox jumps over a remarkably lazy sleepin"
+      }
+    },
+    {
+      "type": "content",
+      "fields": {
+        "heading": "Content heading number 2 the quick brown fox jumps over a re",
+        "body": "Body copy 2 pushed to the maximum allowed length to prove the fixed slide clamps rather than spills the quick brown fox jumps over a remarkably lazy sleeping dog again the quick brown fox jumps over a remarkably lazy sleeping dog again the quick brown fox jumps over a remarkablyx"
+      }
+    },
+    {
+      "type": "content",
+      "fields": {
+        "heading": "Content heading number 3 the quick brown fox jumps over a re",
+        "body": "Body copy 3 pushed to the maximum allowed length to prove the fixed slide clamps rather than spills the quick brown fox jumps over a remarkably lazy sleeping dog again the quick brown fox jumps over a remarkably lazy sleeping dog again the quick brown fox jumps over a remarkablyx"
+      }
+    },
+    {
+      "type": "content",
+      "fields": {
+        "heading": "Content heading number 4 the quick brown fox jumps over a re",
+        "body": "Body copy 4 pushed to the maximum allowed length to prove the fixed slide clamps rather than spills the quick brown fox jumps over a remarkably lazy sleeping dog again the quick brown fox jumps over a remarkably lazy sleeping dog again the quick brown fox jumps over a remarkablyx"
+      }
+    },
+    {
+      "type": "content",
+      "fields": {
+        "heading": "Content heading number 5 the quick brown fox jumps over a re",
+        "body": "Body copy 5 pushed to the maximum allowed length to prove the fixed slide clamps rather than spills the quick brown fox jumps over a remarkably lazy sleeping dog again the quick brown fox jumps over a remarkably lazy sleeping dog again the quick brown fox jumps over a remarkablyx"
+      }
+    },
+    {
+      "type": "list",
+      "fields": {
+        "heading": "List heading number 1 the quick brown fox jumps over a remar",
+        "items": [
+          "https://example.com/really/long/unbreakable/path/segment/x  the quick brown foxx",
+          "List item two with an emoji ✅ at full width the quick brown fox jumps over a rem",
+          "List item three at the maximum allowed width for a single row the quick brown fo",
+          "List item four kept at the eighty character ceiling exactly the quick brown foxx",
+          "List item five also stretched to the eighty character ceiling the quick brown fo",
+          "List item six the sixth and final item at full width the quick brown fox jumps o"
+        ]
+      }
+    },
+    {
+      "type": "list",
+      "fields": {
+        "heading": "List heading number 2 the quick brown fox jumps over a remar",
+        "items": [
+          "List item one for deck 1 the quick brown fox jumps over a remarkably lazy sleepi",
+          "List item two with an emoji ✅ at full width the quick brown fox jumps over a rem",
+          "List item three at the maximum allowed width for a single row the quick brown fo",
+          "List item four kept at the eighty character ceiling exactly the quick brown foxx",
+          "List item five also stretched to the eighty character ceiling the quick brown fo",
+          "List item six the sixth and final item at full width the quick brown fox jumps o"
+        ]
+      }
+    },
+    {
+      "type": "list",
+      "fields": {
+        "heading": "List heading number 3 the quick brown fox jumps over a remar",
+        "items": [
+          "List item one for deck 2 the quick brown fox jumps over a remarkably lazy sleepi",
+          "List item two with an emoji ✅ at full width the quick brown fox jumps over a rem",
+          "List item three at the maximum allowed width for a single row the quick brown fo",
+          "List item four kept at the eighty character ceiling exactly the quick brown foxx",
+          "List item five also stretched to the eighty character ceiling the quick brown fo",
+          "List item six the sixth and final item at full width the quick brown fox jumps o"
+        ]
+      }
+    },
+    {
+      "type": "quote",
+      "fields": {
+        "quote": "Quote 1: a pull quote stretched to the two hundred character ceiling so the largest type on the deck is proven to fit inside the fixed slide the quick brown fox jumps over a remarkably lazy sleeping d",
+        "attribution": "Jane Q. Author, Head of Content 1 the quick brow"
+      }
+    },
+    {
+      "type": "quote",
+      "fields": {
+        "quote": "Quote 2: a pull quote stretched to the two hundred character ceiling so the largest type on the deck is proven to fit inside the fixed slide the quick brown fox jumps over a remarkably lazy sleeping d",
+        "attribution": "Jane Q. Author, Head of Content 2 the quick brow"
+      }
+    },
+    {
+      "type": "quote",
+      "fields": {
+        "quote": "Quote 3: a pull quote stretched to the two hundred character ceiling so the largest type on the deck is proven to fit inside the fixed slide the quick brown fox jumps over a remarkably lazy sleeping d",
+        "attribution": "Jane Q. Author, Head of Content 3 the quick brow"
+      }
+    },
+    {
+      "type": "quote",
+      "fields": {
+        "quote": "Quote 4: a pull quote stretched to the two hundred character ceiling so the largest type on the deck is proven to fit inside the fixed slide the quick brown fox jumps over a remarkably lazy sleeping d",
+        "attribution": "Jane Q. Author, Head of Content 4 the quick brow"
+      }
+    },
+    {
+      "type": "cta",
+      "fields": {
+        "headline": "Follow for more like this deck 1 the quick brown fox jumps over a rema",
+        "action": "Tap the bell and share the quick brown f",
+        "handle": "@marquill.official.handle the quick brow"
+      }
+    },
+    {
+      "type": "cta",
+      "fields": {
+        "headline": "Follow for more like this deck 2 the quick brown fox jumps over a rema",
+        "action": "Tap the bell and share the quick brown f",
+        "handle": "@marquill.official.handle the quick brow"
+      }
+    }
+  ]
+}

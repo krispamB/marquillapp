@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Document generation simulation · Sol, Terra, Luna</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #111114;
+        --body: #34343a;
+        --muted: #8a8a90;
+        --line: #dedee2;
+        --surface: #f4f4f6;
+        --code: #1d1f24;
+        --code-text: #e9e9ed;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: #fff;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+      }
+
+      .page {
+        width: min(1480px, 100%);
+        margin: 0 auto;
+        padding: 56px 28px 90px;
+      }
+
+      .hero {
+        max-width: 880px;
+        padding-bottom: 38px;
+      }
+
+      .eyebrow {
+        margin: 0 0 14px;
+        color: #64646a;
+        font-size: 12px;
+        font-weight: 750;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 20px;
+        font-size: clamp(42px, 6vw, 78px);
+        line-height: 0.98;
+        letter-spacing: -0.06em;
+      }
+
+      .hero p {
+        max-width: 760px;
+        color: #55555c;
+        font-size: clamp(17px, 2vw, 23px);
+        line-height: 1.5;
+      }
+
+      .notice {
+        margin: 0 0 52px;
+        padding: 18px 20px;
+        color: #3b3b42;
+        background: #f4f4f6;
+        border-left: 3px solid #111114;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .section {
+        margin-top: 52px;
+      }
+
+      .section-heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 18px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .section-heading h2 {
+        margin: 0;
+        font-size: clamp(24px, 3vw, 38px);
+        letter-spacing: -0.04em;
+      }
+
+      .section-heading p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        text-align: right;
+      }
+
+      code,
+      pre {
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+      }
+
+      code {
+        padding: 3px 6px;
+        color: #55555c;
+        background: #eeeef1;
+        border-radius: 4px;
+      }
+
+      .scenario {
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+        gap: 18px;
+      }
+
+      .card {
+        padding: 24px;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+      }
+
+      .card h3 {
+        margin-bottom: 16px;
+        font-size: 16px;
+        letter-spacing: -0.01em;
+      }
+
+      pre {
+        margin: 0;
+        padding: 18px;
+        overflow: auto;
+        color: var(--code-text);
+        background: var(--code);
+        border-radius: 8px;
+        font-size: 12px;
+        line-height: 1.7;
+      }
+
+      .definition-list {
+        display: grid;
+        grid-template-columns: 140px 1fr;
+        gap: 12px 16px;
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.45;
+      }
+      .definition-list dt {
+        color: var(--muted);
+        font-weight: 700;
+      }
+      .definition-list dd {
+        margin: 0;
+        color: var(--body);
+      }
+
+      .pipeline {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .step {
+        position: relative;
+        min-height: 196px;
+        padding: 18px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+
+      .step:not(:last-child)::after {
+        position: absolute;
+        top: 50%;
+        right: -14px;
+        z-index: 1;
+        color: var(--muted);
+        content: '→';
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      .step-number {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 750;
+      }
+      .step h3 {
+        margin: 8px 0 10px;
+        font-size: 16px;
+      }
+      .step p {
+        margin: 0;
+        color: #5c5c63;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .kind {
+        display: inline-block;
+        margin-top: 16px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 750;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .two-column {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 18px;
+      }
+
+      .query-list {
+        display: grid;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .query-list li {
+        padding: 12px 14px;
+        background: var(--surface);
+        border-radius: 7px;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+      .query-list strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 12px;
+      }
+      .query-list span {
+        color: var(--muted);
+      }
+
+      .findings {
+        color: var(--body);
+        font-size: 15px;
+        line-height: 1.7;
+      }
+      .findings p:last-child {
+        margin-bottom: 0;
+      }
+
+      .state-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .state-table th,
+      .state-table td {
+        padding: 12px 10px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+      .state-table th {
+        color: var(--muted);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .state-table td:first-child {
+        font-weight: 750;
+      }
+
+      .deck-note {
+        margin: -4px 0 22px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .deck {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .slide-frame {
+        container-type: inline-size;
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1080 / 1350;
+        overflow: hidden;
+        background: #fff;
+        border-radius: 10px;
+        box-shadow:
+          0 14px 34px rgba(25, 35, 48, 0.12),
+          0 2px 5px rgba(25, 35, 48, 0.08);
+      }
+
+      /* The shared carousel frame, scaled from 1080×1350 for this preview. */
+      .slide {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        flex-direction: column;
+        padding: 9.2593cqw 8.8889cqw;
+        overflow-wrap: anywhere;
+        color: #111114;
+        background: #fff;
+        line-height: 1.3;
+      }
+
+      .slide--cover,
+      .slide--quote,
+      .slide--cta {
+        justify-content: center;
+      }
+      .slide--content,
+      .slide--list {
+        justify-content: flex-start;
+      }
+      .slide .eyebrow {
+        margin: 0 0 2.5926cqw;
+        color: #8a8a90;
+        font-size: 2.5926cqw;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .slide .title {
+        margin: 0;
+        color: #111114;
+        font-size: 8.5185cqw;
+        font-weight: 600;
+        line-height: 1.04;
+        letter-spacing: -0.02em;
+      }
+      .slide .subtitle {
+        margin: 2.963cqw 0 0;
+        color: #55555c;
+        font-size: 3.5185cqw;
+        line-height: 1.35;
+      }
+      .slide .heading {
+        margin: 0 0 3.7037cqw;
+        padding-bottom: 2.5926cqw;
+        color: #111114;
+        border-bottom: 0.1852cqw solid #111114;
+        font-size: 5.7407cqw;
+        font-weight: 600;
+        line-height: 1.1;
+      }
+      .slide .body {
+        margin: 0;
+        color: #34343a;
+        font-size: 3.7037cqw;
+        line-height: 1.45;
+      }
+      .slide .list {
+        display: flex;
+        flex-direction: column;
+        gap: 2.5926cqw;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .slide .list-item {
+        position: relative;
+        padding-left: 4.0741cqw;
+        color: #111114;
+        font-size: 3.5185cqw;
+        line-height: 1.35;
+      }
+      .slide .list-item::before {
+        position: absolute;
+        top: 2.2222cqw;
+        left: 0;
+        width: 2.2222cqw;
+        height: 0.1852cqw;
+        background: #111114;
+        content: '';
+      }
+      .slide .quote {
+        margin: 0;
+        padding-left: 4.0741cqw;
+        color: #111114;
+        border-left: 0.3704cqw solid #111114;
+        font-size: 5.5556cqw;
+        font-weight: 500;
+        line-height: 1.25;
+      }
+      .slide .attribution {
+        margin: 4.0741cqw 0 0;
+        color: #8a8a90;
+        font-size: 2.963cqw;
+        font-weight: 500;
+      }
+      .slide .headline {
+        margin: 0;
+        color: #111114;
+        font-size: 7.2222cqw;
+        font-weight: 600;
+        line-height: 1.08;
+        letter-spacing: -0.02em;
+      }
+      .slide .action {
+        align-self: flex-start;
+        margin: 3.7037cqw 0 0;
+        padding-bottom: 0.9259cqw;
+        color: #111114;
+        border-bottom: 0.2778cqw solid #111114;
+        font-size: 4.2593cqw;
+        font-weight: 600;
+      }
+      .slide .handle {
+        margin: 2.5926cqw 0 0;
+        color: #8a8a90;
+        font-size: 2.963cqw;
+        font-weight: 500;
+      }
+
+      .footer {
+        margin-top: 64px;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      @media (max-width: 1050px) {
+        .pipeline {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .step:nth-child(3)::after {
+          display: none;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .page {
+          padding: 38px 18px 64px;
+        }
+        .scenario,
+        .two-column {
+          grid-template-columns: 1fr;
+        }
+        .pipeline,
+        .deck {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .step::after {
+          display: none !important;
+        }
+        .section-heading {
+          display: block;
+        }
+        .section-heading p {
+          margin-top: 6px;
+          text-align: left;
+        }
+      }
+
+      @media (max-width: 460px) {
+        .pipeline,
+        .deck {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">LinkGen · simulated document run</p>
+        <h1>How one prompt becomes a minimal carousel.</h1>
+        <p>
+          This is a walkthrough and HTML preview for the prompt: “Create a
+          document about OpenAI’s new models Sol, Terra and Luna.”
+        </p>
+      </header>
+
+      <div class="notice">
+        <strong>Simulation boundary:</strong> the pipeline was not executed and
+        no live web research was performed. Sol, Terra, and Luna are treated as
+        fictional model names for this example. Their capabilities below are
+        illustrative assumptions, not verified OpenAI product facts.
+      </div>
+
+      <section class="section" aria-labelledby="scenario-title">
+        <div class="section-heading">
+          <h2 id="scenario-title">1. The request enters the system</h2>
+          <p>Visual theme and writing voice are separate inputs.</p>
+        </div>
+        <div class="scenario">
+          <article class="card">
+            <h3>Simulated build input</h3>
+            <pre>
+{
+  "type": "DOCUMENT",
+  "prompt": "Create a document about OpenAI's new models Sol, Terra and Luna.",
+  "withResearch": true,
+  "stylePreset": "educational",
+  "theme": "minimal",
+  "kind": "INITIAL"
+}</pre
+            >
+          </article>
+          <article class="card">
+            <h3>What those fields mean</h3>
+            <dl class="definition-list">
+              <dt>DOCUMENT</dt>
+              <dd>Generate a 2–15 slide LinkedIn carousel.</dd>
+              <dt>withResearch</dt>
+              <dd>Insert the agentic research step for this initial run.</dd>
+              <dt>educational</dt>
+              <dd>Use structured, practical, plain-language writing.</dd>
+              <dt>minimal</dt>
+              <dd>Stamp the visual theme authoritatively onto the deck.</dd>
+              <dt>INITIAL</dt>
+              <dd>Run fresh research; later refines reuse cached findings.</dd>
+            </dl>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="pipeline-title">
+        <div class="section-heading">
+          <h2 id="pipeline-title">
+            2. The deterministic pipeline is assembled
+          </h2>
+          <p><code>DOCUMENT + research-on + initial</code></p>
+        </div>
+        <div class="pipeline">
+          <article class="step">
+            <span class="step-number">01</span>
+            <h3>RESOLVE_INPUT</h3>
+            <p>
+              Materialize the typed request into RunState and bind the
+              artifact/version target.
+            </p>
+            <span class="kind">Code</span>
+          </article>
+          <article class="step">
+            <span class="step-number">02</span>
+            <h3>RESEARCH</h3>
+            <p>
+              Let the research model autonomously call the single
+              <code>searchWeb</code> tool and synthesize findings.
+            </p>
+            <span class="kind">Agentic AI</span>
+          </article>
+          <article class="step">
+            <span class="step-number">03</span>
+            <h3>GENERATE</h3>
+            <p>
+              Make one structured completion for the document slides, with one
+              warm repair retry if Zod rejects it.
+            </p>
+            <span class="kind">Structured AI</span>
+          </article>
+          <article class="step">
+            <span class="step-number">04</span>
+            <h3>RENDER_PDF</h3>
+            <p>
+              Fill the precompiled minimal templates, assemble HTML, render to
+              PDF, and upload the private R2 object.
+            </p>
+            <span class="kind">Code + Browserless</span>
+          </article>
+          <article class="step">
+            <span class="step-number">05</span>
+            <h3>PERSIST_VERSION</h3>
+            <p>
+              Fold in <code>pdfKey</code> and <code>pageCount</code>, then move
+              the version from GENERATING to READY.
+            </p>
+            <span class="kind">Code + database</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="research-title">
+        <div class="section-heading">
+          <h2 id="research-title">3. Simulated RESEARCH output</h2>
+          <p>In production, these would be live tool calls.</p>
+        </div>
+        <div class="two-column">
+          <article class="card">
+            <h3>Queries the research agent might choose</h3>
+            <ul class="query-list">
+              <li>
+                <strong>“OpenAI Sol model announcement”</strong
+                ><span
+                  >Check whether Sol has a primary announcement and what its
+                  stated positioning is.</span
+                >
+              </li>
+              <li>
+                <strong>“OpenAI Terra model reasoning capabilities”</strong
+                ><span
+                  >Look for evidence of reasoning, latency, context, or
+                  evaluation claims.</span
+                >
+              </li>
+              <li>
+                <strong>“OpenAI Luna multimodal model use cases”</strong
+                ><span
+                  >Check whether Luna is associated with multimodal or creative
+                  workflows.</span
+                >
+              </li>
+            </ul>
+          </article>
+          <article class="card findings">
+            <h3>ResearchResult.findings</h3>
+            <p>
+              <strong>Simulation synthesis:</strong> Treat Sol, Terra, and Luna
+              as three newly announced models with intentionally different jobs.
+              For this walkthrough, Sol represents fast general-purpose
+              execution, Terra represents deeper multi-step reasoning, and Luna
+              represents multimodal collaboration and creative exploration.
+            </p>
+            <p>
+              These are bounded assumptions for the simulation. A real research
+              run would only pass claims to GENERATE if the search results
+              supported them. The final writer should not present these labels
+              or capabilities as verified facts outside this hypothetical brief.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="state-title">
+        <div class="section-heading">
+          <h2 id="state-title">4. RunState after each step</h2>
+          <p>The engine shallow-merges each step’s patch.</p>
+        </div>
+        <article class="card">
+          <table class="state-table">
+            <thead>
+              <tr>
+                <th>After</th>
+                <th>RunState slots</th>
+                <th>Durable side effect</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>RESOLVE_INPUT</td>
+                <td><code>input</code></td>
+                <td>Nothing durable beyond the existing run record.</td>
+              </tr>
+              <tr>
+                <td>RESEARCH</td>
+                <td><code>input</code>, <code>research</code></td>
+                <td>
+                  Save <code>researchContext</code> so a future refine can skip
+                  web search.
+                </td>
+              </tr>
+              <tr>
+                <td>GENERATE</td>
+                <td>
+                  <code>input</code>, <code>research</code>,
+                  <code>content</code>
+                </td>
+                <td>Nothing persisted yet; content is Zod-validated first.</td>
+              </tr>
+              <tr>
+                <td>RENDER_PDF</td>
+                <td>Previous slots + <code>render</code></td>
+                <td>
+                  Upload
+                  <code>artifacts/&lt;artifactId&gt;/1/document.pdf</code> and
+                  return its <code>pdfKey</code>.
+                </td>
+              </tr>
+              <tr>
+                <td>PERSIST_VERSION</td>
+                <td>Final state</td>
+                <td>
+                  Write content + render metadata; version becomes
+                  <code>READY</code>.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </article>
+      </section>
+
+      <section class="section" aria-labelledby="json-title">
+        <div class="section-heading">
+          <h2 id="json-title">5. Simulated GENERATE result</h2>
+          <p>This is the slides-only shape before PDF metadata is added.</p>
+        </div>
+        <article class="card">
+          <pre>
+{
+  "commentary": "A practical way to think about the Sol, Terra, and Luna model family is to route work by job shape—not by hype.",
+  "document": {
+    "templateId": "minimal",
+    "slides": [
+      { "type": "cover", "fields": { "eyebrow": "MODEL LANDSCAPE · SIMULATION", "title": "Three models. Three different jobs.", "subtitle": "A practical guide to Sol, Terra, and Luna." } },
+      { "type": "content", "fields": { "heading": "Start with the job, not the model", "body": "Model choice becomes easier when the question comes first: do you need speed, deep reasoning, or a rich multimodal workflow?" } },
+      { "type": "list", "fields": { "heading": "The three-lane mental model", "items": ["Sol — fast, everyday execution.", "Terra — deliberate reasoning for complex work.", "Luna — multimodal collaboration and creative exploration."] } },
+      { "type": "content", "fields": { "heading": "Use them as a routing strategy", "body": "Route simple, high-volume tasks to Sol. Escalate ambiguity and multi-step analysis to Terra. Use Luna when text, images, audio, or creative iteration belong in the same workflow." } },
+      { "type": "quote", "fields": { "quote": "The best model is the one matched to the shape of the work.", "attribution": "Simulation principle" } },
+      { "type": "cta", "fields": { "headline": "Build your model map before you build your prompt.", "action": "Save this framework", "handle": "@linkgen" } }
+    ]
+  }
+}</pre
+          >
+        </article>
+      </section>
+
+      <section class="section" aria-labelledby="result-title">
+        <div class="section-heading">
+          <h2 id="result-title">6. Resulting minimal document preview</h2>
+          <p>Same slide roles and proportions as the production renderer.</p>
+        </div>
+        <p class="deck-note">
+          The production renderer would inline <code>base.css</code> and
+          <code>templates/minimal/theme.css</code>, then pass this slide HTML to
+          <code>htmlToPdf</code>. The cards below are a scaled visual preview of
+          that result.
+        </p>
+        <div class="deck">
+          <div class="slide-frame">
+            <article class="slide slide--cover">
+              <p class="eyebrow">MODEL LANDSCAPE · SIMULATION</p>
+              <h1 class="title">Three models. Three different jobs.</h1>
+              <p class="subtitle">A practical guide to Sol, Terra, and Luna.</p>
+            </article>
+          </div>
+          <div class="slide-frame">
+            <article class="slide slide--content">
+              <h2 class="heading">Start with the job, not the model</h2>
+              <p class="body">
+                Model choice becomes easier when the question comes first: do
+                you need speed, deep reasoning, or a rich multimodal workflow?
+              </p>
+            </article>
+          </div>
+          <div class="slide-frame">
+            <article class="slide slide--list">
+              <h2 class="heading">The three-lane mental model</h2>
+              <ul class="list">
+                <li class="list-item">Sol — fast, everyday execution.</li>
+                <li class="list-item">
+                  Terra — deliberate reasoning for complex work.
+                </li>
+                <li class="list-item">
+                  Luna — multimodal collaboration and creative exploration.
+                </li>
+              </ul>
+            </article>
+          </div>
+          <div class="slide-frame">
+            <article class="slide slide--content">
+              <h2 class="heading">Use them as a routing strategy</h2>
+              <p class="body">
+                Route simple, high-volume tasks to Sol. Escalate ambiguity and
+                multi-step analysis to Terra. Use Luna when text, images, audio,
+                or creative iteration belong in the same workflow.
+              </p>
+            </article>
+          </div>
+          <div class="slide-frame">
+            <article class="slide slide--quote">
+              <blockquote class="quote">
+                The best model is the one matched to the shape of the work.
+              </blockquote>
+              <p class="attribution">Simulation principle</p>
+            </article>
+          </div>
+          <div class="slide-frame">
+            <article class="slide slide--cta">
+              <h2 class="headline">
+                Build your model map before you build your prompt.
+              </h2>
+              <p class="action">Save this framework</p>
+              <p class="handle">@linkgen</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <strong>What happens after this preview:</strong> RENDER_PDF stores the
+        derived PDF under a version-scoped R2 key, and PERSIST_VERSION stores
+        that key—not a public URL. On a later refine, RESEARCH is skipped,
+        cached findings are seeded during RESOLVE_INPUT, the deck is
+        regenerated, and the new version is rendered to a new PDF key.
+      </footer>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,83 @@
+/* bold — high-contrast dark deck, heavy type, one electric accent. */
+
+.slide {
+  background: #0b0b0f;
+  color: #f6f6f4;
+}
+
+.slide--cover {
+  background: #0b0b0f;
+}
+
+.eyebrow {
+  color: #ffe14d;
+}
+
+.title {
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+/* accent bar under the cover title */
+.slide--cover .title::after {
+  content: '';
+  display: block;
+  width: 180px;
+  height: 14px;
+  margin-top: 36px;
+  background: #ffe14d;
+}
+
+.heading,
+.headline {
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.heading {
+  color: #ffffff;
+}
+
+/* square marker for list rows */
+.list-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 18px;
+  width: 20px;
+  height: 20px;
+  background: #ffe14d;
+}
+
+.quote {
+  color: #ffffff;
+}
+
+.slide--quote .quote::before {
+  content: '\201C';
+  display: block;
+  font-size: 140px;
+  line-height: 0.6;
+  color: #ffe14d;
+  margin-bottom: 24px;
+}
+
+.attribution {
+  color: #ffe14d;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.action {
+  display: inline-block;
+  align-self: flex-start;
+  background: #ffe14d;
+  color: #0b0b0f;
+  font-weight: 800;
+  padding: 22px 40px;
+  border-radius: 4px;
+}
+
+.handle {
+  color: #ffe14d;
+}
