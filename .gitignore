@@ -1,0 +1,17 @@
+# Each app keeps its own .gitignore under apps/<name>/. This file covers the
+# workspace root and anything that applies everywhere.
+
+node_modules
+.turbo
+.DS_Store
+.idea
+*.tsbuildinfo
+
+# env files stay local; each app documents its keys in AGENTS.md or .env.example
+.env
+.env*.local
+
+# agent worktrees
+.claude/worktrees/
+.codex/worktrees/
+.claude/settings.local.json

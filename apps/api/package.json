@@ -1,5 +1,5 @@
 {
-  "name": "linkgenserver",
+  "name": "@marquill/api",
   "version": "0.0.1",
   "description": "",
   "author": "",
@@ -12,7 +12,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main.js",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
@@ -21,7 +21,10 @@
     "start:worker": "node dist/workflow/workers/workflow.worker.js",
     "db:migrate:user-indexes": "ts-node src/scripts/migrate-user-identity-indexes.ts",
     "review:credit-economics": "ts-node src/scripts/run-credit-economics-review.ts",
-    "seed:tiers:temp": "ts-node src/scripts/temp-seed-tiers.ts"
+    "seed:tiers:temp": "ts-node src/scripts/temp-seed-tiers.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.build.json",
+    "dev": "nest start --watch",
+    "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",
