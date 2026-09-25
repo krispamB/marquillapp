@@ -1,0 +1,74 @@
+# PROTOTYPE — a definition that must not seed. Every error here is one the
+# contract catches before a single token is spent on generation.
+contract: 1
+id: Broken_System
+version: 0
+name: Broken
+summary: A definition that fails every cross-reference the contract makes.
+intent: Demonstrates the parse boundary.
+page:
+  width: 1080
+  height: 1350
+  safeArea: { top: 88, right: 96, bottom: 96, left: 96 }
+  pages: { min: 20, max: 2 }
+  background: nosuchtoken
+palette:
+  tokens:
+    - { name: ink, hex: '#14110f', role: text }
+    - { name: paper, hex: 'faf7f2', role: background }
+  pairings:
+    - { text: ink, on: ghost }
+  rules:
+    externalColors: forbid
+    references: token-var-only
+    minContrastRatio: 4.5
+typography:
+  fonts:
+    - name: body
+      family: Inter
+      source: google
+      weights: [400]
+      styles: [normal]
+      fallback: sans-serif
+  scale:
+    - name: body
+      px: 28
+      lineHeight: 1.5
+      tracking: '0'
+      font: display
+      weight: 400
+      use: Running prose.
+    - name: tiny
+      px: 14
+      lineHeight: 1.2
+      tracking: '0'
+      font: body
+      weight: 700
+      use: Fine print.
+  rules:
+    sizes: scale-only
+    minPx: 22
+    maxLineLengthCh: 54
+    transforms: [none]
+spacing:
+  base: 4
+  scale: [4, 8, 17, 96]
+  rules:
+    values: scale-only
+    appliesTo: [padding]
+icons:
+  catalog: app-inline-v1
+  allowed: [check]
+  sizes: [24]
+  colors: [neon]
+  rules:
+    maxPerPage: 2
+    role: decorative
+composition:
+  pageRoles:
+    - { name: cover, position: first, required: true, guidance: The hook. }
+    - { name: opener, position: first, required: true, guidance: Also the hook. }
+  principles:
+    - One idea per page.
+  antiPatterns:
+    - { avoid: Crowding., instead: Cutting. }
