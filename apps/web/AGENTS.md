@@ -1,26 +1,24 @@
-# AGENTS.md
+# AGENTS.md — apps/web
 
-This file provides guidance to coding agents when working with code in this repository.
-
-## Implementation Workflow
-
-Prioritize completing the requested functionality first.
-
-Do not perform code review, refactoring, optimization, or quality-improvement workflows until the requested feature is fully implemented and the user has explicitly verified that it works. Do not invoke review-oriented skills or agents prematurely, because they interrupt the implementation workflow and consume unnecessary context.
-
-After the user confirms that the implementation behaves as expected, you may proceed with code review, cleanup, refactoring, performance improvements, documentation updates, or other polish.
+The Next.js product app (`@marquill/web`). Read the root [AGENTS.md](../../AGENTS.md) first; it has the repo map, the cross-app contracts, and the working rules. This file covers only the web app.
 
 ## Commands
 
+Run these from `apps/web`, or from the root with `bun run --filter @marquill/web <script>`:
+
 ```bash
-bun run dev      # dev server at localhost:3000
-bun run build    # production build
-bun run lint     # ESLint
+bun run dev        # dev server at localhost:3000 (needs the api on :3500 for real data)
+bun run build      # production build
+bun run typecheck  # tsc --noEmit
+bun run test       # bun test
+bun run lint       # ESLint (existing backlog; lint only the files you touched)
 ```
 
-Run `bun run build` before `git add` to catch type and compile errors.
+Run `bun run typecheck` and `bun run test` before committing, and `bun run build` if you touched config or routing.
 
-No test suite is configured.
+## Tests
+
+Tests are `*.test.ts(x)` files beside their source, run by `bun test` using `bun:test`. Component tests call `GlobalRegistrator.register()` from `@happy-dom/global-registrator` at the top of the file and render with `@testing-library/react`; copy the setup from an existing `app/redesign/*.test.tsx`. There is one React version (19.2.4) across the workspace. A second copy breaks hooks in tests with "Invalid hook call".
 
 ## Architecture
 
@@ -52,6 +50,8 @@ const data = await readApi<ResponseType>(
   jsonRequest(payload, { method: "POST" }),
 );
 ```
+
+The endpoints, payloads, and error semantics are documented in [`apps/api/docs/api/`](../api/docs/api/README.md). Read the relevant file there before calling or changing an endpoint.
 
 Server components use the helpers in `app/lib/session.ts` to mint fresh Clerk credentials and forward both the `Authorization` and `Cookie` headers to the backend. The public client base URL comes from `NEXT_PUBLIC_API_BASE_URL`; server-side backend calls use `BACKEND_API_URL`.
 

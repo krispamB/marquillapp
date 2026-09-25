@@ -1,6 +1,6 @@
 # Brand Guide
 
-Source: `/Users/tasck/software/incontentlanding/app/globals.css`
+Source: `apps/landing/app/globals.css`
 
 ## Color Palette
 

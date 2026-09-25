@@ -1,47 +1,35 @@
-# AGENTS.md
+# AGENTS.md — apps/api
 
-This file provides guidance to Codex and other coding agents when working with code in this repository.
+The NestJS backend (`@marquill/api`). Read the root [AGENTS.md](../../AGENTS.md) first; it has the repo map, the cross-app contracts, and the working rules. This file covers only the api.
 
-## Documentation and decision documents
+## Docs
 
-The `docs/` folder contains architectural and product decision documents. When working on a task, inspect the filenames and search the folder for documents relevant to the area being changed, then read those documents before making decisions or edits.
-
-Do not load every document by default. Read only the documents that are relevant to the current task, and expand to related documents only when their references or the code under investigation indicate they are needed.
-
-Create and maintain repository documentation in the `docs/` folder unless a task explicitly requires a conventional file elsewhere (for example, `README.md`, `AGENTS.md`, or a colocated code comment).
-
-## Subagents
-
-The default subagent limit for a task is zero. Do not create or delegate work to subagents for convenience, speed, or parallelism.
-
-Only create subagents when the user's prompt explicitly asks for them or an applicable skill's instructions explicitly require them. When subagents are authorized, create no more than the number requested; if no number is specified, use the minimum number necessary to satisfy the instruction.
+- `docs/` holds this app's architecture and product decision documents (workflow engine, artifact schema, credit system, carousel rendering, and more). Search it by filename for the area you're changing, and read only what applies.
+- `docs/api/` is the client-facing API reference that `apps/web` builds against. Update it in the same change as any endpoint change.
+- `CONTEXT.md` is the domain glossary.
 
 ## Commands
 
+Run these from `apps/api`, or from the root with `bun run --filter @marquill/api <script>`:
+
 ```bash
-# Development
-npm run start:dev        # watch mode
-npm run build            # compile TypeScript via nest build
+docker compose up -d     # from the repo root: MongoDB (27017), Redis (6379), BullMQ dashboard (8080)
 
-# Code quality
-npm run lint             # ESLint with auto-fix
-npm run format           # Prettier
+bun run dev              # HTTP server in watch mode (nest start --watch), port 3500
+bun run build            # nest build -> dist/
+bun run start:worker     # the worker process (node dist/workflow/workers/workflow.worker.js); build first
 
-# Testing
-npm run test             # all unit tests (Jest, rootDir: src, pattern: *.spec.ts)
-npm run test:watch       # watch mode
-npm run test:cov         # with coverage
-npm run test:e2e         # end-to-end (test/jest-e2e.json config)
+bun run typecheck        # tsc against tsconfig.build.json, i.e. exactly what ships
+bun run test             # Jest: all *.spec.ts under src/
+bunx jest src/auth/auth.service.spec.ts   # a single file
+bun run test:e2e         # end-to-end (test/jest-e2e.json)
 
-# Run a single test file
-npx jest src/auth/auth.service.spec.ts
-
-# Worker process (separate from the HTTP server)
-npm run start:worker     # node dist/workflow/workers/workflow.worker.js
-
-# Local infrastructure
-docker-compose up -d     # starts MongoDB (27017), Redis (6379), BullMQ dashboard (8080)
+bun run lint             # ESLint, report only (large existing backlog)
+bun run lint:fix         # ESLint --fix; only on files you are changing
+bun run format           # Prettier
 ```
+
+Spec files are not covered by `typecheck` (ts-jest compiles them), and some carry stale type literals. Don't treat those errors as caused by your change.
 
 ## Architecture
 
@@ -85,9 +73,10 @@ Queue producers (`WorkflowQueue`, `ScheduleQueue`, etc.) live in `src/workflow/`
 
 ### Auth flow
 
-- **Google OAuth2** → `AuthService.validateGoogleUser` → JWT cookie
+- **Clerk** is the primary auth. `ClerkAuthGuard` (`src/auth/clerk/`) verifies the Clerk session token (the `__session` cookie, or a Bearer header) without a network call and attaches the local Mongo `User`, provisioning it on first sight (`UserProvisioningService`). If no Clerk token is present, it falls back to the legacy passport-jwt `JwtAuthGuard`, so old `access_token` cookies keep working until they expire. That fallback is meant to be removed once legacy traffic drains.
+- **Google OAuth2** (legacy) → `AuthService.validateGoogleUser` → `access_token` JWT cookie
 - **LinkedIn OAuth2** → `AuthService.linkedinCallback` — stores encrypted access tokens in `ConnectedAccount` documents; supports both `PERSON` and `ORGANIZATION` account types. LinkedIn access tokens are encrypted at rest using AES-256-GCM (`EncryptionService`), requiring `ENCRYPTION_KEY` in the environment.
-- JWT guard (`JwtAuthGuard`) validates the `access_token` cookie on all protected routes. The `@GetUser()` decorator extracts the user from the request.
+- The `@GetUser()` decorator extracts the authenticated user from the request.
 
 ### Database schemas (MongoDB via Mongoose)
 
@@ -101,16 +90,17 @@ Key schemas in `src/database/schemas/`:
 - `Tier` — holds feature `limits` map (keyed by `FeatureKey`); one tier has `isDefault: true`
 - `Usage` — metered usage counters per `(user_id, feature, periodStart)`
 
-## Conventions (from PROJECT_RULES.md)
+## Conventions
 
-- **Files**: kebab-case (`agent.controller.ts`)
-- **Classes/Interfaces**: PascalCase; interfaces have **no** `I` prefix
-- **Variables/functions**: camelCase
-- **Barrel exports**: every folder exposes an `index.ts`
-- **DTOs**: in a `dto/` subfolder within the feature module, validated with `class-validator`
-- **Zod** is used for LLM response parsing; `class-validator` is used for HTTP request DTOs
-- Avoid `any`; define interfaces for all complex structures
-- Use `@nestjs/config` + `.env` for all configuration; no hardcoded values
+- **Language:** TypeScript 5, target ES2023, `module`/`moduleResolution` NodeNext. Global route prefix `api/v1`; entry `src/main.ts`.
+- **Structure:** feature modules under `src/`. DTOs go in `dto/`, Mongoose schemas in `src/database/schemas/`, and shared interfaces in the module root or `interfaces/`. Every folder exposes an `index.ts` barrel.
+- **Imports:** absolute `src/...` imports resolve through `baseUrl`. `nest build` rewrites them to relative paths, but only when it runs under Node (see Production below).
+- **Naming:** files are kebab-case (`agent.controller.ts`). Classes and interfaces are PascalCase, and interfaces have **no** `I` prefix. Variables and functions are camelCase.
+- **Validation:** `class-validator` DTOs for HTTP requests (with a global `ValidationPipe`), and Zod for LLM response parsing.
+- **Config:** use `@nestjs/config` and `.env` for everything. Never hardcode secrets or config values.
+- **DI:** use Nest's dependency injection; avoid manual instantiation where DI is possible.
+- **Types:** avoid `any`; define interfaces for complex structures.
+- **Async:** `async`/`await` throughout.
 
 ## Environment variables
 
@@ -123,25 +113,12 @@ Copy `.env.example` and fill in real values. Required keys not in the example:
 - `TAVILY_API_KEY` — autonomous web research tool
 - `GENERATION_MODEL`, `RESEARCH_MODEL` — OpenRouter model identifiers used by `AgentRunnerService`
 
-## Worktrees
+## Production
 
-Always place worktrees under `.codex/worktrees/` — this path is already gitignored.
-
-```bash
-# Create a worktree on a new branch
-git worktree add .codex/worktrees/<branch-name> -b <branch-name>
-
-# Copy all .env files from the repo root into the worktree
-cp .env* .codex/worktrees/<branch-name>/
-
-# Install dependencies in the worktree
-cd .codex/worktrees/<branch-name> && bun install
-```
-
-Rules:
-- After creating a worktree, always copy `.env*` files before doing any work in it — services will fail to start without them.
-- Never commit worktree directories; `.codex/worktrees/` is in `.gitignore`.
-- Remove stale worktrees with `git worktree remove .codex/worktrees/<branch-name>` when done.
+- The same build runs two processes: `node dist/main.js` (HTTP) and `node dist/workflow/workers/workflow.worker.js` (worker).
+- The working directory must be `apps/api`. Mail and carousel templates are read from `process.cwd()/assets`.
+- `nest build` must run under Node, not Bun. Under Bun, `require.resolve` honours tsconfig's `baseUrl`, so Nest's path-rewrite hook leaves `src/...` imports bare, and `dist/` then fails with `Cannot find module 'src/...'`.
+- `Dockerfile` builds the image from the repository root: `docker build -f apps/api/Dockerfile -t marquill-api .`. `docker compose --profile app up -d` (run from the root) runs the API and worker against the local infrastructure.
 
 ## Writing Tests
 
@@ -150,7 +127,7 @@ Rules:
 Test files are colocated with their source files as `<name>.spec.ts`. Run a single file with:
 
 ```bash
-bun jest src/auth/auth.service.spec.ts
+bunx jest src/auth/auth.service.spec.ts
 ```
 
 ### Structure
