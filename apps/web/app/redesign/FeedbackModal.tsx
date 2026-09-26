@@ -8,10 +8,6 @@ import MarquillSelect, { type MarquillSelectOption } from "../../components/ui/M
 type FeedbackKind = "BUG" | "FEATURE_REQUEST";
 type ModalState = "form" | "submitting" | "success" | "error";
 
-type FeedbackResponse = {
-  data?: { issueUrl?: string };
-};
-
 const feedbackKinds: MarquillSelectOption[] = [
   { value: "BUG", label: "Report a bug", icon: <Bug size={15} /> },
   { value: "FEATURE_REQUEST", label: "Suggest a feature", icon: <Lightbulb size={15} /> },
@@ -41,7 +37,6 @@ export default function FeedbackModal({ isOpen, onClose }: { isOpen: boolean; on
   const [kind, setKind] = useState<FeedbackKind>("BUG");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [issueUrl, setIssueUrl] = useState("");
   const [errorMessage, setErrorMessage] = useState("We could not send that report.");
 
   useEffect(() => {
@@ -60,11 +55,10 @@ export default function FeedbackModal({ isOpen, onClose }: { isOpen: boolean; on
     if (!title.trim() || !description.trim()) return;
     setModalState("submitting");
     try {
-      const response = await readApi<FeedbackResponse>(
+      await readApi(
         `${API_BASE}/feedback/issues`,
         jsonRequest({ type: kind, title: title.trim(), description: description.trim(), deviceReport: await getDeviceReport() }, { method: "POST" }),
       );
-      setIssueUrl(response?.data?.issueUrl ?? "");
       setModalState("success");
     } catch (reason) {
       setErrorMessage(reason instanceof Error ? reason.message : "We could not send that report.");
@@ -109,7 +103,6 @@ export default function FeedbackModal({ isOpen, onClose }: { isOpen: boolean; on
             <span className="mq-eyebrow">Received</span>
             <h2 id="feedback-title">Thanks for the signal.</h2>
             <p>Your {kind === "BUG" ? "bug report" : "feature request"} is in the queue.</p>
-            {issueUrl ? <a href={issueUrl} target="_blank" rel="noopener noreferrer" className="mq-secondary-button">Track request</a> : null}
             <button type="button" className="mq-ghost-button" onClick={onClose}>Close</button>
           </div>
         ) : null}

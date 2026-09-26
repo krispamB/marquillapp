@@ -30,8 +30,10 @@ import {
   RefineArtifactDto,
   UpdateArtifactDto,
 } from './dto';
+import { UserThrottlerGuard } from '../common/guards/user-throttler.guard';
+import { Throttle, minutes } from '@nestjs/throttler';
 
-@UseGuards(ClerkAuthGuard)
+@UseGuards(ClerkAuthGuard, UserThrottlerGuard)
 @Controller('artifacts')
 export class ArtifactController {
   constructor(
@@ -44,6 +46,9 @@ export class ArtifactController {
    * `{ artifactId, runId }` the client uses to open the SSE progress stream —
    * creation is async because research + LLM + render take tens of seconds.
    */
+  // Each run spends LLM, search, and render budget; credits cap the total,
+  // this caps the burst.
+  @Throttle({ default: { limit: 10, ttl: minutes(1) } })
   @HttpCode(HttpStatus.ACCEPTED)
   @Post()
   create(
@@ -53,6 +58,7 @@ export class ArtifactController {
     return this.generation.launchInitialRun(user._id.toString(), dto);
   }
 
+  @Throttle({ default: { limit: 10, ttl: minutes(1) } })
   @HttpCode(HttpStatus.ACCEPTED)
   @Post(':id/refine')
   refine(

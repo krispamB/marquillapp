@@ -8,6 +8,10 @@ import { RequestLoggerMiddleware } from './common/middleware';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule, minutes } from '@nestjs/throttler';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
+import { RedisModule } from './redis/redis.module';
+import { RedisService } from './redis/redis.service';
 import { WorkflowModule } from './workflow/workflow.module';
 import { WorkflowRunModule } from './workflow/workflow-run.module';
 import { DatabaseModule } from './database/database.module';
@@ -34,6 +38,17 @@ import { CarouselModule } from './carousel';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // Counters live in Redis so limits hold across API replicas and restarts.
+    // Applied per route by `UserThrottlerGuard`; routes may tighten the
+    // default with `@Throttle`.
+    ThrottlerModule.forRootAsync({
+      imports: [RedisModule],
+      inject: [RedisService],
+      useFactory: (redis: RedisService) => ({
+        throttlers: [{ ttl: minutes(1), limit: 120 }],
+        storage: new ThrottlerStorageRedisService(redis.getClient()),
+      }),
+    }),
     SubscriptionModule,
     TierModule,
     FeedbackModule,

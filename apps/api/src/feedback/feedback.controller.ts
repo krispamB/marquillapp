@@ -12,12 +12,16 @@ import { IAppResponse } from '../common/interfaces';
 import { User } from '../database/schemas';
 import { CreateFeedbackIssueDto } from './dto';
 import { FeedbackService } from './feedback.service';
+import { UserThrottlerGuard } from '../common/guards/user-throttler.guard';
+import { Throttle, hours } from '@nestjs/throttler';
 
-@UseGuards(ClerkAuthGuard)
+@UseGuards(ClerkAuthGuard, UserThrottlerGuard)
 @Controller('feedback')
 export class FeedbackController {
   constructor(private readonly feedbackService: FeedbackService) {}
 
+  // Each report opens a GitHub issue with our token.
+  @Throttle({ default: { limit: 10, ttl: hours(1) } })
   @Post('issues')
   @HttpCode(HttpStatus.CREATED)
   async submitIssue(

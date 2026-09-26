@@ -16,7 +16,7 @@ The API is versioned under `/api/v1`:
 
 ### Authentication
 
-All routes in these documents require the authenticated user. Browser requests should send the Clerk `__session` cookie. During the migration, the server also accepts the legacy `access_token` cookie and a bearer token.
+All routes in these documents require the authenticated user. Browser requests should send the Clerk `__session` cookie; server-side callers may send the same Clerk session token as `Authorization: Bearer <token>`. A missing or invalid token returns `401`. The legacy `access_token` cookie is no longer accepted. A Clerk identity with no verified email address gets `403` with `code: "CLERK_EMAIL_UNVERIFIED"`.
 
 For a frontend hosted on a different origin, send credentials:
 
@@ -36,6 +36,19 @@ new EventSource(`${API_BASE}/runs/${runId}/events`, {
 ```
 
 `API_BASE` is the server origin plus `/api/v1`, for example `https://api.example.com/api/v1`.
+
+### Rate limits
+
+Authenticated routes are rate-limited per user and per route. The default is 120 requests per minute. These routes are tighter:
+
+| Route | Limit |
+| --- | --- |
+| `POST /artifacts`, `POST /artifacts/:id/refine` | 10 per minute |
+| `POST /auth/linkedin` | 10 per minute |
+| `POST /payment/checkout` | 10 per minute |
+| `POST /feedback/issues` | 10 per hour |
+
+Over the limit, the server returns `429 Too Many Requests` with a `Retry-After` header in seconds. Responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.
 
 ### IDs and dates
 

@@ -6,8 +6,8 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
+import { randomBytes } from 'crypto';
 import { Model, Types } from 'mongoose';
 import {
   AccountProvider,
@@ -15,15 +15,14 @@ import {
   LinkedinAccountType,
 } from '../database/schemas/connected-account.schema';
 import { User } from '../database/schemas/user.schema';
-import { Tier } from '../database/schemas/tier.schema';
 import { Post, PostStatus } from '../database/schemas/post.schema';
 import { ConfigService } from '@nestjs/config';
 import { ApiError, apiFetch } from 'src/common/HelperFn';
 import { EncryptionService } from '../encryption/encryption.service';
+import { RedisService } from '../redis/redis.service';
 import { FeatureGatingService } from '../feature-gating/feature-gating.service';
 import { LinkedinAvatarRefreshQueue } from '../workflow/linkedin-avatar-refresh.queue';
 import { ScheduleQueue } from '../workflow/schedule.queue';
-import { EmailQueue } from '../workflow/email.queue';
 import { isLinkedinAccessUsable } from '../common/HelperFn/linkedin-access.helper';
 
 interface LinkedinUserInfo {
@@ -64,6 +63,9 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly LINKEDIN_API_BASE = 'https://api.linkedin.com/rest';
   private readonly AVATAR_REFRESH_LEAD_TIME_MS = 24 * 60 * 60 * 1000;
+  private readonly LINKEDIN_OAUTH_STATE_KEY_PREFIX =
+    'auth:linkedin:oauth-state:';
+  private readonly LINKEDIN_OAUTH_STATE_TTL_SECONDS = 10 * 60;
   private readonly LINKEDIN_ALLOWED_ORG_ROLES = new Set([
     'ADMINISTRATOR',
     'DIRECT_SPONSORED_CONTENT_POSTER',
@@ -71,75 +73,59 @@ export class AuthService {
   ]);
 
   constructor(
-    @InjectModel(User.name) private userModel: Model<User>,
-    private jwtService: JwtService,
     @InjectModel(ConnectedAccount.name)
     private connectedAccountModel: Model<ConnectedAccount>,
     @InjectModel(Post.name)
     private readonly postModel: Model<Post>,
-    @InjectModel(Tier.name) private tierModel: Model<Tier>,
     private configService: ConfigService,
     private encryptionService: EncryptionService,
+    private readonly redisService: RedisService,
     private readonly featureGatingService: FeatureGatingService,
     private readonly linkedinAvatarRefreshQueue: LinkedinAvatarRefreshQueue,
     private readonly scheduleQueue: ScheduleQueue,
-    private readonly emailQueue: EmailQueue,
   ) {}
 
-  async validateGoogleUser(details: {
-    email: string;
-    name: string;
-    avatar: string;
-    googleId: string;
-  }) {
-    const { email, name, avatar, googleId } = details;
-    let user = await this.userModel.findOne({ googleId });
+  /**
+   * Builds the LinkedIn authorize URL. The OAuth `state` is a random,
+   * single-use nonce mapped to the user in Redis, so a callback can only land
+   * on the account that started the flow; the user id itself is never exposed
+   * as `state`, or anyone could craft a link that binds the victim's LinkedIn
+   * token to the attacker's account.
+   */
+  async createLinkedinOath(user: User): Promise<string> {
+    const state = randomBytes(32).toString('base64url');
+    await this.redisService
+      .getClient()
+      .set(
+        this.linkedinOauthStateKey(state),
+        user._id.toString(),
+        'EX',
+        this.LINKEDIN_OAUTH_STATE_TTL_SECONDS,
+      );
 
-    if (!user) {
-      user = await this.userModel.findOne({ email });
-      if (user) {
-        user.googleId = googleId;
-        user.avatar = avatar;
-        await user.save();
-      } else {
-        const defaultTier = await this.tierModel.findOne({ isDefault: true });
-        user = await this.userModel.create({
-          email,
-          name,
-          avatar,
-          googleId,
-          tier: defaultTier ? defaultTier._id : undefined,
-        });
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: this.configService.getOrThrow<string>('LINKEDIN_CLIENT_ID'),
+      redirect_uri: this.configService.getOrThrow<string>(
+        'LINKEDIN_REDIRECT_URI',
+      ),
+      state,
+      scope:
+        'openid profile email w_member_social r_basicprofile r_organization_admin rw_organization_admin w_organization_social r_organization_social',
+      enable_extended_login: 'true',
+    });
+    return `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`;
+  }
 
-        try {
-          await this.emailQueue.addWelcomeEmailJob(email, name);
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : 'Unknown queue error';
-          this.logger.warn(
-            `Welcome email enqueue failed for new signup (${email}): ${message}`,
-          );
-        }
-      }
+  async linkedinCallback(code: string | undefined, state: string | undefined) {
+    const userId = await this.consumeLinkedinOauthState(state);
+    if (!code) {
+      throw new BadRequestException({
+        message: 'LinkedIn authorization was not completed.',
+        code: 'LINKEDIN_AUTHORIZATION_INCOMPLETE',
+      });
     }
 
-    return user;
-  }
-
-  login(user: User) {
-    const payload = { email: user.email, sub: user._id.toString() };
-    return {
-      access_token: this.jwtService.sign(payload, {
-        expiresIn: 30 * 24 * 60 * 60 * 1000,
-      }),
-    };
-  }
-
-  createLinkedinOath(user: User): string {
-    return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${this.configService.getOrThrow<string>('LINKEDIN_CLIENT_ID')}&redirect_uri=${this.configService.getOrThrow<string>('LINKEDIN_REDIRECT_URI')}&state=${user._id.toString()}&scope=${encodeURIComponent('openid profile email w_member_social r_basicprofile r_organization_admin rw_organization_admin w_organization_social r_organization_social')}&enable_extended_login=true`;
-  }
-
-  async linkedinCallback(code: string, state: string) {
     const { access_token, expires_in } =
       await this.getLinkedinAccessToken(code);
     const profileMetadata = await this.getLinkedinUser(access_token);
@@ -151,7 +137,7 @@ export class AuthService {
     );
     if (
       memberOwnerAccount &&
-      !this.isAccountOwnedByUser(memberOwnerAccount, state)
+      !this.isAccountOwnedByUser(memberOwnerAccount, userId)
     ) {
       throw new ConflictException({
         message: 'This LinkedIn account is already connected to another user.',
@@ -159,7 +145,7 @@ export class AuthService {
       });
     }
 
-    const connectedAccount = await this.getLinkedinPersonalAccount(state);
+    const connectedAccount = await this.getLinkedinPersonalAccount(userId);
     const existingMemberId = this.getStoredLinkedinMemberId(connectedAccount);
     if (
       connectedAccount &&
@@ -176,7 +162,7 @@ export class AuthService {
 
     await this.connectedAccountModel.findOneAndUpdate(
       {
-        user: new Types.ObjectId(state),
+        user: new Types.ObjectId(userId),
         provider: AccountProvider.LINKEDIN,
         $or: [
           { accountType: LinkedinAccountType.PERSON },
@@ -199,7 +185,7 @@ export class AuthService {
     );
     await this.connectedAccountModel.updateMany(
       {
-        user: new Types.ObjectId(state),
+        user: new Types.ObjectId(userId),
         provider: AccountProvider.LINKEDIN,
         accountType: LinkedinAccountType.ORGANIZATION,
       },
@@ -213,6 +199,28 @@ export class AuthService {
     );
 
     return true;
+  }
+
+  /** Resolves and deletes the nonce, so each `state` works exactly once. */
+  private async consumeLinkedinOauthState(
+    state: string | undefined,
+  ): Promise<string> {
+    const userId = state
+      ? await this.redisService
+          .getClient()
+          .getdel(this.linkedinOauthStateKey(state))
+      : null;
+    if (!userId) {
+      throw new BadRequestException({
+        message: 'This LinkedIn connection link is invalid or has expired.',
+        code: 'LINKEDIN_OAUTH_STATE_INVALID',
+      });
+    }
+    return userId;
+  }
+
+  private linkedinOauthStateKey(state: string): string {
+    return `${this.LINKEDIN_OAUTH_STATE_KEY_PREFIX}${state}`;
   }
 
   async getLinkedinOrganizations(userId: string) {
@@ -617,7 +625,7 @@ export class AuthService {
       .find({
         user: userObjectId,
         connectedAccount: { $in: accountIds },
-        status: 'SCHEDULED',
+        status: PostStatus.SCHEDULED,
       })
       .select('_id');
 

@@ -1,2 +1,2 @@
-export * from './jwt-auth.guard';
 export * from './subscription-access.guard';
+export * from './user-throttler.guard';

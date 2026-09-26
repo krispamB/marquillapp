@@ -31,7 +31,6 @@ describe('FeedbackController', () => {
   it('submits feedback and returns IAppResponse with 201', async () => {
     const created = {
       issueNumber: 123,
-      issueUrl: 'https://github.com/acme/repo/issues/123',
       type: FeedbackIssueType.BUG,
     };
     const feedbackService = {

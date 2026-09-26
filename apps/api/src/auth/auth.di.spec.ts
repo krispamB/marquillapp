@@ -2,15 +2,12 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { getModelToken } from '@nestjs/mongoose';
 import { AuthService } from './auth.service';
-import { User } from '../database/schemas/user.schema';
 import { ConnectedAccount } from '../database/schemas/connected-account.schema';
-import { Tier } from '../database/schemas/tier.schema';
-import { JwtService } from '@nestjs/jwt';
 import { EncryptionService } from '../encryption/encryption.service';
 import { FeatureGatingService } from '../feature-gating';
 import { LinkedinAvatarRefreshQueue } from '../workflow/linkedin-avatar-refresh.queue';
 import { ScheduleQueue } from '../workflow/schedule.queue';
-import { EmailQueue } from '../workflow/email.queue';
+import { RedisService } from '../redis/redis.service';
 
 jest.mock(
   'src/common/HelperFn',
@@ -33,23 +30,11 @@ describe('AuthService DI', () => {
         AuthService,
         LinkedinAvatarRefreshQueue,
         {
-          provide: getModelToken(User.name),
-          useValue: {},
-        },
-        {
           provide: getModelToken(ConnectedAccount.name),
           useValue: {},
         },
         {
           provide: getModelToken('Post'),
-          useValue: {},
-        },
-        {
-          provide: getModelToken(Tier.name),
-          useValue: {},
-        },
-        {
-          provide: JwtService,
           useValue: {},
         },
         {
@@ -76,7 +61,7 @@ describe('AuthService DI', () => {
           },
         },
         {
-          provide: EmailQueue,
+          provide: RedisService,
           useValue: {},
         },
       ],

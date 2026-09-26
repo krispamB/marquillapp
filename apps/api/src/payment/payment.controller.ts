@@ -14,12 +14,16 @@ import { GetUser } from '../common/decorators';
 import { User } from '../database/schemas';
 import { CreateCheckoutDto } from './dto';
 import { IAppResponse } from '../common/interfaces';
+import { UserThrottlerGuard } from '../common/guards/user-throttler.guard';
+import { Throttle, minutes } from '@nestjs/throttler';
 
-@UseGuards(ClerkAuthGuard)
+@UseGuards(ClerkAuthGuard, UserThrottlerGuard)
 @Controller('payment')
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
+  // Each call creates a Paddle transaction.
+  @Throttle({ default: { limit: 10, ttl: minutes(1) } })
   @Post('checkout')
   @HttpCode(HttpStatus.OK)
   async createCheckout(

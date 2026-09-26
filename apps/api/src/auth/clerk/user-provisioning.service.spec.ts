@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { UserProvisioningService } from './user-provisioning.service';
 
@@ -24,7 +24,13 @@ const makeService = () => {
     clerkUser: {
       id: 'user_clerk_123',
       primaryEmailAddressId: 'idn_1',
-      emailAddresses: [{ id: 'idn_1', emailAddress: 'a@b.com' }],
+      emailAddresses: [
+        {
+          id: 'idn_1',
+          emailAddress: 'a@b.com',
+          verification: { status: 'verified' },
+        },
+      ],
       firstName: 'Ada',
       lastName: 'Lovelace',
       username: 'ada',
@@ -204,6 +210,57 @@ describe('UserProvisioningService', () => {
       await expect(service.findOrCreate(fixtures.clerkUserId)).resolves.toBe(
         created,
       );
+    });
+    it('should link by a verified secondary email when the primary is unverified', async () => {
+      const owner = { _id: new Types.ObjectId(), email: 'second@b.com' };
+      mocks.userModel.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(owner);
+      mocks.clerkClient.users.getUser.mockResolvedValueOnce({
+        ...fixtures.clerkUser,
+        emailAddresses: [
+          {
+            id: 'idn_1',
+            emailAddress: 'a@b.com',
+            verification: { status: 'unverified' },
+          },
+          {
+            id: 'idn_2',
+            emailAddress: 'second@b.com',
+            verification: { status: 'verified' },
+          },
+        ],
+      });
+      mocks.userModel.findOneAndUpdate.mockResolvedValueOnce(owner);
+
+      await expect(service.findOrCreate(fixtures.clerkUserId)).resolves.toBe(
+        owner,
+      );
+      expect(mocks.userModel.findOne).toHaveBeenLastCalledWith({
+        email: 'second@b.com',
+      });
+    });
+
+    it('should reject and never look up by email when no Clerk email is verified', async () => {
+      mocks.userModel.findOne.mockResolvedValueOnce(null);
+      mocks.clerkClient.users.getUser.mockResolvedValueOnce({
+        ...fixtures.clerkUser,
+        emailAddresses: [
+          {
+            id: 'idn_1',
+            emailAddress: 'victim@b.com',
+            verification: { status: 'unverified' },
+          },
+          { id: 'idn_2', emailAddress: 'other@b.com', verification: null },
+        ],
+      });
+
+      await expect(
+        service.findOrCreate(fixtures.clerkUserId),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(mocks.userModel.findOne).toHaveBeenCalledTimes(1);
+      expect(mocks.userModel.findOneAndUpdate).not.toHaveBeenCalled();
+      expect(mocks.emailQueue.addWelcomeEmailJob).not.toHaveBeenCalled();
     });
   });
 });

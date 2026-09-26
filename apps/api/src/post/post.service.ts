@@ -698,7 +698,7 @@ export class PostService {
   async getPosts(
     user: User,
     connectedAccount?: string,
-    status?: string,
+    status?: PostStatus,
     month?: string,
     page = 1,
   ): Promise<GetPostsResult> {

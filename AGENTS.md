@@ -14,7 +14,7 @@ Bun workspaces and Turborepo. There is one `bun.lock` at the root. `bunfig.toml`
 
 ## How the apps connect
 
-- **web → api.** The browser calls `/api/v1/*` on the web origin, and `apps/web/next.config.ts` rewrites those calls to `BACKEND_API_URL`. Auth is Clerk: web sends the Clerk session token, and the api's `ClerkAuthGuard` verifies it (falling back to a legacy `access_token` JWT).
+- **web → api.** The browser calls `/api/v1/*` on the web origin, and `apps/web/next.config.ts` rewrites those calls to `BACKEND_API_URL`. Auth is Clerk: web sends the Clerk session token, and the api's `ClerkAuthGuard` verifies it.
 - **API contract.** `apps/api/docs/api/` is the single source of truth for the client-facing API. When you change an endpoint, update that doc and the web caller in the same change.
 - **landing → web.** Every CTA links to `NEXT_PUBLIC_APP_URL`. The plan names and limits in `apps/landing/components/landing/data.tsx` must match the tiers seeded in `apps/api/src/scripts/tier-seeds.ts`.
 - **Domain vocabulary.** `apps/api/CONTEXT.md` is the glossary (Artifact, Document Version, Candidate Source, ...). Use its terms in code, docs, and issues, and respect its _Avoid_ lists.

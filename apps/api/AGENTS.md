@@ -73,10 +73,10 @@ Queue producers (`WorkflowQueue`, `ScheduleQueue`, etc.) live in `src/workflow/`
 
 ### Auth flow
 
-- **Clerk** is the primary auth. `ClerkAuthGuard` (`src/auth/clerk/`) verifies the Clerk session token (the `__session` cookie, or a Bearer header) without a network call and attaches the local Mongo `User`, provisioning it on first sight (`UserProvisioningService`). If no Clerk token is present, it falls back to the legacy passport-jwt `JwtAuthGuard`, so old `access_token` cookies keep working until they expire. That fallback is meant to be removed once legacy traffic drains.
-- **Google OAuth2** (legacy) → `AuthService.validateGoogleUser` → `access_token` JWT cookie
-- **LinkedIn OAuth2** → `AuthService.linkedinCallback` — stores encrypted access tokens in `ConnectedAccount` documents; supports both `PERSON` and `ORGANIZATION` account types. LinkedIn access tokens are encrypted at rest using AES-256-GCM (`EncryptionService`), requiring `ENCRYPTION_KEY` in the environment.
+- **Clerk** is the only auth. `ClerkAuthGuard` (`src/auth/clerk/`) verifies the Clerk session token (the `__session` cookie, or a Bearer header) without a network call and attaches the local Mongo `User`, provisioning it on first sight (`UserProvisioningService`). A missing or invalid token is a `401`. The legacy Google OAuth login and its `access_token` JWT cookie have been removed.
+- **LinkedIn OAuth2** → `AuthService.createLinkedinOath` issues a random, single-use `state` nonce stored in Redis (`auth:linkedin:oauth-state:*`, 10-minute TTL) and mapped to the user; `AuthService.linkedinCallback` consumes it with `GETDEL` and rejects unknown or reused states. Never put a user id in `state`. The callback stores encrypted access tokens in `ConnectedAccount` documents and supports both `PERSON` and `ORGANIZATION` account types. LinkedIn access tokens are encrypted at rest using AES-256-GCM (`EncryptionService`), requiring `ENCRYPTION_KEY` in the environment.
 - The `@GetUser()` decorator extracts the authenticated user from the request.
+- **Rate limiting:** every authenticated route uses `@UseGuards(ClerkAuthGuard, UserThrottlerGuard)`, in that order, so limits are counted per user (the web app's proxy makes every browser request share one IP). Counters live in Redis via `ThrottlerModule` in `app.module.ts`. Tighten expensive routes with `@Throttle(...)` and list them in `docs/api/README.md`.
 
 ### Database schemas (MongoDB via Mongoose)
 
@@ -107,7 +107,6 @@ Key schemas in `src/database/schemas/`:
 Copy `.env.example` and fill in real values. Required keys not in the example:
 - `ENCRYPTION_KEY` — arbitrary secret used to derive the AES-256 key for LinkedIn tokens
 - `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, `LINKEDIN_REDIRECT_URI`
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`
 - `APIFY_API_TOKEN` — for web research via `ActorsService`
 - `OPENROUTER_API_KEY` — LLM calls
 - `TAVILY_API_KEY` — autonomous web research tool

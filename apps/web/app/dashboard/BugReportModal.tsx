@@ -52,7 +52,6 @@ export default function BugReportModal({ isOpen, onClose }: BugReportModalProps)
   const [type, setType] = useState("Report a bug");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [issueUrl, setIssueUrl] = useState("");
   const [errorMessage, setErrorMessage] = useState("Error 500 | Internal server error");
 
   // Reset state when opened
@@ -106,7 +105,6 @@ export default function BugReportModal({ isOpen, onClose }: BugReportModalProps)
         throw new Error(json.message || `Error ${res.status} | Internal server error`);
       }
 
-      setIssueUrl(json.data?.issueUrl || "");
       setModalState("success");
     } catch (err: any) {
       setErrorMessage(err.message || "Error 500 | Internal server error");
@@ -182,7 +180,7 @@ export default function BugReportModal({ isOpen, onClose }: BugReportModalProps)
       </p>
 
       <div className="w-full rounded-xl bg-slate-50 py-4 px-6 text-sm font-medium text-slate-600">
-        You can <a href={issueUrl || "#"} target={issueUrl ? "_blank" : undefined} rel={issueUrl ? "noopener noreferrer" : undefined} className="text-indigo-500 hover:text-indigo-600 font-semibold underline decoration-2 underline-offset-2">click here</a> to track the status of your request.
+        We&apos;ll review it and reach out by email if we need more details.
       </div>
     </div>
   );

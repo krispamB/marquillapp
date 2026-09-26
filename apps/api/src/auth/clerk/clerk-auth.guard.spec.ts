@@ -1,4 +1,4 @@
-import { ExecutionContext } from '@nestjs/common';
+import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { ClerkAuthGuard } from './clerk-auth.guard';
 
 const verifyToken = jest.fn();
@@ -28,15 +28,13 @@ const makeGuard = () => {
     }),
   };
   const userProvisioning = { findOrCreate: jest.fn() };
-  const jwtAuthGuard = { canActivate: jest.fn() };
 
   const guard = new ClerkAuthGuard(
     configService as any,
     userProvisioning as any,
-    jwtAuthGuard as any,
   );
 
-  return { guard, mocks: { configService, userProvisioning, jwtAuthGuard } };
+  return { guard, mocks: { configService, userProvisioning } };
 };
 
 describe('ClerkAuthGuard', () => {
@@ -66,7 +64,6 @@ describe('ClerkAuthGuard', () => {
         'user_clerk_1',
       );
       expect(request.user).toBe(user);
-      expect(mocks.jwtAuthGuard.canActivate).not.toHaveBeenCalled();
     });
 
     it('should omit jwtKey and verify via secretKey when CLERK_JWT_KEY is not a real PEM', async () => {
@@ -102,28 +99,33 @@ describe('ClerkAuthGuard', () => {
       expect(verifyToken).toHaveBeenCalledWith('header.jwt', expect.anything());
     });
 
-    it('should fall back to the legacy JwtAuthGuard when no Clerk token is present', async () => {
-      const request: any = { cookies: {}, headers: {} };
-      mocks.jwtAuthGuard.canActivate.mockResolvedValueOnce(true);
+    it('should reject with 401 when no Clerk token is present', async () => {
+      const request = {
+        cookies: { access_token: 'legacy.jwt' },
+        headers: {},
+      };
 
-      await expect(guard.canActivate(makeContext(request))).resolves.toBe(true);
+      await expect(
+        guard.canActivate(makeContext(request)),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
 
       expect(verifyToken).not.toHaveBeenCalled();
-      expect(mocks.jwtAuthGuard.canActivate).toHaveBeenCalledTimes(1);
+      expect(request).not.toHaveProperty('user');
     });
 
-    it('should fall back to the legacy JwtAuthGuard when Clerk verification fails', async () => {
-      const request: any = { cookies: { __session: 'bad.jwt' }, headers: {} };
+    it('should reject with 401 when Clerk verification fails', async () => {
+      const request = { cookies: { __session: 'bad.jwt' }, headers: {} };
       verifyToken.mockRejectedValueOnce(new Error('expired'));
-      mocks.jwtAuthGuard.canActivate.mockResolvedValueOnce(true);
 
-      await expect(guard.canActivate(makeContext(request))).resolves.toBe(true);
+      await expect(
+        guard.canActivate(makeContext(request)),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
 
       expect(mocks.userProvisioning.findOrCreate).not.toHaveBeenCalled();
-      expect(mocks.jwtAuthGuard.canActivate).toHaveBeenCalledTimes(1);
+      expect(request).not.toHaveProperty('user');
     });
 
-    it('should propagate provisioning failures without using the legacy fallback', async () => {
+    it('should propagate provisioning failures when the token is valid', async () => {
       const request: any = {
         cookies: { __session: 'valid.jwt' },
         headers: {},
@@ -137,8 +139,6 @@ describe('ClerkAuthGuard', () => {
       await expect(guard.canActivate(makeContext(request))).rejects.toBe(
         provisioningError,
       );
-
-      expect(mocks.jwtAuthGuard.canActivate).not.toHaveBeenCalled();
     });
   });
 });

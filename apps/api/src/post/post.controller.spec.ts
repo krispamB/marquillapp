@@ -4,7 +4,6 @@ jest.mock('./post.service', () => ({
   PostService: class PostService {},
 }));
 jest.mock('../common/guards', () => ({
-  JwtAuthGuard: class JwtAuthGuard {},
   SubscriptionAccessGuard: class SubscriptionAccessGuard {},
 }));
 jest.mock(

@@ -13,9 +13,10 @@ import { User } from '../database/schemas';
 import { IAppResponse } from '../common/interfaces';
 import { OnboardingService } from './onboarding.service';
 import { InitOnboardingDto, UpdateOnboardingDto } from './dto';
+import { UserThrottlerGuard } from '../common/guards/user-throttler.guard';
 
 @Controller('onboarding')
-@UseGuards(ClerkAuthGuard)
+@UseGuards(ClerkAuthGuard, UserThrottlerGuard)
 export class OnboardingController {
   constructor(private readonly onboardingService: OnboardingService) {}
 
