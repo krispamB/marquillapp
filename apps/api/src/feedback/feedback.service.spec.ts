@@ -75,7 +75,6 @@ describe('FeedbackService', () => {
 
     expect(result).toEqual({
       issueNumber: 45,
-      issueUrl: 'https://github.com/acme/linkgenserver/issues/45',
       type: FeedbackIssueType.BUG,
     });
 

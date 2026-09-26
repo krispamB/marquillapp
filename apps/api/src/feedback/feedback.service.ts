@@ -10,7 +10,6 @@ import { ApiError, apiFetch } from '../common/HelperFn';
 
 type GithubIssueResponse = {
   number?: number;
-  html_url?: string;
   message?: string;
 };
 
@@ -72,9 +71,10 @@ export class FeedbackService {
       );
     }
 
+    // The issue repo is private, so its URL is useless to the reporter and
+    // would only reveal where reports are kept.
     return {
       issueNumber: payload.number,
-      issueUrl: payload.html_url,
       type: dto.type,
     };
   }
