@@ -1,0 +1,5 @@
+[install]
+# Hoisted keeps each app's node_modules layout identical to when it was a
+# standalone repo. The isolated linker breaks the api's declaration emit
+# (TS2742: mongoose's transitive `mongodb` types become unnameable).
+linker = "hoisted"

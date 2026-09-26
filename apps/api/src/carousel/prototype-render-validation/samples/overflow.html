@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>overflow</title>
+<style>
+:root {
+  --ds-paper: #faf7f2;
+  --ds-ink: #14110f;
+  --ds-muted: #5f574e;
+  --ds-rule: #d9d0c3;
+  --ds-accent: #9c3412;
+  --ds-accentInk: #fdf6f2;
+}
+body { color: var(--ds-ink); font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif; }
+.stack { display: flex; flex-direction: column; height: 100%; }
+.spacer { flex: 1; }
+.label { font-size: 22px; line-height: 1.2; letter-spacing: 0.08em; font-weight: 600; text-transform: uppercase; color: var(--ds-muted); margin: 0; }
+.display { font-family: 'Fraunces', Georgia, serif; font-size: 92px; line-height: 1.02; letter-spacing: -0.02em; font-weight: 700; margin: 32px 0 0; }
+.heading { font-family: 'Fraunces', Georgia, serif; font-size: 56px; line-height: 1.12; letter-spacing: -0.01em; font-weight: 600; margin: 0; }
+.lead { font-size: 34px; line-height: 1.35; margin: 24px 0 0; color: var(--ds-muted); }
+.body { font-size: 28px; line-height: 1.5; margin: 48px 0 0; }
+.rule { height: 4px; width: 128px; background: var(--ds-accent); margin: 0 0 32px; }
+.ask { display: flex; gap: 16px; align-items: center; color: var(--ds-accent); }
+.nudge { transform: translateX(-48px); }
+.box { height: 128px; overflow: hidden; }
+</style>
+</head>
+<body>
+<section class="page" data-role="cover">
+  <div class="stack">
+    <p class="label">Field notes</p>
+    <div class="spacer"></div>
+    <h1 class="display nudge">Most decks fail before the first word is read.</h1>
+  </div>
+</section>
+<section class="page" data-role="argument">
+  <h2 class="heading">Attention is spent at the cover, and then it is spent again on every page after it</h2>
+  <p class="lead">A reader decides in the first swipe whether the rest is worth their thumb, and they decide it faster than you think.</p>
+  <p class="body">If the cover argues for the whole document, every page after it inherits the benefit of the doubt. If it does not, every page after it has to win the reader back from nothing, one sentence at a time, and most pages are not written to do that. They are written to be read by someone who has already agreed to read them, which is a reader who does not exist on a feed.</p>
+  <p class="body">So the cover is not decoration. It is the argument in miniature, and a document without one is asking for attention it has not earned.</p>
+  <p class="body">Look at the last ten documents you scrolled past. Not the ones you read — the ones you did not. Each of them had a cover that described its subject instead of arguing its point, and each of them lost you in under a second. None of them were badly written inside. Nobody got that far.</p>
+  <p class="body">Write the cover last, after you know what the document proves.</p>
+  <p class="body">Then cut the page that follows it in half.</p>
+</section>
+<section class="page" data-role="quote">
+  <div class="rule"></div>
+  <div class="box"><p class="lead">Empty paper is not an unfinished page. It is the loudest thing on it, and the thing most often filled in by someone who is afraid of it.</p></div>
+  <p class="label">Jan Tschichold</p>
+</section>
+<section class="page" data-role="closing">
+  <h2 class="heading">Cut one sentence from every page you publish.</h2>
+  <p class="label ask"><svg data-icon="arrow-right" data-size="32"></svg> Follow for more field notes</p>
+</section>
+</body>
+</html>

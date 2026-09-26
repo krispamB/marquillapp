@@ -1,0 +1,88 @@
+/* editorial — cream stock, serif headings, a single rust accent. Magazine feel. */
+
+.slide {
+  background: #f7f3ea;
+  color: #1f1b16;
+}
+
+.eyebrow {
+  color: #b23a2e;
+}
+
+.title,
+.heading,
+.headline,
+.quote {
+  font-family: Georgia, 'Times New Roman', 'Iowan Old Style', serif;
+}
+
+.title {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.slide--cover .title::after {
+  content: '';
+  display: block;
+  width: 240px;
+  height: 3px;
+  margin-top: 36px;
+  background: #b23a2e;
+}
+
+.subtitle {
+  color: #5c5347;
+  font-style: italic;
+}
+
+.heading {
+  font-weight: 700;
+}
+
+.body {
+  color: #33302a;
+}
+
+/* rust bullet */
+.list-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #b23a2e;
+}
+
+.slide--quote .quote::before {
+  content: '\201C';
+  display: block;
+  font-family: Georgia, serif;
+  font-size: 160px;
+  line-height: 0.5;
+  color: #b23a2e;
+  margin-bottom: 16px;
+}
+
+.quote {
+  font-style: italic;
+  font-weight: 600;
+}
+
+.attribution {
+  color: #b23a2e;
+  font-style: normal;
+  letter-spacing: 0.04em;
+}
+
+.action {
+  align-self: flex-start;
+  color: #b23a2e;
+  border-bottom: 3px solid #b23a2e;
+  padding-bottom: 8px;
+}
+
+.handle {
+  color: #5c5347;
+}

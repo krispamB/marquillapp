@@ -1,0 +1,83 @@
+# Local infrastructure for the whole monorepo.
+#
+#   docker compose up -d                 MongoDB, Redis, BullMQ dashboard (default)
+#   docker compose --profile app up -d   ...plus the API and worker built from apps/api/Dockerfile
+#
+# The project name stays "linkgenserver" so existing local volumes
+# (linkgenserver_mongo_data, linkgenserver_redis_data) keep their data.
+name: linkgenserver
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: redis_local
+    ports:
+      - "6379:6379"
+    command: [ "redis-server", "--appendonly", "yes", "--requirepass", "securelinkgenpass", "--maxmemory-policy", "noeviction", "--protected-mode", "no" ]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "securelinkgenpass", "PING" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:latest
+    container_name: mongodb_local
+    restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  bullboard:
+    image: venatum/bull-board
+    container_name: bullmq_dashboard
+    ports:
+      - "8080:3000"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: securelinkgenpass
+      BULL_PREFIX: bull
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: marquill-api
+    env_file: apps/api/.env
+    environment: &app_env
+      NODE_ENV: development
+      MONGO_URI: mongodb://mongo:27017/linkgenserver?directConnection=true
+      REDIS_URL: redis://default:securelinkgenpass@redis:6379
+    ports:
+      - "3500:3500"
+    depends_on: &app_deps
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_started
+
+  worker:
+    profiles: ["app"]
+    image: marquill-api
+    command: ["node", "dist/workflow/workers/workflow.worker.js"]
+    env_file: apps/api/.env
+    environment: *app_env
+    depends_on:
+      <<: *app_deps
+      api:
+        condition: service_started
+
+volumes:
+  redis_data:
+  mongo_data:

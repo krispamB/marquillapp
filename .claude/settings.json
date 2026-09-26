@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun install)",
+      "Bash(bun run check)",
+      "Bash(bun run check:affected)",
+      "Bash(bun run typecheck)",
+      "Bash(bun run test)",
+      "Bash(bun run build)",
+      "Bash(bun run lint)",
+      "Bash(bun run --filter:*)",
+      "Bash(bun test:*)",
+      "Bash(bunx turbo run:*)",
+      "Bash(bunx jest:*)",
+      "Bash(bunx eslint:*)",
+      "Bash(bunx tsc:*)",
+      "Bash(docker compose ps)",
+      "Bash(docker compose logs:*)",
+      "Bash(docker compose up -d)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)"
+    ]
+  }
+}

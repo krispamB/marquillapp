@@ -1,0 +1,23 @@
+
+Name: inContentai
+
+Tagline:
+AI-powered LinkedIn content—researched, written, and ready to post.
+
+Short Description:
+This app helps professionals create high-quality LinkedIn posts by automatically researching any topic across trusted platforms and generating polished, data-driven content. It eliminates hours of manual research and writing.
+
+Long Description:
+This AI-powered tool turns any topic into well-researched, ready-to-publish LinkedIn posts. It gathers insights from top-performing videos, articles, and community discussions, analyzes trending ideas, and uses AI to write clear, engaging posts tailored to the user’s voice. The platform also includes editing tools, post scheduling, and content suggestions to help users stay consistent and grow their online presence effortlessly. It is designed for founders, professionals, creators, and anyone who wants to post smarter—not harder.
+
+Core Features:
+– Automated research (videos, articles, community discussions)
+– Insight extraction and summarization
+– AI-generated LinkedIn posts
+– Post editing and rewriting
+– Scheduling and publishing tools
+– Topic suggestions and content ideas
+– Simple, fast workflow for consistent posting
+
+Target Users:
+Professionals, founders, creators, thought leaders, job seekers, and SMEs who want to share high-quality LinkedIn content without spending hours researching and writing.
