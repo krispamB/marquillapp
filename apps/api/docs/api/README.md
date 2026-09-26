@@ -16,7 +16,7 @@ The API is versioned under `/api/v1`:
 
 ### Authentication
 
-All routes in these documents require the authenticated user. Browser requests should send the Clerk `__session` cookie. During the migration, the server also accepts the legacy `access_token` cookie and a bearer token.
+All routes in these documents require the authenticated user. Browser requests should send the Clerk `__session` cookie; server-side callers may send the same Clerk session token as `Authorization: Bearer <token>`. A missing or invalid token returns `401`. The legacy `access_token` cookie is no longer accepted.
 
 For a frontend hosted on a different origin, send credentials:
 

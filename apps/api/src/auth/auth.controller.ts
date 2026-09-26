@@ -9,10 +9,9 @@ import {
   Param,
   Query,
   HttpStatus,
-  ConflictException,
+  HttpException,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { GetUser } from '../common/decorators';
 import { User } from '../database/schemas';
@@ -23,45 +22,8 @@ import { ConnectLinkedinOrganizationsDto } from './dto/connect-linkedin-organiza
 @Controller('auth')
 export class AuthController {
   private readonly LINKEDIN_CALLBACK_CLOSE_DELAY_SECONDS = 4;
-  private readonly COOKIE_EXP = 30 * 24 * 60 * 60 * 1000;
 
   constructor(private readonly authService: AuthService) {}
-
-  @Get('google')
-  @UseGuards(AuthGuard('google'))
-  async googleAuth(@GetUser() user: User) {}
-
-  @Get('google/callback')
-  @UseGuards(AuthGuard('google'))
-  async googleAuthRedirect(@GetUser() user: User, @Res() res: Response) {
-    const isProd = process.env.NODE_ENV === 'production';
-    const jwt = await this.authService.login(user);
-    res.cookie('access_token', jwt.access_token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: isProd ? 'none' : 'lax',
-      domain: isProd ? '.marquill.com' : undefined,
-      maxAge: this.COOKIE_EXP,
-    });
-    //attach entire user to cookie
-    res.cookie('user', JSON.stringify(user), {
-      httpOnly: false,
-      secure: true,
-      sameSite: isProd ? 'none' : 'lax',
-      domain: isProd ? '.marquill.com' : undefined,
-      maxAge: this.COOKIE_EXP,
-    });
-    return res.redirect(`${process.env.FRONTEND_URL}/auth/callback`);
-  }
-
-  @Post('logout')
-  logout(@Res() res: Response): IAppResponse {
-    res.clearCookie('access_token');
-    return {
-      statusCode: HttpStatus.OK,
-      message: 'Logged out successfully',
-    };
-  }
 
   @UseGuards(ClerkAuthGuard)
   @Post('linkedin')
@@ -76,8 +38,8 @@ export class AuthController {
 
   @Get('linkedin/callback')
   async linkedinAuthRedirect(
-    @Query('code') code: string,
-    @Query('state') state: string,
+    @Query('code') code: string | undefined,
+    @Query('state') state: string | undefined,
     @Res() res: Response,
   ) {
     try {
@@ -89,7 +51,22 @@ export class AuthController {
         variant: 'success',
       });
     } catch (error) {
-      const errorCode = this.extractConflictCode(error);
+      const errorCode = this.extractErrorCode(error);
+      if (
+        errorCode === 'LINKEDIN_OAUTH_STATE_INVALID' ||
+        errorCode === 'LINKEDIN_AUTHORIZATION_INCOMPLETE'
+      ) {
+        const message =
+          errorCode === 'LINKEDIN_OAUTH_STATE_INVALID'
+            ? 'This connection link is invalid or has expired. Start again from Marquill.'
+            : 'LinkedIn authorization was not completed. Start again from Marquill.';
+        return this.sendLinkedinCallbackHtml(res, {
+          statusCode: HttpStatus.BAD_REQUEST,
+          title: 'LinkedIn Connection Error',
+          message,
+          variant: 'error',
+        });
+      }
       if (
         errorCode === 'LINKEDIN_ACCOUNT_ALREADY_CONNECTED' ||
         errorCode === 'LINKEDIN_ACCOUNT_MISMATCH'
@@ -282,8 +259,8 @@ export class AuthController {
 </html>`;
   }
 
-  private extractConflictCode(error: unknown): string | null {
-    if (!(error instanceof ConflictException)) {
+  private extractErrorCode(error: unknown): string | null {
+    if (!(error instanceof HttpException)) {
       return null;
     }
 

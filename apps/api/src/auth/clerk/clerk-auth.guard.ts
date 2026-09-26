@@ -3,24 +3,17 @@ import {
   ExecutionContext,
   Injectable,
   Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { verifyToken, type VerifyTokenOptions } from '@clerk/backend';
 import type { Request } from 'express';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { UserProvisioningService } from './user-provisioning.service';
 
 /**
- * Strangler guard for the Clerk migration.
- *
- * 1. If a Clerk session token is present (the `__session` cookie, or a Bearer
- *    header as a fallback), verify it networklessly and attach the local Mongo
- *    `User` to the request.
- * 2. Otherwise, delegate to the legacy passport-jwt {@link JwtAuthGuard} so
- *    existing `access_token` cookies keep working until they expire.
- *
- * Once legacy JWT traffic drains, drop the fallback and this becomes a plain
- * Clerk-only guard.
+ * Authenticates a request by its Clerk session token (the `__session` cookie,
+ * or a Bearer header as a fallback), verified networklessly, and attaches the
+ * local Mongo `User` to the request. A missing or invalid token is a 401.
  */
 @Injectable()
 export class ClerkAuthGuard implements CanActivate {
@@ -29,7 +22,6 @@ export class ClerkAuthGuard implements CanActivate {
   constructor(
     private readonly configService: ConfigService,
     private readonly userProvisioning: UserProvisioningService,
-    private readonly jwtAuthGuard: JwtAuthGuard,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -37,7 +29,7 @@ export class ClerkAuthGuard implements CanActivate {
     const token = this.extractClerkToken(request);
 
     if (!token) {
-      return this.legacyFallback(context);
+      throw new UnauthorizedException();
     }
 
     let claims: Awaited<ReturnType<typeof verifyToken>>;
@@ -46,17 +38,12 @@ export class ClerkAuthGuard implements CanActivate {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.debug(`Clerk token verification failed: ${message}`);
-      return this.legacyFallback(context);
+      throw new UnauthorizedException();
     }
 
     const user = await this.userProvisioning.findOrCreate(claims.sub);
     (request as Request & { user: unknown }).user = user;
     return true;
-  }
-
-  private async legacyFallback(context: ExecutionContext): Promise<boolean> {
-    const result = await this.jwtAuthGuard.canActivate(context);
-    return result as boolean;
   }
 
   private extractClerkToken(request: Request): string | null {

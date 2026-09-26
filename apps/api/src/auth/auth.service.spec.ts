@@ -5,7 +5,6 @@ import {
   LinkedinAccountType,
 } from '../database/schemas/connected-account.schema';
 import { ApiError, apiFetch } from 'src/common/HelperFn';
-import { EmailQueue } from '../workflow/email.queue';
 
 jest.mock(
   'src/common/HelperFn',
@@ -32,142 +31,78 @@ jest.mock(
 );
 
 import { AuthService } from './auth.service';
+import { User } from '../database/schemas/user.schema';
 
-describe('AuthService.validateGoogleUser', () => {
+const makeRedisService = () => {
+  const client = {
+    set: jest.fn().mockResolvedValue('OK'),
+    getdel: jest.fn().mockResolvedValue(null),
+  };
+  return { client, getClient: jest.fn(() => client) };
+};
+
+describe('AuthService.createLinkedinOath', () => {
   const makeService = () => {
-    const existingByGoogleId = {
-      _id: new Types.ObjectId(),
-      email: 'existing-google@example.com',
+    const redisService = makeRedisService();
+    const configService = {
+      getOrThrow: jest.fn((key: string) =>
+        key === 'LINKEDIN_CLIENT_ID'
+          ? 'client-id'
+          : 'https://api.example.com/api/v1/auth/linkedin/callback',
+      ),
     };
-    const existingByEmail = {
-      _id: new Types.ObjectId(),
-      email: 'existing-email@example.com',
-      googleId: null,
-      avatar: 'old-avatar',
-      save: jest.fn().mockResolvedValue(undefined),
-    };
-    const createdUser = {
-      _id: new Types.ObjectId(),
-      email: 'new-user@example.com',
-      name: 'New User',
-      googleId: 'google-new',
-    };
-
-    const userModel = {
-      findOne: jest.fn(),
-      create: jest.fn(),
-    };
-    const tierModel = {
-      findOne: jest.fn().mockResolvedValue({ _id: new Types.ObjectId() }),
-    };
-    const emailQueue = {
-      addWelcomeEmailJob: jest.fn().mockResolvedValue(undefined),
-    };
-
     const service = new AuthService(
-      userModel as any,
+      {} as any,
+      {} as any,
+      configService as any,
+      {} as any,
+      redisService as any,
       {} as any,
       {} as any,
       {} as any,
-      tierModel as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      emailQueue as EmailQueue,
     );
-
-    return {
-      service,
-      mocks: { userModel, tierModel, emailQueue },
-      fixtures: { existingByGoogleId, existingByEmail, createdUser },
-    };
+    return { service, mocks: { redisService } };
   };
 
-  it('enqueues welcome email once when a new user is created', async () => {
-    const { service, mocks, fixtures } = makeService();
-    mocks.userModel.findOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null);
-    mocks.userModel.create.mockResolvedValue(fixtures.createdUser);
+  it('should store a random single-use state mapped to the user when building the url', async () => {
+    const { service, mocks } = makeService();
+    const userId = new Types.ObjectId();
 
-    const result = await service.validateGoogleUser({
-      email: fixtures.createdUser.email,
-      name: fixtures.createdUser.name,
-      avatar: 'avatar-url',
-      googleId: fixtures.createdUser.googleId,
-    });
+    const url = new URL(
+      await service.createLinkedinOath({ _id: userId } as unknown as User),
+    );
 
-    expect(result).toEqual(fixtures.createdUser);
-    expect(mocks.userModel.create).toHaveBeenCalledTimes(1);
-    expect(mocks.emailQueue.addWelcomeEmailJob).toHaveBeenCalledTimes(1);
-    expect(mocks.emailQueue.addWelcomeEmailJob).toHaveBeenCalledWith(
-      fixtures.createdUser.email,
-      fixtures.createdUser.name,
+    const state = url.searchParams.get('state');
+    expect(state).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(state).not.toContain(userId.toString());
+    expect(url.searchParams.get('client_id')).toBe('client-id');
+    expect(url.searchParams.get('redirect_uri')).toBe(
+      'https://api.example.com/api/v1/auth/linkedin/callback',
+    );
+    expect(mocks.redisService.client.set).toHaveBeenCalledWith(
+      `auth:linkedin:oauth-state:${state}`,
+      userId.toString(),
+      'EX',
+      600,
     );
   });
 
-  it('does not enqueue welcome email for existing googleId user', async () => {
-    const { service, mocks, fixtures } = makeService();
-    mocks.userModel.findOne.mockResolvedValueOnce(fixtures.existingByGoogleId);
+  it('should issue a different state when called twice for the same user', async () => {
+    const { service } = makeService();
+    const user = { _id: new Types.ObjectId() } as unknown as User;
 
-    await service.validateGoogleUser({
-      email: fixtures.existingByGoogleId.email,
-      name: 'Existing User',
-      avatar: 'avatar-url',
-      googleId: 'google-existing',
-    });
+    const first = new URL(await service.createLinkedinOath(user));
+    const second = new URL(await service.createLinkedinOath(user));
 
-    expect(mocks.userModel.create).not.toHaveBeenCalled();
-    expect(mocks.emailQueue.addWelcomeEmailJob).not.toHaveBeenCalled();
-  });
-
-  it('does not enqueue welcome email when linking googleId to existing email user', async () => {
-    const { service, mocks, fixtures } = makeService();
-    mocks.userModel.findOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(fixtures.existingByEmail);
-
-    await service.validateGoogleUser({
-      email: fixtures.existingByEmail.email,
-      name: 'Existing User',
-      avatar: 'new-avatar-url',
-      googleId: 'google-linked',
-    });
-
-    expect(fixtures.existingByEmail.save).toHaveBeenCalledTimes(1);
-    expect(mocks.userModel.create).not.toHaveBeenCalled();
-    expect(mocks.emailQueue.addWelcomeEmailJob).not.toHaveBeenCalled();
-  });
-
-  it('does not throw when welcome email enqueue fails for a new user', async () => {
-    const { service, mocks, fixtures } = makeService();
-    mocks.userModel.findOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null);
-    mocks.userModel.create.mockResolvedValue(fixtures.createdUser);
-    mocks.emailQueue.addWelcomeEmailJob.mockRejectedValueOnce(
-      new Error('queue unavailable'),
+    expect(first.searchParams.get('state')).not.toBe(
+      second.searchParams.get('state'),
     );
-
-    await expect(
-      service.validateGoogleUser({
-        email: fixtures.createdUser.email,
-        name: fixtures.createdUser.name,
-        avatar: 'avatar-url',
-        googleId: fixtures.createdUser.googleId,
-      }),
-    ).resolves.toEqual(fixtures.createdUser);
-
-    expect(mocks.emailQueue.addWelcomeEmailJob).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('AuthService.linkedinCallback', () => {
   const makeService = () => {
-    const userModel = {};
-    const jwtService = {};
+    const redisService = makeRedisService();
     const connectedAccountModel = {
       findOne: jest.fn(),
       findOneAndUpdate: jest.fn(),
@@ -177,7 +112,6 @@ describe('AuthService.linkedinCallback', () => {
       find: jest.fn(),
       updateMany: jest.fn(),
     };
-    const tierModel = {};
     const configService = {};
     const encryptionService = {
       encrypt: jest.fn().mockResolvedValue('encrypted-token'),
@@ -193,27 +127,21 @@ describe('AuthService.linkedinCallback', () => {
         getJob: jest.fn(),
       },
     };
-    const emailQueue = {
-      addWelcomeEmailJob: jest.fn(),
-    };
-
     const service = new AuthService(
-      userModel as any,
-      jwtService as any,
       connectedAccountModel as any,
       postModel as any,
-      tierModel as any,
       configService as any,
       encryptionService as any,
+      redisService as any,
       featureGatingService as any,
       linkedinAvatarRefreshQueue as any,
       scheduleQueue as any,
-      emailQueue as any,
     );
 
     return {
       service,
       mocks: {
+        redisService,
         connectedAccountModel,
         postModel,
         encryptionService,
@@ -227,6 +155,7 @@ describe('AuthService.linkedinCallback', () => {
   it('upserts a new LinkedIn account when no existing connection is found', async () => {
     const { service, mocks } = makeService();
     const userId = new Types.ObjectId().toString();
+    mocks.redisService.client.getdel.mockResolvedValueOnce(userId);
     jest
       .spyOn(service as any, 'getLinkedinAccessToken')
       .mockResolvedValue({ access_token: 'access', expires_in: 3600 });
@@ -242,7 +171,7 @@ describe('AuthService.linkedinCallback', () => {
       .mockResolvedValueOnce(null);
     mocks.connectedAccountModel.findOneAndUpdate.mockResolvedValue({});
 
-    await service.linkedinCallback('code', userId);
+    await service.linkedinCallback('code', 'state-nonce');
 
     expect(mocks.connectedAccountModel.findOneAndUpdate).toHaveBeenCalled();
     const updatePayload =
@@ -256,6 +185,7 @@ describe('AuthService.linkedinCallback', () => {
   it('updates the existing LinkedIn account when the same memberId reconnects', async () => {
     const { service, mocks } = makeService();
     const userId = new Types.ObjectId().toString();
+    mocks.redisService.client.getdel.mockResolvedValueOnce(userId);
     jest
       .spyOn(service as any, 'getLinkedinAccessToken')
       .mockResolvedValue({ access_token: 'access', expires_in: 3600 });
@@ -277,7 +207,7 @@ describe('AuthService.linkedinCallback', () => {
       });
     mocks.connectedAccountModel.findOneAndUpdate.mockResolvedValue({});
 
-    await service.linkedinCallback('code', userId);
+    await service.linkedinCallback('code', 'state-nonce');
 
     expect(mocks.connectedAccountModel.findOne).toHaveBeenCalledWith({
       user: new Types.ObjectId(userId),
@@ -292,6 +222,7 @@ describe('AuthService.linkedinCallback', () => {
   it('throws conflict when reconnecting with a different LinkedIn identity', async () => {
     const { service, mocks } = makeService();
     const userId = new Types.ObjectId().toString();
+    mocks.redisService.client.getdel.mockResolvedValueOnce(userId);
     jest
       .spyOn(service as any, 'getLinkedinAccessToken')
       .mockResolvedValue({ access_token: 'access', expires_in: 3600 });
@@ -311,7 +242,7 @@ describe('AuthService.linkedinCallback', () => {
       });
 
     try {
-      await service.linkedinCallback('code', userId);
+      await service.linkedinCallback('code', 'state-nonce');
       throw new Error('Expected linkedinCallback to throw');
     } catch (error: any) {
       expect(error).toBeInstanceOf(ConflictException);
@@ -328,6 +259,7 @@ describe('AuthService.linkedinCallback', () => {
   it('accepts legacy connected accounts that only have profileMetadata.sub', async () => {
     const { service, mocks } = makeService();
     const userId = new Types.ObjectId().toString();
+    mocks.redisService.client.getdel.mockResolvedValueOnce(userId);
     jest
       .spyOn(service as any, 'getLinkedinAccessToken')
       .mockResolvedValue({ access_token: 'access', expires_in: 3600 });
@@ -349,7 +281,7 @@ describe('AuthService.linkedinCallback', () => {
       });
     mocks.connectedAccountModel.findOneAndUpdate.mockResolvedValue({});
 
-    const result = await service.linkedinCallback('code', userId);
+    const result = await service.linkedinCallback('code', 'state-nonce');
 
     expect(result).toBe(true);
     expect(mocks.connectedAccountModel.findOneAndUpdate).toHaveBeenCalled();
@@ -358,6 +290,7 @@ describe('AuthService.linkedinCallback', () => {
   it('throws conflict when LinkedIn account is already owned by another user', async () => {
     const { service, mocks } = makeService();
     const userId = new Types.ObjectId().toString();
+    mocks.redisService.client.getdel.mockResolvedValueOnce(userId);
     const otherUserId = new Types.ObjectId().toString();
     jest
       .spyOn(service as any, 'getLinkedinAccessToken')
@@ -376,7 +309,7 @@ describe('AuthService.linkedinCallback', () => {
     });
 
     await expect(
-      service.linkedinCallback('code', userId),
+      service.linkedinCallback('code', 'state-nonce'),
     ).rejects.toMatchObject({
       response: {
         code: 'LINKEDIN_ACCOUNT_ALREADY_CONNECTED',
@@ -386,6 +319,49 @@ describe('AuthService.linkedinCallback', () => {
       mocks.featureGatingService.assertConnectedAccountCapacity,
     ).not.toHaveBeenCalled();
     expect(mocks.connectedAccountModel.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('should reject an unknown or expired state without exchanging the code', async () => {
+    const { service, mocks } = makeService();
+    const getAccessToken = jest.spyOn(service as any, 'getLinkedinAccessToken');
+
+    await expect(
+      service.linkedinCallback('code', 'forged-state'),
+    ).rejects.toMatchObject({
+      response: { code: 'LINKEDIN_OAUTH_STATE_INVALID' },
+    });
+    expect(mocks.redisService.client.getdel).toHaveBeenCalledWith(
+      'auth:linkedin:oauth-state:forged-state',
+    );
+    expect(getAccessToken).not.toHaveBeenCalled();
+    expect(mocks.connectedAccountModel.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('should reject a missing state without touching redis', async () => {
+    const { service, mocks } = makeService();
+
+    await expect(
+      service.linkedinCallback('code', undefined),
+    ).rejects.toMatchObject({
+      response: { code: 'LINKEDIN_OAUTH_STATE_INVALID' },
+    });
+    expect(mocks.redisService.client.getdel).not.toHaveBeenCalled();
+  });
+
+  it('should consume the state and reject when LinkedIn returns no code', async () => {
+    const { service, mocks } = makeService();
+    mocks.redisService.client.getdel.mockResolvedValueOnce(
+      new Types.ObjectId().toString(),
+    );
+    const getAccessToken = jest.spyOn(service as any, 'getLinkedinAccessToken');
+
+    await expect(
+      service.linkedinCallback(undefined, 'state-nonce'),
+    ).rejects.toMatchObject({
+      response: { code: 'LINKEDIN_AUTHORIZATION_INCOMPLETE' },
+    });
+    expect(mocks.redisService.client.getdel).toHaveBeenCalledTimes(1);
+    expect(getAccessToken).not.toHaveBeenCalled();
   });
 });
 
@@ -414,8 +390,6 @@ describe('AuthService.disconnectConnectedAccount', () => {
       decrementScheduledPostUsage: jest.fn(),
     };
     const service = new AuthService(
-      {} as any,
-      {} as any,
       connectedAccountModel as any,
       postModel as any,
       {} as any,
@@ -424,7 +398,6 @@ describe('AuthService.disconnectConnectedAccount', () => {
       featureGatingService as any,
       {} as any,
       scheduleQueue as any,
-      {} as any,
     );
 
     return {
@@ -525,15 +498,12 @@ describe('AuthService.getLinkedinOrganizations', () => {
       assertCompanyPagesAccess: jest.fn().mockResolvedValue(undefined),
     };
     const service = new AuthService(
-      {} as any,
-      {} as any,
       connectedAccountModel as any,
       {} as any,
       {} as any,
-      {} as any,
       encryptionService as any,
-      featureGatingService as any,
       {} as any,
+      featureGatingService as any,
       {} as any,
       {} as any,
     );
@@ -627,9 +597,6 @@ describe('AuthService.getLinkedinOrganizations', () => {
 describe('AuthService.getLinkedinUser', () => {
   const createService = () =>
     new AuthService(
-      {} as any,
-      {} as any,
-      {} as any,
       {} as any,
       {} as any,
       {} as any,
@@ -818,8 +785,6 @@ describe('AuthService.getConnectedAccounts', () => {
     };
 
     const service = new AuthService(
-      {} as any,
-      {} as any,
       connectedAccountModel as any,
       {} as any,
       {} as any,
@@ -827,7 +792,6 @@ describe('AuthService.getConnectedAccounts', () => {
       {} as any,
       {} as any,
       linkedinAvatarRefreshQueue as any,
-      {} as any,
       {} as any,
     );
 
@@ -1042,16 +1006,13 @@ describe('AuthService.refreshLinkedinAvatarForAccount', () => {
     };
 
     const service = new AuthService(
-      {} as any,
-      {} as any,
       connectedAccountModel as any,
-      {} as any,
       {} as any,
       {} as any,
       encryptionService as any,
       {} as any,
-      { addAvatarRefreshJob: jest.fn() } as any,
       {} as any,
+      { addAvatarRefreshJob: jest.fn() } as any,
       {} as any,
     );
 

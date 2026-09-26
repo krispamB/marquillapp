@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Types } from 'mongoose';
 
 jest.mock(
@@ -17,14 +17,6 @@ jest.mock('./auth.service', () => ({
 jest.mock('../database/schemas', () => ({
   User: class User {},
 }));
-
-jest.mock(
-  'src/common/guards',
-  () => ({
-    JwtAuthGuard: class JwtAuthGuard {},
-  }),
-  { virtual: true },
-);
 
 import { AuthController } from './auth.controller';
 
@@ -121,6 +113,43 @@ describe('AuthController linkedin callback html responses', () => {
       expect.stringContaining(
         'different LinkedIn account is already connected',
       ),
+    );
+  });
+
+  it('returns 400 html page when the oauth state is invalid or expired', async () => {
+    const { controller, authService } = makeController();
+    const res = buildRes();
+    authService.linkedinCallback.mockRejectedValue(
+      new BadRequestException({
+        message: 'invalid state',
+        code: 'LINKEDIN_OAUTH_STATE_INVALID',
+      }),
+    );
+
+    await controller.linkedinAuthRedirect('code', 'forged', res as any);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.type).toHaveBeenCalledWith('html');
+    expect(res.send).toHaveBeenCalledWith(
+      expect.stringContaining('invalid or has expired'),
+    );
+  });
+
+  it('returns 400 html page when linkedin returns no authorization code', async () => {
+    const { controller, authService } = makeController();
+    const res = buildRes();
+    authService.linkedinCallback.mockRejectedValue(
+      new BadRequestException({
+        message: 'incomplete',
+        code: 'LINKEDIN_AUTHORIZATION_INCOMPLETE',
+      }),
+    );
+
+    await controller.linkedinAuthRedirect(undefined, 'state', res as any);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.send).toHaveBeenCalledWith(
+      expect.stringContaining('authorization was not completed'),
     );
   });
 
