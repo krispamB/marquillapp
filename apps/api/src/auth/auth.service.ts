@@ -625,7 +625,7 @@ export class AuthService {
       .find({
         user: userObjectId,
         connectedAccount: { $in: accountIds },
-        status: 'SCHEDULED',
+        status: PostStatus.SCHEDULED,
       })
       .select('_id');
 
