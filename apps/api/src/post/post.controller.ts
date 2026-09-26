@@ -30,8 +30,9 @@ import { IAppResponse } from 'src/common/interfaces';
 import { GetUser } from 'src/common/decorators';
 import { User } from 'src/database/schemas';
 import type { GetPostsResult } from './post.service';
+import { UserThrottlerGuard } from '../common/guards/user-throttler.guard';
 
-@UseGuards(ClerkAuthGuard)
+@UseGuards(ClerkAuthGuard, UserThrottlerGuard)
 @Controller('posts')
 export class PostController {
   constructor(private readonly postService: PostService) {}

@@ -26,6 +26,7 @@ describe('AuthController linkedin callback html responses', () => {
       status: jest.fn(),
       type: jest.fn(),
       send: jest.fn(),
+      setHeader: jest.fn(),
     };
     res.status.mockReturnValue(res);
     res.type.mockReturnValue(res);
@@ -68,6 +69,18 @@ describe('AuthController linkedin callback html responses', () => {
     );
     expect(res.send).toHaveBeenCalledWith(
       expect.stringContaining('shouldAutoClose'),
+    );
+    const [, csp] = res.setHeader.mock.calls[0] as [string, string];
+    const nonce = /'nonce-([^']+)'/.exec(csp)?.[1];
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'Content-Security-Policy',
+      expect.stringContaining("default-src 'none'"),
+    );
+    expect(res.send).toHaveBeenCalledWith(
+      expect.stringContaining(`<script nonce="${nonce}">`),
+    );
+    expect(res.send).toHaveBeenCalledWith(
+      expect.not.stringContaining('onclick='),
     );
     expect(res.send).toHaveBeenCalledWith(
       expect.not.stringContaining(

@@ -12,12 +12,15 @@ import {
   HttpException,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { randomBytes } from 'crypto';
 import { AuthService } from './auth.service';
 import { GetUser } from '../common/decorators';
 import { User } from '../database/schemas';
 import { ClerkAuthGuard } from './clerk';
 import type { IAppResponse } from 'src/common/interfaces';
 import { ConnectLinkedinOrganizationsDto } from './dto/connect-linkedin-organizations.dto';
+import { UserThrottlerGuard } from '../common/guards/user-throttler.guard';
+import { Throttle, minutes } from '@nestjs/throttler';
 
 @Controller('auth')
 export class AuthController {
@@ -25,7 +28,9 @@ export class AuthController {
 
   constructor(private readonly authService: AuthService) {}
 
-  @UseGuards(ClerkAuthGuard)
+  // Each call writes an OAuth state nonce to Redis.
+  @Throttle({ default: { limit: 10, ttl: minutes(1) } })
+  @UseGuards(ClerkAuthGuard, UserThrottlerGuard)
   @Post('linkedin')
   async linkedinAuth(@GetUser() user: User): Promise<IAppResponse> {
     const url = await this.authService.createLinkedinOath(user);
@@ -87,7 +92,7 @@ export class AuthController {
     }
   }
 
-  @UseGuards(ClerkAuthGuard)
+  @UseGuards(ClerkAuthGuard, UserThrottlerGuard)
   @Get('linkedin/orgs')
   async getLinkedinOrganizations(@GetUser() user: User): Promise<IAppResponse> {
     return {
@@ -99,7 +104,7 @@ export class AuthController {
     };
   }
 
-  @UseGuards(ClerkAuthGuard)
+  @UseGuards(ClerkAuthGuard, UserThrottlerGuard)
   @Post('linkedin/orgs')
   async connectLinkedinOrganizations(
     @GetUser() user: User,
@@ -115,7 +120,7 @@ export class AuthController {
     };
   }
 
-  @UseGuards(ClerkAuthGuard)
+  @UseGuards(ClerkAuthGuard, UserThrottlerGuard)
   @Get('connected-accounts')
   async getConnectedAccounts(@GetUser() user: User): Promise<IAppResponse> {
     const accounts = await this.authService.getConnectedAccounts(
@@ -128,7 +133,7 @@ export class AuthController {
     };
   }
 
-  @UseGuards(ClerkAuthGuard)
+  @UseGuards(ClerkAuthGuard, UserThrottlerGuard)
   @Delete('connected-accounts/:connectedAccountId')
   async disconnectConnectedAccount(
     @GetUser() user: User,
@@ -153,16 +158,22 @@ export class AuthController {
       variant: 'success' | 'error';
     },
   ) {
+    const nonce = randomBytes(16).toString('base64');
+    res.setHeader(
+      'Content-Security-Policy',
+      `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+    );
     return res
       .status(params.statusCode)
       .type('html')
-      .send(this.renderLinkedinCallbackHtml(params));
+      .send(this.renderLinkedinCallbackHtml({ ...params, nonce }));
   }
 
   private renderLinkedinCallbackHtml(params: {
     title: string;
     message: string;
     variant: 'success' | 'error';
+    nonce: string;
   }) {
     const accentColor = params.variant === 'success' ? '#0f766e' : '#b91c1c';
     const borderColor = params.variant === 'success' ? '#99f6e4' : '#fecaca';
@@ -218,10 +229,13 @@ export class AuthController {
     <h1>${params.title}</h1>
     <p>${params.message}</p>
     <small id="close-status">Closing in ${this.LINKEDIN_CALLBACK_CLOSE_DELAY_SECONDS}s...</small>
-    <button type="button" onclick="window.close()">Close window</button>
+    <button type="button" id="close-window">Close window</button>
   </main>
-  <script>
+  <script nonce="${params.nonce}">
     (function () {
+      document.getElementById('close-window').addEventListener('click', function () {
+        window.close();
+      });
       var statusEl = document.getElementById('close-status');
       var delaySeconds = ${this.LINKEDIN_CALLBACK_CLOSE_DELAY_SECONDS};
       var hasPopupOpener = !!window.opener && !window.opener.closed;

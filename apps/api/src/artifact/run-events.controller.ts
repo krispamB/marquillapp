@@ -6,8 +6,9 @@ import { ClerkAuthGuard } from '../auth/clerk/clerk-auth.guard';
 import { GetUser } from '../common/decorators';
 import { User } from '../database/schemas';
 import { RunEventStreamService } from './run-event-stream.service';
+import { UserThrottlerGuard } from '../common/guards/user-throttler.guard';
 
-@UseGuards(ClerkAuthGuard)
+@UseGuards(ClerkAuthGuard, UserThrottlerGuard)
 @Controller('runs')
 export class RunEventsController {
   constructor(private readonly stream: RunEventStreamService) {}

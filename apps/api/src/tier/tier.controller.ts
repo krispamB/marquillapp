@@ -4,6 +4,7 @@ import { IAppResponse } from '../common/interfaces';
 import { ClerkAuthGuard } from '../auth/clerk';
 import { GetUser } from '../common/decorators';
 import { User } from '../database/schemas';
+import { UserThrottlerGuard } from '../common/guards/user-throttler.guard';
 
 @Controller('tiers')
 export class TierController {
@@ -18,7 +19,7 @@ export class TierController {
     };
   }
 
-  @UseGuards(ClerkAuthGuard)
+  @UseGuards(ClerkAuthGuard, UserThrottlerGuard)
   @Get('me')
   async getMyTier(@GetUser() user: User): Promise<IAppResponse> {
     return {
