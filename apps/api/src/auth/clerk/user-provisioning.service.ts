@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   InternalServerErrorException,
@@ -39,15 +40,13 @@ export class UserProvisioningService {
     }
 
     const clerkUser = await this.clerkClient.users.getUser(clerkUserId);
-    const email = this.resolvePrimaryEmail(clerkUser);
+    const email = this.resolveVerifiedEmail(clerkUser);
     const name = this.resolveName(clerkUser);
     const avatar = clerkUser.imageUrl ?? undefined;
 
-    if (email) {
-      const emailOwner = await this.userModel.findOne({ email });
-      if (emailOwner) {
-        return this.linkEmailOwner(emailOwner, clerkUserId, avatar);
-      }
+    const emailOwner = await this.userModel.findOne({ email });
+    if (emailOwner) {
+      return this.linkEmailOwner(emailOwner, clerkUserId, avatar);
     }
 
     const defaultTier = await this.tierModel.findOne({ isDefault: true });
@@ -85,7 +84,7 @@ export class UserProvisioningService {
       );
     }
 
-    if (email && result.lastErrorObject?.upserted) {
+    if (result.lastErrorObject?.upserted) {
       try {
         await this.emailQueue.addWelcomeEmailJob(email, name);
       } catch (error) {
@@ -151,11 +150,9 @@ export class UserProvisioningService {
       return clerkWinner;
     }
 
-    if (email) {
-      const emailWinner = await this.userModel.findOne({ email });
-      if (emailWinner) {
-        return this.linkEmailOwner(emailWinner, clerkUserId, avatar);
-      }
+    const emailWinner = await this.userModel.findOne({ email });
+    if (emailWinner) {
+      return this.linkEmailOwner(emailWinner, clerkUserId, avatar);
     }
 
     throw new InternalServerErrorException(
@@ -179,13 +176,27 @@ export class UserProvisioningService {
     });
   }
 
-  private resolvePrimaryEmail(clerkUser: ClerkUser): string {
-    const primary = clerkUser.emailAddresses.find(
-      (entry) => entry.id === clerkUser.primaryEmailAddressId,
+  /**
+   * The email a Clerk identity may claim: its primary address if verified,
+   * otherwise any other verified address. An existing Marquill user is linked
+   * by email, so an unverified address would let anyone who types in a
+   * victim's email take over the victim's account.
+   */
+  private resolveVerifiedEmail(clerkUser: ClerkUser): string {
+    const verified = clerkUser.emailAddresses.filter(
+      (entry) => entry.verification?.status === 'verified',
     );
-    return (
-      primary?.emailAddress ?? clerkUser.emailAddresses[0]?.emailAddress ?? ''
-    );
+    const email = (
+      verified.find((entry) => entry.id === clerkUser.primaryEmailAddressId) ??
+      verified[0]
+    )?.emailAddress;
+    if (!email) {
+      throw new ForbiddenException({
+        message: 'Verify your email address to continue.',
+        code: 'CLERK_EMAIL_UNVERIFIED',
+      });
+    }
+    return email;
   }
 
   private resolveName(clerkUser: ClerkUser): string {
