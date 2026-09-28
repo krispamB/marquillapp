@@ -35,8 +35,16 @@ export type UserProfile = {
 };
 
 export type SubscriptionTier = {
+  id?: string;
   name: string;
   isDefault?: boolean;
+};
+
+export type BillingSummaryResponse = {
+  tier: SubscriptionTier | null;
+  billingInterval: string | null;
+  nextRenewalDate: string | null;
+  subscriptionStatus: string;
 };
 
 export type UserApiResponse = UserProfile & {

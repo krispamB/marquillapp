@@ -19,7 +19,7 @@ export async function getWorkspaceProps(options: { includeDashboard?: boolean } 
   const [onboarding, apiUser, subscription, connectedAccounts, initialDashboardData] = await Promise.all([
     getOnboardingState(serverAuth),
     getCachedUser(serverAuth, cacheKey),
-    getCachedSubscription(serverAuth, cacheKey),
+    getCachedSubscription(serverAuth, cacheKey, userId),
     getConnectedAccounts(serverAuth),
     options.includeDashboard ? getDashboardInitialData(serverAuth) : Promise.resolve(undefined),
   ]);

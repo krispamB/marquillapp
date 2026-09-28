@@ -1,10 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check, CreditCard, ExternalLink, Plus } from "lucide-react";
 import RedesignShell from "./Shell";
 import { API_BASE, jsonRequest, readApi } from "./api";
-import type { ConnectedAccount, PaymentUsageResponse, SubscriptionTier, Tier, UserProfile } from "../lib/types";
+import {
+  CHECKOUT_POLL_INTERVAL_MS,
+  CHECKOUT_POLL_TIMEOUT_MS,
+  PENDING_CHECKOUT_TIER_KEY,
+  isCheckoutConfirmed,
+} from "./checkoutConfirmation";
+import { revalidateSubscriptionCache } from "../lib/actions";
+import type { BillingSummaryResponse, ConnectedAccount, PaymentUsageResponse, SubscriptionTier, Tier, UserProfile } from "../lib/types";
 
 type Invoice = { id?: string; date?: string; plan?: string; amount?: string | number; status?: string; customer?: string };
 type CheckoutResponse = { transactionId?: string };
@@ -23,12 +31,15 @@ export default function BillingRedesignClient({
   connectedAccounts,
   primaryAccountId,
   subscription,
+  checkoutCompleted = false,
 }: {
   user: UserProfile;
   connectedAccounts: ConnectedAccount[];
   primaryAccountId?: string;
   subscription?: SubscriptionTier | null;
+  checkoutCompleted?: boolean;
 }) {
+  const router = useRouter();
   const [selectedAccountId, setSelectedAccountId] = useState(primaryAccountId ?? connectedAccounts[0]?.id);
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -36,8 +47,11 @@ export default function BillingRedesignClient({
   const [isLoading, setIsLoading] = useState(true);
   const [checkoutTierId, setCheckoutTierId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [checkoutConfirmation, setCheckoutConfirmation] = useState<"idle" | "confirming" | "timed-out">(
+    checkoutCompleted ? "confirming" : "idle",
+  );
 
-  useEffect(() => {
+  const loadBillingData = useCallback(() => (
     Promise.all([
       readApi<unknown>(`${API_BASE}/tiers/active`),
       readApi<unknown>(`${API_BASE}/payment/invoices`).catch(() => null),
@@ -49,10 +63,51 @@ export default function BillingRedesignClient({
         setUsage(usageResponse?.data ?? null);
       })
       .catch((reason) => setError(reason instanceof Error ? reason.message : "Unable to load billing data."))
-      .finally(() => setIsLoading(false));
-  }, []);
+      .finally(() => setIsLoading(false))
+  ), []);
 
-  const planName = subscription?.name ?? usage?.tier?.name ?? user.tier?.name ?? "Free";
+  useEffect(() => {
+    void loadBillingData();
+  }, [loadBillingData]);
+
+  // Paddle redirects here as soon as checkout completes, but the subscription
+  // is only recorded when its webhook reaches the backend. Poll until the
+  // purchased plan shows up, then bust the server-side plan cache and re-render
+  // so the plan card and the shell both show it.
+  useEffect(() => {
+    if (!checkoutCompleted) return;
+    let cancelled = false;
+    const pendingTierId = window.sessionStorage.getItem(PENDING_CHECKOUT_TIER_KEY);
+    const deadline = Date.now() + CHECKOUT_POLL_TIMEOUT_MS;
+
+    const poll = async () => {
+      while (!cancelled && Date.now() < deadline) {
+        const summary = await readApi<BillingSummaryResponse>(`${API_BASE}/payment/subscription`).catch(() => null);
+        if (cancelled) return;
+        if (isCheckoutConfirmed(summary, pendingTierId)) {
+          window.sessionStorage.removeItem(PENDING_CHECKOUT_TIER_KEY);
+          await revalidateSubscriptionCache();
+          if (cancelled) return;
+          await loadBillingData();
+          setCheckoutConfirmation("idle");
+          router.replace("/billing", { scroll: false });
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, CHECKOUT_POLL_INTERVAL_MS));
+      }
+      // Keep `?checkout=success` so a manual refresh resumes confirmation.
+      if (!cancelled) setCheckoutConfirmation("timed-out");
+    };
+
+    void poll();
+    return () => {
+      cancelled = true;
+    };
+  }, [checkoutCompleted, loadBillingData, router]);
+
+  // Prefer the uncached usage response; the server-provided plan can lag a
+  // plan change by up to the cache lifetime.
+  const planName = usage?.tier?.name ?? subscription?.name ?? user.tier?.name ?? "Free";
   const activeTier = useMemo(() => tiers.find((tier) => tier.name.toLowerCase() === planName.toLowerCase()), [planName, tiers]);
   const creditUsage = usage?.usage?.credits;
   const creditLimit = creditUsage?.limit ?? 0;
@@ -85,6 +140,7 @@ export default function BillingRedesignClient({
         throw new Error("The payment service did not return a transaction ID.");
       }
 
+      window.sessionStorage.setItem(PENDING_CHECKOUT_TIER_KEY, tier._id);
       const landingUrl = process.env.NEXT_PUBLIC_LANDING ?? "http://localhost:3001";
       const checkoutUrl = new URL("/checkout", landingUrl);
       checkoutUrl.searchParams.set("transactionId", response.transactionId);
@@ -100,6 +156,8 @@ export default function BillingRedesignClient({
       <div className="mq-page-heading mq-page-heading-compact"><div><span className="mq-eyebrow">Plan, usage &amp; payment history</span><h1>Billing</h1><p>Keep your plan and publishing capacity in view.</p></div></div>
       {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}
       {isLoading ? <div className="mq-alert">Loading billing data…</div> : null}
+      {checkoutConfirmation === "confirming" ? <div className="mq-alert">Payment received. Confirming your new plan…</div> : null}
+      {checkoutConfirmation === "timed-out" ? <div className="mq-alert">Payment received. Your new plan is taking longer than usual to activate; refresh this page in a minute.</div> : null}
 
       <section className="mq-billing-top">
         <div className="mq-plan-card"><div className="mq-plan-card-header"><span className="mq-mono">_ current plan</span><span className="mq-active-badge">Active</span></div><div className="mq-plan-name">{planName}<span>{activeTier?.monthlyPrice ? `$${activeTier.monthlyPrice} / mo` : ""}</span></div><p>{activeTier?.metadata?.description ?? "Your current Marquill plan and publishing limits."}</p><div className="mq-plan-actions"><a href="#change-plan" className="mq-light-button">Change plan</a><button type="button" className="mq-dark-outline-button" disabled title="Payment-management endpoint is not connected"><CreditCard size={14} /> Manage payment</button></div></div>

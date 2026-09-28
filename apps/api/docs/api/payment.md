@@ -42,6 +42,30 @@ The server stores the authenticated user's ID and name as transaction custom
 data so webhook processing can safely associate the resulting subscription with
 the user.
 
+## Get billing summary
+
+`GET /api/v1/payment/subscription`
+
+Returns the caller's current plan. Paid plans come from the subscription that
+Paddle webhooks record; without an active paid subscription the default tier is
+returned.
+
+Response:
+
+```json
+{
+  "tier": { "id": "6651f2c21f2db72ae60ac456", "name": "Pro", "isDefault": false },
+  "billingInterval": "monthly",
+  "nextRenewalDate": "2026-08-01T00:00:00.000Z",
+  "subscriptionStatus": "active"
+}
+```
+
+The subscription is written by the webhook, not by checkout, so it can appear a
+few seconds after Paddle reports `checkout.completed`. After checkout, landing
+redirects to `/billing?checkout=success`, and the web app polls this endpoint
+until the purchased tier appears.
+
 ## Get dashboard usage
 
 `GET /api/v1/payment/usage`
