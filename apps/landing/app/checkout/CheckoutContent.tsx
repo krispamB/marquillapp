@@ -39,7 +39,11 @@ export default function CheckoutContent() {
             setStatus('error');
             return;
           }
-          window.location.href = new URL('/billing', appUrl).toString();
+          // `checkout=success` tells the billing page to wait for the webhook
+          // to record the new plan and then refresh its cached plan.
+          const billingUrl = new URL('/billing', appUrl);
+          billingUrl.searchParams.set('checkout', 'success');
+          window.location.href = billingUrl.toString();
         }
       },
     })

@@ -14,6 +14,7 @@ import type {
   PaymentUsageResponse,
   PostComparisonResponse,
   PostDetailResponse,
+  SubscriptionTier,
   UserApiResponse,
 } from "./types";
 import type { ArtifactDetailResponse } from "../redesign/artifactTypes";
@@ -165,7 +166,16 @@ export function getCachedUser(serverAuth: ServerAuth, cacheKey: string) {
   return readUser().catch(() => null);
 }
 
-export function getCachedSubscription(serverAuth: ServerAuth, cacheKey: string) {
+/** Per-user tag, so a completed checkout busts only that user's plan cache. */
+export function subscriptionCacheTag(userId: string) {
+  return `subscription:${userId}`;
+}
+
+export function getCachedSubscription(
+  serverAuth: ServerAuth,
+  cacheKey: string,
+  userId: string,
+) {
   return unstable_cache(
     async () => {
       try {
@@ -174,16 +184,16 @@ export function getCachedSubscription(serverAuth: ServerAuth, cacheKey: string) 
         });
         if (!res.ok) return null;
         const body = await res.json();
-        return (body?.tier ?? null) as {
-          name: string;
-          isDefault: boolean;
-        } | null;
+        return (body?.tier ?? null) as SubscriptionTier | null;
       } catch {
         return null;
       }
     },
     ["subscription", cacheKey],
-    { revalidate: 300 }
+    // Tagged so a completed checkout can bust this cache (see
+    // revalidateSubscriptionCache); otherwise the new plan stays hidden for up
+    // to five minutes, or until the next sign-in changes the cache key.
+    { revalidate: 300, tags: [subscriptionCacheTag(userId)] }
   )();
 }
 
