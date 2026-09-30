@@ -1,0 +1,129 @@
+# Design System Definition, contract v1. Default system, chosen on issue #140.
+# Successor to the `gradient` template. Dusk-coloured light pooling on a
+# near-black page, rather than a flat diagonal wash.
+
+contract: 1
+
+id: afterglow
+version: 1
+name: Afterglow
+summary: Night-mode tech. Violet-to-tangerine light pooling on near-black, soft glass panels, rounded geometric type.
+intent: >
+  The page is dark and the light comes from within it: soft pools of violet,
+  rose and tangerine glow from the corners and behind the key element, as if
+  the content were lit by a screen at dusk. Text sits on the dark or on a
+  frosted glass panel, never directly on the brightest part of the glow. It
+  should feel modern, product-y and optimistic without shouting.
+
+page:
+  width: 1080
+  height: 1350
+  safeArea: { top: 88, right: 88, bottom: 88, left: 88 }
+  pages: { min: 3, max: 12 }
+  background: night
+
+palette:
+  tokens:
+    - { name: night, hex: '#0d0b1f', role: background }
+    - { name: moon, hex: '#f7f3ff', role: text }
+    - { name: haze, hex: '#b9b0d6', role: text }
+    - { name: violet, hex: '#7c3aed', role: accent }
+    - { name: rose, hex: '#f43f86', role: accent }
+    - { name: tangerine, hex: '#ff8a4c', role: accent }
+  pairings:
+    - { text: moon, on: night }
+    - { text: haze, on: night }
+    - { text: tangerine, on: night }
+    - { text: moon, on: violet }
+    - { text: night, on: tangerine }
+  rules:
+    externalColors: forbid
+    references: token-var-only
+    minContrastRatio: 4.5
+
+typography:
+  fonts:
+    - name: display
+      family: Sora
+      source: google
+      weights: [600, 700]
+      styles: [normal]
+      fallback: "'Helvetica Neue', Arial, sans-serif"
+    - name: text
+      family: Manrope
+      source: google
+      weights: [400, 600]
+      styles: [normal]
+      fallback: -apple-system, 'Segoe UI', sans-serif
+  scale:
+    - { name: stat, px: 200, lineHeight: 0.95, tracking: '-0.05em', font: display, weight: 700, use: 'A single number filled with the glow gradient. Stat pages only.' }
+    - { name: display, px: 104, lineHeight: 1, tracking: '-0.04em', font: display, weight: 700, use: 'The cover headline. The last word may take the gradient fill.' }
+    - { name: heading, px: 64, lineHeight: 1.08, tracking: '-0.03em', font: display, weight: 600, use: 'A body-page heading.' }
+    - { name: lead, px: 36, lineHeight: 1.35, tracking: '-0.01em', font: text, weight: 400, use: 'Standfirst, in haze.' }
+    - { name: body, px: 28, lineHeight: 1.5, tracking: '0', font: text, weight: 400, use: 'Running copy and panel text.' }
+    - { name: label, px: 22, lineHeight: 1.2, tracking: '0.12em', font: display, weight: 600, use: 'Pills and eyebrows. Uppercase.' }
+  rules:
+    sizes: scale-only
+    minPx: 22
+    maxLineLengthCh: 44
+    transforms: [none, uppercase]
+
+spacing:
+  base: 8
+  scale: [8, 16, 24, 32, 40, 48, 64, 88, 128]
+  rules:
+    values: scale-only
+    appliesTo: [margin, padding, gap]
+
+icons:
+  catalog: app-inline-v1
+  allowed: [spark, check, arrow-right, circle-dot]
+  sizes: [24, 32, 48]
+  colors: [moon, tangerine]
+  rules:
+    maxPerPage: 3
+    role: decorative
+
+composition:
+  pageRoles:
+    - name: cover
+      position: first
+      required: true
+      guidance: >
+        A glass pill eyebrow with a spark icon, the display headline with its
+        last word in the gradient fill, and a haze lead. Two glow pools: a large
+        violet one behind the top-right corner and a tangerine one rising from
+        the bottom-left.
+    - name: insight
+      guidance: >
+        A heading on the dark, then a single frosted glass panel with a radius
+        of 40px holding one or two body paragraphs. One glow pool sits behind
+        the panel so its edge catches the light.
+    - name: stat
+      guidance: >
+        One number at stat size in the gradient fill, a heading that explains
+        it, and a body line. Glow sits directly behind the number.
+    - name: steps
+      guidance: >
+        A heading, then up to four stacked glass rows, each with a check or
+        circle-dot icon and one line of body text.
+    - name: closing
+      position: last
+      required: true
+      guidance: >
+        The whole page washed in the violet-to-rose-to-tangerine gradient from
+        the top-left, with a label on the violet corner. The ask sits in a night
+        card with a 40px radius at the foot: moon heading, then a tangerine pill
+        button with night text and an arrow-right icon.
+  principles:
+    - Light comes from glow pools behind content, never from flat fills or outlines.
+    - Gradient fills are reserved for one word, one number, or the closing page.
+    - Round everything that is a container; nothing that is text.
+    - Keep text on the dark or on glass; if it must sit on colour, it sits on violet.
+  antiPatterns:
+    - avoid: A flat diagonal gradient behind every page.
+      instead: Dark pages with glow pools; save the full wash for the closing page.
+    - avoid: Neon outlines and hard drop shadows.
+      instead: Soft blur and low-opacity glass.
+    - avoid: Moon text directly on tangerine or rose.
+      instead: Night text on tangerine, or move the text to glass.

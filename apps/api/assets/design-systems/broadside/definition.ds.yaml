@@ -1,0 +1,126 @@
+# Design System Definition, contract v1. Default system, chosen on issue #140.
+# Successor to the `bold` template. Swiss protest-poster: condensed caps,
+# a cobalt slab, signal-red rules, newsprint.
+
+contract: 1
+
+id: broadside
+version: 1
+name: Broadside
+summary: Swiss poster. Condensed capitals, a cobalt slab, red rules on newsprint. Loud and structured.
+intent: >
+  Every page is a poster pasted to a wall: the headline is set as large as the
+  column allows, in stacked condensed capitals, and a single cobalt slab or
+  numeral gives the page its weight. Structure is visible on purpose. Red
+  rules bracket the headline, the grid shows through, and nothing floats.
+  Loudness comes from scale and contrast, never from decoration.
+
+page:
+  width: 1080
+  height: 1350
+  safeArea: { top: 80, right: 80, bottom: 80, left: 80 }
+  pages: { min: 3, max: 12 }
+  background: newsprint
+
+palette:
+  tokens:
+    - { name: newsprint, hex: '#f2ede3', role: background }
+    - { name: ink, hex: '#111111', role: text }
+    - { name: olive, hex: '#3f5a36', role: text }
+    - { name: cobalt, hex: '#1238d6', role: accent }
+    - { name: signal, hex: '#c8281a', role: accent }
+  pairings:
+    - { text: ink, on: newsprint }
+    - { text: olive, on: newsprint }
+    - { text: cobalt, on: newsprint }
+    - { text: signal, on: newsprint }
+    - { text: newsprint, on: cobalt }
+    - { text: newsprint, on: ink }
+  rules:
+    externalColors: forbid
+    references: token-var-only
+    minContrastRatio: 4.5
+
+typography:
+  fonts:
+    - name: poster
+      family: Anton
+      source: google
+      weights: [400]
+      styles: [normal]
+      fallback: Impact, 'Arial Narrow', sans-serif
+    - name: text
+      family: Archivo
+      source: google
+      weights: [400, 600, 800]
+      styles: [normal]
+      fallback: "'Helvetica Neue', Arial, sans-serif"
+  scale:
+    - { name: numeral, px: 400, lineHeight: 0.82, tracking: '-0.02em', font: poster, weight: 400, use: 'A single cobalt numeral that indexes a rule. One per page, never on the closing page.' }
+    - { name: display, px: 176, lineHeight: 0.88, tracking: '-0.01em', font: poster, weight: 400, use: 'The stacked cover headline, one to three words per line.' }
+    - { name: headline, px: 104, lineHeight: 0.92, tracking: '0', font: poster, weight: 400, use: 'The claim a body page makes. Uppercase, at most four lines.' }
+    - { name: deck, px: 64, lineHeight: 1, tracking: '0', font: poster, weight: 400, use: 'A secondary condensed line under a display headline.' }
+    - { name: lead, px: 36, lineHeight: 1.25, tracking: '-0.01em', font: text, weight: 600, use: 'Standfirst beneath the headline block.' }
+    - { name: body, px: 30, lineHeight: 1.4, tracking: '0', font: text, weight: 400, use: 'Running copy. Two short paragraphs at most.' }
+    - { name: label, px: 22, lineHeight: 1.1, tracking: '0.06em', font: text, weight: 800, use: 'Tags, tabs, page index. Always uppercase.' }
+  rules:
+    sizes: scale-only
+    minPx: 22
+    maxLineLengthCh: 40
+    transforms: [none, uppercase]
+
+spacing:
+  base: 8
+  scale: [8, 16, 24, 32, 48, 64, 80, 96, 128, 160]
+  rules:
+    values: scale-only
+    appliesTo: [margin, padding, gap]
+
+icons:
+  catalog: app-inline-v1
+  allowed: [arrow-right, check, minus]
+  sizes: [32, 48, 64]
+  colors: [ink, cobalt, signal]
+  rules:
+    maxPerPage: 2
+    role: decorative
+
+composition:
+  pageRoles:
+    - name: cover
+      position: first
+      required: true
+      guidance: >
+        A signal rule across the top of the safe area, then the display headline
+        stacked in capitals, then a second signal rule, then a deck line and one
+        olive lead line. A cobalt slab fills the left column beside the
+        headline; the slab may carry thin newsprint crop marks but never text.
+    - name: rule
+      guidance: >
+        A cobalt numeral on the left, the headline set flush against it on the
+        right, and a body paragraph beneath a full-width ink hairline. The
+        numeral and the headline share a top edge.
+    - name: compare
+      guidance: >
+        Two framed panels side by side, labelled with a small ink tab and a
+        cobalt tab (for example BEFORE and AFTER, or MYTH and FACT). An
+        arrow-right icon may sit between them. Each panel holds a headline-sized
+        word or two and one body line.
+    - name: closing
+      position: last
+      required: true
+      guidance: >
+        A full cobalt page. The ask in newsprint capitals at headline size, one
+        label line beneath, and a signal rule at the foot. No numeral.
+  principles:
+    - Set the headline as large as the column allows; if it fits comfortably it is too small.
+    - Keep type flush left on a hard vertical edge; nothing is centred.
+    - Use signal red only for rules and tabs, never for a block of text.
+    - One cobalt mass per page, a slab or a numeral, never both.
+  antiPatterns:
+    - avoid: Rounded corners, drop shadows, or gradients.
+      instead: Square edges and flat ink; this is a printed poster.
+    - avoid: Lower-case headlines.
+      instead: Condensed capitals for every headline and deck.
+    - avoid: Long paragraphs under a huge headline.
+      instead: One body paragraph of two sentences; cut the rest.

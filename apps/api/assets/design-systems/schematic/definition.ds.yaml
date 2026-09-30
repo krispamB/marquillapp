@@ -1,0 +1,128 @@
+# Design System Definition, contract v1. Default system, chosen on issue #140.
+# New (no template predecessor). An engineering drawing: blueprint ground,
+# drafting grid, dimension lines, numbered callouts and a title block.
+
+contract: 1
+
+id: schematic
+version: 1
+name: Schematic
+summary: Engineering blueprint. Drafting grid on deep blue, mono annotations, numbered callouts, a title block in the corner.
+intent: >
+  Every page is a sheet from a technical drawing set. A faint drafting grid
+  covers the blue ground, ideas are drawn as labelled boxes joined by lines,
+  and every element carries an annotation: a figure number, a callout circle,
+  a dimension line. A title block in the bottom-right corner frames each sheet.
+  It should feel precise, systematic and credible, the house style for
+  frameworks, processes and how-tos.
+
+page:
+  width: 1080
+  height: 1350
+  safeArea: { top: 72, right: 72, bottom: 72, left: 72 }
+  pages: { min: 3, max: 15 }
+  background: blueprint
+
+palette:
+  tokens:
+    - { name: blueprint, hex: '#123f7a', role: background }
+    - { name: chalk, hex: '#eef4ff', role: text }
+    - { name: pale, hex: '#a9c4ea', role: text }
+    - { name: grid, hex: '#2c5a96', role: border }
+    - { name: amber, hex: '#ffc857', role: accent }
+  pairings:
+    - { text: chalk, on: blueprint }
+    - { text: pale, on: blueprint }
+    - { text: amber, on: blueprint }
+    - { text: blueprint, on: amber }
+    - { text: blueprint, on: chalk }
+  rules:
+    externalColors: forbid
+    references: token-var-only
+    minContrastRatio: 4.5
+
+typography:
+  fonts:
+    - name: display
+      family: Space Grotesk
+      source: google
+      weights: [500, 700]
+      styles: [normal]
+      fallback: "'Helvetica Neue', Arial, sans-serif"
+    - name: mono
+      family: JetBrains Mono
+      source: google
+      weights: [400, 600]
+      styles: [normal]
+      fallback: Menlo, Consolas, monospace
+  scale:
+    - { name: display, px: 112, lineHeight: 0.98, tracking: '-0.03em', font: display, weight: 700, use: 'The sheet title on the cover.' }
+    - { name: heading, px: 60, lineHeight: 1.08, tracking: '-0.02em', font: display, weight: 500, use: 'A body-sheet heading.' }
+    - { name: node, px: 36, lineHeight: 1.2, tracking: '-0.01em', font: display, weight: 500, use: 'Text inside a diagram box.' }
+    - { name: body, px: 26, lineHeight: 1.5, tracking: '0', font: mono, weight: 400, use: 'Notes and spec values.' }
+    - { name: label, px: 22, lineHeight: 1.2, tracking: '0.1em', font: mono, weight: 600, use: 'Figure numbers, callouts, title-block fields. Uppercase.' }
+  rules:
+    sizes: scale-only
+    minPx: 22
+    maxLineLengthCh: 46
+    transforms: [none, uppercase]
+
+spacing:
+  base: 8
+  scale: [8, 16, 24, 32, 40, 48, 72, 96]
+  rules:
+    values: scale-only
+    appliesTo: [margin, padding, gap]
+
+icons:
+  catalog: app-inline-v1
+  allowed: [arrow-right, circle-dot, check, minus]
+  sizes: [24, 32]
+  colors: [chalk, amber]
+  rules:
+    maxPerPage: 3
+    role: decorative
+
+composition:
+  pageRoles:
+    - name: cover
+      position: first
+      required: true
+      guidance: >
+        A figure label, the display title, a dimension line spanning its width
+        with the sheet count written on it, and a pale note. The title block
+        sits in the bottom-right corner: a ruled box with PROJECT, SHEET and
+        REV fields.
+    - name: figure
+      guidance: >
+        A heading, then a diagram of two to four chalk-outlined boxes joined by
+        straight connector lines with arrow-right icons, each box labelled with
+        a numbered amber callout circle. One box may be filled amber to mark
+        the key step. A figure caption beneath.
+    - name: spec
+      guidance: >
+        A heading, then a ruled table of up to five rows, key in pale label
+        text on the left and value in chalk body text on the right.
+    - name: note
+      guidance: >
+        A single amber-bordered note box with a NOTE label and one or two body
+        sentences, positioned off-centre on the grid, with a leader line to the
+        heading.
+    - name: closing
+      position: last
+      required: true
+      guidance: >
+        The ask as a heading inside a large chalk-outlined box, an amber
+        APPROVED-style stamp label, and the title block.
+  principles:
+    - Everything sits on the 24px drafting grid; boxes and lines snap to it.
+    - Annotate everything. A box without a callout number or a caption is unfinished.
+    - Lines are 2px chalk or pale; amber marks the single most important thing.
+    - The title block appears on the cover and closing sheets in the same corner.
+  antiPatterns:
+    - avoid: Rounded corners, soft shadows, or gradients.
+      instead: Square ruled boxes and hairline connectors.
+    - avoid: Paragraphs of prose.
+      instead: Short mono notes attached to what they describe.
+    - avoid: More than one amber fill per sheet.
+      instead: Amber for one box, one stamp or callout numbers only.

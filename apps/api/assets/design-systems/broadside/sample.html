@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;600;800&display=swap">
+<style>
+:root {
+  --ds-newsprint: #f2ede3;
+  --ds-ink: #111111;
+  --ds-olive: #3f5a36;
+  --ds-cobalt: #1238d6;
+  --ds-signal: #c8281a;
+}
+html, body { margin: 0; padding: 0; }
+.page {
+  width: 1080px;
+  height: 1350px;
+  padding: 80px;
+  box-sizing: border-box;
+  background: var(--ds-newsprint);
+  color: var(--ds-ink);
+  font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+.bar { height: 16px; background: var(--ds-signal); }
+.poster { font-family: 'Anton', Impact, 'Arial Narrow', sans-serif; font-weight: 400; text-transform: uppercase; margin: 0; }
+.display { font-size: 176px; line-height: 0.88; letter-spacing: -0.01em; }
+.headline { font-size: 104px; line-height: 0.92; }
+.deck { font-size: 64px; line-height: 1; }
+.numeral { font-size: 400px; line-height: 0.82; color: var(--ds-cobalt); }
+.lead { font-size: 36px; line-height: 1.25; font-weight: 600; letter-spacing: -0.01em; color: var(--ds-olive); margin: 0; }
+.body { font-size: 30px; line-height: 1.4; margin: 0; }
+.label { font-size: 22px; line-height: 1.1; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; margin: 0; }
+
+/* cover */
+.cover-grid { flex: 1; display: flex; gap: 32px; margin: 32px 0; align-items: stretch; }
+.cover-grid .display { align-self: flex-end; }
+.slab { width: 240px; flex: none; background: var(--ds-cobalt); position: relative; }
+.slab::before, .slab::after { content: ''; position: absolute; left: 24px; right: 24px; top: 50%; border-top: 2px dashed var(--ds-newsprint); opacity: 0.6; }
+.slab::after { left: 50%; right: auto; top: 24px; bottom: 24px; border-top: 0; border-left: 2px dashed var(--ds-newsprint); }
+.cover-foot { margin: 32px 0 0; display: flex; flex-direction: column; gap: 24px; }
+
+/* rule */
+.index { display: flex; justify-content: space-between; }
+.rule-head { display: flex; gap: 32px; align-items: flex-start; margin: 96px 0 48px; }
+.hair { height: 4px; background: var(--ds-ink); margin: 0 0 48px; }
+.fill { flex: 1; }
+
+/* compare */
+.panels { display: flex; gap: 48px; align-items: center; margin: 64px 0 0; }
+.panel { flex: 1; border: 4px solid var(--ds-ink); padding: 32px; height: 800px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px; }
+.panel--after { border-color: var(--ds-cobalt); }
+.tab { align-self: flex-start; background: var(--ds-ink); color: var(--ds-newsprint); padding: 8px 16px; }
+.panel--after .tab { background: var(--ds-cobalt); }
+.panel--after .poster { color: var(--ds-cobalt); }
+
+/* closing */
+.page--cobalt { background: var(--ds-cobalt); color: var(--ds-newsprint); }
+.page--cobalt .bar { margin: 48px 0 0; }
+.foot { margin: 32px 0 0; }
+</style>
+</head>
+<body>
+<section class="page" data-role="cover">
+  <div class="bar"></div>
+  <div class="cover-grid">
+    <div class="slab"></div>
+    <h1 class="poster display">The<br>first<br>swipe</h1>
+  </div>
+  <div class="bar"></div>
+  <div class="cover-foot">
+    <p class="poster deck">Three fixes for carousels people finish</p>
+    <p class="lead">Most readers decide on page one. Here is how to win them there.</p>
+  </div>
+</section>
+
+<section class="page" data-role="rule">
+  <div class="index"><p class="label">Fix 01</p><p class="label">The first swipe</p></div>
+  <div class="rule-head">
+    <p class="poster numeral">1</p>
+    <h2 class="poster headline">Promise one outcome on the cover</h2>
+  </div>
+  <div class="fill"></div>
+  <div class="hair"></div>
+  <p class="body">A cover that lists everything promises nothing. Name the single result a reader walks away with, and every page after it has a job.</p>
+</section>
+
+<section class="page" data-role="rule">
+  <div class="index"><p class="label">Fix 02</p><p class="label">The first swipe</p></div>
+  <div class="rule-head">
+    <p class="poster numeral">2</p>
+    <h2 class="poster headline">One idea per page. No exceptions.</h2>
+  </div>
+  <div class="fill"></div>
+  <div class="hair"></div>
+  <p class="body">If a page needs two headlines, it is two pages. The swipe is free; the reader's patience is not.</p>
+</section>
+
+<section class="page" data-role="compare">
+  <div class="index"><p class="label">Fix 03</p><p class="label">The first swipe</p></div>
+  <h2 class="poster headline">End on one ask</h2>
+  <div class="panels">
+    <div class="panel">
+      <p class="label tab">Before</p>
+      <p class="poster deck">Like, share, follow, comment, save</p>
+      <div class="fill"></div>
+      <p class="body">Five asks. Zero taken.</p>
+    </div>
+    <svg data-icon="arrow-right" data-size="64" width="64" height="64" aria-hidden="true"></svg>
+    <div class="panel panel--after">
+      <p class="label tab">After</p>
+      <p class="poster deck">Save this for your next post</p>
+      <div class="fill"></div>
+      <p class="body">One ask. Easy yes.</p>
+    </div>
+  </div>
+</section>
+
+<section class="page page--cobalt" data-role="closing">
+  <p class="label">The first swipe</p>
+  <div class="fill"></div>
+  <h2 class="poster headline">Make page one earn page two.</h2>
+  <p class="label foot">Follow for the next teardown</p>
+  <div class="bar"></div>
+</section>
+</body>
+</html>
