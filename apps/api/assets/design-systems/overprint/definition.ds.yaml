@@ -1,0 +1,119 @@
+# Design System Definition, contract v1. Default system, chosen on issue #140.
+# New (no template predecessor). Risograph zine: two spot inks that multiply
+# where they overlap, slightly off-register, on warm uncoated paper.
+
+contract: 1
+
+id: overprint
+version: 1
+name: Overprint
+summary: Risograph zine. Fluoro pink and sunflower shapes overlapping on cream, federal-blue ink, tilted stickers.
+intent: >
+  Pages look printed on a risograph in two passes: fluoro pink and sunflower
+  shapes overlap and multiply into orange where they cross, and the blue ink
+  sits on top slightly off-register. Layouts are handmade: things tilt a few
+  degrees, a sticker overlaps an edge, a headline breaks where it wants to. It
+  should feel friendly, human and a little irreverent, never sloppy: the grid
+  underneath is still there.
+
+page:
+  width: 1080
+  height: 1350
+  safeArea: { top: 80, right: 80, bottom: 80, left: 80 }
+  pages: { min: 3, max: 12 }
+  background: cream
+
+palette:
+  tokens:
+    - { name: cream, hex: '#f6f0e1', role: background }
+    - { name: blue, hex: '#1f3a93', role: text }
+    - { name: fluoro, hex: '#ff4f9a', role: accent }
+    - { name: sunflower, hex: '#ffcf33', role: accent }
+  pairings:
+    - { text: blue, on: cream }
+    - { text: blue, on: sunflower }
+    - { text: cream, on: blue }
+  rules:
+    externalColors: forbid
+    references: token-var-only
+    minContrastRatio: 4.5
+
+typography:
+  fonts:
+    - name: display
+      family: Bricolage Grotesque
+      source: google
+      weights: [800]
+      styles: [normal]
+      fallback: "'Arial Black', sans-serif"
+    - name: mono
+      family: Space Mono
+      source: google
+      weights: [400, 700]
+      styles: [normal]
+      fallback: "'Courier New', monospace"
+  scale:
+    - { name: display, px: 144, lineHeight: 0.9, tracking: '-0.045em', font: display, weight: 800, use: 'Cover headline, broken over three or four lines.' }
+    - { name: heading, px: 88, lineHeight: 0.95, tracking: '-0.04em', font: display, weight: 800, use: 'Body-page heading.' }
+    - { name: sticker, px: 32, lineHeight: 1.2, tracking: '0.02em', font: mono, weight: 700, use: 'Text on a tilted sticker or tag. Uppercase.' }
+    - { name: body, px: 28, lineHeight: 1.45, tracking: '0', font: mono, weight: 400, use: 'Running copy. Short lines; the mono is wide.' }
+    - { name: label, px: 22, lineHeight: 1.2, tracking: '0.04em', font: mono, weight: 700, use: 'Issue number, page folio. Uppercase.' }
+  rules:
+    sizes: scale-only
+    minPx: 22
+    maxLineLengthCh: 32
+    transforms: [none, uppercase]
+
+spacing:
+  base: 8
+  scale: [8, 16, 24, 32, 48, 64, 80, 128]
+  rules:
+    values: scale-only
+    appliesTo: [margin, padding, gap]
+
+icons:
+  catalog: app-inline-v1
+  allowed: [check, spark, arrow-right]
+  sizes: [32, 48]
+  colors: [blue]
+  rules:
+    maxPerPage: 3
+    role: decorative
+
+composition:
+  pageRoles:
+    - name: cover
+      position: first
+      required: true
+      guidance: >
+        A folio line top-left, the display headline broken over several lines
+        in blue with a fluoro off-register shadow, and two big overlapping
+        shapes (a sunflower circle and a fluoro blob) multiplying behind it and
+        bleeding off an edge. One tilted sticker names the format.
+    - name: spread
+      guidance: >
+        A heading in blue with the off-register shadow, one overlapping shape
+        pair cropped at a corner, and one body paragraph in a narrow column.
+    - name: checklist
+      guidance: >
+        A heading, then up to five mono lines each with a hand-drawn blue box
+        holding a check icon. One sunflower highlighter stripe behind the most
+        important line.
+    - name: closing
+      position: last
+      required: true
+      guidance: >
+        Full blue page with cream text and a fluoro shape bleeding off a corner.
+        The ask at heading size and a tilted sunflower sticker with blue text.
+  principles:
+    - Overlap is the signature. Where fluoro and sunflower meet they multiply; always use mix-blend-mode multiply on shapes.
+    - Tilt at most two elements per page, by no more than four degrees.
+    - Blue carries all text; fluoro and sunflower are ink for shapes, shadows and highlights only.
+    - Keep one axis straight so the tilt reads as intent.
+  antiPatterns:
+    - avoid: Setting text in fluoro or sunflower on cream.
+      instead: Blue text; use the spot colours as shapes, shadows or a highlighter stripe.
+    - avoid: Perfectly centred symmetrical layouts.
+      instead: Offset the headline and let shapes crop at the edges.
+    - avoid: Soft gradients or blur.
+      instead: Flat spot colour with hard edges.

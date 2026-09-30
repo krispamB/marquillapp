@@ -1,0 +1,136 @@
+# Design System Definition, contract v1. Default system, chosen on issue #140.
+# Successor to the `editorial` template. High-contrast Didone against a
+# condensed grotesk, one oxblood numeral that runs off the page.
+
+contract: 1
+
+id: colophon
+version: 1
+name: Colophon
+summary: Magazine feature. Hairline Didone serifs, a giant oxblood numeral bleeding off the edge, bone paper.
+intent: >
+  Pages read like the opening spread of a design annual. A high-contrast
+  Didone carries the voice, a condensed grotesk answers it, and a single
+  oversized oxblood numeral or glyph is allowed to run off the page edge,
+  cropped, as the image. Type does all the illustrating. Pairing the delicate
+  serif against the blunt condensed face is the signature; keep both on the
+  cover and let body pages choose one.
+
+page:
+  width: 1080
+  height: 1350
+  safeArea: { top: 96, right: 96, bottom: 96, left: 96 }
+  pages: { min: 3, max: 12 }
+  background: bone
+
+palette:
+  tokens:
+    - { name: bone, hex: '#efe9dc', role: background }
+    - { name: ink, hex: '#161412', role: text }
+    - { name: taupe, hex: '#5f574d', role: text }
+    - { name: hairline, hex: '#cfc6b5', role: border }
+    - { name: oxblood, hex: '#a3231c', role: accent }
+  pairings:
+    - { text: ink, on: bone }
+    - { text: taupe, on: bone }
+    - { text: oxblood, on: bone }
+    - { text: bone, on: oxblood }
+  rules:
+    externalColors: forbid
+    references: token-var-only
+    minContrastRatio: 4.5
+
+typography:
+  fonts:
+    - name: didone
+      family: Bodoni Moda
+      source: google
+      weights: [400, 500, 700]
+      styles: [normal, italic]
+      fallback: "'Didot', 'Bodoni 72', Georgia, serif"
+    - name: condensed
+      family: Oswald
+      source: google
+      weights: [500, 600]
+      styles: [normal]
+      fallback: "'Arial Narrow', sans-serif"
+    - name: text
+      family: Inter
+      source: google
+      weights: [400, 500, 600]
+      styles: [normal]
+      fallback: -apple-system, 'Segoe UI', sans-serif
+  scale:
+    - { name: glyph, px: 960, lineHeight: 0.8, tracking: '0', font: didone, weight: 400, use: 'The oversized oxblood numeral or letter. Positioned to crop off one page edge. One per page, at most every other page.' }
+    - { name: display, px: 216, lineHeight: 0.9, tracking: '-0.03em', font: didone, weight: 500, use: 'The one serif word on a cover.' }
+    - { name: condensed, px: 120, lineHeight: 0.95, tracking: '-0.01em', font: condensed, weight: 600, use: 'The blunt lower-case answer to the serif, cover and chapter pages only.' }
+    - { name: heading, px: 72, lineHeight: 1.05, tracking: '-0.02em', font: didone, weight: 500, use: 'A body-page heading in serif. Italic allowed for one emphasised word.' }
+    - { name: lead, px: 36, lineHeight: 1.35, tracking: '-0.01em', font: text, weight: 400, use: 'Standfirst and pull quote.' }
+    - { name: body, px: 28, lineHeight: 1.5, tracking: '0', font: text, weight: 400, use: 'Running prose.' }
+    - { name: label, px: 22, lineHeight: 1.3, tracking: '0.14em', font: text, weight: 600, use: 'Eyebrow and legend captions. Uppercase, widely tracked.' }
+  rules:
+    sizes: scale-only
+    minPx: 22
+    maxLineLengthCh: 48
+    transforms: [none, uppercase]
+
+spacing:
+  base: 8
+  scale: [8, 16, 24, 32, 48, 64, 96, 128, 192]
+  rules:
+    values: scale-only
+    appliesTo: [margin, padding, gap]
+
+icons:
+  catalog: app-inline-v1
+  allowed: [arrow-right, minus]
+  sizes: [32, 48]
+  colors: [ink, oxblood]
+  rules:
+    maxPerPage: 1
+    role: decorative
+
+composition:
+  pageRoles:
+    - name: cover
+      position: first
+      required: true
+      guidance: >
+        A tracked label eyebrow, the display serif word, a short oxblood rule,
+        then two or three condensed lower-case lines and a lead subtitle. The
+        glyph sits behind the right half and runs off the right and bottom
+        edges. A legend strip of up to four labelled items may sit at the foot,
+        separated by thin hairline dividers.
+    - name: chapter
+      guidance: >
+        The glyph set as a chapter number, cropped at the left or right edge.
+        A serif heading and one lead paragraph occupy the opposite half. Nothing
+        else.
+    - name: essay
+      guidance: >
+        A serif heading with at most one italic word, an oxblood rule, and two
+        body paragraphs in a single narrow column pushed to the left. The right
+        third stays empty.
+    - name: quote
+      guidance: >
+        An oversized oxblood opening quote mark set in the display serif, the
+        quote at heading size, a label attribution. Centred is permitted here
+        and only here.
+    - name: closing
+      position: last
+      required: true
+      guidance: >
+        Full oxblood page. The ask as a serif heading in bone, one label line,
+        and the minus icon as a signature rule.
+  principles:
+    - Let the glyph crop. A numeral that fits entirely on the page is decoration; one that runs off is composition.
+    - Pair the thin serif with the heavy condensed face on the cover, never three faces on one body page.
+    - Use oxblood for a single element per page besides the glyph.
+    - Hairlines, not boxes, divide content.
+  antiPatterns:
+    - avoid: Setting body copy in the Didone.
+      instead: Didone for display and headings only; body is always the sans.
+    - avoid: Centring body pages.
+      instead: Asymmetric left column with open space on the right.
+    - avoid: Cards, fills, or tinted panels.
+      instead: Paper, hairlines, and the glyph.

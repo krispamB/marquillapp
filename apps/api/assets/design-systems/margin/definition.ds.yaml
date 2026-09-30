@@ -1,0 +1,108 @@
+# Design System Definition, contract v1. Default system, chosen on issue #140.
+# Successor to the `minimal` template. One family, two greys, mostly paper.
+
+contract: 1
+
+id: margin
+version: 1
+name: Margin
+summary: Quiet Swiss minimalism. One sans family, small type, a fixed baseline, and most of the page left empty.
+intent: >
+  The page is mostly margin. Text is set small and precise in a single family
+  and hangs from the same baseline on every page, so swiping feels like turning
+  pages of a well-made book. There is no accent colour: hierarchy comes from
+  position and weight alone, and a single hairline is the only ornament. It
+  should feel calm, confident and a little expensive.
+
+page:
+  width: 1080
+  height: 1350
+  safeArea: { top: 112, right: 112, bottom: 112, left: 112 }
+  pages: { min: 2, max: 15 }
+  background: white
+
+palette:
+  tokens:
+    - { name: white, hex: '#ffffff', role: background }
+    - { name: ink, hex: '#0a0a0a', role: text }
+    - { name: grey, hex: '#6e6e6e', role: text }
+    - { name: hairline, hex: '#e2e2e2', role: border }
+  pairings:
+    - { text: ink, on: white }
+    - { text: grey, on: white }
+  rules:
+    externalColors: forbid
+    references: token-var-only
+    minContrastRatio: 4.5
+
+typography:
+  fonts:
+    - name: sans
+      family: Inter Tight
+      source: google
+      weights: [400, 500]
+      styles: [normal]
+      fallback: -apple-system, 'Helvetica Neue', sans-serif
+  scale:
+    - { name: title, px: 72, lineHeight: 1.05, tracking: '-0.035em', font: sans, weight: 500, use: 'The cover title. Two lines at most.' }
+    - { name: heading, px: 48, lineHeight: 1.15, tracking: '-0.025em', font: sans, weight: 500, use: 'A body-page statement.' }
+    - { name: body, px: 30, lineHeight: 1.45, tracking: '-0.01em', font: sans, weight: 400, use: 'Supporting text, often in grey.' }
+    - { name: meta, px: 24, lineHeight: 1.3, tracking: '0', font: sans, weight: 400, use: 'Page index, running head, list numbers. Always grey, tabular figures.' }
+  rules:
+    sizes: scale-only
+    minPx: 24
+    maxLineLengthCh: 36
+    transforms: [none]
+
+spacing:
+  base: 8
+  scale: [8, 16, 24, 32, 48, 64, 112, 160, 224]
+  rules:
+    values: scale-only
+    appliesTo: [margin, padding, gap]
+
+icons:
+  catalog: app-inline-v1
+  allowed: [arrow-right]
+  sizes: [24]
+  colors: [ink]
+  rules:
+    maxPerPage: 1
+    role: decorative
+
+composition:
+  pageRoles:
+    - name: title
+      position: first
+      required: true
+      guidance: >
+        A running head at the top: the series name left, the page index right,
+        both in grey meta. The title sits on the shared baseline in the lower
+        third. Nothing between them.
+    - name: statement
+      guidance: >
+        Running head, then a heading on the shared baseline and one grey body
+        paragraph beneath it. The top two thirds stay empty.
+    - name: list
+      guidance: >
+        Running head, a short heading, then up to five items separated by
+        hairlines, each prefixed with a two-digit grey number. The list ends on
+        the shared baseline.
+    - name: end
+      position: last
+      required: true
+      guidance: >
+        Running head, the ask as a heading on the shared baseline, and a meta
+        line with the arrow-right icon beneath it.
+  principles:
+    - Every page puts its last line of text on the same baseline, 112px above the bottom edge.
+    - The top of every page carries the same running head; nothing else lives in the top half.
+    - Two sizes per page at most, plus meta.
+    - When a page feels empty, it is finished.
+  antiPatterns:
+    - avoid: Adding colour for emphasis.
+      instead: Use weight 500 or move the line to its own page.
+    - avoid: Large display type.
+      instead: The title step is the ceiling; restraint is the brand.
+    - avoid: Centring anything.
+      instead: Flush left on the safe-area edge.
