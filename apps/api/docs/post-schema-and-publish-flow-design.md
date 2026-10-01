@@ -1,5 +1,7 @@
 # Post Schema & Publish Flow — Design
 
+> **2026-10-01 amendment (map #131, #142).** Amended by [`document-generation-spec.md`](./document-generation-spec.md) §6.6. §4: a Post pins any `READY` version and never follows refines; the pin CAS checks that the version exists and is `READY` rather than that it is current; publish uploads the stored PDF and never re-renders.
+
 > Status: implemented design, amended 2026-07-18 for mutable Post composition and uploaded media.
 > Author: generated for Christopher Pam. Decisions settled 2026-07-09.
 > Blocked by #95 (compat audit — resolved as a clean write-over) and #96 (LinkedIn

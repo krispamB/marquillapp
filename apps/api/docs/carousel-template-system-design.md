@@ -1,5 +1,7 @@
 # Carousel Template System — Design
 
+> **2026-10-01: superseded in full** by [`document-generation-spec.md`](./document-generation-spec.md) (map #131, #142). Fixed templates and structured slide fields are replaced by AI-authored HTML constrained by app-owned Design Systems. Kept as history; nothing here is a current contract.
+
 > Status: design spec for wayfinder map #94, ticket #103 (grilling outcome).
 > Author: generated for Christopher Pam. Decisions settled in a grilling session
 > on 2026-07-09; **revised 2026-07-09 (v2)** — same settled decisions, with the

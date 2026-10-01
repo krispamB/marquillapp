@@ -1,5 +1,7 @@
 # SSE Progress Contract — Design
 
+> **2026-10-01 amendment (map #131, #142).** Amended by [`document-generation-spec.md`](./document-generation-spec.md) §7.8. §3: `run.failed` gains a stable `code`, and DOCUMENT `step.progress` carries draft, render, retry and repair counts in place of `pageRendered`.
+
 > Status: design spec for wayfinder map #94, ticket #102 (grilling outcome).
 > Author: generated for Christopher Pam. Decisions settled in a grilling session
 > on 2026-07-09.
