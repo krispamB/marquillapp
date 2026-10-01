@@ -83,6 +83,63 @@ describe('ArtifactService library API', () => {
   });
 
   describe('getArtifact', () => {
+    it('should return the newest Attempt and keep the Current Version when a refine is in flight', async () => {
+      const { service, artifactModel } = makeService();
+      artifactModel.findById.mockResolvedValue(
+        readyPost({
+          versions: [
+            ...readyPost().versions,
+            {
+              version: 2,
+              status: VersionStatus.GENERATING,
+              refineFeedback: 'Sharper',
+              parentVersion: 1,
+              createdAt: new Date('2026-07-03T00:00:00.000Z'),
+            },
+          ],
+        }),
+      );
+
+      await expect(
+        service.getArtifact(ids.user.toString(), ids.artifact.toString()),
+      ).resolves.toMatchObject({
+        currentVersion: 1,
+        version: 2,
+        status: VersionStatus.GENERATING,
+        content: {},
+      });
+    });
+
+    it('should omit currentVersion when no version has become READY', async () => {
+      const { service, artifactModel } = makeService();
+      artifactModel.findById.mockResolvedValue(
+        readyPost({
+          currentVersion: undefined,
+          versions: [
+            {
+              version: 1,
+              status: VersionStatus.FAILED,
+              failureCode: 'internal',
+              failureReason: 'boom',
+              createdAt: new Date('2026-07-01T00:00:00.000Z'),
+            },
+          ],
+        }),
+      );
+
+      const detail = await service.getArtifact(
+        ids.user.toString(),
+        ids.artifact.toString(),
+      );
+
+      expect(detail).toMatchObject({
+        version: 1,
+        status: VersionStatus.FAILED,
+        content: {},
+      });
+      expect(detail).not.toHaveProperty('currentVersion');
+    });
+
     it('returns selected version content and signs document previews without exposing pdfKey', async () => {
       const { service, artifactModel } = makeService();
       const createdAt = new Date('2026-07-01T00:00:00.000Z');
@@ -222,7 +279,7 @@ describe('ArtifactService library API', () => {
       expect(promptSearch.test('How to deploy.*safely today')).toBe(true);
       expect(titleSearch.test('Deploy carelessly')).toBe(false);
       expect(listPipeline).toContainEqual({
-        $match: { '_currentVersion.status': VersionStatus.READY },
+        $match: { '_latestVersion.status': VersionStatus.READY },
       });
       const facet = listPipeline.find((stage) => stage.$facet)?.$facet;
       expect(facet?.data).toContainEqual({ $skip: 20 });
@@ -250,7 +307,7 @@ describe('ArtifactService library API', () => {
       expect(aggregateCalls[0][0][0].$match).not.toHaveProperty('$or');
     });
 
-    it('returns summaries, current-version status, signed previews, and filter metadata without versions', async () => {
+    it('should return summaries, latest-version status, signed previews, and filter metadata without versions', async () => {
       const { service, artifactModel } = makeService();
       const firstSlide = { type: 'cover', fields: { title: 'Hello' } };
       const row = {
@@ -258,7 +315,7 @@ describe('ArtifactService library API', () => {
         type: ArtifactType.DOCUMENT,
         title: 'A deck',
         updatedAt: new Date('2026-07-02T00:00:00.000Z'),
-        _currentVersion: {
+        _latestVersion: {
           version: 1,
           status: VersionStatus.READY,
           content: {
@@ -314,28 +371,26 @@ describe('ArtifactService library API', () => {
       expect(JSON.stringify(row)).not.toContain('versions');
     });
 
-    it('should skip malformed artifacts when the current version is missing', async () => {
+    it('should skip malformed artifacts when the artifact has no versions', async () => {
       const { service, artifactModel } = makeService();
       artifactModel.aggregate.mockImplementation((pipeline: unknown[]) => ({
-        exec: jest
-          .fn()
-          .mockResolvedValue(
-            pipeline.some((stage) => '$facet' in (stage as object))
-              ? [
-                  {
-                    data: [
-                      {
-                        _id: ids.artifact,
-                        type: ArtifactType.POST,
-                        updatedAt: new Date('2026-07-02T00:00:00.000Z'),
-                        _currentVersion: null,
-                      },
-                    ],
-                    metadata: [{ total: 0 }],
-                  },
-                ]
-              : [],
-          ),
+        exec: jest.fn().mockResolvedValue(
+          pipeline.some((stage) => '$facet' in (stage as object))
+            ? [
+                {
+                  data: [
+                    {
+                      _id: ids.artifact,
+                      type: ArtifactType.POST,
+                      updatedAt: new Date('2026-07-02T00:00:00.000Z'),
+                      _latestVersion: null,
+                    },
+                  ],
+                  metadata: [{ total: 0 }],
+                },
+              ]
+            : [],
+        ),
       }));
       artifactModel.distinct.mockResolvedValue([]);
 
@@ -344,31 +399,28 @@ describe('ArtifactService library API', () => {
       ).resolves.toMatchObject({ data: [], page: 1, pages: 0 });
 
       const listPipeline = artifactModel.aggregate.mock.calls[0][0];
-      const currentVersionMatch = {
+      const hasVersionMatch = {
         $match: {
           $expr: {
-            $gt: [
-              {
-                $size: {
-                  $filter: {
-                    input: { $ifNull: ['$versions', []] },
-                    as: 'version',
-                    cond: { $eq: ['$$version.version', '$currentVersion'] },
-                  },
-                },
-              },
-              0,
-            ],
+            $gt: [{ $size: { $ifNull: ['$versions', []] } }, 0],
           },
         },
       };
-      expect(listPipeline).toContainEqual(currentVersionMatch);
+      expect(listPipeline).toContainEqual(hasVersionMatch);
+      // An artifact without a Current Version still lists, by its newest Attempt.
+      expect(listPipeline).toContainEqual({
+        $set: {
+          _latestVersion: {
+            $arrayElemAt: [{ $ifNull: ['$versions', []] }, -1],
+          },
+        },
+      });
 
       const availableMonthsPipeline = artifactModel.aggregate.mock.calls[1][0];
-      expect(availableMonthsPipeline).toContainEqual(currentVersionMatch);
+      expect(availableMonthsPipeline).toContainEqual(hasVersionMatch);
       expect(artifactModel.distinct).toHaveBeenCalledWith(
         'type',
-        expect.objectContaining(currentVersionMatch.$match),
+        expect.objectContaining(hasVersionMatch.$match),
       );
     });
   });
@@ -396,6 +448,25 @@ describe('ArtifactService library API', () => {
         },
         { new: true },
       );
+    });
+
+    it('should reject an edit with a conflict when a refine Attempt is in flight', async () => {
+      const { service, artifactModel } = makeService();
+      artifactModel.findById.mockResolvedValue(
+        readyPost({
+          versions: [
+            ...readyPost().versions,
+            { version: 2, status: VersionStatus.GENERATING, parentVersion: 1 },
+          ],
+        }),
+      );
+
+      await expect(
+        service.updateArtifact(ids.user.toString(), ids.artifact.toString(), {
+          commentary: 'Edited',
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(artifactModel.findOneAndUpdate).not.toHaveBeenCalled();
     });
 
     it.each(['   ', 'x'.repeat(101)])(

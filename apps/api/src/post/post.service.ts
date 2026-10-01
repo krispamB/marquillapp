@@ -265,7 +265,7 @@ export class PostService {
       const data: ILinkedInPost = {
         author,
         commentary:
-          typeof version.content.commentary === 'string'
+          typeof version.content?.commentary === 'string'
             ? formatLinkedinContent(version.content.commentary)
             : '',
         ...(content ? { content } : {}),
@@ -369,7 +369,7 @@ export class PostService {
       post.artifacts = [
         {
           artifact: new Types.ObjectId(dto.artifactId),
-          version: versionNumber,
+          version: version.version,
         },
       ];
     }

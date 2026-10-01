@@ -7,6 +7,11 @@ jest.mock(
   () => ({
     ArtifactType: { POST: 'POST', POLL: 'POLL', DOCUMENT: 'DOCUMENT' },
     RunKind: { INITIAL: 'INITIAL', REFINE: 'REFINE' },
+    VersionStatus: {
+      GENERATING: 'GENERATING',
+      READY: 'READY',
+      FAILED: 'FAILED',
+    },
   }),
   { virtual: true },
 );
@@ -66,10 +71,10 @@ const makeProcessor = () => {
     research: jest.fn(),
   };
   const artifacts = {
-    readCurrent: jest.fn().mockResolvedValue({ version: 1 }),
+    readVersion: jest.fn().mockResolvedValue({ status: 'GENERATING' }),
     readRefineInput: jest.fn(),
-    setVersionContent: jest.fn().mockResolvedValue(undefined),
-    failVersion: jest.fn().mockResolvedValue(undefined),
+    promoteVersion: jest.fn().mockResolvedValue(undefined),
+    failVersion: jest.fn().mockResolvedValue('FAILED'),
   };
   const runHandle = {
     runId: 'run-1',
@@ -123,6 +128,11 @@ const emittedTypes = (redis: { xadd: jest.Mock }): string[] =>
 const emittedSeqs = (redis: { xadd: jest.Mock }): number[] =>
   redis.xadd.mock.calls.map(
     (call) => (JSON.parse(call[8] as string) as { seq: number }).seq,
+  );
+
+const emittedData = (redis: { xadd: jest.Mock }): Record<string, unknown>[] =>
+  redis.xadd.mock.calls.map(
+    (call) => JSON.parse(call[8] as string) as Record<string, unknown>,
   );
 
 let processor: ArtifactRunProcessor;
@@ -190,7 +200,10 @@ describe('ArtifactRunProcessor', () => {
     });
 
     it('should allow a paid research job through the worker capability check', async () => {
-      mocks.agent.research.mockResolvedValue({ findings: 'Found', sources: [] });
+      mocks.agent.research.mockResolvedValue({
+        findings: 'Found',
+        sources: [],
+      });
       const job = makeJob({ data: buildInput({ withResearch: true }) });
 
       await processor.process(job);
@@ -246,7 +259,7 @@ describe('ArtifactRunProcessor', () => {
     it('should run a research-off POST job to a READY version', async () => {
       await processor.process(makeJob());
 
-      expect(mocks.artifacts.setVersionContent).toHaveBeenCalledWith(
+      expect(mocks.artifacts.promoteVersion).toHaveBeenCalledWith(
         'artifact-1',
         1,
         { commentary: 'Write more.' },
@@ -276,7 +289,6 @@ describe('ArtifactRunProcessor', () => {
         findings: 'Cached findings',
         sources: [{ title: 'Source', url: 'https://example.com' }],
       };
-      mocks.artifacts.readCurrent.mockResolvedValue({ version: 2 });
       mocks.artifacts.readRefineInput.mockResolvedValue({
         priorContent: { commentary: 'The original post.' },
         feedback: 'Make the hook sharper',
@@ -320,7 +332,6 @@ describe('ArtifactRunProcessor', () => {
     });
 
     it('should render a DOCUMENT refine to the new version key when processing a DOCUMENT REFINE job', async () => {
-      mocks.artifacts.readCurrent.mockResolvedValue({ version: 2 });
       mocks.artifacts.readRefineInput.mockResolvedValue({
         priorContent: {
           document: {
@@ -370,7 +381,7 @@ describe('ArtifactRunProcessor', () => {
           { type: 'content', fields: { heading: 'A', body: 'B' } },
         ],
       });
-      expect(mocks.artifacts.setVersionContent).toHaveBeenCalledWith(
+      expect(mocks.artifacts.promoteVersion).toHaveBeenCalledWith(
         'artifact-1',
         2,
         {
@@ -412,14 +423,12 @@ describe('ArtifactRunProcessor', () => {
         pageCount: 1,
         browserless: { durationMs: 12_000, units: 1 },
       });
-      mocks.artifacts.setVersionContent.mockRejectedValue(
+      mocks.artifacts.promoteVersion.mockRejectedValue(
         new Error('mongo unavailable'),
       );
 
       await expect(
-        processor.process(
-          makeJob({ data: buildInput({ type: 'DOCUMENT' }) }),
-        ),
+        processor.process(makeJob({ data: buildInput({ type: 'DOCUMENT' }) })),
       ).rejects.toThrow('mongo unavailable');
 
       expect(mocks.runHandle.recordRenderAttempt).toHaveBeenCalledWith({
@@ -518,9 +527,7 @@ describe('ArtifactRunProcessor', () => {
       expect(mocks.runHandle.complete).toHaveBeenCalledWith(20);
       expect(mocks.creditMeter.debit).toHaveBeenCalledWith('user-1', 20);
       expect(
-        mocks.redis.xadd.mock.calls.filter(
-          (call) => call[6] === 'usage.tick',
-        ),
+        mocks.redis.xadd.mock.calls.filter((call) => call[6] === 'usage.tick'),
       ).toHaveLength(1);
     });
 
@@ -541,12 +548,18 @@ describe('ArtifactRunProcessor', () => {
       expect(mocks.artifacts.failVersion).toHaveBeenCalledWith(
         'artifact-1',
         1,
+        'internal',
         'commentary must not be empty',
       );
       expect(mocks.runHandle.fail).toHaveBeenCalledWith(
+        'internal',
         'commentary must not be empty',
       );
       expect(emittedTypes(mocks.redis)).toEqual(['run.failed']);
+      expect(emittedData(mocks.redis)[0]).toMatchObject({
+        code: 'internal',
+        failureReason: 'commentary must not be empty',
+      });
     });
 
     it('should never commit credits for a failed run', async () => {
@@ -594,9 +607,11 @@ describe('ArtifactRunProcessor', () => {
       expect(mocks.artifacts.failVersion).toHaveBeenCalledWith(
         'artifact-1',
         1,
+        'internal',
         'Generation is temporarily unavailable. Please try again.',
       );
       expect(mocks.runHandle.fail).toHaveBeenCalledWith(
+        'internal',
         'Generation is temporarily unavailable. Please try again.',
       );
       expect(emittedTypes(mocks.redis)).toEqual(['run.failed']);

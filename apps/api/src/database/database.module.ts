@@ -29,6 +29,8 @@ import {
   ArtifactSchema,
   WorkflowRun,
   WorkflowRunSchema,
+  DesignSystem,
+  DesignSystemSchema,
 } from './schemas';
 
 @Global()
@@ -55,6 +57,7 @@ import {
       { name: OnboardingProfile.name, schema: OnboardingProfileSchema },
       { name: Artifact.name, schema: ArtifactSchema },
       { name: WorkflowRun.name, schema: WorkflowRunSchema },
+      { name: DesignSystem.name, schema: DesignSystemSchema },
     ]),
   ],
   exports: [MongooseModule],

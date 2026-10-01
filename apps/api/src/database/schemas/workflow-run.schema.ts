@@ -7,7 +7,7 @@ import type { RenderAttemptUsage } from '../../carousel/render-usage.types';
 // Type-only, and to the leaf module rather than the engine barrel: the engine
 // imports RunKind from here, so a value import either way would be a cycle.
 import type { BuildInput } from '../../workflow/engine/workflow.types';
-import { WorkflowStep } from '../../workflow/workflow.constants';
+import { FailureCode, WorkflowStep } from '../../workflow/workflow.constants';
 
 export enum RunKind {
   INITIAL = 'INITIAL',
@@ -68,6 +68,9 @@ export class WorkflowRun extends Document {
   // cannot double-count. Only the winning attempt's total is ever debited.
   @Prop({ required: true, default: 0 })
   creditsUsed: number;
+
+  @Prop({ enum: FailureCode })
+  failureCode?: FailureCode;
 
   @Prop()
   failureReason?: string;

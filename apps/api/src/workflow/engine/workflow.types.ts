@@ -17,7 +17,7 @@ import type {
 import type { StylePreset } from '../../agent/style-presets.config';
 import type { UsageRecord } from '../../feature-gating/credit-meter.constants';
 import type { RenderAttemptUsage } from '../../carousel/render-usage.types';
-import { WorkflowStep } from '../workflow.constants';
+import { FailureCode, WorkflowStep } from '../workflow.constants';
 import type { EmittedEvent } from './run-event.types';
 
 export interface WorkflowDefinition {
@@ -108,7 +108,7 @@ export interface RunRecordHandle {
     artifactId: string,
   ): Promise<ResearchResult | undefined>;
   complete(creditsUsed: number): Promise<void>;
-  fail(failureReason: string): Promise<void>;
+  fail(failureCode: FailureCode, failureReason: string): Promise<void>;
 }
 
 /**

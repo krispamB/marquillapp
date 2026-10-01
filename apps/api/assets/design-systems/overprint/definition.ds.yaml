@@ -73,7 +73,7 @@ spacing:
 
 icons:
   catalog: app-inline-v1
-  allowed: [check, spark, arrow-right]
+  allowed: [check, plus, arrow-right]
   sizes: [32, 48]
   colors: [blue]
   rules:

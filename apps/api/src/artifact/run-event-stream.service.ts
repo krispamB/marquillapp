@@ -10,6 +10,7 @@ import { RunStatus, WorkflowRun } from 'src/database/schemas';
 import { RedisService } from 'src/redis/redis.service';
 import { WorkflowRunService } from 'src/workflow/workflow-run.service';
 import { buildWorkflow } from 'src/workflow/engine/workflow.builder';
+import { FailureCode } from '../workflow/workflow.constants';
 import {
   RunEventType,
   isTerminalRunEvent,
@@ -262,6 +263,7 @@ export class RunEventStreamService {
       });
     } else {
       emit(RunEventType.RUN_FAILED, {
+        code: run.failureCode ?? FailureCode.INTERNAL,
         failureReason: run.failureReason ?? 'Run failed',
       });
     }

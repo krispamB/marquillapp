@@ -2,7 +2,14 @@ import { NotFoundException } from '@nestjs/common';
 
 jest.mock(
   '../../database/schemas',
-  () => ({ RunKind: { INITIAL: 'INITIAL', REFINE: 'REFINE' } }),
+  () => ({
+    RunKind: { INITIAL: 'INITIAL', REFINE: 'REFINE' },
+    VersionStatus: {
+      GENERATING: 'GENERATING',
+      READY: 'READY',
+      FAILED: 'FAILED',
+    },
+  }),
   { virtual: true },
 );
 
@@ -12,7 +19,7 @@ import { resolveInputStep } from './resolve-input.step';
 
 const makeStep = () => {
   const artifacts = {
-    readCurrent: jest.fn(),
+    readVersion: jest.fn(),
     readRefineInput: jest.fn(),
   };
   const run = { getLatestCompletedResearch: jest.fn() };
@@ -35,15 +42,27 @@ beforeEach(() => {
 });
 
 describe('resolveInputStep', () => {
-  it('should return an empty patch when the target version exists', async () => {
-    mocks.artifacts.readCurrent.mockResolvedValue({ version: 1 });
+  it('should return an empty patch when the target Attempt is GENERATING', async () => {
+    mocks.artifacts.readVersion.mockResolvedValue({
+      version: 1,
+      status: 'GENERATING',
+    });
 
     await expect(resolveInputStep(fixtures.state, ctx)).resolves.toEqual({});
-    expect(mocks.artifacts.readCurrent).toHaveBeenCalledWith('artifact-1');
+    expect(mocks.artifacts.readVersion).toHaveBeenCalledWith('artifact-1', 1);
+  });
+
+  it('should continue when a replay finds the target already READY', async () => {
+    mocks.artifacts.readVersion.mockResolvedValue({
+      version: 1,
+      status: 'READY',
+    });
+
+    await expect(resolveInputStep(fixtures.state, ctx)).resolves.toEqual({});
   });
 
   it('should fail terminally when the artifact does not exist', async () => {
-    mocks.artifacts.readCurrent.mockRejectedValue(
+    mocks.artifacts.readVersion.mockRejectedValue(
       new NotFoundException('Artifact artifact-1 not found'),
     );
 
@@ -53,8 +72,11 @@ describe('resolveInputStep', () => {
     });
   });
 
-  it('should fail terminally when the current version is not the target version', async () => {
-    mocks.artifacts.readCurrent.mockResolvedValue({ version: 2 });
+  it('should fail terminally when the target Attempt already FAILED', async () => {
+    mocks.artifacts.readVersion.mockResolvedValue({
+      version: 1,
+      status: 'FAILED',
+    });
 
     const error = await resolveInputStep(fixtures.state, ctx).catch(
       (e: unknown) => e,
@@ -62,12 +84,12 @@ describe('resolveInputStep', () => {
 
     expect(error).toBeInstanceOf(WorkflowError);
     expect(error).toMatchObject({ retryable: false });
-    expect((error as WorkflowError).reason).toContain('no version 1 to fill');
+    expect((error as WorkflowError).reason).toContain('never resumed');
   });
 
   it('should rethrow an unreachable-database error so it stays retryable', async () => {
     const outage = new Error('connection timed out');
-    mocks.artifacts.readCurrent.mockRejectedValue(outage);
+    mocks.artifacts.readVersion.mockRejectedValue(outage);
 
     await expect(resolveInputStep(fixtures.state, ctx)).rejects.toBe(outage);
   });
@@ -78,7 +100,10 @@ describe('resolveInputStep', () => {
       version: 2,
       kind: 'REFINE',
     } as never;
-    mocks.artifacts.readCurrent.mockResolvedValue({ version: 2 });
+    mocks.artifacts.readVersion.mockResolvedValue({
+      version: 2,
+      status: 'GENERATING',
+    });
     mocks.artifacts.readRefineInput.mockResolvedValue({
       priorContent: { commentary: 'The original post.' },
       feedback: 'Make the hook sharper',
@@ -113,7 +138,10 @@ describe('resolveInputStep', () => {
       version: 2,
       kind: 'REFINE',
     } as never;
-    mocks.artifacts.readCurrent.mockResolvedValue({ version: 2 });
+    mocks.artifacts.readVersion.mockResolvedValue({
+      version: 2,
+      status: 'GENERATING',
+    });
     mocks.artifacts.readRefineInput.mockResolvedValue({
       priorContent: { commentary: 'The original post.' },
       feedback: 'Make the hook sharper',

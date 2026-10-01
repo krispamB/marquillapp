@@ -77,7 +77,7 @@ spacing:
 
 icons:
   catalog: app-inline-v1
-  allowed: [spark, check, arrow-right, circle-dot]
+  allowed: [plus, check, arrow-right, circle-dot]
   sizes: [24, 32, 48]
   colors: [moon, tangerine]
   rules:
@@ -90,7 +90,7 @@ composition:
       position: first
       required: true
       guidance: >
-        A glass pill eyebrow with a spark icon, the display headline with its
+        A glass pill eyebrow with a plus icon, the display headline with its
         last word in the gradient fill, and a haze lead. Two glow pools: a large
         violet one behind the top-right corner and a tangerine one rising from
         the bottom-left.

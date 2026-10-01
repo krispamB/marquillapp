@@ -10,9 +10,14 @@ jest.mock(
 );
 
 import { ArtifactType, RunKind } from '../../database/schemas';
-import { WorkflowStep } from '../workflow.constants';
+import { ArtifactDeletedError } from '../../artifact/artifact-deleted.error';
+import { FailureCode, WorkflowStep } from '../workflow.constants';
 import { RunEventType } from './run-event.types';
-import { handleTerminalFailure, runWorkflow } from './workflow.engine';
+import {
+  ARTIFACT_DELETED_FAILURE_REASON,
+  handleTerminalFailure,
+  runWorkflow,
+} from './workflow.engine';
 import { WorkflowError, terminal, transient } from './workflow.error';
 import type { BuildInput, StepHandlerMap } from './workflow.types';
 
@@ -339,6 +344,20 @@ describe('runWorkflow', () => {
       });
     });
 
+    it('should fail terminally without step.failed or a credit commit when the artifact was deleted mid-run', async () => {
+      (mocks.handlers[PERSIST_VERSION] as jest.Mock).mockRejectedValue(
+        new ArtifactDeletedError('artifact-1'),
+      );
+
+      const error = await runWorkflow(makeInput(), deps).catch(
+        (e: unknown) => e,
+      );
+
+      expect(error).toBeInstanceOf(UnrecoverableError);
+      expect(emittedOf(RunEventType.STEP_FAILED)).toEqual([]);
+      expect(mocks.meter.commit).not.toHaveBeenCalled();
+    });
+
     it('should emit step.failed with retryable false for a terminal failure', async () => {
       (mocks.handlers[GENERATE] as jest.Mock).mockRejectedValue(
         terminal('zod invalid after repair'),
@@ -470,10 +489,10 @@ describe('handleTerminalFailure', () => {
       emit: jest.fn(),
       flush: jest.fn().mockResolvedValue(undefined),
     };
-    const artifacts = { failVersion: jest.fn().mockResolvedValue(undefined) };
+    const artifacts = { failVersion: jest.fn().mockResolvedValue('FAILED') };
     const run = { fail: jest.fn().mockResolvedValue(undefined) };
     const meter = { commit: jest.fn() };
-    const logger = { error: jest.fn(), warn: jest.fn() };
+    const logger = { error: jest.fn(), warn: jest.fn(), log: jest.fn() };
 
     return {
       deps: { artifacts, run, emitter, logger } as any,
@@ -489,31 +508,53 @@ describe('handleTerminalFailure', () => {
     ({ deps, mocks } = makeDeps());
   });
 
-  const failure = { artifactId, version: 2, failureReason: 'zod invalid' };
+  const failure = {
+    artifactId,
+    version: 2,
+    failureCode: FailureCode.INTERNAL,
+    failureReason: 'zod invalid',
+  };
 
-  it('should mark the target version FAILED with the reason', async () => {
+  it('should mark the target Attempt FAILED with the code and reason', async () => {
     await handleTerminalFailure(deps, failure);
 
     expect(mocks.artifacts.failVersion).toHaveBeenCalledWith(
       artifactId,
       2,
+      FailureCode.INTERNAL,
       'zod invalid',
     );
   });
 
-  it('should mark the run FAILED with the reason', async () => {
+  it('should mark the run FAILED with the code and reason', async () => {
     await handleTerminalFailure(deps, failure);
 
-    expect(mocks.run.fail).toHaveBeenCalledWith('zod invalid');
+    expect(mocks.run.fail).toHaveBeenCalledWith(
+      FailureCode.INTERNAL,
+      'zod invalid',
+    );
   });
 
-  it('should emit run.failed with the reason', async () => {
+  it('should emit run.failed with the code beside the reason', async () => {
     await handleTerminalFailure(deps, failure);
 
     expect(mocks.emitter.emit).toHaveBeenCalledWith({
       type: RunEventType.RUN_FAILED,
-      data: { failureReason: 'zod invalid' },
+      data: { code: 'internal', failureReason: 'zod invalid' },
     });
+  });
+
+  it('should fail the run without a client message when the artifact was deleted mid-run', async () => {
+    mocks.artifacts.failVersion.mockResolvedValue('ARTIFACT_DELETED');
+
+    await handleTerminalFailure(deps, failure);
+
+    expect(mocks.run.fail).toHaveBeenCalledWith(
+      FailureCode.INTERNAL,
+      ARTIFACT_DELETED_FAILURE_REASON,
+    );
+    expect(mocks.emitter.emit).not.toHaveBeenCalled();
+    expect(mocks.meter.commit).not.toHaveBeenCalled();
   });
 
   it('should never commit credits — a failed run is not charged', async () => {
@@ -546,7 +587,7 @@ describe('handleTerminalFailure', () => {
 
     expect(mocks.emitter.emit).toHaveBeenCalledWith({
       type: RunEventType.RUN_FAILED,
-      data: { failureReason: 'zod invalid' },
+      data: { code: 'internal', failureReason: 'zod invalid' },
     });
   });
 });

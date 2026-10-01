@@ -45,8 +45,8 @@ data: {"seq":4,"ts":1752500000123,"step":"GENERATE","index":2,"total":4}
 | `step.progress` | `step`, plus step-specific fields | Optional UI detail; never a required checkpoint. |
 | `usage.tick` | `kind`, `credits`, `totalCredits`, optional `detail` | Update the live credit display. |
 | `step.failed` | `step`, `retryable`, `message` | When `retryable` is true, show a transient retry notice. When false, `run.failed` follows. |
-| `run.completed` | `artifactId`, `version` | The version is `READY`; refetch the artifact and close the stream. |
-| `run.failed` | `failureReason` | Show the failure and close the stream. Retry-exhausted infrastructure failures use a client-safe generic reason. |
+| `run.completed` | `artifactId`, `version` | The version is `READY` and is now the artifact's `currentVersion`; refetch the artifact and close the stream. |
+| `run.failed` | `code`, `failureReason` | Show the failure and close the stream. The Attempt stays `FAILED` and the Current Version is unchanged. Retry-exhausted infrastructure failures use a client-safe generic reason. |
 
 The possible workflow steps are `RESOLVE_INPUT`, `RESEARCH`, `GENERATE`, `RENDER_PDF`, and `PERSIST_VERSION`.
 
@@ -75,7 +75,15 @@ type RunEventData =
   | { seq: number; ts: number; kind: 'llm' | 'web_search' | 'pdf_render'; credits: number; totalCredits: number; detail?: unknown }
   | { seq: number; ts: number; step: WorkflowStep; retryable: boolean; message: string }
   | { seq: number; ts: number; artifactId: string; version: number }
-  | { seq: number; ts: number; failureReason: string };
+  | { seq: number; ts: number; code: RunFailureCode; failureReason: string };
+
+type RunFailureCode =
+  | 'document.repair_exhausted'
+  | 'document.truncated'
+  | 'design_system.unavailable'
+  | 'render.unavailable'
+  | 'artifact.source_missing'
+  | 'internal';
 ```
 
 The current `step.progress` signal is `sourcesFound` for `RESEARCH`. PDF rendering is atomic and does not currently emit page-level progress.
@@ -92,6 +100,15 @@ Generation is temporarily unavailable. Please try again.
 
 Clients must not depend on provider, database, or network error text appearing
 in `failureReason`.
+
+`code` is stable and is what a client should branch on; `failureReason` is
+display text. POST and POLL runs always emit `internal`. The failed Attempt
+stores the same `code` and `failureReason`.
+
+If the artifact is deleted while its run is in flight, the run fails without
+charging credits and without a `step.failed` or `run.failed` event: the client that deleted it is
+no longer listening. A later reconnect to the finished run receives a synthesized
+`run.failed` from the run record.
 
 ## Reconnect and close behavior
 

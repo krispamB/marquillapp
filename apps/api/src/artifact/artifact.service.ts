@@ -17,10 +17,13 @@ import {
 } from 'src/database/schemas';
 import { getSignedUrl } from '../s3';
 import type { StylePreset } from 'src/agent/style-presets.config';
+import type { FailureCode } from 'src/workflow/workflow.constants';
 import {
+  ArtifactDeletedError,
   ArtifactWriter,
-  CurrentVersionRead,
+  FailVersionOutcome,
   RefineContext,
+  VersionRead,
   VersionRender,
   VersionWriteOptions,
 } from './artifact-writer.interface';
@@ -93,7 +96,7 @@ export interface ArtifactDetail {
   id: string;
   type: ArtifactType;
   title?: string;
-  currentVersion: number;
+  currentVersion?: number;
   version: number;
   status: VersionStatus;
   updatedAt?: Date;
@@ -119,15 +122,15 @@ interface ArtifactListRow {
   type: ArtifactType;
   title?: string;
   updatedAt: Date;
-  _currentVersion: {
+  _latestVersion: {
     version: number;
     status: VersionStatus;
-    content: Record<string, unknown>;
+    content?: Record<string, unknown>;
   } | null;
 }
 
 type ValidArtifactListRow = ArtifactListRow & {
-  _currentVersion: NonNullable<ArtifactListRow['_currentVersion']>;
+  _latestVersion: NonNullable<ArtifactListRow['_latestVersion']>;
 };
 
 interface ArtifactListAggregateResult {
@@ -161,11 +164,17 @@ export class ArtifactService implements ArtifactWriter {
         ...(input.stylePreset ? { stylePreset: input.stylePreset } : {}),
         ...(input.theme ? { theme: input.theme } : {}),
       },
-      currentVersion: 1,
-      versions: [{ version: 1, status: VersionStatus.GENERATING, content: {} }],
+      // No currentVersion until v1 is promoted to READY.
+      versions: [{ version: 1, status: VersionStatus.GENERATING }],
     });
   }
 
+  /**
+   * Appends a `GENERATING` Attempt that refines the Current Version. The
+   * Current Version does not move: only promotion moves it, once the Attempt
+   * is `READY`. At most one Attempt is in flight, enforced by the write itself
+   * so two concurrent refines cannot both append.
+   */
   async appendRefineVersion(
     userId: string,
     artifactId: string,
@@ -181,44 +190,52 @@ export class ArtifactService implements ArtifactWriter {
       throw new NotFoundException(`Artifact ${artifactId} not found`);
     }
 
-    const current = artifact.versions.find(
-      (item) => item.version === artifact.currentVersion,
-    );
-    if (!current || current.status === VersionStatus.GENERATING) {
+    if (
+      artifact.versions.some((item) => item.status === VersionStatus.GENERATING)
+    ) {
       throw new ConflictException(
         `Artifact ${artifactId} is still generating and cannot be refined`,
       );
     }
 
-    const priorContent = this.findLatestUsableContent(
-      artifact,
-      artifact.currentVersion + 1,
+    const base = artifact.versions.find(
+      (item) =>
+        item.version === artifact.currentVersion &&
+        item.status === VersionStatus.READY,
     );
-    let theme = artifact.source.theme;
-    if (
-      !theme &&
-      artifact.type === ArtifactType.DOCUMENT &&
-      priorContent &&
-      'document' in priorContent
-    ) {
-      theme = priorContent.document.templateId;
+    if (!base) {
+      throw new ConflictException(
+        `Artifact ${artifactId} has no ready version to refine`,
+      );
     }
 
-    const nextVersion = artifact.currentVersion + 1;
+    let theme = artifact.source.theme;
+    if (!theme && artifact.type === ArtifactType.DOCUMENT) {
+      const baseContent = parseArtifactContent(artifact.type, base.content);
+      if ('document' in baseContent) {
+        theme = baseContent.document.templateId;
+      }
+    }
+
+    // Numbers are never reused, so a failed Attempt keeps its number forever.
+    const nextVersion =
+      Math.max(...artifact.versions.map((item) => item.version)) + 1;
     const result = await this.artifactModel.updateOne(
       {
         _id: artifact._id,
         user,
-        currentVersion: artifact.currentVersion,
+        deletedAt: { $exists: false },
+        currentVersion: base.version,
+        'versions.status': { $ne: VersionStatus.GENERATING },
+        'versions.version': { $ne: nextVersion },
       },
       {
-        $set: { currentVersion: nextVersion },
         $push: {
           versions: {
             version: nextVersion,
             status: VersionStatus.GENERATING,
-            content: {},
             refineFeedback: feedback,
+            parentVersion: base.version,
           },
         },
       },
@@ -242,24 +259,39 @@ export class ArtifactService implements ArtifactWriter {
     };
   }
 
+  /** The refine's base is the Current Version recorded when it was appended. */
   async readRefineInput(
     artifactId: string,
     version: number,
   ): Promise<RefineContext> {
     const artifact = await this.getLiveArtifact(artifactId);
     const target = artifact.versions.find((item) => item.version === version);
-    const priorContent = this.findLatestUsableContent(artifact, version);
+    const base = artifact.versions.find(
+      (item) =>
+        target?.parentVersion !== undefined &&
+        item.version === target.parentVersion &&
+        item.status === VersionStatus.READY,
+    );
 
-    if (!target || target.refineFeedback == null || !priorContent) {
+    if (!target || target.refineFeedback == null || !base) {
       throw new NotFoundException(
         `Refine input for artifact ${artifactId} v${version} not found`,
       );
     }
 
-    return { priorContent, feedback: target.refineFeedback };
+    return {
+      priorContent: parseArtifactContent(artifact.type, base.content),
+      feedback: target.refineFeedback,
+    };
   }
 
-  async setVersionContent(
+  /**
+   * The only write that makes a version `READY`, and the only one that moves
+   * `currentVersion`, in the same update. It matches only a live artifact whose
+   * target version is still `GENERATING`, so it can neither resurrect a failed
+   * Attempt nor write into a deleted artifact.
+   */
+  async promoteVersion(
     artifactId: string,
     version: number,
     content: ArtifactContent,
@@ -292,63 +324,88 @@ export class ArtifactService implements ArtifactWriter {
       );
     }
 
-    // The write targets the fixed (artifactId, version), so a whole-job retry
-    // overwrites rather than appends.
-    await this.artifactModel.updateOne(
-      { _id: artifact._id, 'versions.version': version },
+    const result = await this.artifactModel.updateOne(
+      {
+        _id: artifact._id,
+        deletedAt: { $exists: false },
+        versions: {
+          $elemMatch: { version, status: VersionStatus.GENERATING },
+        },
+      },
       {
         $set: {
           ...(title !== undefined ? { title } : {}),
           'versions.$.content': parsed,
           'versions.$.status': VersionStatus.READY,
+          currentVersion: version,
         },
       },
+    );
+    if (result.matchedCount === 1) {
+      return;
+    }
+
+    // Nothing matched. A replay of a promotion that already landed is success;
+    // anything else means this Attempt can no longer become READY.
+    const latest = await this.getLiveArtifact(artifactId);
+    const target = latest.versions.find((v) => v.version === version);
+    if (target?.status === VersionStatus.READY) {
+      return;
+    }
+    throw new ConflictException(
+      `Version ${version} of artifact ${artifactId} is ${target?.status ?? 'missing'} and cannot be promoted`,
     );
   }
 
   /**
-   * Terminal end of a run: the version keeps its place in the artifact's
-   * history rather than being removed, so the user can see what failed and
-   * refine from it.
+   * Terminal end of a run: the Attempt keeps its place in the history as
+   * `FAILED`, with its failure code and reason and no content. Only a
+   * `GENERATING` Attempt is failed, so a version a promotion already made READY
+   * is never overwritten.
    */
   async failVersion(
     artifactId: string,
     version: number,
+    failureCode: FailureCode,
     failureReason: string,
-  ): Promise<void> {
+  ): Promise<FailVersionOutcome> {
+    const artifact = await this.artifactModel.findById(artifactId);
+    if (!artifact) {
+      throw new NotFoundException(`Artifact ${artifactId} not found`);
+    }
+    const result = await this.artifactModel.updateOne(
+      {
+        _id: artifact._id,
+        versions: {
+          $elemMatch: { version, status: VersionStatus.GENERATING },
+        },
+      },
+      {
+        $set: {
+          'versions.$.status': VersionStatus.FAILED,
+          'versions.$.failureCode': failureCode,
+          'versions.$.failureReason': failureReason,
+        },
+        $unset: { 'versions.$.content': '' },
+      },
+    );
+    // A deleted artifact's Attempt is still failed, so a direct link never
+    // shows it in flight; the caller only needs to know not to announce it.
+    if (artifact.deletedAt) {
+      return 'ARTIFACT_DELETED';
+    }
+    return result.matchedCount === 1 ? 'FAILED' : 'NOT_GENERATING';
+  }
+
+  async readVersion(artifactId: string, version: number): Promise<VersionRead> {
     const artifact = await this.getLiveArtifact(artifactId);
-    if (!artifact.versions.some((v) => v.version === version)) {
+    const target = artifact.versions.find((v) => v.version === version);
+    if (!target) {
       throw new NotFoundException(
         `Version ${version} not found on artifact ${artifactId}`,
       );
     }
-
-    await this.artifactModel.updateOne(
-      { _id: artifact._id, 'versions.version': version },
-      {
-        $set: {
-          'versions.$.status': VersionStatus.FAILED,
-          'versions.$.failureReason': failureReason,
-        },
-      },
-    );
-  }
-
-  async readCurrent(artifactId: string): Promise<CurrentVersionRead> {
-    const artifact = await this.getLiveArtifact(artifactId);
-    const current = artifact.versions.find(
-      (v) => v.version === artifact.currentVersion,
-    );
-    if (!current) {
-      throw new NotFoundException(
-        `Version ${artifact.currentVersion} not found on artifact ${artifactId}`,
-      );
-    }
-    return {
-      type: artifact.type,
-      version: current.version,
-      content: current.content as ArtifactContent,
-    };
+    return { type: artifact.type, version, status: target.status };
   }
 
   /**
@@ -391,32 +448,26 @@ export class ArtifactService implements ArtifactWriter {
       };
     }
 
-    const matchingCurrentVersionsExpression = {
-      $filter: {
-        input: { $ifNull: ['$versions', []] },
-        as: 'version',
-        cond: { $eq: ['$$version.version', '$currentVersion'] },
-      },
-    };
-    const currentVersionExpression = {
-      $arrayElemAt: [matchingCurrentVersionsExpression, 0],
-    };
-    const currentVersionMatch = {
+    // Versions are only ever appended as max + 1, so the last element is the
+    // newest version: the Current Version, or an Attempt made after it.
+    const versionsExpression = { $ifNull: ['$versions', []] };
+    const latestVersionExpression = { $arrayElemAt: [versionsExpression, -1] };
+    const hasVersionMatch = {
       $match: {
         $expr: {
-          $gt: [{ $size: matchingCurrentVersionsExpression }, 0],
+          $gt: [{ $size: versionsExpression }, 0],
         },
       },
     };
 
     const statusMatch = query.status
-      ? [{ $match: { '_currentVersion.status': query.status } }]
+      ? [{ $match: { '_latestVersion.status': query.status } }]
       : [];
 
     const listPipeline = [
       { $match: pageMatch },
-      currentVersionMatch,
-      { $set: { _currentVersion: currentVersionExpression } },
+      hasVersionMatch,
+      { $set: { _latestVersion: latestVersionExpression } },
       ...statusMatch,
       { $sort: { updatedAt: -1, _id: -1 } },
       {
@@ -430,7 +481,7 @@ export class ArtifactService implements ArtifactWriter {
                 type: 1,
                 title: 1,
                 updatedAt: 1,
-                _currentVersion: 1,
+                _latestVersion: 1,
               },
             },
           ],
@@ -452,7 +503,7 @@ export class ArtifactService implements ArtifactWriter {
         this.artifactModel
           .aggregate<{ month: string }>([
             { $match: filterMatch },
-            currentVersionMatch,
+            hasVersionMatch,
             {
               $group: {
                 _id: {
@@ -469,7 +520,7 @@ export class ArtifactService implements ArtifactWriter {
           .exec(),
         this.artifactModel.distinct('type', {
           ...filterMatch,
-          ...currentVersionMatch.$match,
+          ...hasVersionMatch.$match,
         }),
       ]);
 
@@ -480,7 +531,7 @@ export class ArtifactService implements ArtifactWriter {
         // The aggregation excludes these rows; keep the boundary defensive in
         // case a mock or future pipeline change returns malformed data.
         .filter(
-          (row): row is ValidArtifactListRow => row._currentVersion !== null,
+          (row): row is ValidArtifactListRow => row._latestVersion !== null,
         )
         .map((row) => this.toSummary(row)),
     );
@@ -507,7 +558,9 @@ export class ArtifactService implements ArtifactWriter {
 
   /**
    * Reads a selected version, including soft-deleted artifacts for direct
-   * links. Version history is deliberately metadata-only.
+   * links. Without one it reads the newest version, which is an Attempt while a
+   * refine is in flight or after one failed. Version history is deliberately
+   * metadata-only.
    */
   async getArtifact(
     userId: string,
@@ -515,7 +568,9 @@ export class ArtifactService implements ArtifactWriter {
     options: ArtifactGetOptions = {},
   ): Promise<ArtifactDetail> {
     const artifact = await this.getOwnedArtifact(userId, artifactId, true);
-    const versionNumber = options.version ?? artifact.currentVersion;
+    const versionNumber =
+      options.version ??
+      artifact.versions[artifact.versions.length - 1]?.version;
     const version = artifact.versions.find(
       (candidate) => candidate.version === versionNumber,
     );
@@ -546,14 +601,25 @@ export class ArtifactService implements ArtifactWriter {
     );
 
     if (!current) {
-      throw new NotFoundException(
-        `Version ${artifact.currentVersion} not found on artifact ${artifactId}`,
+      throw new ConflictException(
+        `Artifact ${artifactId} has no ready version to edit`,
       );
     }
 
     if (current.status !== VersionStatus.READY) {
       throw new ConflictException(
         `Artifact ${artifactId} cannot be edited while version ${current.version} is ${current.status}`,
+      );
+    }
+
+    // A refine reads the Current Version's content when its run starts, so an
+    // edit while one is in flight would silently change the refine's input.
+    const attempt = artifact.versions.find(
+      (version) => version.status === VersionStatus.GENERATING,
+    );
+    if (attempt) {
+      throw new ConflictException(
+        `Artifact ${artifactId} cannot be edited while version ${attempt.version} is GENERATING`,
       );
     }
 
@@ -578,7 +644,7 @@ export class ArtifactService implements ArtifactWriter {
     try {
       parsedContent = parseArtifactContent(
         artifact.type,
-        this.mergeRecords(current.content, contentPatch),
+        this.mergeRecords(current.content ?? {}, contentPatch),
       );
       parsedTitle =
         input.title !== undefined
@@ -684,34 +750,14 @@ export class ArtifactService implements ArtifactWriter {
     };
   }
 
-  private findLatestUsableContent(
-    artifact: Artifact,
-    beforeVersion: number,
-  ): ArtifactContent | undefined {
-    const versions = [...artifact.versions]
-      .filter((version) => version.version < beforeVersion)
-      .sort((a, b) => b.version - a.version);
-
-    for (const version of versions) {
-      try {
-        return parseArtifactContent(artifact.type, version.content);
-      } catch {
-        // Failed versions can retain an empty content object. Keep walking back
-        // so a later refine can still revise the last usable version.
-      }
-    }
-
-    return undefined;
-  }
-
   private async toSummary(row: ValidArtifactListRow): Promise<ArtifactSummary> {
-    const content = row._currentVersion.content ?? {};
+    const content = row._latestVersion.content ?? {};
     const preview = await this.toPreview(row.type, content);
     return {
       id: row._id.toString(),
       type: row.type,
       ...(row.title !== undefined ? { title: row.title } : {}),
-      status: row._currentVersion.status,
+      status: row._latestVersion.status,
       updatedAt: row.updatedAt,
       preview,
     };
@@ -752,7 +798,9 @@ export class ArtifactService implements ArtifactWriter {
       id: artifact._id.toString(),
       type: artifact.type,
       ...(artifact.title !== undefined ? { title: artifact.title } : {}),
-      currentVersion: artifact.currentVersion,
+      ...(artifact.currentVersion !== undefined
+        ? { currentVersion: artifact.currentVersion }
+        : {}),
       version: version.version,
       status: version.status,
       ...(artifact.updatedAt ? { updatedAt: artifact.updatedAt } : {}),
@@ -907,10 +955,14 @@ export class ArtifactService implements ArtifactWriter {
     return String(value);
   }
 
+  /** For the run's own reads and writes: a deletion mid-run is not a bug. */
   private async getLiveArtifact(artifactId: string): Promise<Artifact> {
     const artifact = await this.artifactModel.findById(artifactId);
-    if (!artifact || artifact.deletedAt) {
+    if (!artifact) {
       throw new NotFoundException(`Artifact ${artifactId} not found`);
+    }
+    if (artifact.deletedAt) {
+      throw new ArtifactDeletedError(artifactId);
     }
     return artifact;
   }

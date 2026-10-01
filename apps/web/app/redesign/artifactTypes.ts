@@ -79,9 +79,19 @@ export type RunCompletedEvent = {
   version: number;
 };
 
+/** Stable failure codes on `run.failed`; POST and POLL runs only emit `internal`. */
+export type RunFailureCode =
+  | "document.repair_exhausted"
+  | "document.truncated"
+  | "design_system.unavailable"
+  | "render.unavailable"
+  | "artifact.source_missing"
+  | "internal";
+
 export type RunFailedEvent = {
   seq: number;
   ts: number;
+  code: RunFailureCode;
   failureReason: string;
 };
 
@@ -114,7 +124,8 @@ export type ArtifactDetailData = {
   id: string;
   type: ArtifactType;
   title?: string;
-  currentVersion: number;
+  /** The newest READY version; absent until the first version is READY. */
+  currentVersion?: number;
   version: number;
   status: ArtifactStatus;
   updatedAt?: string;

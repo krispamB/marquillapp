@@ -1,6 +1,6 @@
 import { UnrecoverableError } from 'bullmq';
 import type { Logger } from '@nestjs/common';
-import { WorkflowStep } from '../workflow.constants';
+import { FailureCode, WorkflowStep } from '../workflow.constants';
 import { RunEventEmitter } from './run-event.emitter';
 import { RunEventType } from './run-event.types';
 import { buildWorkflow } from './workflow.builder';
@@ -33,8 +33,8 @@ export interface RunDeps {
  *
  * A retry re-runs the whole job from step 1 — there are no per-step checkpoints.
  * That is safe because the run targets a fixed `(artifactId, version)` created
- * as `GENERATING` at kickoff, so every step, `PERSIST_VERSION` included,
- * overwrites rather than appends.
+ * as a `GENERATING` Attempt at kickoff, and `PERSIST_VERSION`'s promotion is
+ * idempotent: a replay that finds the version already `READY` succeeds.
  */
 export async function runWorkflow(
   input: BuildInput,
@@ -139,10 +139,12 @@ async function announceFailure(
   step: WorkflowStep,
   error: WorkflowError,
 ): Promise<Error> {
-  emitter.emit({
-    type: RunEventType.STEP_FAILED,
-    data: { step, retryable: error.retryable, message: error.reason },
-  });
+  if (!error.silent) {
+    emitter.emit({
+      type: RunEventType.STEP_FAILED,
+      data: { step, retryable: error.retryable, message: error.reason },
+    });
+  }
   await emitter.flush();
 
   return error.retryable ? error : new UnrecoverableError(error.reason);
@@ -158,41 +160,64 @@ export interface TerminalFailureDeps {
 export interface TerminalFailure {
   artifactId: string;
   version: number;
+  failureCode: FailureCode;
   failureReason: string;
 }
 
+export const ARTIFACT_DELETED_FAILURE_REASON =
+  'The artifact was deleted before the run finished.';
+
 /**
  * Fired only on attempts-exhausted or `UnrecoverableError`, mirroring the
- * `media-upload` `exhausted` idiom.
+ * `media-upload` `exhausted` idiom. The failed Attempt and the run store the
+ * same `failureCode` and `failureReason` that `run.failed` carries.
  *
  * **No credit commit** — the operator absorbs the spend of a failed run. Each
  * write is isolated: this is the last line of defence, and one broken write must
  * not strand the run in `RUNNING` or deny the client its `run.failed`.
+ *
+ * An artifact the user deleted mid-run fails its run silently: the client that
+ * deleted it is not waiting for the result.
  */
 export async function handleTerminalFailure(
   { artifacts, run, emitter, logger }: TerminalFailureDeps,
-  { artifactId, version, failureReason }: TerminalFailure,
+  { artifactId, version, failureCode, failureReason }: TerminalFailure,
 ): Promise<void> {
   const report = (what: string, error: unknown): void =>
     logger.error(
       `Terminal-failure handler could not ${what} for artifact ${artifactId} v${version}: ${describeError(error)}`,
     );
 
+  let deleted = false;
   try {
-    await artifacts.failVersion(artifactId, version, failureReason);
+    const outcome = await artifacts.failVersion(
+      artifactId,
+      version,
+      failureCode,
+      failureReason,
+    );
+    deleted = outcome === 'ARTIFACT_DELETED';
   } catch (error: unknown) {
     report('mark the version FAILED', error);
   }
 
   try {
-    await run.fail(failureReason);
+    await (deleted
+      ? run.fail(FailureCode.INTERNAL, ARTIFACT_DELETED_FAILURE_REASON)
+      : run.fail(failureCode, failureReason));
   } catch (error: unknown) {
     report('mark the run FAILED', error);
   }
 
-  emitter.emit({
-    type: RunEventType.RUN_FAILED,
-    data: { failureReason },
-  });
+  if (deleted) {
+    logger.log(
+      `Run for artifact ${artifactId} v${version} failed after the artifact was deleted`,
+    );
+  } else {
+    emitter.emit({
+      type: RunEventType.RUN_FAILED,
+      data: { code: failureCode, failureReason },
+    });
+  }
   await emitter.flush();
 }

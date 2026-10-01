@@ -40,7 +40,7 @@ Initial generation also creates a trimmed, descriptive `title` of 1–100 charac
 }
 ```
 
-Open the SSE stream in [runs.md](./runs.md) with `runId`. The version is ready only after `run.completed`.
+Open the SSE stream in [runs.md](./runs.md) with `runId`. The version is ready only after `run.completed`. Until then the artifact has no `currentVersion`; version 1 is an Attempt.
 
 ### Common errors
 
@@ -49,7 +49,9 @@ Open the SSE stream in [runs.md](./runs.md) with `runId`. The version is ready o
 
 ## `POST /artifacts/:id/refine`
 
-Starts a new AI refinement against the current usable version. It appends a version, increments `currentVersion`, and returns the new version number and run ID.
+Starts a new AI refinement of the Current Version. It appends an Attempt: a new `GENERATING` version numbered `max(versions) + 1`. `currentVersion` does not move; it moves to the Attempt only when the Attempt becomes `READY`, at `run.completed`. If the run fails, the Attempt stays in the history as `FAILED`, with no content, and the Current Version is unchanged. A failed Attempt is never resumed or reused; refine the Current Version again instead. Version numbers are never reused.
+
+At most one Attempt is in flight per artifact.
 
 ### Request
 
@@ -71,10 +73,12 @@ Starts a new AI refinement against the current usable version. It appends a vers
 }
 ```
 
+`version` is the Attempt's number.
+
 ### Common errors
 
 - `404` artifact does not exist, is deleted, or is not owned by the caller.
-- `409` the current version is still `GENERATING`, or another refine changed the artifact concurrently.
+- `409` an Attempt is already `GENERATING`, the artifact has no `READY` version to refine, or another refine started concurrently.
 - `403` insufficient credits.
 
 ## `GET /artifacts`
@@ -86,7 +90,7 @@ Lists live artifacts as lightweight summaries, newest first, with 20 results per
 | Parameter | Type | Notes |
 |---|---|---|
 | `type` | `POST \| POLL \| DOCUMENT` | Optional type filter. |
-| `status` | `GENERATING \| READY \| FAILED` | Optional current-version status filter. |
+| `status` | `GENERATING \| READY \| FAILED` | Optional filter on the newest version's status. |
 | `month` | `YYYY-MM` | Optional `updatedAt` month filter. |
 | `search` | string | Optional case-insensitive literal substring match against `title` and the original `source.prompt`. Surrounding whitespace is ignored. |
 | `page` | positive integer | Optional one-based page; defaults to `1`. |
@@ -126,13 +130,15 @@ Search treats punctuation and regular-expression characters literally. It can be
 
 ## `GET /artifacts/:id`
 
-Returns a selected version in full. Without query parameters it returns the artifact's current version.
+Returns a selected version in full. Without query parameters it returns the artifact's newest version: the Current Version, or a newer Attempt that is `GENERATING` or `FAILED`. A summary's `status` in `GET /artifacts` is the same newest version's status.
+
+`currentVersion` is the newest `READY` version. It is omitted until the first version becomes `READY`. A version that is not `READY` has `content: {}`.
 
 ### Query parameters
 
 | Parameter | Type | Notes |
 |---|---|---|
-| `version` | positive integer | Return this version instead of `currentVersion`. |
+| `version` | positive integer | Return this version instead of the newest one. |
 | `includeVersions` | `true \| false` | When true, add version metadata; history does not repeat full content. |
 
 ### Response: `200 OK`
@@ -205,7 +211,7 @@ Poll options must be unique after trimming and case-folding. The server validate
 
 ## `PATCH /artifacts/:id`
 
-Edits the current version in place. It does not create a new version. The current version must be `READY`, must not be referenced by a `SCHEDULED` or `PUBLISHED` Post, and the response stamps `editedAt`.
+Edits the Current Version in place. It does not create a new version. The artifact must have a Current Version and no Attempt in flight, the Current Version must not be referenced by a `SCHEDULED` or `PUBLISHED` Post, and the response stamps `editedAt`.
 
 Preferred request envelope:
 
@@ -234,7 +240,7 @@ The response is the same artifact detail shape as `GET /artifacts/:id`, inside `
 
 - `400` invalid or incomplete content after merging the patch.
 - `404` artifact not found, deleted, or not owned by the caller.
-- `409` current version is not `READY`, is pinned by a scheduled/published Post, or changed before the edit was saved. Unschedule first or create/refine another version instead of mutating an approved composition.
+- `409` there is no Current Version, a refine is in flight, the Current Version is pinned by a scheduled/published Post, or it changed before the edit was saved. Unschedule first or create/refine another version instead of mutating an approved composition.
 
 ## `DELETE /artifacts/:id`
 

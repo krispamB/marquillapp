@@ -5,7 +5,7 @@ import { RunKind, RunStatus, WorkflowRun } from '../database/schemas';
 import type { ResearchResult } from '../agent/agent-runner.interface';
 import type { RenderAttemptUsage } from '../carousel/render-usage.types';
 import type { BuildInput, RunRecordHandle } from './engine/workflow.types';
-import { WorkflowStep } from './workflow.constants';
+import { FailureCode, WorkflowStep } from './workflow.constants';
 
 export interface CreateRunInput {
   userId: string;
@@ -77,8 +77,12 @@ export class WorkflowRunService {
         this.getLatestCompletedResearch(artifactId),
       complete: (creditsUsed: number) =>
         this.patch(runId, { status: RunStatus.COMPLETED, creditsUsed }),
-      fail: (failureReason: string) =>
-        this.patch(runId, { status: RunStatus.FAILED, failureReason }),
+      fail: (failureCode: FailureCode, failureReason: string) =>
+        this.patch(runId, {
+          status: RunStatus.FAILED,
+          failureCode,
+          failureReason,
+        }),
     };
   }
 
