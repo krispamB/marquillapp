@@ -1,5 +1,7 @@
 # Artifact Workflow Step Pipelines — Design
 
+> **2026-10-01 amendment (map #131, #142).** Amended by [`document-generation-spec.md`](./document-generation-spec.md) §7. The DOCUMENT pipelines, `GENERATE`, `RENDER_PDF` and `PERSIST_VERSION` now own a shared Repair budget, a CDP render session with a judge, a render checkpoint and a conditional promotion. §8's terminal post-repair Zod failure becomes a turn of `DOCUMENT_REPAIR_BUDGET` for DOCUMENT.
+
 > Status: design spec for wayfinder map #94, ticket #104 (grilling outcome).
 > Author: generated for Christopher Pam. Decisions settled on 2026-07-09.
 > **Synthesis ticket.** It does not invent a new engine — #98 (engine/step model),

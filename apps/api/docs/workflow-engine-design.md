@@ -1,5 +1,7 @@
 # Workflow Engine — Design
 
+> **2026-10-01 amendment (map #131, #142).** Amended by [`document-generation-spec.md`](./document-generation-spec.md). §4: the run record gains `documentDiagnostics`, the `acceptedCandidate` checkpoint and 90-day retention of candidate text (spec §7.3, §11.1, §11.5). §7: DOCUMENT runs have a 6-minute per-attempt deadline and a stable failure-code table (spec §7.5, §7.8). The step model is unchanged.
+
 > Status: design spec for wayfinder map #94, ticket #98 (grilling outcome).
 > Author: generated for Christopher Pam. Decisions settled in a grilling session
 > on 2026-07-09.

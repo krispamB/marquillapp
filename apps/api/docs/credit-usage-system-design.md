@@ -1,5 +1,7 @@
 # Credit-Based Usage System — Design
 
+> **2026-10-01 amendment (map #131, #142).** Amended by [`document-generation-spec.md`](./document-generation-spec.md) §7.7. The `pdf_render` surcharge is one record per run, priced over the units of every render session that produced a verdict, so the minimum applies once per run; sessions lost to outages are absorbed.
+
 > Status: design spec for wayfinder map #94, ticket #100 (grilling outcome).
 > Author: generated for Christopher Pam. Decisions settled 2026-07-09.
 > Implements the `CreditMeter` interface #98 defines and consumes the raw usage

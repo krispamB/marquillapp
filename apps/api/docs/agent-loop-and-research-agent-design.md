@@ -1,5 +1,7 @@
 # Agent Loop & Research Agent — Design
 
+> **2026-10-01 amendment (map #131, #142).** Amended by [`document-generation-spec.md`](./document-generation-spec.md) §7. §4: DOCUMENT generation emits JSON `{ title?, commentary, html }` and is followed by backend-driven Repair turns (still no agent loop). §8: the LLM layer surfaces `finishReason`; `length` is terminal truncation.
+
 > Status: design spec for wayfinder map #94, ticket #99 (grilling outcome).
 > Author: generated for Christopher Pam. Decisions settled in a grilling session
 > on 2026-07-09.

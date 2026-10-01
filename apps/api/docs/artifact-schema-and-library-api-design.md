@@ -1,5 +1,7 @@
 # Artifact Schema, Versioning & Library API — Design
 
+> **2026-10-01 amendment (map #131, #142).** Amended by [`document-generation-spec.md`](./document-generation-spec.md). §1–§2: `currentVersion` is the newest `READY` version, Attempts never replace it, at most one is in flight (spec §6.1–§6.2). §4: DOCUMENT content is R2 keys, hashes and a per-version Design System pin, not `templateId` + `slides` (spec §6.3). §5: refine bases on the Current Version's Candidate Source; DOCUMENT `PATCH` edits title and commentary only (spec §6.4–§6.5). §8: client reads are an allowlist with `coverUrl` and `latestAttempt` (spec §6.7–§6.8).
+
 > Status: design spec for wayfinder map #94, ticket #97 (grilling outcome).
 > Author: generated for Christopher Pam. Decisions settled in a grilling session
 > on 2026-07-09.
