@@ -1,24 +1,21 @@
 export const POLL_DURATION_DAYS = [1, 3, 7, 14] as const;
 export type PollDurationDays = (typeof POLL_DURATION_DAYS)[number];
 
-export type ArtifactSlide =
-  | { type: "cover"; fields: { eyebrow?: string; title: string; subtitle?: string } }
-  | { type: "content"; fields: { heading: string; body: string } }
-  | { type: "list"; fields: { heading: string; items: string[] } }
-  | { type: "quote"; fields: { quote: string; attribution?: string } }
-  | { type: "cta"; fields: { headline: string; action: string; handle?: string } };
-
 export type ArtifactPollContent = {
   question: string;
   options: string[];
   durationDays: PollDurationDays;
 };
 
+/** A READY Document Version as the API serializes it: its pin, size and a signed PDF. */
 export type ArtifactDocumentContent = {
-  templateId: "bold" | "minimal" | "editorial" | "gradient";
-  slides: ArtifactSlide[];
-  pageCount?: number;
-  pdfUrl?: string;
+  designSystemId: string;
+  designSystemVersion: number;
+  designSystemName: string;
+  pageCount: number;
+  /** Signed per read; valid until `pdfUrlExpiresAt`. */
+  pdfUrl: string;
+  pdfUrlExpiresAt: string;
 };
 
 export type ArtifactContent = {

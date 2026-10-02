@@ -3,6 +3,7 @@ import { NotFoundException } from '@nestjs/common';
 jest.mock(
   '../../database/schemas',
   () => ({
+    ArtifactType: { POST: 'POST', POLL: 'POLL', DOCUMENT: 'DOCUMENT' },
     RunKind: { INITIAL: 'INITIAL', REFINE: 'REFINE' },
     VersionStatus: {
       GENERATING: 'GENERATING',
@@ -12,6 +13,10 @@ jest.mock(
   }),
   { virtual: true },
 );
+
+jest.mock('../../design-system/prompt-fragment', () => ({
+  renderPromptFragment: jest.fn(() => 'FRAGMENT'),
+}));
 
 import { WorkflowError } from '../engine/workflow.error';
 import type { RunState, StepContext } from '../engine/workflow.types';
@@ -23,13 +28,40 @@ const makeStep = () => {
     readRefineInput: jest.fn(),
   };
   const run = { getLatestCompletedResearch: jest.fn() };
-  const ctx = { artifacts, run } as unknown as StepContext;
+  const designSystems = { resolve: jest.fn() };
+  const logger = { error: jest.fn() };
+  const ctx = {
+    artifacts,
+    run,
+    designSystems,
+    logger,
+  } as unknown as StepContext;
 
   const state = {
-    input: { artifactId: 'artifact-1', version: 1, kind: 'INITIAL' },
+    input: {
+      artifactId: 'artifact-1',
+      version: 1,
+      kind: 'INITIAL',
+      type: 'POST',
+    },
   } as unknown as RunState;
 
-  return { ctx, mocks: { artifacts, run }, fixtures: { state } };
+  const definition = { id: 'margin', version: 2 };
+  const documentState = {
+    input: {
+      artifactId: 'artifact-1',
+      version: 1,
+      kind: 'INITIAL',
+      type: 'DOCUMENT',
+      designSystem: { id: 'margin', version: 2 },
+    },
+  } as unknown as RunState;
+
+  return {
+    ctx,
+    mocks: { artifacts, run, designSystems, logger },
+    fixtures: { state, documentState, definition },
+  };
 };
 
 let ctx: StepContext;
@@ -153,6 +185,82 @@ describe('resolveInputStep', () => {
         priorContent: { commentary: 'The original post.' },
         feedback: 'Make the hook sharper',
       },
+    });
+  });
+
+  describe('for a DOCUMENT run', () => {
+    beforeEach(() => {
+      mocks.artifacts.readVersion.mockResolvedValue({
+        version: 1,
+        status: 'GENERATING',
+      });
+    });
+
+    it('should load the pinned definition and its fragment when the pin resolves', async () => {
+      mocks.designSystems.resolve.mockResolvedValue({
+        contract: 1,
+        definition: fixtures.definition,
+      });
+
+      await expect(
+        resolveInputStep(fixtures.documentState, ctx),
+      ).resolves.toEqual({
+        designSystem: {
+          definition: fixtures.definition,
+          fragment: 'FRAGMENT',
+        },
+      });
+      expect(mocks.designSystems.resolve).toHaveBeenCalledWith('margin', 2);
+    });
+
+    it('should fail terminally with design_system.unavailable and alert when the pin does not resolve', async () => {
+      mocks.designSystems.resolve.mockRejectedValue(
+        new NotFoundException('Design System margin v2 not found'),
+      );
+
+      await expect(
+        resolveInputStep(fixtures.documentState, ctx),
+      ).rejects.toMatchObject({
+        retryable: false,
+        code: 'design_system.unavailable',
+      });
+      expect(mocks.logger.error).toHaveBeenCalledWith(
+        expect.stringContaining('[ALERT design_system.unresolvable]'),
+      );
+    });
+
+    it('should fail transiently when the pinned contract is not the supported one', async () => {
+      mocks.designSystems.resolve.mockResolvedValue({
+        contract: 2,
+        definition: fixtures.definition,
+      });
+
+      await expect(
+        resolveInputStep(fixtures.documentState, ctx),
+      ).rejects.toMatchObject({
+        retryable: true,
+        code: 'design_system.unavailable',
+      });
+    });
+
+    it('should rethrow a read failure so it stays retryable', async () => {
+      const outage = new Error('connection reset');
+      mocks.designSystems.resolve.mockRejectedValue(outage);
+
+      await expect(resolveInputStep(fixtures.documentState, ctx)).rejects.toBe(
+        outage,
+      );
+    });
+
+    it('should fail terminally when the job carries no pin', async () => {
+      const state = {
+        input: { ...fixtures.documentState.input, designSystem: undefined },
+      } as unknown as RunState;
+
+      await expect(resolveInputStep(state, ctx)).rejects.toMatchObject({
+        retryable: false,
+      });
+      expect(mocks.designSystems.resolve).not.toHaveBeenCalled();
     });
   });
 });

@@ -9,7 +9,6 @@ import {
   GalleryHorizontal,
   LoaderCircle,
   LockKeyhole,
-  Palette,
   PenLine,
   Search,
   X,
@@ -29,8 +28,6 @@ import { API_BASE, jsonRequest, readApi } from "./api";
 import RedesignShell from "./Shell";
 import { canUseResearch } from "./tier-access";
 
-type CarouselTheme = "bold" | "minimal" | "editorial" | "gradient";
-
 const artifactOptions: Array<{
   type: ArtifactType;
   label: string;
@@ -49,13 +46,6 @@ const styleOptions = [
   { value: StylePreset.BOLD, label: "Bold" },
   { value: StylePreset.CONTRARIAN, label: "Contrarian" },
   { value: StylePreset.FOUNDER, label: "Founder" },
-];
-
-const themeOptions: Array<{ value: CarouselTheme; label: string }> = [
-  { value: "bold", label: "Bold" },
-  { value: "minimal", label: "Minimal" },
-  { value: "editorial", label: "Editorial" },
-  { value: "gradient", label: "Gradient" },
 ];
 
 export default function ArtifactStudioClient({
@@ -78,7 +68,6 @@ export default function ArtifactStudioClient({
   const [prompt, setPrompt] = useState("");
   const [withResearch, setWithResearch] = useState(false);
   const [stylePreset, setStylePreset] = useState<StylePreset>(StylePreset.PROFESSIONAL);
-  const [theme, setTheme] = useState<CarouselTheme>("minimal");
   const [isCreating, setIsCreating] = useState(false);
   const [creationError, setCreationError] = useState<string | null>(null);
   const researchAvailable = canUseResearch(subscription ?? user.tier);
@@ -106,7 +95,6 @@ export default function ArtifactStudioClient({
           prompt: trimmedPrompt,
           withResearch: researchAvailable && withResearch,
           ...(type === "POST" ? { stylePreset } : {}),
-          ...(type === "DOCUMENT" ? { theme } : {}),
         }, { method: "POST" }),
       );
       if (!response?.artifactId || !response.runId) {
@@ -195,19 +183,6 @@ export default function ArtifactStudioClient({
                 </div>
 
                 <div className="mq-artifact-prompt-controls">
-                  {type === "DOCUMENT" ? (
-                    <label className="mq-artifact-studio-select">
-                      <Palette size={14} />
-                      <span className="sr-only">Carousel theme</span>
-                      <MarquillSelect
-                        value={theme}
-                        onChange={(value) => setTheme(value as CarouselTheme)}
-                        options={themeOptions}
-                        ariaLabel="Carousel theme"
-                      />
-                    </label>
-                  ) : null}
-
                   {type === "POST" ? (
                     <label className="mq-artifact-studio-select">
                       <PenLine size={14} />

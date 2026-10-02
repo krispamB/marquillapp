@@ -24,13 +24,9 @@ function monthLabel(value: string) {
   return new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
 }
 
-function previewCopy(artifact: ArtifactSummary) {
+export function previewCopy(artifact: ArtifactSummary) {
   if (artifact.preview?.commentary?.trim()) return artifact.preview.commentary.trim();
-  const firstSlide = artifact.preview?.firstSlide;
-  if (firstSlide) {
-    const fields = firstSlide.fields as Record<string, unknown>;
-    return [fields.eyebrow, fields.title, fields.subtitle].filter((value) => typeof value === "string").join(" · ");
-  }
+  if (artifact.preview?.pageCount) return `${artifact.preview.pageCount}-page document`;
   return "Open this artifact to review its latest READY version.";
 }
 
@@ -159,7 +155,15 @@ export default function PostArtifactPicker({
                 onClick={() => onSelect(artifact)}
                 title={incompatible ? "Remove media before selecting this artifact type" : undefined}
               >
-                <span className={`mq-artifact-pick-icon is-${artifact.type.toLowerCase()}`}><ArtifactIcon size={18} /></span>
+                <span className={`mq-artifact-pick-icon is-${artifact.type.toLowerCase()}`}>
+                  {artifact.preview?.coverUrl ? (
+                    // A signed, short-lived R2 URL: next/image would cache and re-serve it.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={artifact.preview.coverUrl} alt="" />
+                  ) : (
+                    <ArtifactIcon size={18} />
+                  )}
+                </span>
                 <span className="mq-artifact-pick-copy">
                   <span><strong>{artifact.title?.trim() || "Untitled artifact"}</strong><b>{artifact.type}</b></span>
                   <small>{previewCopy(artifact)}</small>

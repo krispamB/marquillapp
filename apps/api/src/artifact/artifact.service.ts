@@ -4,13 +4,13 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, type PipelineStage } from 'mongoose';
 import {
   Artifact,
   ArtifactType,
-  CarouselTheme,
   Post,
   PostStatus,
   VersionStatus,
@@ -19,18 +19,19 @@ import { getSignedUrl } from '../s3';
 import type { StylePreset } from 'src/agent/style-presets.config';
 import type { FailureCode } from 'src/workflow/workflow.constants';
 import { WorkflowRunService } from 'src/workflow/workflow-run.service';
+import { DesignSystemsService } from '../design-system/design-systems.service';
 import {
   ArtifactDeletedError,
   ArtifactWriter,
   FailVersionOutcome,
   RefineContext,
   VersionRead,
-  VersionRender,
   VersionWriteOptions,
 } from './artifact-writer.interface';
 import {
   ArtifactContent,
   DocumentContent,
+  DocumentVersion,
   artifactTitleSchema,
   parseArtifactContent,
 } from './schemas';
@@ -46,11 +47,15 @@ export interface ArtifactSourceInput {
   prompt: string;
   withResearch: boolean;
   stylePreset?: StylePreset;
-  theme?: CarouselTheme;
 }
 
 export interface CreateArtifactInput extends ArtifactSourceInput {
   type: ArtifactType;
+  /**
+   * DOCUMENT only: the Design System the user asked for, recorded as the
+   * request. The version itself is pinned at kickoff.
+   */
+  designSystemId?: string;
 }
 
 export interface RefineArtifactInput extends ArtifactSourceInput {
@@ -79,8 +84,10 @@ export interface UpdateArtifactInput {
 
 export interface ArtifactPreview {
   commentary?: string;
-  firstSlide?: unknown;
   pdfUrl?: string;
+  pageCount?: number;
+  /** Signed PNG of page 1; absent when the cover capture failed. */
+  coverUrl?: string;
 }
 
 export interface ArtifactSummary {
@@ -135,6 +142,8 @@ export interface ArtifactListResult {
 
 const ARTIFACT_PAGE_SIZE = 20;
 const PREVIEW_SNIPPET_LENGTH = 240;
+/** Signed object URLs are minted per read and live for one hour. */
+const SIGNED_URL_TTL_SECONDS = 3600;
 
 interface ArtifactListRow {
   _id: Types.ObjectId | string;
@@ -176,6 +185,7 @@ export class ArtifactService implements ArtifactWriter {
     @InjectModel(Artifact.name) private readonly artifactModel: Model<Artifact>,
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
     private readonly workflowRuns: WorkflowRunService,
+    private readonly designSystems: DesignSystemsService,
   ) {}
 
   async createArtifact(
@@ -189,7 +199,9 @@ export class ArtifactService implements ArtifactWriter {
         prompt: input.prompt,
         withResearch: input.withResearch,
         ...(input.stylePreset ? { stylePreset: input.stylePreset } : {}),
-        ...(input.theme ? { theme: input.theme } : {}),
+        ...(input.designSystemId
+          ? { designSystemId: input.designSystemId }
+          : {}),
       },
       // No currentVersion until v1 is promoted to READY.
       versions: [{ version: 1, status: VersionStatus.GENERATING }],
@@ -217,6 +229,15 @@ export class ArtifactService implements ArtifactWriter {
       throw new NotFoundException(`Artifact ${artifactId} not found`);
     }
 
+    // Refining a Document Version needs its Candidate Source in the prompt,
+    // which arrives with #171. Until then it is refused before anything is
+    // appended or charged.
+    if (artifact.type === ArtifactType.DOCUMENT) {
+      throw new UnprocessableEntityException(
+        'Refining a document is not available yet',
+      );
+    }
+
     if (
       artifact.versions.some((item) => item.status === VersionStatus.GENERATING)
     ) {
@@ -234,14 +255,6 @@ export class ArtifactService implements ArtifactWriter {
       throw new ConflictException(
         `Artifact ${artifactId} has no ready version to refine`,
       );
-    }
-
-    let theme = artifact.source.theme;
-    if (!theme && artifact.type === ArtifactType.DOCUMENT) {
-      const baseContent = parseArtifactContent(artifact.type, base.content);
-      if ('document' in baseContent) {
-        theme = baseContent.document.templateId;
-      }
     }
 
     // Numbers are never reused, so a failed Attempt keeps its number forever.
@@ -282,7 +295,6 @@ export class ArtifactService implements ArtifactWriter {
       ...(artifact.source.stylePreset
         ? { stylePreset: artifact.source.stylePreset }
         : {}),
-      ...(theme ? { theme } : {}),
     };
   }
 
@@ -331,25 +343,13 @@ export class ArtifactService implements ArtifactWriter {
       );
     }
 
-    // For a DOCUMENT, fold RENDER_PDF's derived output onto the slides-only
-    // content GENERATE produced; POST/POLL carry no document to fold into.
-    const folded = this.foldRender(artifact.type, content, options.render);
-    const parsed = parseArtifactContent(artifact.type, folded);
+    // The content union is the READY gate: a DOCUMENT parses only as a
+    // complete Document Version, whose objects RENDER_PDF already wrote.
+    const parsed = parseArtifactContent(artifact.type, content);
     const title =
       version === 1 && options.title !== undefined
         ? artifactTitleSchema.parse(options.title)
         : undefined;
-
-    // RENDER_PDF is what gates READY for a document: without a rendered pdfKey the
-    // deck has no preview, so this flip would publish a half-built version.
-    if (
-      artifact.type === ArtifactType.DOCUMENT &&
-      !(parsed as DocumentContent).document.pdfKey
-    ) {
-      throw new Error(
-        `Cannot mark document ${artifactId} v${version} READY without a rendered pdfKey`,
-      );
-    }
 
     const result = await this.artifactModel.updateOne(
       {
@@ -372,11 +372,15 @@ export class ArtifactService implements ArtifactWriter {
       return;
     }
 
-    // Nothing matched. A replay of a promotion that already landed is success;
-    // anything else means this Attempt can no longer become READY.
+    // Nothing matched. A replay of a promotion that already landed is success
+    // (for a DOCUMENT, only of the same Document Source); anything else means
+    // this Attempt can no longer become READY.
     const latest = await this.getLiveArtifact(artifactId);
     const target = latest.versions.find((v) => v.version === version);
-    if (target?.status === VersionStatus.READY) {
+    if (
+      target?.status === VersionStatus.READY &&
+      this.isSamePromotion(artifact.type, target.content, parsed)
+    ) {
       return;
     }
     throw new ConflictException(
@@ -711,6 +715,10 @@ export class ArtifactService implements ArtifactWriter {
       );
     }
 
+    if (artifact.type === ArtifactType.DOCUMENT) {
+      this.assertDocumentEditable(input);
+    }
+
     const contentPatch = this.contentPatch(input);
     let parsedContent: ArtifactContent;
     let parsedTitle: string | undefined;
@@ -801,26 +809,22 @@ export class ArtifactService implements ArtifactWriter {
   }
 
   /**
-   * Folds RENDER_PDF's `pdfKey`/`pageCount` onto a document's slides-only
-   * content. A no-op for POST/POLL (no document object) and for a document
-   * reached without a render (the gate below rejects that separately).
+   * Whether an already-READY version holds what a replay would promote. Only a
+   * DOCUMENT can tell: the same `sourceSha256` is the same Document Source.
    */
-  private foldRender(
+  private isSamePromotion(
     type: ArtifactType,
-    content: ArtifactContent,
-    render?: VersionRender,
-  ): ArtifactContent {
-    if (type !== ArtifactType.DOCUMENT || !render || !('document' in content)) {
-      return content;
+    stored: Record<string, unknown> | undefined,
+    replayed: ArtifactContent,
+  ): boolean {
+    if (type !== ArtifactType.DOCUMENT) {
+      return true;
     }
-    return {
-      ...content,
-      document: {
-        ...content.document,
-        pdfKey: render.pdfKey,
-        pageCount: render.pageCount,
-      },
-    };
+    const storedDocument = this.recordValue(stored?.document);
+    return (
+      storedDocument?.sourceSha256 ===
+      (replayed as DocumentContent).document.sourceSha256
+    );
   }
 
   private async toSummary(
@@ -900,12 +904,15 @@ export class ArtifactService implements ArtifactWriter {
     }
 
     const document = this.recordValue(content.document);
-    const slides = document?.slides;
-    if (Array.isArray(slides) && slides.length > 0) {
-      preview.firstSlide = slides[0];
-    }
     if (typeof document?.pdfUrl === 'string') {
       preview.pdfUrl = document.pdfUrl;
+    }
+    if (typeof document?.pageCount === 'number') {
+      preview.pageCount = document.pageCount;
+    }
+    const coverKey = this.recordValue(rawContent.document)?.coverKey;
+    if (typeof coverKey === 'string') {
+      preview.coverUrl = await getSignedUrl(coverKey, SIGNED_URL_TTL_SECONDS);
     }
     return preview;
   }
@@ -981,6 +988,12 @@ export class ArtifactService implements ArtifactWriter {
     return detail;
   }
 
+  /**
+   * The client's view of a version's content. For a DOCUMENT it is an
+   * allowlist (spec §6.7): the pin with its display name, the page count, and
+   * a PDF URL signed per read. No key, hash or URL of either HTML object is
+   * ever serialized.
+   */
   private async serializeContent(
     type: ArtifactType,
     rawContent: Record<string, unknown>,
@@ -989,21 +1002,54 @@ export class ArtifactService implements ArtifactWriter {
       return rawContent;
     }
 
-    const document = this.recordValue(rawContent.document);
-    if (!document) {
-      return { ...rawContent };
-    }
+    const { commentary, document } = parseArtifactContent(
+      type,
+      rawContent,
+    ) as DocumentContent;
+    return {
+      ...(commentary !== undefined ? { commentary } : {}),
+      document: await this.serializeDocument(document),
+    };
+  }
 
-    const pdfKey = typeof document.pdfKey === 'string' ? document.pdfKey : null;
-    const safeDocument = { ...document };
-    delete safeDocument.pdfKey;
-    delete safeDocument.pdfUrl;
-    const signedDocument = { ...safeDocument };
-    if (pdfKey) {
-      signedDocument.pdfUrl = await getSignedUrl(pdfKey);
-    }
+  private async serializeDocument(
+    document: DocumentVersion,
+  ): Promise<Record<string, unknown>> {
+    const pin = await this.designSystems.resolve(
+      document.designSystemId,
+      document.designSystemVersion,
+    );
+    const expiresAt = new Date(Date.now() + SIGNED_URL_TTL_SECONDS * 1000);
+    return {
+      designSystemId: document.designSystemId,
+      designSystemVersion: document.designSystemVersion,
+      designSystemName: pin.name,
+      pageCount: document.pageCount,
+      pdfUrl: await getSignedUrl(document.pdfKey, SIGNED_URL_TTL_SECONDS),
+      pdfUrlExpiresAt: expiresAt.toISOString(),
+    };
+  }
 
-    return { ...rawContent, document: signedDocument };
+  /**
+   * A Document Version is one immutable document: an edit may change only the
+   * title and the commentary (spec §6.4), and any other content key is a `400`
+   * naming it.
+   */
+  private assertDocumentEditable(input: UpdateArtifactInput): void {
+    const content =
+      input.content !== undefined
+        ? input.content
+        : { ...input, title: undefined };
+    for (const [key, value] of Object.entries(content)) {
+      if (key === 'commentary' || value === undefined) continue;
+      if (key === 'document') {
+        const field = Object.keys(this.recordValue(value) ?? {})[0];
+        throw new BadRequestException(
+          `content.document${field ? `.${field}` : ''} cannot be edited`,
+        );
+      }
+      throw new BadRequestException(`content.${key} cannot be edited`);
+    }
   }
 
   private contentPatch(input: UpdateArtifactInput): Record<string, unknown> {
@@ -1011,15 +1057,6 @@ export class ArtifactService implements ArtifactWriter {
       input.content !== undefined ? { ...input.content } : { ...input };
     delete directContent.title;
     delete directContent.content;
-
-    const document = this.recordValue(directContent.document);
-    if (document) {
-      const editableDocument = { ...document };
-      delete editableDocument.pdfKey;
-      delete editableDocument.pageCount;
-      delete editableDocument.pdfUrl;
-      directContent.document = editableDocument;
-    }
 
     return directContent;
   }

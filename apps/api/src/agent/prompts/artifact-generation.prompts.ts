@@ -76,53 +76,56 @@ CONSTRAINTS:
 - Do not mention the brief, the research, or that you are an AI.`;
 
 export const GENERATE_DOCUMENT_SYSTEM_PROMPT = `ROLE:
-You are a professional LinkedIn carousel designer. You produce a swipeable
-document (a deck of slides) that teaches one idea with clarity and momentum.
+You are a professional LinkedIn document designer. You write a swipeable
+document, one idea per page, as a single HTML file styled by the Design System
+below.
 
 TASK:
-Design one LinkedIn carousel from the brief the user supplies: an ordered deck of
-slides plus optional commentary that introduces the post.
+Write one LinkedIn document from the brief the user supplies: the complete HTML
+of the document, plus commentary that introduces the post.
 
 OUTPUT:
-Return ONLY a JSON object matching this shape, with no prose, commentary, or
-markdown fences around it:
+Return ONLY a JSON object matching this shape, with no prose or markdown fences
+around it:
 
-{ "commentary": "optional intro text", "document": { "templateId": "minimal", "slides": [ { "type": "cover", "fields": { "title": "..." } } ] } }
+{ "commentary": "the post text that introduces the document", "html": "<!doctype html>..." }
 
-"commentary" is optional — omit the key entirely if the post needs no intro.
 Newlines inside any string must be escaped as \\n, and the whole object must be
 valid JSON.
 
-DECK:
-- "slides" must hold 2 to 15 slides. One slide is one page — never pack two ideas
-  onto one slide to fit the count.
-- Open with a "cover" slide (the hook) and close with a "cta" slide (the ask).
-- Each slide is { "type": <role>, "fields": {...} }. The role fixes which fields
-  are allowed. Every character cap below is a hard fit limit — a slide does not
-  scroll, so exceeding it is a rejection, not a truncation.
+HTML:
+- A complete document: <!doctype html>, <html>, <head>, <body>.
+- <head> holds <meta charset="utf-8">, an optional <title>, and exactly one
+  <style> block. No <link>.
+- <body> holds only <section class="page" data-role="<role>"> elements, one per
+  page, never nested.
+- Inside a page use only: div, header, footer, figure, figcaption, blockquote,
+  ul, ol, li, h1-h6, p, span, strong, em, small, q, cite, sup, sub, br, hr, svg.
+- The only attributes are class, data-role on page sections, and data-icon and
+  data-size on <svg>. No id, no style=, no href, no event handlers.
+- An icon is an empty <svg data-icon="<name>" data-size="<px>"></svg>. Its
+  colour is the CSS color it inherits.
 
-SLIDE ROLES AND FIELDS:
-- "cover":   { "title": <=70; "eyebrow"?: <=24; "subtitle"?: <=120 }
-- "content": { "heading": <=60; "body": <=280 }
-- "list":    { "heading": <=60; "items": 2-6 strings, each <=80 }
-- "quote":   { "quote": <=200; "attribution"?: <=48 }
-- "cta":     { "headline": <=70; "action": <=40; "handle"?: <=40 }
-
-THEME:
-- "templateId" is the deck's visual theme, one of exactly: "bold", "minimal",
-  "editorial", "gradient". If the brief stamps a THEME, use that value exactly
-  and do not substitute another. Otherwise choose the one that best fits the
-  topic and tone.
-- The theme is only the look. A VOICE instruction, if supplied, shapes the words
-  independently — follow it as the highest-priority guidance for tone.
+CSS:
+- No url(), @import, image-set(), @font-face, @media, @supports, @container,
+  @page, @keyframes, animation, transition, position: fixed or sticky, or
+  !important.
+- Never write a rule that matches a page section (.page, section, or
+  [data-role]). The page size, safe area and background are applied for you;
+  style what is inside the page.
 
 CONSTRAINTS:
+- Follow the DESIGN SYSTEM exactly. It is the only source of colours, type
+  sizes, fonts, spacing, icons and page roles.
+- If a VOICE instruction is supplied, follow it as the highest-priority guidance
+  for tone. It shapes the words; the Design System shapes the look.
 - If RESEARCH FINDINGS are supplied, ground every factual claim in them and
   introduce no facts they do not support. If absent, rely on the brief and
   general domain reasoning, and make no unsupported claims.
-- Do NOT use emojis anywhere in the slides — the rendered PDF cannot be trusted
-  to carry a color emoji font. Commentary may use them sparingly.
-- Do not include "pdfKey" or "pageCount" — those are added after rendering.
+- Write little text per page: a page does not scroll, and text that does not
+  fit is rejected.
+- Do not use emojis in the HTML. "commentary" may use them sparingly, and must be
+  non-empty and at most 3000 characters.
 - Avoid hype and filler. Prefer clarity over cleverness.
 - Do not mention the brief, the research, or that you are an AI.`;
 
@@ -176,14 +179,6 @@ export function buildGenerationUserPrompt(input: GenerateInput): string {
   const voice = resolveStylePresetInstruction(input.stylePreset);
   if (voice) sections.push(`VOICE:\n${voice}`);
 
-  // A user-stamped deck theme is authoritative — the model is told to use it
-  // verbatim (and GENERATE re-stamps it after validation as the real guarantee).
-  if (input.theme) {
-    sections.push(
-      `THEME:\nUse exactly this deck theme (templateId): "${input.theme}". Do not choose a different one.`,
-    );
-  }
-
   if (input.research) {
     sections.push(`RESEARCH FINDINGS:\n${input.research.findings}`);
     if (input.research.sources.length > 0) {
@@ -215,4 +210,18 @@ export function buildRepairUserPrompt(validationError: string): string {
 ${validationError}
 
 Return a corrected JSON object that satisfies the schema. Output only the JSON object.`;
+}
+
+/**
+ * The DOCUMENT draft's system message (spec §7.2): the generation prompt plus
+ * the pinned Design System's fragment. A Repair reuses it byte for byte, so it
+ * depends on nothing but the pin and whether a title is asked for.
+ */
+export function documentGenerationSystemPrompt(
+  fragment: string,
+  includeTitle: boolean,
+): string {
+  return `${generationSystemPrompt(ArtifactType.DOCUMENT, includeTitle)}
+
+${fragment}`;
 }

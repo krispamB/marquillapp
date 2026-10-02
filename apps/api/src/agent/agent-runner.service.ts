@@ -1,8 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ArtifactType } from 'src/database/schemas';
 import type { ZodType } from 'zod';
-import { ArtifactContent, generationSchemaFor } from '../artifact/schemas';
+import {
+  ArtifactContent,
+  documentDraftSchemaFor,
+  generationSchemaFor,
+} from '../artifact/schemas';
+import { ArtifactType } from 'src/database/schemas';
 import { LLMProvider, MessageRole } from '../llm/interfaces';
 import type {
   LLMMessage,
@@ -12,7 +16,10 @@ import type {
 } from '../llm/interfaces';
 import { LLMService } from '../llm/llm.service';
 import { ResponseParserService } from '../llm/parsers/responseParser.service';
-import { ContentValidationError } from './agent-runner.error';
+import {
+  ContentValidationError,
+  DocumentTruncatedError,
+} from './agent-runner.error';
 import type {
   AgentHooks,
   ArtifactGenerationResult,
@@ -20,6 +27,8 @@ import type {
   AgentRunResult,
   AgentRunner,
   AgentStep,
+  DocumentDraftResult,
+  DocumentGenerateInput,
   GenerateInput,
   ResearchInput,
   ResearchResult,
@@ -29,6 +38,7 @@ import type {
 import {
   buildGenerationUserPrompt,
   buildRepairUserPrompt,
+  documentGenerationSystemPrompt,
   generationSystemPrompt,
   researchSystemPrompt,
   researchUserPrompt,
@@ -42,6 +52,7 @@ import {
 const DEFAULT_RESEARCH_MAX_STEPS = 5;
 const DEFAULT_RESEARCH_MAX_SUCCESSFUL_SEARCHES = 5;
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+const DEFAULT_DOCUMENT_MAX_OUTPUT_TOKENS = 16384;
 
 const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -96,6 +107,7 @@ export class AgentRunnerService implements AgentRunner {
   private readonly researchMaxSuccessfulSearches: number;
   private readonly researchMaxOutputTokens: number;
   private readonly generationMaxOutputTokens: number;
+  private readonly documentMaxOutputTokens: number;
   private readonly searchWebTool: Tool;
 
   constructor(
@@ -122,6 +134,10 @@ export class AgentRunnerService implements AgentRunner {
     this.generationMaxOutputTokens = this.readPositiveInteger(
       'GENERATION_MAX_OUTPUT_TOKENS',
       DEFAULT_MAX_OUTPUT_TOKENS,
+    );
+    this.documentMaxOutputTokens = this.readPositiveInteger(
+      'DOCUMENT_GENERATION_MAX_OUTPUT_TOKENS',
+      DEFAULT_DOCUMENT_MAX_OUTPUT_TOKENS,
     );
     this.searchWebTool = createSearchWebTool(
       this.configService.getOrThrow<string>('TAVILY_API_KEY'),
@@ -291,7 +307,7 @@ export class AgentRunnerService implements AgentRunner {
       { role: MessageRole.User, content: buildGenerationUserPrompt(input) },
     ];
 
-    const draft = await this.complete(messages, hooks, schema);
+    const { text: draft } = await this.complete(messages, hooks, schema);
 
     let validationError: unknown;
     try {
@@ -299,7 +315,6 @@ export class AgentRunnerService implements AgentRunner {
         this.parser.parseWithSchema(draft, schema, {
           stripNullObjectValues: true,
         }),
-        input,
         includeTitle,
       );
     } catch (error: unknown) {
@@ -310,7 +325,7 @@ export class AgentRunnerService implements AgentRunner {
       `Generated ${input.type} first draft failed validation; attempting one repair: ${describeError(validationError)}`,
     );
 
-    const repaired = await this.complete(
+    const { text: repaired } = await this.complete(
       [
         ...messages,
         { role: MessageRole.Assistant, content: draft },
@@ -328,7 +343,6 @@ export class AgentRunnerService implements AgentRunner {
         this.parser.parseWithSchema(repaired, schema, {
           stripNullObjectValues: true,
         }),
-        input,
         includeTitle,
       );
     } catch (error: unknown) {
@@ -339,39 +353,119 @@ export class AgentRunnerService implements AgentRunner {
     }
   }
 
+  /**
+   * One DOCUMENT draft (spec §7.5): a structured completion whose `html` is the
+   * Candidate Source. The system message is the generation prompt plus the
+   * pinned fragment. Truncation is checked before any parse, because a cut-off
+   * JSON envelope would otherwise read as a validation failure and spend a
+   * repair turn it cannot use.
+   *
+   * The envelope gets the same single Zod repair turn as `generate`. Checking
+   * the Candidate Source is the caller's job.
+   */
+  async generateDocument(
+    input: DocumentGenerateInput,
+    hooks?: AgentHooks,
+  ): Promise<DocumentDraftResult> {
+    const schema = documentDraftSchemaFor(input.includeTitle);
+    const messages: LLMMessage[] = [
+      {
+        role: MessageRole.System,
+        content: documentGenerationSystemPrompt(
+          input.fragment,
+          input.includeTitle,
+        ),
+      },
+      {
+        role: MessageRole.User,
+        content: buildGenerationUserPrompt({
+          type: ArtifactType.DOCUMENT,
+          prompt: input.prompt,
+          stylePreset: input.stylePreset,
+          research: input.research,
+        }),
+      },
+    ];
+    const options = { maxTokens: this.documentMaxOutputTokens };
+
+    const draft = await this.complete(messages, hooks, schema, options);
+    this.assertNotTruncated(draft.finishReason);
+
+    let validationError: unknown;
+    try {
+      return this.toDocumentDraft(
+        this.parser.parseWithSchema(draft.text, schema, {
+          stripNullObjectValues: true,
+        }),
+        input.includeTitle,
+      );
+    } catch (error: unknown) {
+      validationError = error;
+    }
+
+    this.logger.warn(
+      `Generated DOCUMENT draft failed envelope validation; attempting one repair: ${describeError(validationError)}`,
+    );
+
+    const repaired = await this.complete(
+      [
+        ...messages,
+        { role: MessageRole.Assistant, content: draft.text },
+        {
+          role: MessageRole.User,
+          content: buildRepairUserPrompt(describeError(validationError)),
+        },
+      ],
+      hooks,
+      schema,
+      options,
+    );
+    this.assertNotTruncated(repaired.finishReason);
+
+    try {
+      return this.toDocumentDraft(
+        this.parser.parseWithSchema(repaired.text, schema, {
+          stripNullObjectValues: true,
+        }),
+        input.includeTitle,
+      );
+    } catch (error: unknown) {
+      throw new ContentValidationError(
+        `Generated DOCUMENT draft failed validation after one repair retry: ${describeError(error)}`,
+        { cause: error },
+      );
+    }
+  }
+
+  private assertNotTruncated(finishReason: string | undefined): void {
+    if (finishReason === 'length') {
+      throw new DocumentTruncatedError(
+        'The DOCUMENT draft hit the output token cap',
+      );
+    }
+  }
+
+  private toDocumentDraft(
+    parsed: DocumentDraftResult,
+    includeTitle: boolean,
+  ): DocumentDraftResult {
+    return {
+      ...(includeTitle && parsed.title !== undefined
+        ? { title: parsed.title }
+        : {}),
+      commentary: parsed.commentary,
+      html: parsed.html,
+    };
+  }
+
   private toGenerationResult(
     parsed: ArtifactContent & { title?: string },
-    input: GenerateInput,
     includeTitle: boolean,
   ): ArtifactGenerationResult {
     const { title, ...content } = parsed;
     return {
       ...(includeTitle && title !== undefined ? { title } : {}),
-      content: this.stampTheme(content as ArtifactContent, input),
-    };
-  }
-
-  /**
-   * A user-supplied `theme` is authoritative: it overrides whatever templateId
-   * the model chose, so a document keeps the user's chosen look across the
-   * initial run and every later refine (R4). Applied after validation, so it is
-   * a stamp over already-valid content — not a chance to sneak a bad theme past
-   * Zod. With no theme, the model's own validated pick stands.
-   */
-  private stampTheme(
-    content: ArtifactContent,
-    input: GenerateInput,
-  ): ArtifactContent {
-    if (
-      input.type !== ArtifactType.DOCUMENT ||
-      !input.theme ||
-      !('document' in content)
-    ) {
-      return content;
-    }
-    return {
-      ...content,
-      document: { ...content.document, templateId: input.theme },
+      content: content as ArtifactContent,
     };
   }
 
@@ -436,13 +530,14 @@ export class AgentRunnerService implements AgentRunner {
     messages: LLMMessage[],
     hooks?: AgentHooks,
     responseSchema?: ZodType,
-  ): Promise<string> {
-    const { text, usage } = await this.llmService.complete(
+    options: { maxTokens?: number } = {},
+  ): Promise<{ text: string; finishReason?: string }> {
+    const { text, usage, finishReason } = await this.llmService.complete(
       LLMProvider.OPENROUTER,
       messages,
       {
         model: this.generationModel,
-        max_tokens: this.generationMaxOutputTokens,
+        max_tokens: options.maxTokens ?? this.generationMaxOutputTokens,
         ...(responseSchema
           ? {
               responseSchema: {
@@ -456,7 +551,7 @@ export class AgentRunnerService implements AgentRunner {
 
     hooks?.onUsage?.({ ...usage, model: this.generationModel });
 
-    return text;
+    return { text, ...(finishReason ? { finishReason } : {}) };
   }
 
   private readMaxSteps(): number {

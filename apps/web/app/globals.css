@@ -1407,6 +1407,7 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
 .mq-artifact-pick-icon { display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; border-radius: 11px; background: var(--artifact-post-bg); color: var(--artifact-post-ink); }
 .mq-artifact-pick-icon.is-poll { background: var(--warn-bg); color: var(--warn-ink); }
 .mq-artifact-pick-icon.is-document { background: var(--artifact-document-bg); color: var(--artifact-document-ink); }
+.mq-artifact-pick-icon img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; object-position: top; }
 .mq-artifact-pick-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 5px; }
 .mq-artifact-pick-copy > span { display: flex; align-items: center; gap: 7px; }
 .mq-artifact-pick-copy strong { overflow: hidden; color: var(--ink-900); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }

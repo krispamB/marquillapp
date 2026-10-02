@@ -28,7 +28,7 @@ import { FeedbackModule } from './feedback/feedback.module';
 import { OnboardingModule } from './onboarding';
 import { DiagnosticsModule } from './diagnostics/diagnostics.module';
 import { ArtifactModule } from './artifact';
-import { CarouselModule } from './carousel';
+import { DocumentRenderModule } from './document-render/document-render.module';
 import { DesignSystemModule } from './design-system';
 
 // The HTTP server's root. The LLM stack (`LlmModule`, `AgentModule`) and its
@@ -66,7 +66,7 @@ import { DesignSystemModule } from './design-system';
     OnboardingModule,
     DiagnosticsModule,
     ArtifactModule,
-    CarouselModule,
+    DocumentRenderModule,
     DesignSystemModule,
   ],
   controllers: [AppController],

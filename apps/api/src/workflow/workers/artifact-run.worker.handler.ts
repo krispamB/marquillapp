@@ -6,7 +6,7 @@ import type { CreditMeterService } from '../../feature-gating/credit-meter.servi
 import type { FeatureGatingService } from '../../feature-gating/feature-gating.service';
 import { FeatureGateForbiddenException } from '../../feature-gating/feature-gating.exception';
 import { RunKind } from '../../database/schemas';
-import { FailureCode } from '../workflow.constants';
+import { FAILURE_REASONS } from '../workflow.constants';
 import { RunCreditMeter } from '../engine/run-credit-meter';
 import {
   RunEventEmitter,
@@ -14,10 +14,12 @@ import {
 } from '../engine/run-event.emitter';
 import type { EmittedEvent } from '../engine/run-event.types';
 import { handleTerminalFailure, runWorkflow } from '../engine/workflow.engine';
-import { describeError } from '../engine/workflow.error';
+import { describeError, failureCodeOf } from '../engine/workflow.error';
 import type {
   BuildInput,
-  CarouselRenderer,
+  DesignSystemResolver,
+  DocumentObjectStore,
+  DocumentRenderer,
   RunRecordHandle,
   StepContext,
 } from '../engine/workflow.types';
@@ -31,7 +33,9 @@ export interface RunRecordStore {
 export interface ArtifactRunDeps {
   agent: AgentRunner;
   artifacts: ArtifactWriter;
-  renderer: CarouselRenderer;
+  designSystems: DesignSystemResolver;
+  renderer: DocumentRenderer;
+  objects: DocumentObjectStore;
   creditMeter: CreditMeterService;
   featureGating: FeatureGatingService;
   runs: RunRecordStore;
@@ -95,7 +99,9 @@ export class ArtifactRunProcessor {
       logger,
       agent: this.deps.agent,
       artifacts: this.deps.artifacts,
+      designSystems: this.deps.designSystems,
       renderer: this.deps.renderer,
+      objects: this.deps.objects,
       meter: new RunCreditMeter(creditMeter, job.data.userId, emit, logger),
       emit,
       run: runs.handleFor(runId),
@@ -143,9 +149,14 @@ export class ArtifactRunProcessor {
     // Absent from the map only when the attempt ran in another process; a fresh
     // emitter restarts `seq`, a lesser evil than losing the client's `run.failed`.
     logger.error(`Artifact run ${runId} failed terminally: ${error.message}`);
-    const failureReason = isUnrecoverableFailure(error)
-      ? describeError(error)
-      : TEMPORARY_FAILURE_REASON;
+    // A DOCUMENT failure carries a stable code with its own client wording;
+    // anything else is `internal`, described as before.
+    const failureCode = failureCodeOf(error);
+    const failureReason =
+      FAILURE_REASONS[failureCode] ??
+      (isUnrecoverableFailure(error)
+        ? describeError(error)
+        : TEMPORARY_FAILURE_REASON);
 
     await handleTerminalFailure(
       {
@@ -157,9 +168,7 @@ export class ArtifactRunProcessor {
       {
         artifactId: job.data.artifactId,
         version: job.data.version,
-        // POST and POLL have no finer-grained codes; the DOCUMENT pipeline
-        // brings its own.
-        failureCode: FailureCode.INTERNAL,
+        failureCode,
         failureReason,
       },
     );

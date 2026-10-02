@@ -34,7 +34,7 @@ ENV NODE_ENV=production
 WORKDIR /repo
 COPY --from=prod-deps /repo ./
 COPY --from=build /repo/apps/api/dist apps/api/dist
-# Mail and carousel templates are read from process.cwd()/assets at runtime.
+# Mail templates and Design Systems are read from process.cwd()/assets at runtime.
 COPY apps/api/assets apps/api/assets
 WORKDIR /repo/apps/api
 EXPOSE 3500

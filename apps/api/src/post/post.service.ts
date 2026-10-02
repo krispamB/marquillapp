@@ -134,15 +134,12 @@ export class PostService {
       );
     }
 
-    const versionNumber = dto.version ?? artifact.currentVersion;
-    const version = artifact.versions.find(
-      (candidate) => candidate.version === versionNumber,
+    const version = this.resolvePinnableVersion(
+      artifact,
+      dto.version,
+      'Artifact version must be READY to publish',
     );
-    if (!version || version.status !== VersionStatus.READY) {
-      throw new BadRequestException(
-        'Artifact version must be READY to publish',
-      );
-    }
+    const versionNumber = version.version;
 
     const connectedAccount = await this.getOwnedUsableLinkedinConnectedAccount(
       user._id.toString(),
@@ -246,7 +243,7 @@ export class PostService {
         };
       } else if (artifact.type === ArtifactType.DOCUMENT) {
         const documentContent = version.content as unknown as DocumentContent;
-        const { pdfKey, pageCount, slides } = documentContent.document;
+        const { pdfKey, pageCount } = documentContent.document;
         if (!pdfKey || !pageCount) {
           throw new BadRequestException('source artifact unavailable');
         }
@@ -257,9 +254,9 @@ export class PostService {
           bytes,
           pageCount,
         );
-        const cover = slides[0];
-        const title =
-          cover?.type === 'cover' ? cover.fields.title : 'LinkedIn document';
+        // A Document Version has no structured cover to read a title from, so
+        // the document is named after its artifact.
+        const title = artifact.title ?? 'LinkedIn document';
         content = { media: { id: documentUrn, title } };
       }
       const data: ILinkedInPost = {
@@ -348,15 +345,11 @@ export class PostService {
           'You are not authorized to attach this artifact',
         );
       }
-      const versionNumber = dto.version ?? artifact.currentVersion;
-      const version = artifact.versions.find(
-        (candidate) => candidate.version === versionNumber,
+      const version = this.resolvePinnableVersion(
+        artifact,
+        dto.version,
+        'Artifact version must be READY to attach',
       );
-      if (!version || version.status !== VersionStatus.READY) {
-        throw new BadRequestException(
-          'Artifact version must be READY to attach',
-        );
-      }
       if (
         (post.media?.length ?? 0) > 0 &&
         artifact.type !== ArtifactType.POST
@@ -1302,17 +1295,53 @@ export class PostService {
     return `media-uploads/${postId}/${mediaId}`;
   }
 
+  /**
+   * Resolves the exact version a Post pins. Any READY version is pinnable; an
+   * omitted `version` means the Current Version, so an Artifact without one
+   * (nothing READY yet) is a 400 rather than a silent pin to an Attempt.
+   */
+  private resolvePinnableVersion(
+    artifact: Artifact,
+    requestedVersion: number | undefined,
+    notReadyMessage: string,
+  ): Artifact['versions'][number] {
+    const versionNumber = requestedVersion ?? artifact.currentVersion;
+    if (versionNumber === undefined || versionNumber === null) {
+      throw new BadRequestException(
+        'Artifact has no Current Version; specify a READY version to pin',
+      );
+    }
+    const version = artifact.versions.find(
+      (candidate) => candidate.version === versionNumber,
+    );
+    if (!version || version.status !== VersionStatus.READY) {
+      throw new BadRequestException(notReadyMessage);
+    }
+    return version;
+  }
+
+  /**
+   * Pins `(artifact, version)` for a schedule or publish. The CAS matches any
+   * READY version, not just the Current Version: a Post never follows later
+   * refinements. The `pinRevision` bump is what a concurrent commentary edit
+   * of the Current Version (the only in-place edit) checks against; pinning
+   * an older version bumps it too, which at worst turns such a racing edit
+   * into a retryable 409.
+   */
   private async bumpArtifactPinRevision(
     artifactId: Types.ObjectId,
     version: number,
   ): Promise<void> {
     const result = await this.artifactModel.updateOne(
-      { _id: artifactId, currentVersion: version },
+      {
+        _id: artifactId,
+        versions: { $elemMatch: { version, status: VersionStatus.READY } },
+      },
       { $inc: { pinRevision: 1 } },
     );
     if (result.matchedCount === 0) {
       throw new ConflictException(
-        'Selected artifact version changed before it could be pinned',
+        'Selected artifact version is no longer READY and cannot be pinned',
       );
     }
   }

@@ -3,8 +3,12 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, isValidObjectId } from 'mongoose';
 import { RunKind, RunStatus, WorkflowRun } from '../database/schemas';
 import type { ResearchResult } from '../agent/agent-runner.interface';
-import type { RenderAttemptUsage } from '../carousel/render-usage.types';
-import type { BuildInput, RunRecordHandle } from './engine/workflow.types';
+import type { RenderAttemptUsage } from '../document-render/render-usage.types';
+import type {
+  BuildInput,
+  DocumentCheck,
+  RunRecordHandle,
+} from './engine/workflow.types';
 import { FailureCode, WorkflowStep } from './workflow.constants';
 
 export interface CreateRunInput {
@@ -119,6 +123,8 @@ export class WorkflowRunService {
         this.patch(runId, { researchContext: research }),
       recordRenderAttempt: (usage: RenderAttemptUsage) =>
         this.appendRenderAttempt(runId, usage),
+      recordDocumentCheck: (check: DocumentCheck) =>
+        this.appendDocumentCheck(runId, check),
       getLatestCompletedResearch: (artifactId: string) =>
         this.getLatestCompletedResearch(artifactId),
       complete: (creditsUsed: number) =>
@@ -149,6 +155,16 @@ export class WorkflowRunService {
     await this.workflowRunModel.updateOne(
       { _id: new Types.ObjectId(runId) },
       { $push: { renderAttempts: usage } },
+    );
+  }
+
+  private async appendDocumentCheck(
+    runId: string,
+    check: DocumentCheck,
+  ): Promise<void> {
+    await this.workflowRunModel.updateOne(
+      { _id: new Types.ObjectId(runId) },
+      { $push: { documentChecks: check } },
     );
   }
 }

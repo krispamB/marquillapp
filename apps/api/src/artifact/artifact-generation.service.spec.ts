@@ -2,12 +2,6 @@ jest.mock(
   'src/database/schemas',
   () => ({
     ArtifactType: { POST: 'POST', POLL: 'POLL', DOCUMENT: 'DOCUMENT' },
-    CarouselTheme: {
-      BOLD: 'bold',
-      MINIMAL: 'minimal',
-      EDITORIAL: 'editorial',
-      GRADIENT: 'gradient',
-    },
     VersionStatus: {
       GENERATING: 'GENERATING',
       READY: 'READY',
@@ -36,10 +30,16 @@ jest.mock(
   () => ({ WorkflowRunService: class {} }),
   { virtual: true },
 );
+jest.mock(
+  '../design-system/design-systems.service',
+  () => ({ DesignSystemsService: class {} }),
+  { virtual: true },
+);
 jest.mock('src/workflow/workflow.queue', () => ({ WorkflowQueue: class {} }), {
   virtual: true,
 });
 
+import { BadRequestException } from '@nestjs/common';
 import { ArtifactType, RunKind } from 'src/database/schemas';
 import { ArtifactGenerationService } from './artifact-generation.service';
 
@@ -66,6 +66,16 @@ describe('ArtifactGenerationService', () => {
     const workflowQueue = {
       addArtifactRunJob: jest.fn().mockResolvedValue(undefined),
     };
+    const designSystems = {
+      getActive: jest.fn((id: string) => {
+        if (id === 'retired') {
+          throw new BadRequestException(
+            `Design System "${id}" is not available`,
+          );
+        }
+        return { id, version: id === 'margin' ? 2 : 1, name: 'Margin' };
+      }),
+    };
 
     const service = new ArtifactGenerationService(
       artifactService as any,
@@ -73,6 +83,7 @@ describe('ArtifactGenerationService', () => {
       creditMeter as any,
       featureGating as any,
       workflowQueue as any,
+      designSystems as any,
     );
 
     const dto = {
@@ -89,10 +100,19 @@ describe('ArtifactGenerationService', () => {
         creditMeter,
         featureGating,
         workflowQueue,
+        designSystems,
       },
       fixtures: { userId: 'user123', dto },
     };
   };
+
+  /** The `BuildInput` the first `createRun` stored. */
+  const storedInput = (): Record<string, unknown> =>
+    (
+      mocks.workflowRunService.createRun.mock.calls[0] as [
+        { input: Record<string, unknown> },
+      ]
+    )[0].input;
 
   let service: ArtifactGenerationService;
   let mocks: ReturnType<typeof makeService>['mocks'];
@@ -191,7 +211,7 @@ describe('ArtifactGenerationService', () => {
         prompt: 'deep modules',
         withResearch: false,
         stylePreset: 'educational' as any,
-        theme: 'minimal' as any,
+        designSystemId: 'schematic',
       });
 
       expect(mocks.artifactService.createArtifact).toHaveBeenCalledWith(
@@ -201,9 +221,70 @@ describe('ArtifactGenerationService', () => {
           prompt: 'deep modules',
           withResearch: false,
           stylePreset: 'educational',
-          theme: 'minimal',
+          designSystemId: 'schematic',
         },
       );
+    });
+
+    it("should pin a DOCUMENT to the requested Design System's ACTIVE version", async () => {
+      await service.launchInitialRun(fixtures.userId, {
+        type: ArtifactType.DOCUMENT,
+        prompt: 'deep modules',
+        withResearch: false,
+        designSystemId: 'schematic',
+      });
+
+      expect(mocks.designSystems.getActive).toHaveBeenCalledWith('schematic');
+      expect(storedInput()).toMatchObject({
+        designSystem: { id: 'schematic', version: 1 },
+      });
+    });
+
+    it('should pin a DOCUMENT that names no Design System to the default', async () => {
+      await service.launchInitialRun(fixtures.userId, {
+        type: ArtifactType.DOCUMENT,
+        prompt: 'deep modules',
+        withResearch: false,
+      });
+
+      expect(mocks.designSystems.getActive).toHaveBeenCalledWith('margin');
+      expect(storedInput()).toMatchObject({
+        designSystem: { id: 'margin', version: 2 },
+      });
+    });
+
+    it('should reject an unavailable Design System before any check, write or enqueue', async () => {
+      await expect(
+        service.launchInitialRun(fixtures.userId, {
+          type: ArtifactType.DOCUMENT,
+          prompt: 'deep modules',
+          withResearch: true,
+          designSystemId: 'retired',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(mocks.featureGating.assertResearchAccess).not.toHaveBeenCalled();
+      expect(mocks.creditMeter.assertBalance).not.toHaveBeenCalled();
+      expect(mocks.artifactService.createArtifact).not.toHaveBeenCalled();
+      expect(mocks.workflowQueue.addArtifactRunJob).not.toHaveBeenCalled();
+    });
+
+    it('should reject a designSystemId on a type that is not a DOCUMENT', async () => {
+      await expect(
+        service.launchInitialRun(fixtures.userId, {
+          ...fixtures.dto,
+          designSystemId: 'margin',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(mocks.artifactService.createArtifact).not.toHaveBeenCalled();
+    });
+
+    it('should not pin a POST', async () => {
+      await service.launchInitialRun(fixtures.userId, fixtures.dto);
+
+      expect(mocks.designSystems.getActive).not.toHaveBeenCalled();
+      expect(storedInput()).not.toHaveProperty('designSystem');
     });
 
     it('should persist an INITIAL run whose input targets version 1 of the new artifact', async () => {
@@ -287,11 +368,10 @@ describe('ArtifactGenerationService', () => {
     it('should persist and enqueue a REFINE run when the version is appended', async () => {
       mocks.artifactService.appendRefineVersion.mockResolvedValue({
         version: 3,
-        type: ArtifactType.DOCUMENT,
+        type: ArtifactType.POLL,
         prompt: 'deep modules',
         withResearch: true,
         stylePreset: 'educational',
-        theme: 'minimal',
       });
 
       await service.launchRefineRun(
@@ -306,11 +386,10 @@ describe('ArtifactGenerationService', () => {
         targetVersion: 3,
         kind: RunKind.REFINE,
         input: {
-          type: ArtifactType.DOCUMENT,
+          type: ArtifactType.POLL,
           prompt: 'deep modules',
           withResearch: true,
           stylePreset: 'educational',
-          theme: 'minimal',
           kind: RunKind.REFINE,
           userId: 'user123',
           artifactId: 'artifact123',

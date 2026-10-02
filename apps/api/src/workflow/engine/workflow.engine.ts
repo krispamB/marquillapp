@@ -9,6 +9,7 @@ import {
   describeError,
   terminal,
   toWorkflowError,
+  withFailureCode,
 } from './workflow.error';
 import type { ArtifactWriter } from '../../artifact/artifact-writer.interface';
 import type {
@@ -147,7 +148,9 @@ async function announceFailure(
   }
   await emitter.flush();
 
-  return error.retryable ? error : new UnrecoverableError(error.reason);
+  return error.retryable
+    ? withFailureCode(error, error.code)
+    : withFailureCode(new UnrecoverableError(error.reason), error.code);
 }
 
 export interface TerminalFailureDeps {

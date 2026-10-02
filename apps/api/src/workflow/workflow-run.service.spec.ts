@@ -232,8 +232,8 @@ describe('WorkflowRunService', () => {
       await service.handleFor(fixtures.runId).recordRenderAttempt({
         durationMs: 60_001,
         units: 3,
-        outcome: 'FAILED',
-        failureStage: 'upload',
+        outcome: 'ERROR',
+        billed: false,
       });
 
       expect(mocks.workflowRunModel.updateOne).toHaveBeenCalledWith(
@@ -243,12 +243,28 @@ describe('WorkflowRunService', () => {
             renderAttempts: {
               durationMs: 60_001,
               units: 3,
-              outcome: 'FAILED',
-              failureStage: 'upload',
+              outcome: 'ERROR',
+              billed: false,
             },
           },
         },
       );
+    });
+
+    it('should append a document check, with its full violation list, to the run', async () => {
+      const check = {
+        phase: 'static' as const,
+        candidateSha256: 'a'.repeat(64),
+        violations: [{ code: 'typography.scale', detail: '13px', line: 4 }],
+        checkedAt: new Date('2026-10-02T00:00:00.000Z'),
+      };
+
+      await service.handleFor(fixtures.runId).recordDocumentCheck(check);
+
+      const [filter, update] = mocks.workflowRunModel.updateOne.mock
+        .calls[0] as [{ _id: unknown }, unknown];
+      expect(filter._id).toBeInstanceOf(Types.ObjectId);
+      expect(update).toEqual({ $push: { documentChecks: check } });
     });
 
     it('should mark the run COMPLETED with the winning attempt total', async () => {

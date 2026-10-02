@@ -1,14 +1,9 @@
 import type { Logger } from '@nestjs/common';
-import type {
-  ArtifactType,
-  CarouselTheme,
-  RunKind,
-} from '../../database/schemas';
-import type { ArtifactContent } from '../../artifact/schemas';
+import type { ArtifactType, RunKind } from '../../database/schemas';
+import type { ArtifactContent, DocumentVersion } from '../../artifact/schemas';
 import type {
   ArtifactWriter,
   RefineContext,
-  VersionRender,
 } from '../../artifact/artifact-writer.interface';
 import type {
   AgentRunner,
@@ -16,7 +11,11 @@ import type {
 } from '../../agent/agent-runner.interface';
 import type { StylePreset } from '../../agent/style-presets.config';
 import type { UsageRecord } from '../../feature-gating/credit-meter.constants';
-import type { RenderAttemptUsage } from '../../carousel/render-usage.types';
+import type { RenderAttemptUsage } from '../../document-render/render-usage.types';
+import type { RenderSessionResult } from '../../document-render/render-session';
+import type { DesignSystemDefinition } from '../../design-system/design-system-definition';
+import type { DesignSystemRecord } from '../../design-system/design-systems.service';
+import type { Violation } from '../../document-source/violation';
 import { FailureCode, WorkflowStep } from '../workflow.constants';
 import type { EmittedEvent } from './run-event.types';
 
@@ -36,10 +35,46 @@ export interface BuildSpec {
 export interface BuildInput extends BuildSpec {
   prompt: string;
   stylePreset?: StylePreset;
-  theme?: CarouselTheme;
+  /**
+   * DOCUMENT only: the Design System Version this Attempt is pinned to,
+   * stamped server-side at kickoff so every job attempt renders against the
+   * same definition.
+   */
+  designSystem?: DesignSystemPin;
   userId: string;
   artifactId: string;
   version: number;
+}
+
+/** A per-version Design System pin (spec §6.3). */
+export interface DesignSystemPin {
+  id: string;
+  version: number;
+}
+
+/** The pinned Design System, loaded by `RESOLVE_INPUT` for a DOCUMENT run. */
+export interface ResolvedDesignSystem {
+  definition: DesignSystemDefinition;
+  /** The memoised prompt fragment for the pinned version. */
+  fragment: string;
+}
+
+/** What `GENERATE` hands `RENDER_PDF` for a DOCUMENT: the Candidate Source. */
+export interface DocumentDraftState {
+  commentary: string;
+  candidate: string;
+}
+
+/**
+ * One check of a Candidate Source, recorded on the run with its full violation
+ * list (spec §6.2): the only place violation details are kept.
+ */
+export interface DocumentCheck {
+  phase: 'static' | 'render';
+  /** SHA-256 of the Candidate Source that was checked. */
+  candidateSha256: string;
+  violations: Violation[];
+  checkedAt: Date;
 }
 
 /**
@@ -52,8 +87,14 @@ export interface RunState {
   research?: ResearchResult;
   refine?: RefineContext;
   generatedTitle?: string;
+  /** POST and POLL: the generated content. */
   content?: ArtifactContent;
-  render?: VersionRender;
+  /** DOCUMENT: the pinned Design System. */
+  designSystem?: ResolvedDesignSystem;
+  /** DOCUMENT: the statically clean Candidate Source and its commentary. */
+  draft?: DocumentDraftState;
+  /** DOCUMENT: the uploaded Document Version, without its commentary. */
+  document?: DocumentVersion;
 }
 
 /**
@@ -68,17 +109,25 @@ export type StepHandler = (
 
 export type StepHandlerMap = Partial<Record<WorkflowStep, StepHandler>>;
 
-/** DOCUMENT-only. `CarouselRendererService` (#116) consumes it. */
-export interface CarouselRenderInput {
-  artifactId: string;
-  version: number;
-  templateId: CarouselTheme;
-  // Typed with the DOCUMENT content arm (#117). The engine never inspects them.
-  slides: unknown[];
+/**
+ * DOCUMENT-only: one render session (spec §5.1) against Browserless. It
+ * measures and never decides; `RENDER_PDF` judges the facts.
+ */
+export interface DocumentRenderer {
+  render(
+    definition: DesignSystemDefinition,
+    documentSource: string,
+  ): Promise<RenderSessionResult>;
 }
 
-export interface CarouselRenderer {
-  render(input: CarouselRenderInput): Promise<VersionRender>;
+/** DOCUMENT-only: the private object store a Document Version lives in. */
+export interface DocumentObjectStore {
+  put(key: string, body: Buffer, contentType: string): Promise<void>;
+}
+
+/** DOCUMENT-only: status-blind reads of an exact Design System Version. */
+export interface DesignSystemResolver {
+  resolve(id: string, version: number): Promise<DesignSystemRecord>;
 }
 
 /**
@@ -104,6 +153,7 @@ export interface RunRecordHandle {
   setCurrentStep(step: WorkflowStep): Promise<void>;
   saveResearchContext(research: ResearchResult): Promise<void>;
   recordRenderAttempt(usage: RenderAttemptUsage): Promise<void>;
+  recordDocumentCheck(check: DocumentCheck): Promise<void>;
   getLatestCompletedResearch(
     artifactId: string,
   ): Promise<ResearchResult | undefined>;
@@ -120,7 +170,9 @@ export interface StepContext {
   agent: AgentRunner;
   artifacts: ArtifactWriter;
   meter: CreditMeter;
-  renderer: CarouselRenderer;
+  designSystems: DesignSystemResolver;
+  renderer: DocumentRenderer;
+  objects: DocumentObjectStore;
   /** `step.progress` only. Lifecycle events are the core's job. */
   emit: (event: EmittedEvent) => void;
   run: RunRecordHandle;

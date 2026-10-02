@@ -30,3 +30,21 @@ export enum FailureCode {
   ARTIFACT_SOURCE_MISSING = 'artifact.source_missing',
   INTERNAL = 'internal',
 }
+
+/**
+ * The client-facing `failureReason` for each code a DOCUMENT run fails with
+ * (spec §7.8). `internal` has none here: its reason is the existing
+ * terminal-or-temporary wording, so POST and POLL read exactly as before.
+ */
+export const FAILURE_REASONS: Partial<Record<FailureCode, string>> = {
+  [FailureCode.DOCUMENT_REPAIR_EXHAUSTED]:
+    "We couldn't get this design to fit cleanly. Try refining with a shorter brief or another design.",
+  [FailureCode.DOCUMENT_TRUNCATED]:
+    'This document was too long to generate. Try fewer pages or a shorter brief.',
+  [FailureCode.DESIGN_SYSTEM_UNAVAILABLE]:
+    'This design is unavailable. Try again with another design.',
+  [FailureCode.RENDER_UNAVAILABLE]:
+    "We couldn't render your document right now. Please try again.",
+  [FailureCode.ARTIFACT_SOURCE_MISSING]:
+    "This version can't be refined. Refine the current version again or create a new document.",
+};

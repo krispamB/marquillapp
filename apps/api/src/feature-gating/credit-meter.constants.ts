@@ -1,4 +1,4 @@
-import type { BrowserlessUsage } from '../carousel/render-usage.types';
+import type { BrowserlessUsage } from '../document-render/render-usage.types';
 
 export const USAGE_KINDS = {
   LLM: 'llm',

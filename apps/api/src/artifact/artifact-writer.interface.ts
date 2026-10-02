@@ -1,20 +1,10 @@
 import { ArtifactType, VersionStatus } from 'src/database/schemas';
 import type { FailureCode } from 'src/workflow/workflow.constants';
 import { ArtifactContent } from './schemas';
-import type { BrowserlessUsage } from '../carousel/render-usage.types';
 
 export { ArtifactDeletedError } from './artifact-deleted.error';
 
-// RENDER_PDF's output for DOCUMENT artifacts, folded into content.document
-// by setVersionContent.
-export interface VersionRender {
-  pdfKey: string;
-  pageCount: number;
-  browserless: BrowserlessUsage;
-}
-
 export interface VersionWriteOptions {
-  render?: VersionRender;
   title?: string;
 }
 
@@ -43,8 +33,10 @@ export type FailVersionOutcome =
 export interface ArtifactWriter {
   /**
    * Promotes a `GENERATING` Attempt to `READY` and makes it the Current Version
-   * in one conditional write. Idempotent: a replay that finds the version
-   * already `READY` succeeds without writing.
+   * in one conditional write. `content` is the complete version content, a
+   * DOCUMENT's Document Version included. Idempotent: a replay that finds the
+   * version already `READY` succeeds without writing (for a DOCUMENT, only with
+   * the same `sourceSha256`).
    */
   promoteVersion(
     artifactId: string,

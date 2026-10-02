@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import { ArtifactType, CarouselTheme } from 'src/database/schemas';
-import { slidesSchema } from '../../carousel/schemas';
+import { ArtifactType } from 'src/database/schemas';
 import { linkedInCharCount } from '../utils/linkedin-char-count.util';
 import { CONTENT_TITLE_MAX_LENGTH } from '../../common/constants';
 
@@ -83,35 +82,63 @@ export const pollContentSchema = z.object({
 
 export type PollContent = z.infer<typeof pollContentSchema>;
 
-// DOCUMENT — a carousel deck, optionally introduced by commentary. `slides` is
-// the editable source of truth authored by GENERATE; the PDF is the disposable
-// derived output. `pdfKey`/`pageCount` are therefore optional here: GENERATE
-// emits the slides-only shape, and PERSIST_VERSION folds RENDER_PDF's output in.
-// `templateId` reuses the deck-level `CarouselTheme` (its look), distinct from
-// `stylePreset` (voice) which shapes the slide copy (R4). `slides` reuses the one
-// carousel Zod contract, so the union, the generation contract, and the four
-// themes validate the same shape.
-export const documentContentSchema = z.object({
-  commentary: commentarySchema.optional(),
-  document: z.object({
-    templateId: z.enum(CarouselTheme),
-    slides: slidesSchema,
-    pdfKey: z.string().min(1).optional(),
-    pageCount: z.number().int().positive().optional(),
-  }),
+// DOCUMENT — a stored Document Version (spec §6.3), optionally introduced by
+// commentary. Everything under `document` is written by the run: the pin is
+// stamped server-side, and the HTML lives in R2 under the keys, never inline.
+// The object is strict, so a template-era `templateId`/`slides` version is
+// rejected rather than silently stripped. This is also the READY gate: a
+// version cannot be promoted without its Document Source, its Candidate Source
+// and its PDF.
+const sha256Schema = z
+  .string()
+  .regex(/^[0-9a-f]{64}$/, 'must be a lowercase hex SHA-256 digest');
+const objectKeySchema = z.string().min(1);
+
+export const documentVersionSchema = z.strictObject({
+  designSystemId: z.string().min(1),
+  designSystemVersion: z.number().int().positive(),
+  sourceKey: objectKeySchema,
+  sourceSha256: sha256Schema,
+  candidateKey: objectKeySchema,
+  candidateSha256: sha256Schema,
+  pdfKey: objectKeySchema,
+  pageCount: z.number().int().positive(),
+  coverKey: objectKeySchema.optional(),
 });
 
-const documentGenerationContentSchema = documentContentSchema.extend({
-  document: documentContentSchema.shape.document.omit({
-    pdfKey: true,
-    pageCount: true,
-  }),
+export type DocumentVersion = z.infer<typeof documentVersionSchema>;
+
+export const documentContentSchema = z.object({
+  commentary: commentarySchema.optional(),
+  document: documentVersionSchema,
 });
+
+/**
+ * What the model writes for a DOCUMENT (§7.5): the Candidate Source as `html`,
+ * and the commentary that introduces it. `title` is added on INITIAL runs.
+ */
+export const documentDraftSchema = z.object({
+  commentary: commentarySchema,
+  html: z.string().min(1, 'html must not be empty'),
+});
+
+export type DocumentDraft = z.infer<typeof documentDraftSchema> & {
+  title?: string;
+};
+
+/** The DOCUMENT generation contract, with `title` on INITIAL runs only. */
+export function documentDraftSchemaFor(
+  includeTitle: boolean,
+): z.ZodType<DocumentDraft> {
+  return includeTitle
+    ? documentDraftSchema.extend({ title: artifactTitleSchema })
+    : documentDraftSchema;
+}
 
 export type DocumentContent = z.infer<typeof documentContentSchema>;
 
 // Discriminated on the artifact's family-level `type`. POST/POLL carry text
-// only; DOCUMENT adds the derived-PDF-backed carousel deck.
+// only; DOCUMENT adds the stored Document Version.
 export type ArtifactContent = PostContent | PollContent | DocumentContent;
 
 const contentSchemaByType: Partial<
@@ -139,7 +166,8 @@ export function contentSchemaFor(
 }
 
 /**
- * The provider-facing generation contract. Initial generation adds a title by
+ * The provider-facing generation contract for POST and POLL; DOCUMENT uses
+ * `documentDraftSchemaFor`. Initial generation adds a title by
  * extending the concrete content object instead of intersecting two schemas:
  * JSON-Schema structured-output providers handle a single object reliably,
  * while an `allOf` intersection is not uniformly supported.
@@ -155,9 +183,6 @@ export function generationSchemaFor(
       break;
     case ArtifactType.POLL:
       schema = pollContentSchema;
-      break;
-    case ArtifactType.DOCUMENT:
-      schema = documentGenerationContentSchema;
       break;
     default:
       throw new Error(

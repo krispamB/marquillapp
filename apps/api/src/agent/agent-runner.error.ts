@@ -13,3 +13,15 @@ export class ContentValidationError extends Error {
     this.name = 'ContentValidationError';
   }
 }
+
+/**
+ * The provider stopped a DOCUMENT draft at the output token cap
+ * (`finishReason: length`). Raised before any parse, and terminal: a truncated
+ * document cannot be repaired, only asked for again with less to write.
+ */
+export class DocumentTruncatedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DocumentTruncatedError';
+  }
+}

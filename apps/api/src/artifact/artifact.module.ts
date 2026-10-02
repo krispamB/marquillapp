@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { WorkflowModule } from '../workflow/workflow.module';
 import { WorkflowRunModule } from '../workflow/workflow-run.module';
 import { FeatureGatingModule } from '../feature-gating';
+import { DesignSystemModule } from '../design-system/design-system.module';
 import { ArtifactService } from './artifact.service';
 import { ArtifactGenerationService } from './artifact-generation.service';
 import { RunEventStreamService } from './run-event-stream.service';
@@ -12,7 +13,12 @@ import { RunEventsController } from './run-events.controller';
 // is @Global, so only the queue producer, run record, and credit meter modules
 // need importing here.
 @Module({
-  imports: [WorkflowModule, WorkflowRunModule, FeatureGatingModule],
+  imports: [
+    WorkflowModule,
+    WorkflowRunModule,
+    FeatureGatingModule,
+    DesignSystemModule,
+  ],
   controllers: [ArtifactController, RunEventsController],
   providers: [
     ArtifactService,

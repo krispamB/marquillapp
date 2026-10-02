@@ -7,12 +7,6 @@ jest.mock(
     Post: { name: 'Post' },
     PostStatus: { SCHEDULED: 'SCHEDULED', PUBLISHED: 'PUBLISHED' },
     ArtifactType: { POST: 'POST', POLL: 'POLL', DOCUMENT: 'DOCUMENT' },
-    CarouselTheme: {
-      BOLD: 'bold',
-      MINIMAL: 'minimal',
-      EDITORIAL: 'editorial',
-      GRADIENT: 'gradient',
-    },
     VersionStatus: {
       GENERATING: 'GENERATING',
       READY: 'READY',
@@ -22,6 +16,11 @@ jest.mock(
   { virtual: true },
 );
 jest.mock('../s3', () => ({ getSignedUrl: jest.fn() }), { virtual: true });
+jest.mock(
+  '../design-system/design-systems.service',
+  () => ({ DesignSystemsService: class {} }),
+  { virtual: true },
+);
 jest.mock(
   'src/workflow/workflow-run.service',
   () => ({ WorkflowRunService: class {} }),
@@ -50,17 +49,36 @@ const makeService = () => {
   };
   const postModel = { exists: jest.fn().mockResolvedValue(false) };
   const workflowRuns = { findRunsForVersions: jest.fn().mockResolvedValue([]) };
+  const designSystems = {
+    resolve: jest.fn().mockResolvedValue({ name: 'Margin' }),
+  };
   return {
     service: new ArtifactService(
       artifactModel as never,
       postModel as never,
       workflowRuns as never,
+      designSystems as never,
     ),
     artifactModel,
     postModel,
     workflowRuns,
+    designSystems,
   };
 };
+
+/** A stored §6.3 Document Version, every key and hash included. */
+const storedDocument = (overrides: Record<string, unknown> = {}) => ({
+  designSystemId: 'margin',
+  designSystemVersion: 2,
+  sourceKey: 'artifacts/deck/1/source.html',
+  sourceSha256: 'a'.repeat(64),
+  candidateKey: 'artifacts/deck/1/candidate.html',
+  candidateSha256: 'b'.repeat(64),
+  pdfKey: 'artifacts/deck/1/document.pdf',
+  pageCount: 4,
+  coverKey: 'artifacts/deck/1/cover.png',
+  ...overrides,
+});
 
 const ids = {
   artifact: new Types.ObjectId(),
@@ -335,18 +353,14 @@ describe('ArtifactService library API', () => {
       expect(detail).not.toHaveProperty('currentVersion');
     });
 
-    it('returns selected version content and signs document previews without exposing pdfKey', async () => {
-      const { service, artifactModel } = makeService();
+    it('returns the DOCUMENT allowlist with the pin, its name and a signed PDF URL, and no HTML key or hash', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-07-03T00:00:00.000Z'));
+      const { service, artifactModel, designSystems } = makeService();
       const createdAt = new Date('2026-07-01T00:00:00.000Z');
       const editedAt = new Date('2026-07-02T00:00:00.000Z');
       const document = {
         commentary: 'A deck intro',
-        document: {
-          templateId: 'minimal',
-          slides: [{ type: 'cover', fields: { title: 'Hello' } }],
-          pdfKey: 'artifacts/deck/1/document.pdf',
-          pageCount: 1,
-        },
+        document: storedDocument(),
       };
       const artifact = {
         ...readyPost(),
@@ -380,10 +394,12 @@ describe('ArtifactService library API', () => {
         content: {
           commentary: 'A deck intro',
           document: {
-            templateId: 'minimal',
-            slides: [{ type: 'cover', fields: { title: 'Hello' } }],
-            pageCount: 1,
+            designSystemId: 'margin',
+            designSystemVersion: 2,
+            designSystemName: 'Margin',
+            pageCount: 4,
             pdfUrl: 'https://signed.example/document.pdf',
+            pdfUrlExpiresAt: '2026-07-03T01:00:00.000Z',
           },
         },
         versions: [
@@ -396,7 +412,12 @@ describe('ArtifactService library API', () => {
           },
         ],
       });
-      expect(signedUrl).toHaveBeenCalledWith('artifacts/deck/1/document.pdf');
+      expect(signedUrl).toHaveBeenCalledWith(
+        'artifacts/deck/1/document.pdf',
+        3600,
+      );
+      expect(designSystems.resolve).toHaveBeenCalledWith('margin', 2);
+      jest.useRealTimers();
     });
 
     it('allows a direct GET of a soft-deleted artifact while keeping ownership enforced', async () => {
@@ -505,7 +526,6 @@ describe('ArtifactService library API', () => {
 
     it('should return summaries, latest-version status, signed previews, and filter metadata without versions', async () => {
       const { service, artifactModel } = makeService();
-      const firstSlide = { type: 'cover', fields: { title: 'Hello' } };
       const row = {
         _id: ids.artifact,
         type: ArtifactType.DOCUMENT,
@@ -516,12 +536,7 @@ describe('ArtifactService library API', () => {
         _latestVersion: { version: 1, status: VersionStatus.READY },
         _currentContent: {
           commentary: 'A deck intro',
-          document: {
-            templateId: 'minimal',
-            slides: [firstSlide],
-            pdfKey: 'artifacts/deck/1/document.pdf',
-            pageCount: 1,
-          },
+          document: storedDocument(),
         },
       };
       artifactModel.aggregate.mockImplementation((pipeline: unknown[]) => ({
@@ -551,8 +566,9 @@ describe('ArtifactService library API', () => {
             updatedAt: row.updatedAt,
             preview: {
               commentary: 'A deck intro',
-              firstSlide,
               pdfUrl: 'https://signed.example/document.pdf',
+              pageCount: 4,
+              coverUrl: 'https://signed.example/document.pdf',
             },
           },
         ],
@@ -563,8 +579,49 @@ describe('ArtifactService library API', () => {
         page: 1,
         pages: 1,
       });
-      expect(signedUrl).toHaveBeenCalledWith('artifacts/deck/1/document.pdf');
+      expect(signedUrl).toHaveBeenCalledWith(
+        'artifacts/deck/1/document.pdf',
+        3600,
+      );
+      expect(signedUrl).toHaveBeenCalledWith(
+        'artifacts/deck/1/cover.png',
+        3600,
+      );
       expect(JSON.stringify(row)).not.toContain('versions');
+    });
+
+    it('should leave coverUrl out of a DOCUMENT preview when the cover capture failed', async () => {
+      const { service, artifactModel } = makeService();
+      const row = {
+        _id: ids.artifact,
+        type: ArtifactType.DOCUMENT,
+        title: 'A deck',
+        updatedAt: new Date('2026-07-02T00:00:00.000Z'),
+        currentVersion: 1,
+        _attemptInFlight: false,
+        _latestVersion: { version: 1, status: VersionStatus.READY },
+        _currentContent: {
+          document: storedDocument({ coverKey: undefined }),
+        },
+      };
+      artifactModel.aggregate.mockImplementation((pipeline: unknown[]) => ({
+        exec: jest
+          .fn()
+          .mockResolvedValue(
+            pipeline.some((stage) => '$facet' in (stage as object))
+              ? [{ data: [row], metadata: [{ total: 1 }] }]
+              : [],
+          ),
+      }));
+      artifactModel.distinct.mockResolvedValue([]);
+
+      const { data } = await service.listArtifacts(ids.user.toString());
+
+      expect(data[0].preview).toEqual({
+        pdfUrl: 'https://signed.example/document.pdf',
+        pageCount: 4,
+      });
+      expect(JSON.stringify(data)).not.toContain('html');
     });
 
     it('should skip malformed artifacts when the artifact has no versions', async () => {
@@ -983,69 +1040,72 @@ describe('ArtifactService library API', () => {
       expect(artifactModel.findOneAndUpdate).not.toHaveBeenCalled();
     });
 
-    it('preserves renderer-owned document metadata when the editor submits a document patch', async () => {
-      const { service, artifactModel } = makeService();
-      const artifact = readyPost({
+    const readyDocument = () =>
+      readyPost({
         type: ArtifactType.DOCUMENT,
         versions: [
           {
             version: 1,
             status: VersionStatus.READY,
-            content: {
-              document: {
-                templateId: 'minimal',
-                slides: [
-                  { type: 'cover', fields: { title: 'Original' } },
-                  { type: 'content', fields: { heading: 'One', body: 'Body' } },
-                ],
-                pdfKey: 'artifacts/deck/1/document.pdf',
-                pageCount: 1,
-              },
-            },
+            content: { commentary: 'Old intro', document: storedDocument() },
             createdAt: new Date(),
           },
         ],
       });
+
+    it('edits only the commentary of a DOCUMENT and keeps its Document Version', async () => {
+      const { service, artifactModel } = makeService();
+      const artifact = readyDocument();
       artifactModel.findById.mockResolvedValue(artifact);
       artifactModel.findOneAndUpdate.mockResolvedValue(artifact);
 
       await service.updateArtifact(
         ids.user.toString(),
         ids.artifact.toString(),
-        {
-          content: {
-            document: {
-              slides: [
-                { type: 'cover', fields: { title: 'Edited' } },
-                { type: 'content', fields: { heading: 'One', body: 'Body' } },
-              ],
-              pdfKey: 'arbitrary/key.pdf',
-              pageCount: 99,
-            },
-          },
-        },
+        { title: 'Renamed', content: { commentary: 'New intro' } },
       );
 
       expect(artifactModel.findOneAndUpdate).toHaveBeenCalledWith(
         expect.anything(),
         {
           $set: expect.objectContaining({
+            title: 'Renamed',
             'versions.$.content': {
-              document: {
-                templateId: 'minimal',
-                slides: [
-                  { type: 'cover', fields: { title: 'Edited' } },
-                  { type: 'content', fields: { heading: 'One', body: 'Body' } },
-                ],
-                pdfKey: 'artifacts/deck/1/document.pdf',
-                pageCount: 1,
-              },
+              commentary: 'New intro',
+              document: storedDocument(),
             },
           }),
         },
         { new: true },
       );
     });
+
+    it.each([
+      [
+        { content: { document: { pdfKey: 'arbitrary/key.pdf' } } },
+        'content.document.pdfKey',
+      ],
+      [
+        { content: { document: { designSystemId: 'schematic' } } },
+        'content.document.designSystemId',
+      ],
+      [{ document: { slides: [] } }, 'content.document.slides'],
+      [{ content: { poll: {} } }, 'content.poll'],
+    ])(
+      'rejects a DOCUMENT edit of %j with a 400 naming the field',
+      async (patch, field) => {
+        const { service, artifactModel } = makeService();
+        artifactModel.findById.mockResolvedValue(readyDocument());
+
+        const error = await service
+          .updateArtifact(ids.user.toString(), ids.artifact.toString(), patch)
+          .catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(BadRequestException);
+        expect((error as Error).message).toContain(field);
+        expect(artifactModel.findOneAndUpdate).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe('deleteArtifact', () => {
