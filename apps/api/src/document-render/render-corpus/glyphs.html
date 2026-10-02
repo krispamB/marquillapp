@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- The family loads fine; an emoji and Devanagari are not in it, so the
+     browser paints them in whatever local font has them. -->
+<style>
+:root { --ds-white: #ffffff; --ds-ink: #0a0a0a; --ds-grey: #6e6e6e; --ds-hairline: #e2e2e2; }
+.leaf { height: 100%; color: var(--ds-ink); font-family: 'Inter Tight', -apple-system, 'Helvetica Neue', sans-serif; display: flex; flex-direction: column; }
+.title { font-size: 72px; line-height: 1.05; letter-spacing: -0.035em; font-weight: 500; margin: 0; }
+</style>
+</head>
+<body>
+<section class="page" data-role="title">
+  <div class="leaf">
+    <h1 class="title">Ship it 🚀 नमस्ते</h1>
+  </div>
+</section>
+<section class="page" data-role="end">
+  <div class="leaf">
+    <h1 class="title">Save this for the next one.</h1>
+  </div>
+</section>
+</body>
+</html>

@@ -1,10 +1,9 @@
 /**
- * PROTOTYPE — count the pages of the PDF Chromium printed. Throwaway (issue #137).
- *
- * No PDF library: Skia writes the page tree uncompressed, so the root `/Pages`
- * node's `/Count` is readable as text, and it is the largest `/Count` in the
- * file (intermediate nodes count a subset). Checked against `/Type /Page`
- * objects so a PDF that ever moves its tree into an object stream fails loudly
+ * Counts the pages of a PDF that Chromium printed (§5.1 step 8), without a PDF
+ * library. Skia writes the page tree uncompressed, so the root `/Pages` node's
+ * `/Count` is readable as text, and it is the largest `/Count` in the file
+ * (intermediate nodes count a subset). It is checked against the `/Type /Page`
+ * objects, so a PDF that ever moves its tree into an object stream fails loudly
  * instead of reporting zero pages.
  */
 export function countPdfPages(pdf: Uint8Array): number {
@@ -14,9 +13,10 @@ export function countPdfPages(pdf: Uint8Array): number {
   );
   const leaves = (text.match(/\/Type\s*\/Page\b(?!s)/g) ?? []).length;
   const root = counts.length ? Math.max(...counts) : 0;
-  if (root !== leaves || root === 0)
+  if (root !== leaves || root === 0) {
     throw new Error(
       `unreadable PDF page tree: /Count ${root}, ${leaves} /Page objects`,
     );
+  }
   return root;
 }

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- A fixed-height box with overflow: hidden cuts a paragraph off after its
+     first line. -->
+<style>
+:root { --ds-white: #ffffff; --ds-ink: #0a0a0a; --ds-grey: #6e6e6e; --ds-hairline: #e2e2e2; }
+.leaf { height: 100%; color: var(--ds-ink); font-family: 'Inter Tight', -apple-system, 'Helvetica Neue', sans-serif; display: flex; flex-direction: column; }
+.title { font-size: 72px; line-height: 1.05; letter-spacing: -0.035em; font-weight: 500; margin: 0; }
+.body { font-size: 30px; line-height: 1.45; color: var(--ds-grey); margin: 0; }
+.box { height: 48px; overflow: hidden; margin: 32px 0 0; }
+</style>
+</head>
+<body>
+<section class="page" data-role="title">
+  <div class="leaf">
+    <h1 class="title">Three fixes for carousels people finish.</h1>
+    <div class="box"><p class="body">A cover that lists everything promises nothing. Name the single result a reader leaves with, and say it in the reader's words.</p></div>
+  </div>
+</section>
+<section class="page" data-role="end">
+  <div class="leaf">
+    <h1 class="title">Save this for the next one.</h1>
+  </div>
+</section>
+</body>
+</html>

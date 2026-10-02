@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- Page 2 is filled only by a script. JavaScript is off in the session, so
+     the script never runs and the page renders blank. -->
+<style>
+:root { --ds-white: #ffffff; --ds-ink: #0a0a0a; --ds-grey: #6e6e6e; --ds-hairline: #e2e2e2; }
+.leaf { height: 100%; color: var(--ds-ink); font-family: 'Inter Tight', -apple-system, 'Helvetica Neue', sans-serif; display: flex; flex-direction: column; }
+.title { font-size: 72px; line-height: 1.05; letter-spacing: -0.035em; font-weight: 500; margin: 0; }
+</style>
+</head>
+<body>
+<section class="page" data-role="title">
+  <div class="leaf">
+    <h1 class="title">Three fixes for carousels people finish.</h1>
+  </div>
+</section>
+<section class="page" data-role="end">
+  <div class="leaf" id="slot"></div>
+  <script>document.getElementById('slot').textContent = 'Written by a script';</script>
+</section>
+</body>
+</html>

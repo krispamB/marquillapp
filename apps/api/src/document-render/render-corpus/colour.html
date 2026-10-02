@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- Every colour is a valid var(--ds-*) token; the pairs they form are not.
+     Page 1: grey text on a hairline chip, and a grey icon (icons may be ink).
+     Page 2: ink text over a full-page ink backdrop drawn by a ::before. -->
+<style>
+:root { --ds-white: #ffffff; --ds-ink: #0a0a0a; --ds-grey: #6e6e6e; --ds-hairline: #e2e2e2; }
+.leaf { height: 100%; color: var(--ds-ink); font-family: 'Inter Tight', -apple-system, 'Helvetica Neue', sans-serif; display: flex; flex-direction: column; }
+.title { font-size: 72px; line-height: 1.05; letter-spacing: -0.035em; font-weight: 500; margin: 0; }
+.meta { font-size: 24px; line-height: 1.3; color: var(--ds-grey); margin: 32px 0 0; }
+.chip { align-self: flex-start; padding: 8px 16px; background: var(--ds-hairline); }
+.dark::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--ds-ink); }
+</style>
+</head>
+<body>
+<section class="page" data-role="title">
+  <div class="leaf">
+    <h1 class="title">Three fixes for carousels people finish.</h1>
+    <p class="meta chip">New</p>
+    <p class="meta"><svg data-icon="arrow-right" data-size="24"></svg></p>
+  </div>
+</section>
+<section class="page" data-role="end">
+  <div class="leaf dark">
+    <h1 class="title">Save this for the next one.</h1>
+  </div>
+</section>
+</body>
+</html>
