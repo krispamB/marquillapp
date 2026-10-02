@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DesignSystemsController } from './design-systems.controller';
 import { DesignSystemsService } from './design-systems.service';
 
 /**
@@ -6,6 +7,7 @@ import { DesignSystemsService } from './design-systems.service';
  * both verify the seeds at boot.
  */
 @Module({
+  controllers: [DesignSystemsController],
   providers: [DesignSystemsService],
   exports: [DesignSystemsService],
 })

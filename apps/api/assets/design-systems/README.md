@@ -31,8 +31,14 @@ Chrome:
 
 ```
 bun src/carousel/prototype-design-systems/preview.ts --check    # parse + checker + contrast
-bun src/carousel/prototype-design-systems/preview.ts --render   # rewrite previews/
+bun src/carousel/prototype-design-systems/preview.ts --render   # assemble, rewrite previews/
 ```
 
-Samples reference icons as `<svg data-icon data-size>` placeholders and are not
-assembled; assembly (#136) inlines them.
+Each sample must check with zero violations against its own definition; the
+seed conformance test (`src/document-source/seed-conformance.spec.ts`) fails
+otherwise. A sample is written the way the model must write: no font `<link>`,
+no rule that matches a page element (the app's frame owns `.page`, its size,
+padding and background), so each page lays out an inner `<div class="leaf">`,
+and icons are empty `<svg data-icon data-size>` placeholders. Previews are
+rendered from the assembled Document Source, which adds the frame, the font
+link and the icons.

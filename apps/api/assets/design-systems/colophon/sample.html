@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght@0,400;0,500;0,700;1,500&family=Oswald:wght@500;600&family=Inter:wght@400;500;600&display=swap">
 <style>
 :root {
   --ds-bone: #efe9dc;
@@ -12,20 +11,14 @@
   --ds-oxblood: #a3231c;
 }
 html, body { margin: 0; padding: 0; }
-.page {
-  width: 1080px;
-  height: 1350px;
-  padding: 96px;
-  box-sizing: border-box;
-  background: var(--ds-bone);
+.leaf {
+  height: 100%;
   color: var(--ds-ink);
   font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  position: relative;
 }
-.page > * { position: relative; }
+.leaf > * { position: relative; }
 .glyph { position: absolute; font-family: 'Bodoni Moda', Didot, Georgia, serif; font-size: 960px; line-height: 0.8; font-weight: 400; color: var(--ds-oxblood); margin: 0; }
 .display { font-family: 'Bodoni Moda', Didot, Georgia, serif; font-size: 216px; line-height: 0.9; letter-spacing: -0.03em; font-weight: 500; margin: 24px 0 0; }
 .condensed { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 120px; line-height: 0.95; letter-spacing: -0.01em; font-weight: 600; margin: 0; }
@@ -59,61 +52,72 @@ html, body { margin: 0; padding: 0; }
 .quote .label { margin: 64px 0 0; color: var(--ds-taupe); }
 
 /* closing */
-.closing { background: var(--ds-oxblood); color: var(--ds-bone); }
+.closing { color: var(--ds-bone); }
+.closing::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--ds-oxblood); }
 .closing .heading { font-size: 72px; }
 .closing .sig { display: flex; gap: 16px; align-items: center; margin: 48px 0 0; }
 </style>
 </head>
 <body>
-<section class="page cover" data-role="cover">
-  <p class="glyph" aria-hidden="true">1</p>
-  <p class="label">The rule of</p>
-  <h1 class="display">One</h1>
-  <div class="rule"></div>
-  <p class="condensed">in carousel<br>design</p>
-  <div class="fill"></div>
-  <p class="lead">Three fixes for carousels people finish</p>
-  <div class="fill"></div>
-  <div class="legend">
-    <div><p class="mark">i.</p><p class="label">One outcome</p></div>
-    <div><p class="mark">ii.</p><p class="label">One idea a page</p></div>
-    <div><p class="mark">iii.</p><p class="label">One ask</p></div>
-  </div>
-</section>
-
-<section class="page chapter" data-role="chapter">
-  <p class="glyph" aria-hidden="true">2</p>
-  <div class="fill"></div>
-  <div class="col">
-    <p class="label">Fix one</p>
-    <h2 class="heading">Promise one <em>outcome</em> on the cover</h2>
-    <p class="lead">A cover that lists everything promises nothing. Name the single result the reader leaves with.</p>
-  </div>
-  <div class="fill"></div>
-</section>
-
-<section class="page essay" data-role="essay">
-  <p class="label">Fix two</p>
-  <div class="fill"></div>
-  <div class="col">
-    <h2 class="heading">One idea, <em>then</em> the swipe</h2>
+<section class="page" data-role="cover">
+  <div class="leaf cover">
+    <p class="glyph">1</p>
+    <p class="label">The rule of</p>
+    <h1 class="display">One</h1>
     <div class="rule"></div>
-    <p class="body">If a page needs two headings it is two pages. Readers forgive a long carousel; they do not forgive a crowded page.</p>
-    <p class="body">Give each idea the whole sheet and let the empty paper tell the reader where to look.</p>
+    <p class="condensed">in carousel<br>design</p>
+    <div class="fill"></div>
+    <p class="lead">Three fixes for carousels people finish</p>
+    <div class="fill"></div>
+    <div class="legend">
+      <div><p class="mark">i.</p><p class="label">One outcome</p></div>
+      <div><p class="mark">ii.</p><p class="label">One idea a page</p></div>
+      <div><p class="mark">iii.</p><p class="label">One ask</p></div>
+    </div>
   </div>
 </section>
 
-<section class="page quote" data-role="quote">
-  <p class="mark" aria-hidden="true">&ldquo;</p>
-  <p class="heading">The swipe is free. Attention is not.</p>
-  <p class="label">Fix three</p>
+<section class="page" data-role="chapter">
+  <div class="leaf chapter">
+    <p class="glyph">2</p>
+    <div class="fill"></div>
+    <div class="col">
+      <p class="label">Fix one</p>
+      <h2 class="heading">Promise one <em>outcome</em> on the cover</h2>
+      <p class="lead">A cover that lists everything promises nothing. Name the single result the reader leaves with.</p>
+    </div>
+    <div class="fill"></div>
+  </div>
 </section>
 
-<section class="page closing" data-role="closing">
-  <p class="label">Colophon</p>
-  <div class="fill"></div>
-  <h2 class="heading">End on one ask, and make it easy to say yes to.</h2>
-  <div class="sig"><svg data-icon="minus" data-size="48" width="48" height="48" aria-hidden="true"></svg><p class="label">Save this for your next post</p></div>
+<section class="page" data-role="essay">
+  <div class="leaf essay">
+    <p class="label">Fix two</p>
+    <div class="fill"></div>
+    <div class="col">
+      <h2 class="heading">One idea, <em>then</em> the swipe</h2>
+      <div class="rule"></div>
+      <p class="body">If a page needs two headings it is two pages. Readers forgive a long carousel; they do not forgive a crowded page.</p>
+      <p class="body">Give each idea the whole sheet and let the empty paper tell the reader where to look.</p>
+    </div>
+  </div>
+</section>
+
+<section class="page" data-role="quote">
+  <div class="leaf quote">
+    <p class="mark">&ldquo;</p>
+    <p class="heading">The swipe is free. Attention is not.</p>
+    <p class="label">Fix three</p>
+  </div>
+</section>
+
+<section class="page" data-role="closing">
+  <div class="leaf closing">
+    <p class="label">Colophon</p>
+    <div class="fill"></div>
+    <h2 class="heading">End on one ask, and make it easy to say yes to.</h2>
+    <div class="sig"><svg data-icon="minus" data-size="48"></svg><p class="label">Save this for your next post</p></div>
+  </div>
 </section>
 </body>
 </html>

@@ -55,6 +55,8 @@
     "ioredis": "^5.8.2",
     "lucide-static": "1.49.0",
     "mongoose": "^9.10.2",
+    "parse5": "^7",
+    "postcss": "^8.5.28",
     "puppeteer-core": "^24.43.0",
     "reflect-metadata": "^0.2.2",
     "resend": "^6.10.0",

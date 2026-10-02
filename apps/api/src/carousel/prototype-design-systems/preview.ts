@@ -5,8 +5,9 @@
  * Source on the same topic, switchable via `?variant=<id>` on one local page,
  * plus `?variant=overview` to compare every cover side by side.
  *
- * Every definition goes through the real #134 parse boundary and every sample
- * through the static checker, so what you see is also what would pass.
+ * Every definition goes through the production parse boundary, every sample
+ * through the production checker (#160), and every render through production
+ * assembly (#161), so what you see is also what would pass.
  *
  * The definitions and samples were kept (see #140) and now live in
  * `assets/design-systems/<id>/`; this server only reads them.
@@ -15,11 +16,36 @@
  *   bun src/carousel/prototype-design-systems/preview.ts --check    parse + checker only
  *   bun src/carousel/prototype-design-systems/preview.ts --render   rewrite previews/*.png
  */
-import { parseDesignSystem } from '../prototype-design-system/contract';
-import type { DesignSystem } from '../prototype-design-system/contract';
-import { contrastReport, enforce } from '../prototype-design-system/enforce';
-import { renderPromptFragment } from '../prototype-design-system/prompt';
-import { ICON_CATALOG } from '../prototype-render-validation/icons';
+import {
+  parseDesignSystemDefinition,
+  type DesignSystemDefinition as DesignSystem,
+} from '../../design-system/design-system-definition';
+import { renderPromptFragment } from '../../design-system/prompt-fragment';
+import { assemble } from '../../document-source/assemble';
+import { check } from '../../document-source/candidate-check';
+import type { Violation } from '../../document-source/violation';
+
+/** Definition-time check: do the declared pairings clear the contrast floor? */
+function contrastReport(ds: DesignSystem) {
+  const lum = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const hex = (name: string) =>
+    ds.palette.tokens.find((t) => t.name === name)!.hex;
+  return ds.palette.pairings.map((p) => {
+    const [a, b] = [lum(hex(p.text)), lum(hex(p.on))].sort((x, y) => y - x);
+    const ratio = (a + 0.05) / (b + 0.05);
+    return {
+      pair: `${p.text} on ${p.on}`,
+      ratio,
+      pass: ratio >= ds.palette.rules.minContrastRatio,
+    };
+  });
+}
 
 const IDS = [
   'broadside',
@@ -39,7 +65,7 @@ type Loaded = {
   ds?: DesignSystem;
   errors: string[];
   source: string;
-  violations: ReturnType<typeof enforce>;
+  violations: Violation[];
   contrast: ReturnType<typeof contrastReport>;
   promptTokens: number;
 };
@@ -47,39 +73,31 @@ type Loaded = {
 async function load(id: string): Promise<Loaded> {
   const yaml = await Bun.file(`${ASSETS}/${id}/definition.ds.yaml`).text();
   const source = await Bun.file(`${ASSETS}/${id}/sample.html`).text();
-  const parsed = parseDesignSystem(yaml);
+  const parsed = parseDesignSystemDefinition(yaml);
   if (!parsed.success)
     return {
       id,
-      errors: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+      errors: parsed.errors,
       source,
       violations: [],
       contrast: [],
       promptTokens: 0,
     };
-  const ds = parsed.data;
+  const ds = parsed.definition;
   return {
     id,
     ds,
     errors: [],
     source,
-    violations: enforce(ds, source),
+    violations: check(ds, source),
     contrast: contrastReport(ds),
     promptTokens: Math.round(renderPromptFragment(ds).length / 4),
   };
 }
 
-/** Stand-in for #136 assembly: inline the catalog icons. */
-const assemble = (source: string) =>
-  source.replace(
-    /<svg data-icon="([^"]+)" data-size="(\d+)"[^>]*><\/svg>/g,
-    (_, name: string, size: string) =>
-      `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_CATALOG[name] ?? ''}</svg>`,
-  );
-
 /** Preview-only chrome inside the iframe: lay pages out as a scaled strip. */
-const frame = (source: string, zoom: number, onlyFirst = false) =>
-  assemble(source).replace(
+const frame = (ds: DesignSystem, source: string, zoom: number, onlyFirst = false) =>
+  assemble(ds, source).replace(
     '</head>',
     `<style>
       html, body { background: #1b1b1f !important; }
@@ -116,7 +134,7 @@ function detail(l: Loaded) {
     )
     .join('');
   const violations = l.violations.length
-    ? `<ul class="bad">${l.violations.map((v) => `<li>${v.page ? `p${v.page} ` : ''}<b>${v.rule}</b> ${esc(v.detail)}</li>`).join('')}</ul>`
+    ? `<ul class="bad">${l.violations.map((v) => `<li>${v.page ? `p${v.page} ` : ''}<b>${v.code}</b> ${esc(v.detail)}</li>`).join('')}</ul>`
     : '<p class="ok">0 violations against its own definition</p>';
   return `
     <aside>
@@ -131,14 +149,14 @@ function detail(l: Loaded) {
       <h2>Type scale</h2><ul>${scale}</ul>
       <h2>Page roles</h2><ul>${roles}</ul>
     </aside>
-    <main><iframe srcdoc="${esc(frame(l.source, 0.3))}"></iframe></main>`;
+    <main><iframe srcdoc="${esc(frame(ds, l.source, 0.3))}"></iframe></main>`;
 }
 
 function overview(all: Loaded[]) {
   const cells = all
     .map(
       (l) => `<a class="cell" href="?variant=${l.id}">
-        <iframe srcdoc="${esc(frame(l.source, 0.3, true))}" tabindex="-1"></iframe>
+        ${l.ds ? `<iframe srcdoc="${esc(frame(l.ds, l.source, 0.3, true))}" tabindex="-1"></iframe>` : ''}
         <b>${l.ds?.name ?? l.id}</b><span>${esc(l.ds?.summary ?? l.errors.join('; '))}</span>
         <em class="${l.violations.length || l.errors.length ? 'bad' : 'ok'}">${l.errors.length ? 'definition does not parse' : `${l.violations.length} violations`}</em>
       </a>`,
@@ -208,7 +226,7 @@ async function render() {
   const tmp = `${process.env.TMPDIR ?? '/tmp'}/ds-previews`;
   await Bun.$`mkdir -p ${tmp}`.quiet();
   for (const id of IDS) {
-    const { source, errors, violations } = await load(id);
+    const { ds, source, errors, violations } = await load(id);
     if (errors.length || violations.length)
       throw new Error(`${id} does not pass its own definition; run --check`);
     const pages = (source.match(/<section[^>]*class="[^"]*\bpage\b/g) ?? []).length;
@@ -218,7 +236,7 @@ async function render() {
       const html = `${tmp}/${id}-${n}.html`;
       await Bun.write(
         html,
-        assemble(source).replace(
+        assemble(ds!, source).replace(
           '</head>',
           `<style>section.page:not(:nth-of-type(${n})) { display: none !important; }</style></head>`,
         ),
@@ -242,7 +260,7 @@ if (process.argv.includes('--render')) {
     );
     for (const e of l.errors) console.log(`    ! ${e}`);
     for (const v of l.violations)
-      console.log(`    - ${v.page ? `p${v.page} ` : ''}${v.rule}: ${v.detail}`);
+      console.log(`    - ${v.page ? `p${v.page} ` : ''}${v.code}: ${v.detail}`);
     for (const f of failing) console.log(`    - contrast: ${f}`);
   }
 } else {

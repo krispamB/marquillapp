@@ -1,4 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { join } from 'node:path';
 import { DesignSystemStatus } from '../database/schemas/design-system.schema';
 import { readSeedFiles } from './design-system-seed';
 import {
@@ -107,6 +108,7 @@ describe('DesignSystemsService', () => {
       expect(Object.keys(list[0]).sort()).toEqual([
         'id',
         'name',
+        'previews',
         'summary',
         'version',
       ]);
@@ -117,6 +119,33 @@ describe('DesignSystemsService', () => {
         'overprint',
         'schematic',
       ]);
+    });
+
+    it('should list preview API paths in page order', async () => {
+      await service.onModuleInit();
+
+      expect(service.listActive()[0].previews).toEqual([
+        '/api/v1/design-systems/margin/1/previews/1.png',
+        '/api/v1/design-systems/margin/1/previews/2.png',
+        '/api/v1/design-systems/margin/1/previews/3.png',
+        '/api/v1/design-systems/margin/1/previews/4.png',
+        '/api/v1/design-systems/margin/1/previews/5.png',
+      ]);
+    });
+
+    it('should exclude a system when it is not ACTIVE', async () => {
+      ({ service } = makeService(
+        allActive().map((record) =>
+          record.id === 'broadside'
+            ? { ...record, status: DesignSystemStatus.SUPERSEDED }
+            : record,
+        ),
+      ));
+      await service.onModuleInit();
+
+      expect(service.listActive().map((item) => item.id)).not.toContain(
+        'broadside',
+      );
     });
 
     it('should exclude a system when it is unlisted', async () => {
@@ -158,6 +187,55 @@ describe('DesignSystemsService', () => {
         unlisted.pop();
       }
     });
+  });
+
+  describe('previewFile', () => {
+    beforeEach(() => service.onModuleInit());
+
+    it('should return the seed image when the version is ACTIVE', () => {
+      expect(service.previewFile('margin', 1, 2)).toBe(
+        join(DESIGN_SYSTEM_SEED_DIR, 'margin', 'previews', 'page-02.png'),
+      );
+    });
+
+    it('should throw when the version is superseded', () => {
+      expect(() => service.previewFile('margin', 0, 1)).toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw when the version is newer than the ACTIVE one', () => {
+      expect(() => service.previewFile('margin', 2, 1)).toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw when the system is unknown', () => {
+      expect(() => service.previewFile('nope', 1, 1)).toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw when the system is unlisted', () => {
+      const unlisted = UNLISTED_DESIGN_SYSTEMS as string[];
+      unlisted.push('margin');
+      try {
+        expect(() => service.previewFile('margin', 1, 1)).toThrow(
+          NotFoundException,
+        );
+      } finally {
+        unlisted.pop();
+      }
+    });
+
+    it.each([0, 6, 1.5, -1])(
+      'should throw when page %s does not exist',
+      (page) => {
+        expect(() => service.previewFile('margin', 1, page)).toThrow(
+          NotFoundException,
+        );
+      },
+    );
   });
 
   describe('resolve', () => {

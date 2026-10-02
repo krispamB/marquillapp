@@ -62,7 +62,7 @@ deleted when its production equivalent lands (§12).
 
 | Prototype | Ticket | Path |
 |---|---|---|
-| Design System Definition contract, prompt fragment, static checker | #134, #136 | `src/carousel/prototype-design-system/` |
+| Design System Definition contract, prompt fragment, static checker | #134, #136 | deleted; production in `src/design-system/` and `src/document-source/` (#158, #160) |
 | Render session, probe, judge, assembly | #137 | `src/carousel/prototype-render-validation/` |
 | Six default systems, previews | #140 | `src/carousel/prototype-design-systems/` |
 
@@ -106,7 +106,7 @@ checkers (§4, §5) produce violations against a Candidate Source. Nothing is re
 constant.
 
 Top-level keys: `contract`, `id`, `version`, `name`, `summary`, `intent`, `page`, `palette`,
-`typography`, `spacing`, `icons`, `composition`. Reference: `prototype-design-system/contract.ts`
+`typography`, `spacing`, `icons`, `composition`. Reference: `src/design-system/design-system-definition.ts`
 and the six seeds in `assets/design-systems/`.
 
 Every key belongs to exactly one consumer class:
@@ -302,7 +302,8 @@ blend modes, gradients, `color-mix`, `backdrop-filter`).
 The backend derives the `.page` rule from the definition and injects it during assembly. It owns
 geometry and pagination only: `width`, `height`, `box-sizing`, `padding` (from `page.safeArea`),
 `background`, `overflow`, `overflow-wrap`, `break-after`, **`contain: strict`**, and
-`.page:last-child { break-after: auto }`. It does not set `display`.
+`.page:last-child { break-after: auto }`. It also resets `html, body { margin: 0; padding: 0 }`, so
+page `i` starts at `y = i·height` (§5.2). It does not set `display`.
 
 A model-authored rule matching a page element is a violation, not a silent override: a model that
 composed for the wrong canvas must repair, not render clipped.

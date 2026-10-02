@@ -14,7 +14,7 @@
  */
 import { homedir } from 'node:os';
 import puppeteer, { type Browser, TimeoutError } from 'puppeteer-core';
-import type { DesignSystem } from '../prototype-design-system/contract';
+import type { DesignSystemDefinition as DesignSystem } from '../../design-system/design-system-definition';
 import { countPdfPages } from './pdf';
 import { ELEMENT_SELECTOR, probeInPage } from './probe';
 import type { PlatformFont, RenderFacts } from './types';

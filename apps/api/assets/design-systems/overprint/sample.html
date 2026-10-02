@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Space+Mono:wght@400;700&display=swap">
 <style>
 :root {
   --ds-cream: #f6f0e1;
@@ -11,19 +10,12 @@
   --ds-sunflower: #ffcf33;
 }
 html, body { margin: 0; padding: 0; }
-.page {
-  width: 1080px;
-  height: 1350px;
-  padding: 80px;
-  box-sizing: border-box;
-  background: var(--ds-cream);
+.leaf {
+  height: 100%;
   color: var(--ds-blue);
   font-family: 'Space Mono', 'Courier New', monospace;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  position: relative;
-  isolation: isolate;
 }
 .shape { position: absolute; mix-blend-mode: multiply; z-index: -1; }
 .sun { background: var(--ds-sunflower); border-radius: 50%; }
@@ -56,59 +48,70 @@ html, body { margin: 0; padding: 0; }
 .checklist .blob { width: 360px; height: 320px; right: -120px; top: -80px; }
 
 /* closing */
-.closing { background: var(--ds-blue); color: var(--ds-cream); }
+.closing { color: var(--ds-cream); }
+.closing::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--ds-blue); }
 .closing .blob { width: 600px; height: 560px; right: -220px; top: -180px; mix-blend-mode: normal; z-index: 0; }
 .closing .heading { text-shadow: none; position: relative; }
 .closing .sticker { transform: rotate(3deg); margin: 48px 0 0; display: flex; gap: 16px; align-items: center; }
 </style>
 </head>
 <body>
-<section class="page cover" data-role="cover">
-  <div class="shape sun"></div>
-  <div class="shape blob"></div>
-  <div class="folio"><p class="label">Issue 07</p><p class="label">Carousel club</p></div>
-  <h1 class="display">The<br>first<br>swipe<br>zine</h1>
-  <p class="sticker">3 fixes inside</p>
-  <div class="fill"></div>
-  <p class="body">For carousels people actually finish.</p>
+<section class="page" data-role="cover">
+  <div class="leaf cover">
+    <div class="shape sun"></div>
+    <div class="shape blob"></div>
+    <div class="folio"><p class="label">Issue 07</p><p class="label">Carousel club</p></div>
+    <h1 class="display">The<br>first<br>swipe<br>zine</h1>
+    <p class="sticker">3 fixes inside</p>
+    <div class="fill"></div>
+    <p class="body">For carousels people actually finish.</p>
+  </div>
 </section>
 
-<section class="page spread" data-role="spread">
-  <div class="shape sun"></div>
-  <div class="shape blob"></div>
-  <div class="folio"><p class="label">Fix 01</p><p class="label">p.2</p></div>
-  <div class="fill"></div>
-  <h2 class="heading">Promise one thing on the cover.</h2>
-  <p class="body">A cover that lists everything promises nothing. Name the single result a reader walks away with.</p>
+<section class="page" data-role="spread">
+  <div class="leaf spread">
+    <div class="shape sun"></div>
+    <div class="shape blob"></div>
+    <div class="folio"><p class="label">Fix 01</p><p class="label">p.2</p></div>
+    <div class="fill"></div>
+    <h2 class="heading">Promise one thing on the cover.</h2>
+    <p class="body">A cover that lists everything promises nothing. Name the single result a reader walks away with.</p>
+  </div>
 </section>
 
-<section class="page spread" data-role="spread">
-  <div class="shape sun"></div>
-  <div class="shape blob"></div>
-  <div class="folio"><p class="label">Fix 02</p><p class="label">p.3</p></div>
-  <div class="fill"></div>
-  <h2 class="heading">One idea per page. Seriously.</h2>
-  <p class="body">Two headings on a page means it is two pages. Swipes are free.</p>
+<section class="page" data-role="spread">
+  <div class="leaf spread">
+    <div class="shape sun"></div>
+    <div class="shape blob"></div>
+    <div class="folio"><p class="label">Fix 02</p><p class="label">p.3</p></div>
+    <div class="fill"></div>
+    <h2 class="heading">One idea per page. Seriously.</h2>
+    <p class="body">Two headings on a page means it is two pages. Swipes are free.</p>
+  </div>
 </section>
 
-<section class="page checklist" data-role="checklist">
-  <div class="shape blob"></div>
-  <div class="folio"><p class="label">Fix 03</p><p class="label">p.4</p></div>
-  <div class="fill"></div>
-  <h2 class="heading">Before you hit post</h2>
-  <ul class="ticks">
-    <li><span class="box"><svg data-icon="check" data-size="32" width="32" height="32" aria-hidden="true"></svg></span>Cover names one outcome</li>
-    <li><span class="box"><svg data-icon="check" data-size="32" width="32" height="32" aria-hidden="true"></svg></span>One idea on every page</li>
-    <li class="hl"><span class="box"><svg data-icon="check" data-size="32" width="32" height="32" aria-hidden="true"></svg></span>Last page asks for ONE thing</li>
-  </ul>
+<section class="page" data-role="checklist">
+  <div class="leaf checklist">
+    <div class="shape blob"></div>
+    <div class="folio"><p class="label">Fix 03</p><p class="label">p.4</p></div>
+    <div class="fill"></div>
+    <h2 class="heading">Before you hit post</h2>
+    <ul class="ticks">
+      <li><span class="box"><svg data-icon="check" data-size="32"></svg></span>Cover names one outcome</li>
+      <li><span class="box"><svg data-icon="check" data-size="32"></svg></span>One idea on every page</li>
+      <li class="hl"><span class="box"><svg data-icon="check" data-size="32"></svg></span>Last page asks for ONE thing</li>
+    </ul>
+  </div>
 </section>
 
-<section class="page closing" data-role="closing">
-  <div class="shape blob"></div>
-  <div class="folio"><p class="label">Fin</p><p class="label">p.5</p></div>
-  <div class="fill"></div>
-  <h2 class="heading">Save this for your next carousel.</h2>
-  <p class="sticker"><svg data-icon="plus" data-size="32" width="32" height="32" aria-hidden="true"></svg>Follow the club</p>
+<section class="page" data-role="closing">
+  <div class="leaf closing">
+    <div class="shape blob"></div>
+    <div class="folio"><p class="label">Fin</p><p class="label">p.5</p></div>
+    <div class="fill"></div>
+    <h2 class="heading">Save this for your next carousel.</h2>
+    <p class="sticker"><svg data-icon="plus" data-size="32"></svg>Follow the club</p>
+  </div>
 </section>
 </body>
 </html>

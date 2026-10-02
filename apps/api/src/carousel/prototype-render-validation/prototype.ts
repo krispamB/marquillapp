@@ -16,9 +16,9 @@
  */
 import type { Browser } from 'puppeteer-core';
 import {
-  parseDesignSystem,
-  type DesignSystem,
-} from '../prototype-design-system/contract';
+  parseDesignSystemDefinition,
+  type DesignSystemDefinition as DesignSystem,
+} from '../../design-system/design-system-definition';
 import { assemble } from './assemble';
 import { boundForModel, remedyOf } from './diagnostics';
 import { judge } from './judge';
@@ -45,13 +45,13 @@ const c = {
 const rule = (t = '') =>
   console.log(c.dim('-'.repeat(78)) + (t ? `\n${c.bold(t)}` : ''));
 
-const parsed = parseDesignSystem(
+const parsed = parseDesignSystemDefinition(
   await Bun.file(
-    `${dir}/../prototype-design-system/editorial-serif.ds.yaml`,
+    `${dir}/samples/editorial-serif.ds.yaml`,
   ).text(),
 );
-if (!parsed.success) throw parsed.error;
-const ds: DesignSystem = parsed.data;
+if (!parsed.success) throw new Error(parsed.errors.join('\n'));
+const ds: DesignSystem = parsed.definition;
 
 // Locally one Chrome serves every menu item. Against Browserless each render
 // gets its own session, as production would: one document, one session, one
