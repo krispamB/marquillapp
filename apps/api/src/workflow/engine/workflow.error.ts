@@ -1,3 +1,4 @@
+import { ArtifactDeletedError } from '../../artifact/artifact-deleted.error';
 import { LLMError } from '../../llm/errors';
 
 /**
@@ -12,15 +13,18 @@ import { LLMError } from '../../llm/errors';
 export class WorkflowError extends Error {
   readonly retryable: boolean;
   readonly reason: string;
+  /** Announce nothing to the client: no `step.failed`, no `run.failed`. */
+  readonly silent: boolean;
 
   constructor(
     reason: string,
-    options: { retryable: boolean; cause?: unknown },
+    options: { retryable: boolean; silent?: boolean; cause?: unknown },
   ) {
     super(reason, { cause: options.cause });
     this.name = 'WorkflowError';
     this.reason = reason;
     this.retryable = options.retryable;
+    this.silent = options.silent ?? false;
   }
 }
 
@@ -46,6 +50,16 @@ export const transient = (reason: string, cause?: unknown): WorkflowError =>
  */
 export const toWorkflowError = (error: unknown): WorkflowError => {
   if (error instanceof WorkflowError) return error;
+
+  // The user deleted the artifact mid-run. Nothing can finish it, and nobody
+  // is waiting for the result.
+  if (error instanceof ArtifactDeletedError) {
+    return new WorkflowError(error.message, {
+      retryable: false,
+      silent: true,
+      cause: error,
+    });
+  }
 
   // The LLM layer already knows which provider faults are worth replaying.
   if (error instanceof LLMError) {

@@ -6,6 +6,7 @@ import type {
   ArtifactType,
   RunCompletedEvent,
   RunFailedEvent,
+  RunFailureCode,
   RunProgressEvent,
   RunStartedEvent,
   RunStepEvent,
@@ -30,6 +31,7 @@ export type RunState = {
   steps: ProgressStep[];
   credits: number;
   sourcesFound?: number;
+  failureCode?: RunFailureCode;
   failureReason?: string;
   failureAction?: "retry-create" | "retry-load";
   retryVersion?: number;
@@ -236,6 +238,7 @@ export function useArtifactRun({
         type: current?.type ?? initialTypeRef.current,
         steps: current?.steps ?? [],
         credits: current?.credits ?? 0,
+        failureCode: data.code,
         failureReason: data.failureReason,
         failureAction: current?.kind === "REFINE" ? undefined : "retry-create",
       }));

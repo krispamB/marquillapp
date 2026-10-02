@@ -114,7 +114,7 @@ export default function ArtifactConversationClient({
     if (artifact.title?.trim()) setArtifactTitle(artifact.title.trim());
     setEntries((current) => {
       const id = `version-${artifact.version}`;
-      const synchronized = current.map((entry) => entry.role === "assistant"
+      const synchronized: ConversationEntry[] = current.map((entry) => entry.role === "assistant"
         ? { ...entry, artifact: { ...entry.artifact, currentVersion: artifact.currentVersion } }
         : entry);
       const existingIndex = synchronized.findIndex((entry) => entry.id === id);
@@ -205,9 +205,11 @@ export default function ArtifactConversationClient({
           if (!cancelled) appendArtifact(previous);
         }
 
-        const currentVersion = detail.versions?.find((version) => version.version === detail.currentVersion);
-        if (currentVersion?.refineFeedback) {
-          appendUser(currentVersion.refineFeedback, `feedback-${detail.currentVersion}`);
+        // Without ?version= the detail is the newest version: the Attempt a
+        // refine appended, which is not the Current Version until it is READY.
+        const latestAttempt = detail.versions?.find((version) => version.version === detail.version);
+        if (latestAttempt?.refineFeedback) {
+          appendUser(latestAttempt.refineFeedback, `feedback-${detail.version}`);
         }
         if (!initialRunIdRef.current && detail.status === "FAILED") {
           showDurableFailure(detail.type, readyVersions.length ? "REFINE" : "INITIAL");

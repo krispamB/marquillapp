@@ -38,6 +38,8 @@ import {
 import { StylePreset } from '../agent/style-presets.config';
 import type { ArtifactContent } from './schemas';
 import { ArtifactService } from './artifact.service';
+import { ArtifactDeletedError } from './artifact-deleted.error';
+import { FailureCode } from '../workflow/workflow.constants';
 
 const makeService = () => {
   const artifactModel = {
@@ -74,7 +76,7 @@ beforeEach(() => {
 
 describe('ArtifactService', () => {
   describe('createArtifact', () => {
-    it('should create the artifact with version 1 GENERATING when given a prompt', async () => {
+    it('should create a content-less v1 Attempt and no Current Version when given a prompt', async () => {
       const created = { _id: new Types.ObjectId() };
       mocks.artifactModel.create.mockResolvedValue(created);
 
@@ -87,10 +89,7 @@ describe('ArtifactService', () => {
         user: new Types.ObjectId(fixtures.userId),
         type: ArtifactType.POST,
         source: { prompt: 'Write about TDD', withResearch: false },
-        currentVersion: 1,
-        versions: [
-          { version: 1, status: VersionStatus.GENERATING, content: {} },
-        ],
+        versions: [{ version: 1, status: VersionStatus.GENERATING }],
       });
     });
 
@@ -133,16 +132,17 @@ describe('ArtifactService', () => {
       ],
     });
 
-    it('should append a GENERATING version and move the head forward when refining a ready artifact', async () => {
+    const refine = () =>
+      service.appendRefineVersion(
+        fixtures.userId,
+        fixtures.artifactId,
+        'Make the hook sharper',
+      );
+
+    it('should append a GENERATING Attempt without moving the Current Version when refining', async () => {
       mocks.artifactModel.findOne.mockResolvedValue(readyArtifact());
 
-      await expect(
-        service.appendRefineVersion(
-          fixtures.userId,
-          fixtures.artifactId,
-          'Make the hook sharper',
-        ),
-      ).resolves.toEqual({
+      await expect(refine()).resolves.toEqual({
         version: 2,
         type: ArtifactType.POST,
         prompt: 'Write about TDD',
@@ -158,16 +158,49 @@ describe('ArtifactService', () => {
         {
           _id: fixtures.artifactId,
           user: expect.any(Types.ObjectId),
+          deletedAt: { $exists: false },
           currentVersion: 1,
+          'versions.status': { $ne: VersionStatus.GENERATING },
+          'versions.version': { $ne: 2 },
         },
         {
-          $set: { currentVersion: 2 },
           $push: {
             versions: {
               version: 2,
               status: VersionStatus.GENERATING,
-              content: {},
               refineFeedback: 'Make the hook sharper',
+              parentVersion: 1,
+            },
+          },
+        },
+      );
+    });
+
+    it('should number the Attempt past a failed one when an earlier refine failed', async () => {
+      mocks.artifactModel.findOne.mockResolvedValue({
+        ...readyArtifact(),
+        versions: [
+          ...readyArtifact().versions,
+          {
+            version: 2,
+            status: VersionStatus.FAILED,
+            failureCode: FailureCode.INTERNAL,
+            failureReason: 'boom',
+          },
+        ],
+      });
+
+      await expect(refine()).resolves.toMatchObject({ version: 3 });
+
+      expect(mocks.artifactModel.updateOne).toHaveBeenCalledWith(
+        expect.anything(),
+        {
+          $push: {
+            versions: {
+              version: 3,
+              status: VersionStatus.GENERATING,
+              refineFeedback: 'Make the hook sharper',
+              parentVersion: 1,
             },
           },
         },
@@ -185,13 +218,7 @@ describe('ArtifactService', () => {
         },
       });
 
-      await expect(
-        service.appendRefineVersion(
-          fixtures.userId,
-          fixtures.artifactId,
-          'Use fewer words',
-        ),
-      ).resolves.toMatchObject({
+      await expect(refine()).resolves.toMatchObject({
         type: ArtifactType.DOCUMENT,
         prompt: 'Build a carousel',
         withResearch: false,
@@ -224,83 +251,80 @@ describe('ArtifactService', () => {
         ],
       });
 
-      await expect(
-        service.appendRefineVersion(
-          fixtures.userId,
-          fixtures.artifactId,
-          'Use fewer words',
-        ),
-      ).resolves.toMatchObject({ theme: CarouselTheme.GRADIENT });
+      await expect(refine()).resolves.toMatchObject({
+        theme: CarouselTheme.GRADIENT,
+      });
     });
 
     it('should reject an unknown or soft-deleted artifact when appending a version', async () => {
       mocks.artifactModel.findOne.mockResolvedValue(null);
 
-      await expect(
-        service.appendRefineVersion(
-          fixtures.userId,
-          fixtures.artifactId,
-          'Try again',
-        ),
-      ).rejects.toMatchObject({ name: 'NotFoundException' });
+      await expect(refine()).rejects.toMatchObject({
+        name: 'NotFoundException',
+      });
 
       mocks.artifactModel.findOne.mockResolvedValue({
         ...readyArtifact(),
         deletedAt: new Date(),
       });
 
-      await expect(
-        service.appendRefineVersion(
-          fixtures.userId,
-          fixtures.artifactId,
-          'Try again',
-        ),
-      ).rejects.toMatchObject({ name: 'NotFoundException' });
+      await expect(refine()).rejects.toMatchObject({
+        name: 'NotFoundException',
+      });
       expect(mocks.artifactModel.updateOne).not.toHaveBeenCalled();
     });
 
-    it('should reject a concurrent head change when appending a version', async () => {
+    it('should reject with a conflict when the conditional write matches nothing', async () => {
       mocks.artifactModel.findOne.mockResolvedValue(readyArtifact());
       mocks.artifactModel.updateOne.mockResolvedValue({ matchedCount: 0 });
 
-      await expect(
-        service.appendRefineVersion(
-          fixtures.userId,
-          fixtures.artifactId,
-          'Try again',
-        ),
-      ).rejects.toMatchObject({ name: 'ConflictException' });
+      await expect(refine()).rejects.toMatchObject({
+        name: 'ConflictException',
+      });
     });
 
-    it('should reject a refine when the current version is still generating', async () => {
+    it('should reject with a conflict when an Attempt is already in flight', async () => {
       mocks.artifactModel.findOne.mockResolvedValue({
         ...readyArtifact(),
         versions: [
+          ...readyArtifact().versions,
+          { version: 2, status: VersionStatus.GENERATING },
+        ],
+      });
+
+      await expect(refine()).rejects.toMatchObject({
+        name: 'ConflictException',
+      });
+      expect(mocks.artifactModel.updateOne).not.toHaveBeenCalled();
+    });
+
+    it('should reject with a conflict when there is no Current Version to refine', async () => {
+      mocks.artifactModel.findOne.mockResolvedValue({
+        ...readyArtifact(),
+        currentVersion: undefined,
+        versions: [
           {
             version: 1,
-            status: VersionStatus.GENERATING,
-            content: {},
+            status: VersionStatus.FAILED,
+            failureCode: FailureCode.INTERNAL,
+            failureReason: 'boom',
           },
         ],
       });
 
-      await expect(
-        service.appendRefineVersion(
-          fixtures.userId,
-          fixtures.artifactId,
-          'Try again',
-        ),
-      ).rejects.toMatchObject({ name: 'ConflictException' });
+      await expect(refine()).rejects.toMatchObject({
+        name: 'ConflictException',
+      });
       expect(mocks.artifactModel.updateOne).not.toHaveBeenCalled();
     });
   });
 
   describe('readRefineInput', () => {
-    it('should return the prior version content and feedback when the target version is refining', async () => {
+    it('should return the parent version content and feedback when the target is refining', async () => {
       mocks.artifactModel.findById.mockResolvedValue({
         _id: fixtures.artifactId,
         type: ArtifactType.POST,
-        currentVersion: 2,
+        currentVersion: 1,
         versions: [
           {
             version: 1,
@@ -310,8 +334,8 @@ describe('ArtifactService', () => {
           {
             version: 2,
             status: VersionStatus.GENERATING,
-            content: {},
             refineFeedback: 'Make the hook sharper',
+            parentVersion: 1,
           },
         ],
       });
@@ -324,31 +348,11 @@ describe('ArtifactService', () => {
       });
     });
 
-    it('should reject when the target has no usable prior version for refinement', async () => {
+    it('should read the recorded parent rather than the latest earlier version when one failed', async () => {
       mocks.artifactModel.findById.mockResolvedValue({
         _id: fixtures.artifactId,
         type: ArtifactType.POST,
-        currentVersion: 2,
-        versions: [
-          {
-            version: 2,
-            status: VersionStatus.GENERATING,
-            content: {},
-            refineFeedback: 'Try again',
-          },
-        ],
-      });
-
-      await expect(
-        service.readRefineInput(fixtures.artifactId, 2),
-      ).rejects.toMatchObject({ name: 'NotFoundException' });
-    });
-
-    it('should skip failed versions when finding the latest earlier usable content', async () => {
-      mocks.artifactModel.findById.mockResolvedValue({
-        _id: fixtures.artifactId,
-        type: ArtifactType.POST,
-        currentVersion: 3,
+        currentVersion: 1,
         versions: [
           {
             version: 1,
@@ -358,15 +362,15 @@ describe('ArtifactService', () => {
           {
             version: 2,
             status: VersionStatus.FAILED,
-            content: {},
             failureReason: 'generation failed',
             refineFeedback: 'Make the hook sharper',
+            parentVersion: 1,
           },
           {
             version: 3,
             status: VersionStatus.GENERATING,
-            content: {},
             refineFeedback: 'Try a more direct opening',
+            parentVersion: 1,
           },
         ],
       });
@@ -378,19 +382,46 @@ describe('ArtifactService', () => {
         feedback: 'Try a more direct opening',
       });
     });
+
+    it('should reject when the target has no READY parent version', async () => {
+      mocks.artifactModel.findById.mockResolvedValue({
+        _id: fixtures.artifactId,
+        type: ArtifactType.POST,
+        versions: [
+          {
+            version: 2,
+            status: VersionStatus.GENERATING,
+            refineFeedback: 'Try again',
+            parentVersion: 1,
+          },
+        ],
+      });
+
+      await expect(
+        service.readRefineInput(fixtures.artifactId, 2),
+      ).rejects.toMatchObject({ name: 'NotFoundException' });
+    });
   });
 
-  describe('setVersionContent', () => {
+  describe('promoteVersion', () => {
     const generatingArtifact = () => ({
       _id: fixtures.artifactId,
       type: ArtifactType.POST,
-      versions: [{ version: 1, status: VersionStatus.GENERATING, content: {} }],
+      versions: [{ version: 1, status: VersionStatus.GENERATING }],
     });
 
     const generatingDocument = () => ({
       _id: fixtures.artifactId,
       type: ArtifactType.DOCUMENT,
-      versions: [{ version: 1, status: VersionStatus.GENERATING, content: {} }],
+      versions: [{ version: 1, status: VersionStatus.GENERATING }],
+    });
+
+    const promotionFilter = (version: number) => ({
+      _id: fixtures.artifactId,
+      deletedAt: { $exists: false },
+      versions: {
+        $elemMatch: { version, status: VersionStatus.GENERATING },
+      },
     });
 
     // The slides-only shape GENERATE writes into state.content — no pdfKey yet.
@@ -404,10 +435,10 @@ describe('ArtifactService', () => {
       },
     });
 
-    it('should validate the content and flip the version to READY when the version exists', async () => {
+    it('should set the content, READY and currentVersion in one conditional write when the Attempt is GENERATING', async () => {
       mocks.artifactModel.findById.mockResolvedValue(generatingArtifact());
 
-      await service.setVersionContent(
+      await service.promoteVersion(
         fixtures.artifactId,
         1,
         {
@@ -416,33 +447,32 @@ describe('ArtifactService', () => {
         { title: '  A finished artifact  ' },
       );
 
+      expect(mocks.artifactModel.updateOne).toHaveBeenCalledTimes(1);
       expect(mocks.artifactModel.updateOne).toHaveBeenCalledWith(
-        { _id: fixtures.artifactId, 'versions.version': 1 },
+        promotionFilter(1),
         {
           $set: {
             title: 'A finished artifact',
             'versions.$.content': { commentary: 'A finished post 🎉' },
             'versions.$.status': VersionStatus.READY,
+            currentVersion: 1,
           },
         },
       );
     });
 
-    it('should preserve the artifact title when persisting a refinement version', async () => {
+    it('should preserve the artifact title when promoting a refinement', async () => {
       mocks.artifactModel.findById.mockResolvedValue({
         ...generatingArtifact(),
         title: 'Manually edited title',
-        currentVersion: 2,
+        currentVersion: 1,
         versions: [
-          {
-            version: 2,
-            status: VersionStatus.GENERATING,
-            content: {},
-          },
+          { version: 1, status: VersionStatus.READY, content: {} },
+          { version: 2, status: VersionStatus.GENERATING, parentVersion: 1 },
         ],
       });
 
-      await service.setVersionContent(
+      await service.promoteVersion(
         fixtures.artifactId,
         2,
         { commentary: 'Refined post' },
@@ -450,21 +480,92 @@ describe('ArtifactService', () => {
       );
 
       expect(mocks.artifactModel.updateOne).toHaveBeenCalledWith(
-        expect.anything(),
+        promotionFilter(2),
         {
           $set: {
             'versions.$.content': { commentary: 'Refined post' },
             'versions.$.status': VersionStatus.READY,
+            currentVersion: 2,
           },
         },
       );
+    });
+
+    it('should succeed without writing again when a replay finds the version already READY', async () => {
+      mocks.artifactModel.findById
+        .mockResolvedValueOnce(generatingArtifact())
+        .mockResolvedValueOnce({
+          ...generatingArtifact(),
+          currentVersion: 1,
+          versions: [
+            {
+              version: 1,
+              status: VersionStatus.READY,
+              content: { commentary: 'Plain post' },
+            },
+          ],
+        });
+      mocks.artifactModel.updateOne.mockResolvedValue({ matchedCount: 0 });
+
+      await expect(
+        service.promoteVersion(fixtures.artifactId, 1, {
+          commentary: 'Plain post',
+        }),
+      ).resolves.toBeUndefined();
+      expect(mocks.artifactModel.updateOne).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw a conflict when the Attempt already FAILED', async () => {
+      mocks.artifactModel.findById
+        .mockResolvedValueOnce(generatingArtifact())
+        .mockResolvedValueOnce({
+          ...generatingArtifact(),
+          versions: [{ version: 1, status: VersionStatus.FAILED }],
+        });
+      mocks.artifactModel.updateOne.mockResolvedValue({ matchedCount: 0 });
+
+      await expect(
+        service.promoteVersion(fixtures.artifactId, 1, {
+          commentary: 'Plain post',
+        }),
+      ).rejects.toMatchObject({ name: 'ConflictException' });
+    });
+
+    it('should throw ArtifactDeletedError when the artifact is deleted during the write', async () => {
+      mocks.artifactModel.findById
+        .mockResolvedValueOnce(generatingArtifact())
+        .mockResolvedValueOnce({
+          ...generatingArtifact(),
+          deletedAt: new Date(),
+        });
+      mocks.artifactModel.updateOne.mockResolvedValue({ matchedCount: 0 });
+
+      await expect(
+        service.promoteVersion(fixtures.artifactId, 1, {
+          commentary: 'Plain post',
+        }),
+      ).rejects.toBeInstanceOf(ArtifactDeletedError);
+    });
+
+    it('should throw ArtifactDeletedError without writing when the artifact is already soft-deleted', async () => {
+      mocks.artifactModel.findById.mockResolvedValue({
+        ...generatingArtifact(),
+        deletedAt: new Date(),
+      });
+
+      await expect(
+        service.promoteVersion(fixtures.artifactId, 1, {
+          commentary: 'x',
+        }),
+      ).rejects.toBeInstanceOf(ArtifactDeletedError);
+      expect(mocks.artifactModel.updateOne).not.toHaveBeenCalled();
     });
 
     it('should reject with a ZodError and not write when the commentary exceeds 3000 characters', async () => {
       mocks.artifactModel.findById.mockResolvedValue(generatingArtifact());
 
       await expect(
-        service.setVersionContent(fixtures.artifactId, 1, {
+        service.promoteVersion(fixtures.artifactId, 1, {
           commentary: 'a'.repeat(3001),
         }),
       ).rejects.toMatchObject({ name: 'ZodError' });
@@ -474,7 +575,7 @@ describe('ArtifactService', () => {
     it('should ignore render when the artifact is not a DOCUMENT', async () => {
       mocks.artifactModel.findById.mockResolvedValue(generatingArtifact());
 
-      await service.setVersionContent(
+      await service.promoteVersion(
         fixtures.artifactId,
         1,
         { commentary: 'Plain post' },
@@ -487,15 +588,16 @@ describe('ArtifactService', () => {
           $set: {
             'versions.$.content': { commentary: 'Plain post' },
             'versions.$.status': VersionStatus.READY,
+            currentVersion: 1,
           },
         },
       );
     });
 
-    it('should fold the render pdfKey and pageCount into the document before flipping READY', async () => {
+    it('should fold the render pdfKey and pageCount into the document before promoting', async () => {
       mocks.artifactModel.findById.mockResolvedValue(generatingDocument());
 
-      await service.setVersionContent(
+      await service.promoteVersion(
         fixtures.artifactId,
         1,
         slidesOnlyDocument(),
@@ -508,7 +610,7 @@ describe('ArtifactService', () => {
       );
 
       expect(mocks.artifactModel.updateOne).toHaveBeenCalledWith(
-        { _id: fixtures.artifactId, 'versions.version': 1 },
+        promotionFilter(1),
         {
           $set: {
             'versions.$.content': {
@@ -526,18 +628,19 @@ describe('ArtifactService', () => {
               },
             },
             'versions.$.status': VersionStatus.READY,
+            currentVersion: 1,
           },
         },
       );
     });
 
-    it('should refuse to flip a document READY when no render pdfKey has been produced', async () => {
+    it('should refuse to promote a document when no render pdfKey has been produced', async () => {
       mocks.artifactModel.findById.mockResolvedValue(generatingDocument());
 
       // RENDER_PDF gates READY for documents; reaching PERSIST_VERSION without a
       // render is a wiring bug, never a healthy state to persist.
       await expect(
-        service.setVersionContent(fixtures.artifactId, 1, slidesOnlyDocument()),
+        service.promoteVersion(fixtures.artifactId, 1, slidesOnlyDocument()),
       ).rejects.toThrow(/pdfKey/i);
       expect(mocks.artifactModel.updateOne).not.toHaveBeenCalled();
     });
@@ -546,21 +649,7 @@ describe('ArtifactService', () => {
       mocks.artifactModel.findById.mockResolvedValue(null);
 
       await expect(
-        service.setVersionContent(fixtures.artifactId, 1, {
-          commentary: 'x',
-        }),
-      ).rejects.toMatchObject({ name: 'NotFoundException' });
-      expect(mocks.artifactModel.updateOne).not.toHaveBeenCalled();
-    });
-
-    it('should throw NotFoundException when the artifact is soft-deleted', async () => {
-      mocks.artifactModel.findById.mockResolvedValue({
-        ...generatingArtifact(),
-        deletedAt: new Date(),
-      });
-
-      await expect(
-        service.setVersionContent(fixtures.artifactId, 1, {
+        service.promoteVersion(fixtures.artifactId, 1, {
           commentary: 'x',
         }),
       ).rejects.toMatchObject({ name: 'NotFoundException' });
@@ -571,7 +660,7 @@ describe('ArtifactService', () => {
       mocks.artifactModel.findById.mockResolvedValue(generatingArtifact());
 
       await expect(
-        service.setVersionContent(fixtures.artifactId, 2, {
+        service.promoteVersion(fixtures.artifactId, 2, {
           commentary: 'x',
         }),
       ).rejects.toMatchObject({ name: 'NotFoundException' });
@@ -583,109 +672,122 @@ describe('ArtifactService', () => {
     const generatingArtifact = () => ({
       _id: fixtures.artifactId,
       type: ArtifactType.POST,
-      versions: [{ version: 1, status: VersionStatus.GENERATING, content: {} }],
+      versions: [{ version: 1, status: VersionStatus.GENERATING }],
     });
 
-    it('should flip the version to FAILED with the reason when the version exists', async () => {
+    it('should keep the Attempt as content-less FAILED history with its code and reason', async () => {
       mocks.artifactModel.findById.mockResolvedValue(generatingArtifact());
 
-      await service.failVersion(fixtures.artifactId, 1, 'insufficient credits');
+      await expect(
+        service.failVersion(
+          fixtures.artifactId,
+          1,
+          FailureCode.INTERNAL,
+          'insufficient credits',
+        ),
+      ).resolves.toBe('FAILED');
 
       expect(mocks.artifactModel.updateOne).toHaveBeenCalledWith(
-        { _id: fixtures.artifactId, 'versions.version': 1 },
+        {
+          _id: fixtures.artifactId,
+          versions: {
+            $elemMatch: { version: 1, status: VersionStatus.GENERATING },
+          },
+        },
         {
           $set: {
             'versions.$.status': VersionStatus.FAILED,
+            'versions.$.failureCode': FailureCode.INTERNAL,
             'versions.$.failureReason': 'insufficient credits',
           },
+          $unset: { 'versions.$.content': '' },
         },
       );
     });
 
-    it('should preserve the version rather than remove it, so the user can refine from it', async () => {
+    it('should report NOT_GENERATING when the version is no longer GENERATING', async () => {
       mocks.artifactModel.findById.mockResolvedValue(generatingArtifact());
+      mocks.artifactModel.updateOne.mockResolvedValue({ matchedCount: 0 });
 
-      await service.failVersion(fixtures.artifactId, 1, 'zod invalid');
+      await expect(
+        service.failVersion(fixtures.artifactId, 1, FailureCode.INTERNAL, 'x'),
+      ).resolves.toBe('NOT_GENERATING');
+    });
 
-      const [, update] = mocks.artifactModel.updateOne.mock.calls[0] as [
-        unknown,
-        { $set: Record<string, unknown> },
-      ];
-      expect(update.$set).not.toHaveProperty('versions.$.content');
+    it('should still fail the Attempt and report ARTIFACT_DELETED when the artifact was soft-deleted', async () => {
+      mocks.artifactModel.findById.mockResolvedValue({
+        ...generatingArtifact(),
+        deletedAt: new Date(),
+      });
+
+      await expect(
+        service.failVersion(fixtures.artifactId, 1, FailureCode.INTERNAL, 'x'),
+      ).resolves.toBe('ARTIFACT_DELETED');
+      expect(mocks.artifactModel.updateOne).toHaveBeenCalledTimes(1);
     });
 
     it('should throw NotFoundException when the artifact does not exist', async () => {
       mocks.artifactModel.findById.mockResolvedValue(null);
 
       await expect(
-        service.failVersion(fixtures.artifactId, 1, 'boom'),
-      ).rejects.toMatchObject({ name: 'NotFoundException' });
-      expect(mocks.artifactModel.updateOne).not.toHaveBeenCalled();
-    });
-
-    it('should throw NotFoundException when the version does not exist on the artifact', async () => {
-      mocks.artifactModel.findById.mockResolvedValue(generatingArtifact());
-
-      await expect(
-        service.failVersion(fixtures.artifactId, 2, 'boom'),
+        service.failVersion(fixtures.artifactId, 1, FailureCode.INTERNAL, 'x'),
       ).rejects.toMatchObject({ name: 'NotFoundException' });
       expect(mocks.artifactModel.updateOne).not.toHaveBeenCalled();
     });
   });
 
-  describe('readCurrent', () => {
-    it('should return the current version content when the artifact exists', async () => {
-      mocks.artifactModel.findById.mockResolvedValue({
-        _id: fixtures.artifactId,
-        type: ArtifactType.POST,
-        currentVersion: 2,
-        versions: [
-          {
-            version: 1,
-            status: VersionStatus.READY,
-            content: { commentary: 'old' },
-          },
-          {
-            version: 2,
-            status: VersionStatus.READY,
-            content: { commentary: 'new' },
-          },
-        ],
-      });
+  describe('readVersion', () => {
+    const artifact = () => ({
+      _id: fixtures.artifactId,
+      type: ArtifactType.POST,
+      currentVersion: 1,
+      versions: [
+        {
+          version: 1,
+          status: VersionStatus.READY,
+          content: { commentary: 'old' },
+        },
+        { version: 2, status: VersionStatus.GENERATING, parentVersion: 1 },
+      ],
+    });
 
-      await expect(service.readCurrent(fixtures.artifactId)).resolves.toEqual({
+    it('should return the type and status when the version exists', async () => {
+      mocks.artifactModel.findById.mockResolvedValue(artifact());
+
+      await expect(
+        service.readVersion(fixtures.artifactId, 2),
+      ).resolves.toEqual({
         type: ArtifactType.POST,
         version: 2,
-        content: { commentary: 'new' },
+        status: VersionStatus.GENERATING,
       });
+    });
+
+    it('should throw NotFoundException when the version does not exist', async () => {
+      mocks.artifactModel.findById.mockResolvedValue(artifact());
+
+      await expect(
+        service.readVersion(fixtures.artifactId, 3),
+      ).rejects.toMatchObject({ name: 'NotFoundException' });
     });
 
     it('should throw NotFoundException when the artifact does not exist', async () => {
       mocks.artifactModel.findById.mockResolvedValue(null);
 
       await expect(
-        service.readCurrent(fixtures.artifactId),
+        service.readVersion(fixtures.artifactId, 1),
       ).rejects.toMatchObject({ name: 'NotFoundException' });
     });
 
-    it('should throw NotFoundException when the artifact is soft-deleted', async () => {
+    it('should throw ArtifactDeletedError when the artifact is soft-deleted', async () => {
       mocks.artifactModel.findById.mockResolvedValue({
-        _id: fixtures.artifactId,
-        type: ArtifactType.POST,
-        currentVersion: 1,
-        versions: [
-          {
-            version: 1,
-            status: VersionStatus.READY,
-            content: { commentary: 'x' },
-          },
-        ],
+        ...artifact(),
         deletedAt: new Date(),
       });
 
       await expect(
-        service.readCurrent(fixtures.artifactId),
-      ).rejects.toMatchObject({ name: 'NotFoundException' });
+        service.readVersion(fixtures.artifactId, 1),
+      ).rejects.toBeInstanceOf(ArtifactDeletedError);
     });
   });
 });

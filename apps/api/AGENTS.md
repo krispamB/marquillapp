@@ -19,6 +19,7 @@ bun run dev              # HTTP server in watch mode (nest start --watch), port 
 bun run build            # nest build -> dist/
 bun run start:worker     # the worker process (node dist/workflow/workers/workflow.worker.js); build first
 
+bun run seed:design-systems  # seed Design Systems from assets/design-systems; the API and worker refuse to boot without it
 bun run typecheck        # tsc against tsconfig.build.json, i.e. exactly what ships
 bun run test             # Jest: all *.spec.ts under src/
 bunx jest src/auth/auth.service.spec.ts   # a single file
@@ -89,6 +90,7 @@ Key schemas in `src/database/schemas/`:
 - `Subscription` — Paddle subscription state; `currentPeriodStart`/`currentPeriodEnd` drives usage period calculation
 - `Tier` — holds feature `limits` map (keyed by `FeatureKey`); one tier has `isDefault: true`
 - `Usage` — metered usage counters per `(user_id, feature, periodStart)`
+- `DesignSystem` — one immutable Design System Version per `(id, version)` in `design_systems`, written only by `seed:design-systems`; only `status` changes after insert
 
 ## Conventions
 

@@ -1,13 +1,17 @@
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { terminal } from '../engine/workflow.error';
 import type { StepHandler } from '../engine/workflow.types';
 
 /**
- * The run's only durable content write: it flips the target version
- * `GENERATING → READY`.
+ * The run's only durable content write: it promotes the target Attempt
+ * `GENERATING → READY` and makes it the Current Version, in one conditional
+ * update.
  *
- * A write failure is retryable and simply propagates — the write targets the
- * fixed `(artifactId, version)`, so a whole-job retry overwrites rather than
- * appends.
+ * Idempotent: a whole-job retry whose earlier attempt already promoted the
+ * version finds it `READY` and succeeds without writing. A write failure is
+ * retryable and simply propagates. An Attempt that can no longer be promoted
+ * is terminal, and so is an artifact deleted mid-run, which the engine fails
+ * silently.
  */
 export const persistVersionStep: StepHandler = async (state, ctx) => {
   const { artifactId, version } = state.input;
@@ -20,12 +24,22 @@ export const persistVersionStep: StepHandler = async (state, ctx) => {
     );
   }
 
-  await ctx.artifacts.setVersionContent(artifactId, version, state.content, {
-    ...(state.render !== undefined ? { render: state.render } : {}),
-    ...(state.generatedTitle !== undefined
-      ? { title: state.generatedTitle }
-      : {}),
-  });
+  try {
+    await ctx.artifacts.promoteVersion(artifactId, version, state.content, {
+      ...(state.render !== undefined ? { render: state.render } : {}),
+      ...(state.generatedTitle !== undefined
+        ? { title: state.generatedTitle }
+        : {}),
+    });
+  } catch (error: unknown) {
+    if (
+      error instanceof ConflictException ||
+      error instanceof NotFoundException
+    ) {
+      throw terminal(error.message, error);
+    }
+    throw error;
+  }
 
   return {};
 };

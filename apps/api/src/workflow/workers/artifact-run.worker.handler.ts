@@ -6,6 +6,7 @@ import type { CreditMeterService } from '../../feature-gating/credit-meter.servi
 import type { FeatureGatingService } from '../../feature-gating/feature-gating.service';
 import { FeatureGateForbiddenException } from '../../feature-gating/feature-gating.exception';
 import { RunKind } from '../../database/schemas';
+import { FailureCode } from '../workflow.constants';
 import { RunCreditMeter } from '../engine/run-credit-meter';
 import {
   RunEventEmitter,
@@ -78,7 +79,9 @@ export class ArtifactRunProcessor {
         await this.deps.featureGating.assertResearchAccess(job.data.userId);
       } catch (error: unknown) {
         if (error instanceof FeatureGateForbiddenException) {
-          throw new UnrecoverableError('research is not available on this plan');
+          throw new UnrecoverableError(
+            'research is not available on this plan',
+          );
         }
         throw error;
       }
@@ -154,6 +157,9 @@ export class ArtifactRunProcessor {
       {
         artifactId: job.data.artifactId,
         version: job.data.version,
+        // POST and POLL have no finer-grained codes; the DOCUMENT pipeline
+        // brings its own.
+        failureCode: FailureCode.INTERNAL,
         failureReason,
       },
     );

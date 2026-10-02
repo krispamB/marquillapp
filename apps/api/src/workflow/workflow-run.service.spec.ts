@@ -14,7 +14,7 @@ jest.mock(
 
 import { Types } from 'mongoose';
 import { RunKind, RunStatus } from '../database/schemas';
-import { WorkflowStep } from './workflow.constants';
+import { FailureCode, WorkflowStep } from './workflow.constants';
 import { WorkflowRunService } from './workflow-run.service';
 
 describe('WorkflowRunService', () => {
@@ -194,14 +194,17 @@ describe('WorkflowRunService', () => {
       );
     });
 
-    it('should mark the run FAILED with the reason', async () => {
-      await service.handleFor(fixtures.runId).fail('insufficient credits');
+    it('should mark the run FAILED with the code and reason', async () => {
+      await service
+        .handleFor(fixtures.runId)
+        .fail(FailureCode.INTERNAL, 'insufficient credits');
 
       expect(mocks.workflowRunModel.updateOne).toHaveBeenCalledWith(
         { _id: expect.any(Types.ObjectId) },
         {
           $set: {
             status: RunStatus.FAILED,
+            failureCode: 'internal',
             failureReason: 'insufficient credits',
           },
         },

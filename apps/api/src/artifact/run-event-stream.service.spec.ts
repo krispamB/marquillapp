@@ -314,7 +314,9 @@ describe('RunEventStreamService', () => {
       expect(res.writeHead).toHaveBeenCalledWith(200, expect.any(Object));
       expect(written).toContain('event: run.started');
       expect(written).toContain('event: run.failed');
-      expect(written).toContain('Zod rejected the model output');
+      expect(written).toContain(
+        '"code":"internal","failureReason":"Zod rejected the model output"',
+      );
       expect(written).toContain(
         '"steps":["RESOLVE_INPUT","GENERATE","PERSIST_VERSION"]',
       );

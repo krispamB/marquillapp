@@ -29,6 +29,7 @@ import { OnboardingModule } from './onboarding';
 import { DiagnosticsModule } from './diagnostics/diagnostics.module';
 import { ArtifactModule } from './artifact';
 import { CarouselModule } from './carousel';
+import { DesignSystemModule } from './design-system';
 
 // The HTTP server's root. The LLM stack (`LlmModule`, `AgentModule`) and its
 // scraping siblings (`ApifyModule`, `ActorsModule`) live in `WorkerModule`
@@ -66,6 +67,7 @@ import { CarouselModule } from './carousel';
     DiagnosticsModule,
     ArtifactModule,
     CarouselModule,
+    DesignSystemModule,
   ],
   controllers: [AppController],
   providers: [AppService],
