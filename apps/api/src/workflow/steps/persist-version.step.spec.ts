@@ -1,4 +1,13 @@
 import { ConflictException } from '@nestjs/common';
+
+jest.mock(
+  '../../database/schemas',
+  () => ({
+    ArtifactType: { POST: 'POST', POLL: 'POLL', DOCUMENT: 'DOCUMENT' },
+  }),
+  { virtual: true },
+);
+
 import { ArtifactDeletedError } from '../../artifact/artifact-deleted.error';
 import { WorkflowError, toWorkflowError } from '../engine/workflow.error';
 import type { RunState, StepContext } from '../engine/workflow.types';
@@ -9,7 +18,7 @@ const makeStep = () => {
   const ctx = { artifacts } as unknown as StepContext;
 
   const state = {
-    input: { artifactId: 'artifact-1', version: 1 },
+    input: { artifactId: 'artifact-1', version: 1, type: 'POST' },
     generatedTitle: 'Writing more',
     content: { commentary: 'Write more.' },
   } as unknown as RunState;
@@ -39,18 +48,45 @@ describe('persistVersionStep', () => {
     );
   });
 
-  it('should pass the render slot through when a document was rendered', async () => {
+  it('should promote a DOCUMENT as the draft commentary and the uploaded Document Version', async () => {
     mocks.artifacts.promoteVersion.mockResolvedValue(undefined);
-    const render = { pdfKey: 'carousels/artifact-1/v1.pdf', pageCount: 6 };
+    const document = {
+      designSystemId: 'margin',
+      designSystemVersion: 2,
+      sourceKey: 'artifacts/artifact-1/1/source.html',
+      sourceSha256: 'a'.repeat(64),
+      candidateKey: 'artifacts/artifact-1/1/candidate.html',
+      candidateSha256: 'b'.repeat(64),
+      pdfKey: 'artifacts/artifact-1/1/document.pdf',
+      pageCount: 4,
+    };
+    const state = {
+      input: { artifactId: 'artifact-1', version: 1, type: 'DOCUMENT' },
+      generatedTitle: 'Three fixes',
+      draft: { commentary: 'Swipe through.', candidate: '<html></html>' },
+      document,
+    } as unknown as RunState;
 
-    await persistVersionStep({ ...fixtures.state, render }, ctx);
+    await persistVersionStep(state, ctx);
 
     expect(mocks.artifacts.promoteVersion).toHaveBeenCalledWith(
       'artifact-1',
       1,
-      { commentary: 'Write more.' },
-      { render, title: 'Writing more' },
+      { commentary: 'Swipe through.', document },
+      { title: 'Three fixes' },
     );
+  });
+
+  it('should fail terminally when a DOCUMENT reaches it without a Document Version', async () => {
+    const state = {
+      input: { artifactId: 'artifact-1', version: 1, type: 'DOCUMENT' },
+      draft: { commentary: 'Swipe through.', candidate: '<html></html>' },
+    } as unknown as RunState;
+
+    await expect(persistVersionStep(state, ctx)).rejects.toMatchObject({
+      retryable: false,
+    });
+    expect(mocks.artifacts.promoteVersion).not.toHaveBeenCalled();
   });
 
   it('should omit the title when a refinement has not generated one', async () => {

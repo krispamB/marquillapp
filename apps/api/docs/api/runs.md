@@ -72,6 +72,8 @@ type RunEventData =
   | { seq: number; ts: number; kind: 'INITIAL' | 'REFINE'; type: 'POST' | 'POLL' | 'DOCUMENT'; steps: WorkflowStep[] }
   | { seq: number; ts: number; step: WorkflowStep; index: number; total: number }
   | { seq: number; ts: number; step: WorkflowStep; sourcesFound: number }
+  | { seq: number; ts: number; step: 'GENERATE'; phase: 'draft' }
+  | { seq: number; ts: number; step: 'RENDER_PDF'; phase: 'render'; session: number }
   | { seq: number; ts: number; kind: 'llm' | 'web_search' | 'pdf_render'; credits: number; totalCredits: number; detail?: unknown }
   | { seq: number; ts: number; step: WorkflowStep; retryable: boolean; message: string }
   | { seq: number; ts: number; artifactId: string; version: number }
@@ -86,7 +88,13 @@ type RunFailureCode =
   | 'internal';
 ```
 
-The current `step.progress` signal is `sourcesFound` for `RESEARCH`. PDF rendering is atomic and does not currently emit page-level progress.
+`step.progress` signals:
+
+- `RESEARCH`: `sourcesFound`.
+- DOCUMENT `GENERATE`: `{ phase: 'draft' }` when the model starts writing the document.
+- DOCUMENT `RENDER_PDF`: `{ phase: 'render', session }` when a render session starts.
+
+DOCUMENT progress carries counts only, never what a check found. More phases (`repair`, `retry`) arrive with document Repairs; ignore a `phase` you do not recognise.
 
 ### Failure reason policy
 
@@ -104,6 +112,16 @@ in `failureReason`.
 `code` is stable and is what a client should branch on; `failureReason` is
 display text. POST and POLL runs always emit `internal`. The failed Attempt
 stores the same `code` and `failureReason`.
+
+DOCUMENT runs emit these codes, each with fixed display text:
+
+| `code` | Cause | `failureReason` |
+|---|---|---|
+| `document.repair_exhausted` | the generated document broke a Design System or render rule (documents are not repaired yet) | We couldn't get this design to fit cleanly. Try refining with a shorter brief or another design. |
+| `document.truncated` | the document was too long to generate | This document was too long to generate. Try fewer pages or a shorter brief. |
+| `design_system.unavailable` | the pinned Design System cannot be used | This design is unavailable. Try again with another design. |
+| `render.unavailable` | rendering failed after retries | We couldn't render your document right now. Please try again. |
+| `internal` | anything else | the generic text above |
 
 If the artifact is deleted while its run is in flight, the run fails without
 charging credits and without a `step.failed` or `run.failed` event: the client that deleted it is

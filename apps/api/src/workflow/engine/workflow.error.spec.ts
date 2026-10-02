@@ -1,9 +1,13 @@
+import { UnrecoverableError } from 'bullmq';
 import { LLMError } from '../../llm/errors';
+import { FailureCode } from '../workflow.constants';
 import {
   WorkflowError,
+  failureCodeOf,
   terminal,
   toWorkflowError,
   transient,
+  withFailureCode,
 } from './workflow.error';
 
 describe('WorkflowError', () => {
@@ -97,5 +101,33 @@ describe('toWorkflowError', () => {
     expect(converted.reason).toBe('Workflow step failed');
     expect(converted.retryable).toBe(true);
     expect(converted.cause).toBe('something odd');
+  });
+});
+
+describe('failure codes', () => {
+  it('should carry a code on terminal and transient errors', () => {
+    expect(
+      terminal('no Repair', undefined, FailureCode.DOCUMENT_REPAIR_EXHAUSTED),
+    ).toMatchObject({ retryable: false, code: 'document.repair_exhausted' });
+    expect(
+      transient('socket hang up', undefined, FailureCode.RENDER_UNAVAILABLE),
+    ).toMatchObject({ retryable: true, code: 'render.unavailable' });
+  });
+
+  it('should read back a code attached to any thrown error', () => {
+    const error = withFailureCode(
+      new UnrecoverableError('no Repair'),
+      FailureCode.DOCUMENT_TRUNCATED,
+    );
+
+    expect(failureCodeOf(error)).toBe('document.truncated');
+  });
+
+  it('should read internal from an error that carries no code', () => {
+    expect(failureCodeOf(new Error('boom'))).toBe('internal');
+    expect(failureCodeOf(withFailureCode(new Error('boom'), undefined))).toBe(
+      'internal',
+    );
+    expect(failureCodeOf('a string')).toBe('internal');
   });
 });

@@ -7,12 +7,6 @@ jest.mock(
   'src/database/schemas',
   () => ({
     ArtifactType: { POST: 'POST', POLL: 'POLL', DOCUMENT: 'DOCUMENT' },
-    CarouselTheme: {
-      BOLD: 'bold',
-      MINIMAL: 'minimal',
-      EDITORIAL: 'editorial',
-      GRADIENT: 'gradient',
-    },
   }),
   { virtual: true },
 );
@@ -26,7 +20,7 @@ jest.mock(
   { virtual: true },
 );
 
-import { ArtifactType, CarouselTheme } from 'src/database/schemas';
+import { ArtifactType } from 'src/database/schemas';
 import { z } from 'zod';
 import { LLMError } from '../llm/errors';
 import { LLMProvider, MessageRole } from '../llm/interfaces';
@@ -38,10 +32,14 @@ import type {
   Usage,
 } from '../llm/interfaces';
 import { ResponseParserService } from '../llm/parsers/responseParser.service';
-import { ContentValidationError } from './agent-runner.error';
+import {
+  ContentValidationError,
+  DocumentTruncatedError,
+} from './agent-runner.error';
 import { AgentRunnerService } from './agent-runner.service';
 import type {
   AgentRunConfig,
+  DocumentGenerateInput,
   GenerateInput,
   Tool,
 } from './agent-runner.interface';
@@ -90,6 +88,7 @@ interface ServiceConfig {
   maxSuccessfulSearches?: number;
   researchMaxOutputTokens?: string | number;
   generationMaxOutputTokens?: string | number;
+  documentMaxOutputTokens?: string | number;
 }
 
 const makeService = ({
@@ -97,6 +96,7 @@ const makeService = ({
   maxSuccessfulSearches,
   researchMaxOutputTokens,
   generationMaxOutputTokens,
+  documentMaxOutputTokens,
 }: ServiceConfig = {}) => {
   const llmService = { complete: jest.fn(), completeWithTools: jest.fn() };
   const configService = {
@@ -111,6 +111,9 @@ const makeService = ({
       }
       if (key === 'GENERATION_MAX_OUTPUT_TOKENS') {
         return generationMaxOutputTokens;
+      }
+      if (key === 'DOCUMENT_GENERATION_MAX_OUTPUT_TOKENS') {
+        return documentMaxOutputTokens;
       }
       return undefined;
     }),
@@ -458,177 +461,130 @@ describe('AgentRunnerService', () => {
       );
     });
 
-    describe('DOCUMENT generation', () => {
-      // A valid slides-only deck the model returns; templateId varies per test.
-      const deckJson = (templateId: string) =>
-        generatedJson({
-          document: {
-            templateId,
-            slides: [
-              { type: 'cover', fields: { title: 'A carousel' } },
-              { type: 'content', fields: { heading: 'One', body: 'A point' } },
-            ],
-          },
-        });
+    it('should refuse a DOCUMENT, which drafts through generateDocument', async () => {
+      await expect(
+        service.generate({ type: ArtifactType.DOCUMENT, prompt: 'A doc' }),
+      ).rejects.toThrow('No generation schema implemented');
+      expect(mocks.llmService.complete).not.toHaveBeenCalled();
+    });
+  });
 
-      const documentInput: GenerateInput = {
-        type: ArtifactType.DOCUMENT,
-        prompt: 'A carousel on staff engineering',
-      };
-
-      it('should parse and return the document deck the model produces', async () => {
-        mocks.llmService.complete.mockResolvedValue(
-          completion(deckJson('editorial')),
-        );
-
-        const generated = await service.generate(documentInput);
-
-        expect(generated).toMatchObject({
-          title: 'Artifact title',
-          content: { document: { templateId: 'editorial' } },
-        });
-        expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+  describe('generateDocument', () => {
+    const HTML = '<!doctype html><html><body></body></html>';
+    const draftJson = (overrides: Record<string, unknown> = {}) =>
+      JSON.stringify({
+        title: 'Three fixes',
+        commentary: 'Swipe through.',
+        html: HTML,
+        ...overrides,
       });
 
-      it('should constrain both attempts when repairing over-limit slide copy', async () => {
-        const overLimitDeck = generatedJson({
-          document: {
-            templateId: 'minimal',
-            slides: [
-              { type: 'cover', fields: { title: 'A carousel' } },
-              {
-                type: 'list',
-                fields: {
-                  heading: 'Three ideas',
-                  items: [
-                    'Valid item',
-                    'a'.repeat(81),
-                    'b'.repeat(81),
-                    'c'.repeat(81),
-                  ],
-                },
-              },
-              {
-                type: 'cta',
-                fields: {
-                  headline: 'Keep learning',
-                  action: 'Follow',
-                  handle: 'h'.repeat(41),
-                },
-              },
-            ],
-          },
-        });
-        mocks.llmService.complete
-          .mockResolvedValueOnce(completion(overLimitDeck))
-          .mockResolvedValueOnce(completion(deckJson('minimal')));
+    const documentInput: DocumentGenerateInput = {
+      prompt: 'Three fixes for documents',
+      fragment: 'DESIGN SYSTEM: Margin (margin v2)',
+      includeTitle: true,
+    };
 
-        await expect(service.generate(documentInput)).resolves.toMatchObject({
-          content: { document: { templateId: 'minimal' } },
-        });
+    it('should return the title, commentary and Candidate Source the model wrote', async () => {
+      mocks.llmService.complete.mockResolvedValue(completion(draftJson()));
 
-        expect(mocks.llmService.complete).toHaveBeenCalledTimes(2);
-        for (const [, , options] of completeCalls()) {
-          expectGenerationOptions(options);
-        }
-        const repairPrompt = messagesOfCall(2).at(-1)?.content ?? '';
-        expect(repairPrompt).toContain('maximum');
-        expect(repairPrompt).toContain('80');
-        expect(repairPrompt).toContain('40');
+      await expect(service.generateDocument(documentInput)).resolves.toEqual({
+        title: 'Three fixes',
+        commentary: 'Swipe through.',
+        html: HTML,
+      });
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+    });
+
+    it('should put the pinned fragment after the generation prompt in the system message', async () => {
+      mocks.llmService.complete.mockResolvedValue(completion(draftJson()));
+
+      await service.generateDocument(documentInput);
+
+      const [system] = messagesOfCall(1);
+      expect(system.role).toBe(MessageRole.System);
+      expect(system.content).toContain('LinkedIn document designer');
+      expect(system.content).toMatch(/DESIGN SYSTEM: Margin \(margin v2\)$/);
+    });
+
+    it('should drop the title when none was asked for', async () => {
+      mocks.llmService.complete.mockResolvedValue(completion(draftJson()));
+
+      const draft = await service.generateDocument({
+        ...documentInput,
+        includeTitle: false,
       });
 
-      it('should keep the model-chosen theme when the user supplied none', async () => {
-        mocks.llmService.complete.mockResolvedValue(
-          completion(deckJson('gradient')),
-        );
+      expect(draft).toEqual({ commentary: 'Swipe through.', html: HTML });
+    });
 
-        const generated = await service.generate(documentInput);
+    it('should cap the output at 16384 tokens by default', async () => {
+      mocks.llmService.complete.mockResolvedValue(completion(draftJson()));
 
-        expect(generated.content).toMatchObject({
-          document: { templateId: 'gradient' },
-        });
+      await service.generateDocument(documentInput);
+
+      expectGenerationOptions(completeCalls()[0][2], 16384);
+    });
+
+    it('should read the cap from DOCUMENT_GENERATION_MAX_OUTPUT_TOKENS', async () => {
+      ({ service, mocks } = makeService({ documentMaxOutputTokens: '20000' }));
+      mocks.llmService.complete.mockResolvedValue(completion(draftJson()));
+
+      await service.generateDocument(documentInput);
+
+      expectGenerationOptions(completeCalls()[0][2], 20000);
+    });
+
+    it('should throw DocumentTruncatedError before parsing when the draft hit the cap', async () => {
+      mocks.llmService.complete.mockResolvedValue({
+        ...completion('{"commentary": "Swipe', 0.05),
+        finishReason: 'length',
       });
+      const onUsage = jest.fn();
 
-      it('should remove provider null placeholders from optional document fields', async () => {
-        mocks.llmService.complete.mockResolvedValue(
-          completion(
-            generatedJson({
-              commentary: null,
-              document: {
-                templateId: 'minimal',
-                slides: [
-                  {
-                    type: 'cover',
-                    fields: {
-                      eyebrow: null,
-                      title: 'A carousel',
-                      subtitle: null,
-                    },
-                  },
-                  {
-                    type: 'cta',
-                    fields: {
-                      headline: 'Keep learning',
-                      action: 'Follow',
-                      handle: null,
-                    },
-                  },
-                ],
-              },
-            }),
-          ),
-        );
+      await expect(
+        service.generateDocument(documentInput, { onUsage }),
+      ).rejects.toBeInstanceOf(DocumentTruncatedError);
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+      expect(onUsage).toHaveBeenCalledTimes(1);
+    });
 
-        await expect(service.generate(documentInput)).resolves.toEqual({
-          title: 'Artifact title',
-          content: {
-            document: {
-              templateId: 'minimal',
-              slides: [
-                { type: 'cover', fields: { title: 'A carousel' } },
-                {
-                  type: 'cta',
-                  fields: {
-                    headline: 'Keep learning',
-                    action: 'Follow',
-                  },
-                },
-              ],
-            },
-          },
-        });
-      });
+    it('should repair an invalid envelope once and meter both turns', async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(completion(draftJson({ html: '' }), 0.03))
+        .mockResolvedValueOnce(completion(draftJson(), 0.04));
+      const onUsage = jest.fn();
 
-      it('should stamp the user-supplied theme over a different one the model picked', async () => {
-        // The model tries to pick "bold"; the user asked for "minimal".
-        mocks.llmService.complete.mockResolvedValue(
-          completion(deckJson('bold')),
-        );
+      await expect(
+        service.generateDocument(documentInput, { onUsage }),
+      ).resolves.toMatchObject({ html: HTML });
+      expect(onUsage).toHaveBeenCalledTimes(2);
+      const repairPrompt = messagesOfCall(2).at(-1)?.content ?? '';
+      expect(repairPrompt).toContain('rejected');
+    });
 
-        const generated = await service.generate({
-          ...documentInput,
-          theme: CarouselTheme.MINIMAL,
+    it('should throw ContentValidationError when the repair is invalid too', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        completion(draftJson({ html: '' })),
+      );
+
+      await expect(
+        service.generateDocument(documentInput),
+      ).rejects.toBeInstanceOf(ContentValidationError);
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(2);
+    });
+
+    it('should throw DocumentTruncatedError when the repair hit the cap', async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(completion(draftJson({ html: '' })))
+        .mockResolvedValueOnce({
+          ...completion('{"commentary"'),
+          finishReason: 'length',
         });
 
-        expect(generated.content).toMatchObject({
-          document: { templateId: 'minimal' },
-        });
-      });
-
-      it('should instruct the model to use the stamped theme in the user prompt', async () => {
-        mocks.llmService.complete.mockResolvedValue(
-          completion(deckJson('minimal')),
-        );
-
-        await service.generate({
-          ...documentInput,
-          theme: CarouselTheme.MINIMAL,
-        });
-
-        const [, user] = messagesOfCall(1);
-        expect(user.content).toContain('THEME:');
-        expect(user.content).toContain('minimal');
-      });
+      await expect(
+        service.generateDocument(documentInput),
+      ).rejects.toBeInstanceOf(DocumentTruncatedError);
     });
   });
 

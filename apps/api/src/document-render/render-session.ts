@@ -1,5 +1,5 @@
 import puppeteer, { type Browser, type HTTPRequest } from 'puppeteer-core';
-import type { BrowserlessUsage } from '../carousel/render-usage.types';
+import type { BrowserlessUsage } from './render-usage.types';
 import type { DesignSystemDefinition } from '../design-system/design-system-definition';
 import { isFontRequest } from '../document-source/assemble';
 import {
@@ -9,7 +9,10 @@ import {
   RENDER_SNIPPET_LENGTH,
 } from './document-render.constants';
 import { countPdfPages } from './pdf-page-count';
+import { RenderSessionError } from './render-session.error';
 import { PROBE_ELEMENT_SELECTOR, probeInPage } from './probe';
+
+export { RenderSessionError } from './render-session.error';
 import {
   emptyRenderFacts,
   type PlatformFont,
@@ -39,22 +42,6 @@ export interface RenderSessionResult {
   refusedRequests: string[];
   /** Wall time from connect to disconnect, and the Browserless units it costs. */
   usage: BrowserlessUsage;
-}
-
-/**
- * The session failed for a reason that is not a finding: the connection
- * dropped, the protocol errored, or the PDF was unreadable. It still carries
- * the usage, because Browserless bills the session regardless.
- */
-export class RenderSessionError extends Error {
-  constructor(
-    message: string,
-    readonly usage: BrowserlessUsage,
-    options?: { cause?: unknown },
-  ) {
-    super(message, options);
-    this.name = 'RenderSessionError';
-  }
 }
 
 /**

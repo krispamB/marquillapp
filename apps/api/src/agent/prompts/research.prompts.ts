@@ -39,7 +39,7 @@ function audienceHint(type: ArtifactType): string {
     case ArtifactType.POLL:
       return 'a LinkedIn poll with a question and options';
     case ArtifactType.DOCUMENT:
-      return 'a LinkedIn carousel (multi-slide document)';
+      return 'a LinkedIn document (a multi-page PDF)';
     default:
       return 'a single LinkedIn text post';
   }

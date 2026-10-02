@@ -18,15 +18,20 @@ jest.mock(
 
 import { ContentValidationError } from '../../agent/agent-runner.error';
 import { FeatureGateForbiddenException } from '../../feature-gating/feature-gating.exception';
-import { WorkflowError } from '../engine/workflow.error';
+import { WorkflowError, withFailureCode } from '../engine/workflow.error';
+import { FailureCode } from '../workflow.constants';
 import type { BuildInput } from '../engine/workflow.types';
 import {
   ArtifactRunProcessor,
   isTerminalJobFailure,
 } from './artifact-run.worker.handler';
 
-// These POST-run tests never reach RENDER_PDF, so a never-called stub suffices.
+// These POST-run tests never reach RENDER_PDF, so never-called stubs suffice.
+// The DOCUMENT pipeline runs through this processor in
+// `document-generation.integration.spec.ts`.
 const stubRenderer = { render: jest.fn() };
+const stubDesignSystems = { resolve: jest.fn() };
+const stubObjects = { put: jest.fn() };
 
 const buildInput = (overrides: Partial<BuildInput> = {}): BuildInput =>
   ({
@@ -81,6 +86,7 @@ const makeProcessor = () => {
     setCurrentStep: jest.fn().mockResolvedValue(undefined),
     saveResearchContext: jest.fn().mockResolvedValue(undefined),
     recordRenderAttempt: jest.fn().mockResolvedValue(undefined),
+    recordDocumentCheck: jest.fn().mockResolvedValue(undefined),
     getLatestCompletedResearch: jest.fn(),
     complete: jest.fn().mockResolvedValue(undefined),
     fail: jest.fn().mockResolvedValue(undefined),
@@ -98,7 +104,9 @@ const makeProcessor = () => {
   const processor = new ArtifactRunProcessor({
     agent: agent as any,
     artifacts: artifacts as any,
+    designSystems: stubDesignSystems as never,
     renderer: stubRenderer as any,
+    objects: stubObjects as never,
     creditMeter: creditMeter as any,
     featureGating: featureGating as any,
     runs: runs as any,
@@ -331,115 +339,6 @@ describe('ArtifactRunProcessor', () => {
       ]);
     });
 
-    it('should render a DOCUMENT refine to the new version key when processing a DOCUMENT REFINE job', async () => {
-      mocks.artifacts.readRefineInput.mockResolvedValue({
-        priorContent: {
-          document: {
-            templateId: 'minimal',
-            slides: [
-              { type: 'cover', fields: { title: 'The original' } },
-              { type: 'content', fields: { heading: 'A', body: 'B' } },
-            ],
-          },
-        },
-        feedback: 'Make the first slide clearer',
-      });
-      mocks.runHandle.getLatestCompletedResearch.mockResolvedValue(undefined);
-      mocks.agent.generate.mockResolvedValue({
-        content: {
-          document: {
-            templateId: 'minimal',
-            slides: [
-              { type: 'cover', fields: { title: 'A clearer cover' } },
-              { type: 'content', fields: { heading: 'A', body: 'B' } },
-            ],
-          },
-        },
-      });
-      stubRenderer.render.mockResolvedValue({
-        pdfKey: 'artifacts/artifact-1/2/document.pdf',
-        pageCount: 2,
-        browserless: { durationMs: 30_001, units: 2 },
-      });
-      const job = makeJob({
-        data: buildInput({
-          type: 'DOCUMENT',
-          kind: 'REFINE',
-          withResearch: true,
-          version: 2,
-        }),
-      });
-
-      await processor.process(job);
-
-      expect(stubRenderer.render).toHaveBeenCalledWith({
-        artifactId: 'artifact-1',
-        version: 2,
-        templateId: 'minimal',
-        slides: [
-          { type: 'cover', fields: { title: 'A clearer cover' } },
-          { type: 'content', fields: { heading: 'A', body: 'B' } },
-        ],
-      });
-      expect(mocks.artifacts.promoteVersion).toHaveBeenCalledWith(
-        'artifact-1',
-        2,
-        {
-          document: {
-            templateId: 'minimal',
-            slides: [
-              { type: 'cover', fields: { title: 'A clearer cover' } },
-              { type: 'content', fields: { heading: 'A', body: 'B' } },
-            ],
-          },
-        },
-        {
-          render: {
-            pdfKey: 'artifacts/artifact-1/2/document.pdf',
-            pageCount: 2,
-            browserless: { durationMs: 30_001, units: 2 },
-          },
-        },
-      );
-      expect(mocks.runHandle.recordRenderAttempt).toHaveBeenCalledWith({
-        durationMs: 30_001,
-        units: 2,
-        outcome: 'SUCCEEDED',
-      });
-    });
-
-    it('should retain render telemetry but never settle credits when later workflow persistence fails', async () => {
-      mocks.agent.generate.mockResolvedValue({
-        title: 'A document',
-        content: {
-          document: {
-            templateId: 'minimal',
-            slides: [{ type: 'cover', fields: { title: 'A document' } }],
-          },
-        },
-      });
-      stubRenderer.render.mockResolvedValue({
-        pdfKey: 'artifacts/artifact-1/1/document.pdf',
-        pageCount: 1,
-        browserless: { durationMs: 12_000, units: 1 },
-      });
-      mocks.artifacts.promoteVersion.mockRejectedValue(
-        new Error('mongo unavailable'),
-      );
-
-      await expect(
-        processor.process(makeJob({ data: buildInput({ type: 'DOCUMENT' }) })),
-      ).rejects.toThrow('mongo unavailable');
-
-      expect(mocks.runHandle.recordRenderAttempt).toHaveBeenCalledWith({
-        durationMs: 12_000,
-        units: 1,
-        outcome: 'SUCCEEDED',
-      });
-      expect(mocks.creditMeter.debit).not.toHaveBeenCalled();
-      expect(mocks.runHandle.complete).not.toHaveBeenCalled();
-    });
-
     it('should meter the LLM turn and commit the credits once', async () => {
       mocks.agent.generate.mockImplementation((_input, hooks) => {
         hooks.onUsage({
@@ -617,6 +516,46 @@ describe('ArtifactRunProcessor', () => {
       expect(emittedTypes(mocks.redis)).toEqual(['run.failed']);
       expect(mocks.logger.error).toHaveBeenCalledWith(
         expect.stringContaining("Socket 'secureConnect' timed out"),
+      );
+    });
+
+    it("should fail with the code the error carries and that code's client reason", async () => {
+      const error = withFailureCode(
+        new UnrecoverableError('3 static violation(s), and there is no Repair'),
+        FailureCode.DOCUMENT_REPAIR_EXHAUSTED,
+      );
+
+      await processor.onFailed(makeJob(), error);
+
+      const reason =
+        "We couldn't get this design to fit cleanly. Try refining with a shorter brief or another design.";
+      expect(mocks.artifacts.failVersion).toHaveBeenCalledWith(
+        'artifact-1',
+        1,
+        'document.repair_exhausted',
+        reason,
+      );
+      expect(mocks.runHandle.fail).toHaveBeenCalledWith(
+        'document.repair_exhausted',
+        reason,
+      );
+      expect(emittedData(mocks.redis)[0]).toMatchObject({
+        code: 'document.repair_exhausted',
+        failureReason: reason,
+      });
+    });
+
+    it('should keep a transient code when the attempt budget is exhausted', async () => {
+      const error = withFailureCode(
+        new WorkflowError('socket hang up', { retryable: true }),
+        FailureCode.RENDER_UNAVAILABLE,
+      );
+
+      await processor.onFailed(makeJob({ attemptsMade: 3 }), error);
+
+      expect(mocks.runHandle.fail).toHaveBeenCalledWith(
+        'render.unavailable',
+        "We couldn't render your document right now. Please try again.",
       );
     });
 

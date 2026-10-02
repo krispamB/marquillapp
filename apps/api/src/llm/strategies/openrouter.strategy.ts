@@ -205,7 +205,8 @@ export class OpenRouterStrategy implements LLMStrategy {
     options?: CompletionOptions,
   ): Promise<CompletionResult> {
     const result = await this.send(messages, options);
-    const text = readText(result.choices[0]?.message?.content);
+    const choice = result.choices[0];
+    const text = readText(choice?.message?.content);
 
     if (text === undefined) {
       throw new LLMError('OpenRouter returned no text content', {
@@ -213,7 +214,11 @@ export class OpenRouterStrategy implements LLMStrategy {
       });
     }
 
-    return { text, usage: toUsage(result.usage) };
+    return {
+      text,
+      usage: toUsage(result.usage),
+      ...(choice?.finishReason ? { finishReason: choice.finishReason } : {}),
+    };
   }
 
   async completeWithTools(

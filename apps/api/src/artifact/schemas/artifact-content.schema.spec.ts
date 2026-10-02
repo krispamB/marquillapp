@@ -2,12 +2,6 @@ jest.mock(
   'src/database/schemas',
   () => ({
     ArtifactType: { POST: 'POST', POLL: 'POLL', DOCUMENT: 'DOCUMENT' },
-    CarouselTheme: {
-      BOLD: 'bold',
-      MINIMAL: 'minimal',
-      EDITORIAL: 'editorial',
-      GRADIENT: 'gradient',
-    },
   }),
   { virtual: true },
 );
@@ -15,24 +9,45 @@ jest.mock(
 import { z, ZodError } from 'zod';
 import { ArtifactType } from 'src/database/schemas';
 import {
+  documentDraftSchemaFor,
   generationSchemaFor,
   parseArtifactContent,
 } from './artifact-content.schema';
 
 describe('generationSchemaFor', () => {
-  it('should expose one provider-compatible DOCUMENT object with the slide caps', () => {
-    const jsonSchema = z.toJSONSchema(
-      generationSchemaFor(ArtifactType.DOCUMENT, true),
-      { target: 'draft-7', io: 'output' },
+  it('should refuse a DOCUMENT, whose contract is the draft envelope', () => {
+    expect(() => generationSchemaFor(ArtifactType.DOCUMENT, true)).toThrow(
+      'No generation schema implemented',
     );
-    const serialized = JSON.stringify(jsonSchema);
+  });
+});
+
+describe('documentDraftSchemaFor', () => {
+  it('should expose one provider-compatible object with commentary and html', () => {
+    const jsonSchema = z.toJSONSchema(documentDraftSchemaFor(true), {
+      target: 'draft-7',
+      io: 'output',
+    });
 
     expect(jsonSchema).not.toHaveProperty('allOf');
-    expect(serialized).toContain('"maxLength":80');
-    expect(serialized).toContain('"maxLength":40');
-    expect(serialized).toContain('"maxLength":100');
-    expect(serialized).not.toContain('"pdfKey"');
-    expect(serialized).not.toContain('"pageCount"');
+    expect(jsonSchema).toHaveProperty('properties.commentary');
+    expect(jsonSchema).toHaveProperty('properties.html');
+    expect(jsonSchema).toHaveProperty('properties.title');
+  });
+
+  it('should leave the title out when none is asked for', () => {
+    const jsonSchema = z.toJSONSchema(documentDraftSchemaFor(false), {
+      target: 'draft-7',
+      io: 'output',
+    });
+
+    expect(JSON.stringify(jsonSchema)).not.toContain('"title"');
+  });
+
+  it('should reject an empty html', () => {
+    expect(() =>
+      documentDraftSchemaFor(false).parse({ commentary: 'Hi', html: '' }),
+    ).toThrow(ZodError);
   });
 });
 
@@ -335,71 +350,73 @@ describe('parseArtifactContent', () => {
   });
 
   describe('DOCUMENT arm', () => {
-    // The slides-only shape GENERATE emits: templateId + a valid deck, with no
-    // pdfKey/pageCount yet (those are RENDER_PDF's derived output).
-    const slidesOnlyDocument = () => ({
-      document: {
-        templateId: 'minimal',
-        slides: [
-          { type: 'cover', fields: { title: 'A carousel' } },
-          { type: 'content', fields: { heading: 'One', body: 'A point' } },
-        ],
-      },
+    // A complete stored Document Version (spec §6.3).
+    const documentVersion = () => ({
+      designSystemId: 'margin',
+      designSystemVersion: 2,
+      sourceKey: 'artifacts/abc/1/source.html',
+      sourceSha256: 'a'.repeat(64),
+      candidateKey: 'artifacts/abc/1/candidate.html',
+      candidateSha256: 'b'.repeat(64),
+      pdfKey: 'artifacts/abc/1/document.pdf',
+      pageCount: 4,
     });
 
-    it('should accept the slides-only document GENERATE emits', () => {
-      const content = slidesOnlyDocument();
+    it('should accept a complete Document Version', () => {
+      const content = { document: documentVersion() };
       expect(parseArtifactContent(ArtifactType.DOCUMENT, content)).toEqual(
         content,
       );
     });
 
-    it('should accept optional framing commentary alongside the deck', () => {
-      const content = { commentary: 'A thread 🧵', ...slidesOnlyDocument() };
-      expect(parseArtifactContent(ArtifactType.DOCUMENT, content)).toEqual(
-        content,
-      );
-    });
-
-    it('should accept the folded form carrying pdfKey and pageCount', () => {
-      const base = slidesOnlyDocument();
-      const folded = {
+    it('should accept commentary and an optional coverKey', () => {
+      const content = {
+        commentary: 'A thread 🧵',
         document: {
-          ...base.document,
-          pdfKey: 'artifacts/abc/1/document.pdf',
-          pageCount: 2,
+          ...documentVersion(),
+          coverKey: 'artifacts/abc/1/cover.png',
         },
       };
-      expect(parseArtifactContent(ArtifactType.DOCUMENT, folded)).toEqual(
-        folded,
+      expect(parseArtifactContent(ArtifactType.DOCUMENT, content)).toEqual(
+        content,
       );
     });
 
-    it('should reject a templateId that is not a real CarouselTheme', () => {
-      const content = slidesOnlyDocument();
-      content.document.templateId = 'neon';
-      expect(() =>
-        parseArtifactContent(ArtifactType.DOCUMENT, content),
-      ).toThrow(ZodError);
-    });
+    it.each(['sourceKey', 'candidateKey', 'pdfKey'] as const)(
+      'should reject a version without %s, the READY gate',
+      (key) => {
+        const document: Record<string, unknown> = documentVersion();
+        delete document[key];
+        expect(() =>
+          parseArtifactContent(ArtifactType.DOCUMENT, { document }),
+        ).toThrow(ZodError);
+      },
+    );
 
-    it('should reject a deck with fewer than two slides', () => {
-      const content = slidesOnlyDocument();
-      content.document.slides = [content.document.slides[0]];
-      expect(() =>
-        parseArtifactContent(ArtifactType.DOCUMENT, content),
-      ).toThrow(ZodError);
-    });
-
-    it('should reject a slide whose type is not a known slide role', () => {
+    it('should reject a template-era version carrying templateId and slides', () => {
       const content = {
         document: {
           templateId: 'minimal',
-          slides: [
-            { type: 'cover', fields: { title: 'A carousel' } },
-            { type: 'banner', fields: { heading: 'One', body: 'A point' } },
-          ],
+          slides: [{ type: 'cover', fields: { title: 'A carousel' } }],
         },
+      };
+      expect(() =>
+        parseArtifactContent(ArtifactType.DOCUMENT, content),
+      ).toThrow(ZodError);
+    });
+
+    it('should reject a Document Version that also carries slides', () => {
+      const content = {
+        document: { ...documentVersion(), slides: [] },
+      };
+      expect(() =>
+        parseArtifactContent(ArtifactType.DOCUMENT, content),
+      ).toThrow(ZodError);
+    });
+
+    it('should reject a hash that is not a lowercase hex SHA-256', () => {
+      const content = {
+        document: { ...documentVersion(), sourceSha256: 'not-a-hash' },
       };
       expect(() =>
         parseArtifactContent(ArtifactType.DOCUMENT, content),

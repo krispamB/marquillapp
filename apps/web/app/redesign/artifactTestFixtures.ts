@@ -17,13 +17,12 @@ export function documentArtifactFixture({
     content: {
       ...(commentary ? { commentary } : {}),
       document: {
-        templateId: "editorial",
-        slides: [
-          { type: "cover", fields: { title: "Marketing playbook" } },
-          { type: "cta", fields: { headline: "Start today", action: "Follow" } },
-        ],
+        designSystemId: "margin",
+        designSystemVersion: 1,
+        designSystemName: "Margin",
         pageCount: 2,
-        ...(pdfUrl ? { pdfUrl } : {}),
+        pdfUrl: pdfUrl ?? "",
+        pdfUrlExpiresAt: "2026-10-02T13:00:00.000Z",
       },
     },
   };

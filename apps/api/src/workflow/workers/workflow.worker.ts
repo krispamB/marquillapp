@@ -21,7 +21,9 @@ import { processEmailJob } from './email.worker.handler';
 import { ArtifactRunProcessor } from './artifact-run.worker.handler';
 import { AgentRunnerService } from '../../agent/agent-runner.service';
 import { ArtifactService } from '../../artifact/artifact.service';
-import { CarouselRendererService } from '../../carousel';
+import { DocumentRendererService } from '../../document-render/document-renderer.service';
+import { DesignSystemsService } from '../../design-system/design-systems.service';
+import { uploadFile } from '../../s3';
 import { CreditMeterService } from '../../feature-gating/credit-meter.service';
 import { FeatureGatingService } from '../../feature-gating/feature-gating.service';
 import { RedisService } from '../../redis/redis.service';
@@ -56,7 +58,13 @@ async function bootstrapWorker() {
   const artifactRuns = new ArtifactRunProcessor({
     agent: app.get(AgentRunnerService),
     artifacts: app.get(ArtifactService),
-    renderer: app.get(CarouselRendererService),
+    designSystems: app.get(DesignSystemsService),
+    renderer: app.get(DocumentRendererService),
+    objects: {
+      put: async (key, body, contentType) => {
+        await uploadFile(key, body, contentType);
+      },
+    },
     creditMeter: app.get(CreditMeterService),
     featureGating: app.get(FeatureGatingService),
     runs: app.get(WorkflowRunService),

@@ -112,7 +112,7 @@ The older `GET /posts/linkedin/image/:urn` route remains available for compatibi
 
 Publishes a `DRAFT`, `FAILED`, or `SCHEDULED` Post immediately. After the connected-account preflight succeeds, a pending schedule job is removed. `PUBLISHED` is terminal.
 
-Publishing uses the Post's pinned version, even when a refinement has since produced a newer Current Version. If that version is no longer `READY`, publish returns `409`. For a `DOCUMENT` artifact, the server uploads the pinned version's stored PDF bytes to LinkedIn; it never re-renders the document.
+Publishing uses the Post's pinned version, even when a refinement has since produced a newer Current Version. If that version is no longer `READY`, publish returns `409`. For a `DOCUMENT` artifact, the server uploads the pinned version's stored PDF bytes to LinkedIn; it never re-renders the document. LinkedIn shows the document under the artifact's title, or `LinkedIn document` when it has none.
 
 Publishing is blocked with `409` while any media item is `PENDING`, `UPLOADING`, or `FAILED`; failed media must be removed or uploaded again. READY media is composed as one `content.media` object or an ordered `content.multiImage` object.
 

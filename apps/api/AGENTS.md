@@ -4,7 +4,7 @@ The NestJS backend (`@marquill/api`). Read the root [AGENTS.md](../../AGENTS.md)
 
 ## Docs
 
-- `docs/` holds this app's architecture and product decision documents (workflow engine, artifact schema, credit system, carousel rendering, and more). Search it by filename for the area you're changing, and read only what applies.
+- `docs/` holds this app's architecture and product decision documents (workflow engine, artifact schema, credit system, document generation, and more). Search it by filename for the area you're changing, and read only what applies.
 - `docs/api/` is the client-facing API reference that `apps/web` builds against. Update it in the same change as any endpoint change.
 - `CONTEXT.md` is the domain glossary.
 
@@ -118,7 +118,7 @@ Copy `.env.example` and fill in real values. Required keys not in the example:
 ## Production
 
 - The same build runs two processes: `node dist/main.js` (HTTP) and `node dist/workflow/workers/workflow.worker.js` (worker).
-- The working directory must be `apps/api`. Mail and carousel templates are read from `process.cwd()/assets`.
+- The working directory must be `apps/api`. Mail templates and Design Systems are read from `process.cwd()/assets`.
 - `nest build` must run under Node, not Bun. Under Bun, `require.resolve` honours tsconfig's `baseUrl`, so Nest's path-rewrite hook leaves `src/...` imports bare, and `dist/` then fails with `Cannot find module 'src/...'`.
 - `Dockerfile` builds the image from the repository root: `docker build -f apps/api/Dockerfile -t marquill-api .`. `docker compose --profile app up -d` (run from the root) runs the API and worker against the local infrastructure.
 

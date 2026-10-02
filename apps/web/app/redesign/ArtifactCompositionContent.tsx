@@ -10,8 +10,8 @@ import { truncatePostPreview } from "./postPreviewCutoff";
 export function artifactSummaryCopy(artifact: ArtifactDetailData) {
   if (artifact.content.commentary?.trim()) return artifact.content.commentary.trim();
   if (artifact.content.poll) return artifact.content.poll.question;
-  const firstSlide = artifact.content.document?.slides[0];
-  if (firstSlide) return Object.values(firstSlide.fields).filter((value) => typeof value === "string").join(" · ");
+  const document = artifact.content.document;
+  if (document) return `${document.pageCount}-page document in ${document.designSystemName}`;
   return "This artifact is ready to publish.";
 }
 
@@ -58,7 +58,7 @@ export function ArtifactContentView({ artifact }: { artifact: ArtifactDetailData
           <PdfPreview
             source={document.pdfUrl}
             title={artifact.title?.trim() || "LinkedIn document"}
-            pageCountHint={document.pageCount ?? document.slides.length}
+            pageCountHint={document.pageCount}
             openHref={document.pdfUrl}
             ariaLabel={`${artifact.title?.trim() || "LinkedIn document"} carousel preview`}
             className="mq-pdf-preview-composition"
@@ -68,7 +68,7 @@ export function ArtifactContentView({ artifact }: { artifact: ArtifactDetailData
             <FileText size={28} />
             <span>
               <strong>{artifact.title?.trim() || "LinkedIn document"}</strong>
-              <small>{document.pageCount ?? document.slides.length} pages · PDF</small>
+              <small>{document.pageCount} pages · PDF</small>
             </span>
             <small>PDF preview unavailable</small>
           </div>

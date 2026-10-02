@@ -3,3 +3,4 @@ export * from './candidate-check';
 export * from './document-source.constants';
 export * from './icon-inlining.error';
 export * from './violation';
+export * from './sha256';

@@ -83,7 +83,7 @@ function DocumentResponse({ artifact }: { artifact: ArtifactDetailData }) {
         <div>
           <strong>{artifact.title?.trim() || "Your carousel is ready"}</strong>
           {commentary ? <p>{commentary}</p> : null}
-          <span>{document?.pageCount ?? document?.slides.length ?? 0} pages</span>
+          <span>{document?.pageCount ?? 0} pages</span>
         </div>
         {!document?.pdfUrl ? <span className="mq-studio-pdf-pending">PDF link unavailable</span> : null}
       </div>
@@ -91,7 +91,7 @@ function DocumentResponse({ artifact }: { artifact: ArtifactDetailData }) {
         <PdfPreview
           source={document.pdfUrl}
           title={artifact.title?.trim() || "Your carousel is ready"}
-          pageCountHint={document.pageCount ?? document.slides.length}
+          pageCountHint={document.pageCount}
           openHref={document.pdfUrl}
           ariaLabel={`${artifact.title?.trim() || "Carousel"} PDF preview`}
           className="mq-pdf-preview-studio"

@@ -243,7 +243,7 @@ export class PostService {
         };
       } else if (artifact.type === ArtifactType.DOCUMENT) {
         const documentContent = version.content as unknown as DocumentContent;
-        const { pdfKey, pageCount, slides } = documentContent.document;
+        const { pdfKey, pageCount } = documentContent.document;
         if (!pdfKey || !pageCount) {
           throw new BadRequestException('source artifact unavailable');
         }
@@ -254,9 +254,9 @@ export class PostService {
           bytes,
           pageCount,
         );
-        const cover = slides[0];
-        const title =
-          cover?.type === 'cover' ? cover.fields.title : 'LinkedIn document';
+        // A Document Version has no structured cover to read a title from, so
+        // the document is named after its artifact.
+        const title = artifact.title ?? 'LinkedIn document';
         content = { media: { id: documentUrn, title } };
       }
       const data: ILinkedInPost = {

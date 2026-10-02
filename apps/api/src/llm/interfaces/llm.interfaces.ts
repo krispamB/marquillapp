@@ -66,6 +66,11 @@ export interface Usage {
 export interface CompletionResult {
   text: string;
   usage: Usage;
+  /**
+   * Why the provider stopped, when it says (`stop`, `length`, ...). `length`
+   * means the output hit `max_tokens` and is truncated.
+   */
+  finishReason?: string;
 }
 
 export interface ToolTurnResult {

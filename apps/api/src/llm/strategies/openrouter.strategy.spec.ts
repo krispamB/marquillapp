@@ -90,6 +90,21 @@ describe('OpenRouterStrategy', () => {
       });
     });
 
+    it('should surface the finish reason when the provider reports one', async () => {
+      send.mockResolvedValue({
+        choices: [
+          { message: { content: '{"html": "<ht' }, finishReason: 'length' },
+        ],
+        usage,
+      });
+
+      const result = await strategy.complete([
+        { role: MessageRole.User, content: 'hi' },
+      ]);
+
+      expect(result.finishReason).toBe('length');
+    });
+
     it('should report a zero cost when the provider omits it', async () => {
       send.mockResolvedValue({
         choices: [{ message: { content: 'x' } }],

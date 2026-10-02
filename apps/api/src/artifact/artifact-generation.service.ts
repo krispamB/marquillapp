@@ -1,10 +1,15 @@
-import { Injectable } from '@nestjs/common';
-import { RunKind } from 'src/database/schemas';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { ArtifactType, RunKind } from 'src/database/schemas';
+import { DEFAULT_DESIGN_SYSTEM_ID } from '../design-system/design-system.constants';
+import { DesignSystemsService } from '../design-system/design-systems.service';
 import { CreditMeterService } from 'src/feature-gating/credit-meter.service';
 import { FeatureGatingService } from 'src/feature-gating/feature-gating.service';
 import { WorkflowRunService } from 'src/workflow/workflow-run.service';
 import { WorkflowQueue } from 'src/workflow/workflow.queue';
-import type { BuildInput } from 'src/workflow/engine/workflow.types';
+import type {
+  BuildInput,
+  DesignSystemPin,
+} from 'src/workflow/engine/workflow.types';
 import { ArtifactService, CreateArtifactInput } from './artifact.service';
 
 export interface LaunchResult {
@@ -31,12 +36,17 @@ export class ArtifactGenerationService {
     private readonly creditMeter: CreditMeterService,
     private readonly featureGating: FeatureGatingService,
     private readonly workflowQueue: WorkflowQueue,
+    private readonly designSystems: DesignSystemsService,
   ) {}
 
   async launchInitialRun(
     userId: string,
     input: CreateArtifactInput,
   ): Promise<LaunchResult> {
+    // In the request path, before any spend: an unknown, superseded, retired or
+    // unlisted slug is a 400.
+    const designSystem = this.pinDesignSystem(input);
+
     if (input.withResearch) {
       await this.featureGating.assertResearchAccess(userId);
     }
@@ -56,7 +66,7 @@ export class ArtifactGenerationService {
       prompt: input.prompt,
       withResearch: input.withResearch,
       stylePreset: input.stylePreset,
-      theme: input.theme,
+      ...(designSystem ? { designSystem } : {}),
       kind: RunKind.INITIAL,
       userId,
       artifactId,
@@ -90,7 +100,6 @@ export class ArtifactGenerationService {
       prompt: refinement.prompt,
       withResearch: refinement.withResearch,
       stylePreset: refinement.stylePreset,
-      theme: refinement.theme,
       kind: RunKind.REFINE,
       userId,
       artifactId,
@@ -104,6 +113,28 @@ export class ArtifactGenerationService {
     );
 
     return { artifactId, version: refinement.version, runId };
+  }
+
+  /**
+   * The Design System Version a new DOCUMENT is pinned to: the requested
+   * slug's ACTIVE version, or the default's. The pin rides the job payload,
+   * so every job attempt renders against the same definition.
+   */
+  private pinDesignSystem(
+    input: CreateArtifactInput,
+  ): DesignSystemPin | undefined {
+    if (input.type !== ArtifactType.DOCUMENT) {
+      if (input.designSystemId !== undefined) {
+        throw new BadRequestException(
+          'designSystemId applies only to DOCUMENT artifacts',
+        );
+      }
+      return undefined;
+    }
+    const { id, version } = this.designSystems.getActive(
+      input.designSystemId ?? DEFAULT_DESIGN_SYSTEM_ID,
+    );
+    return { id, version };
   }
 
   private async persistAndEnqueueRun(

@@ -6,7 +6,7 @@ import {
   IsString,
   MaxLength,
 } from 'class-validator';
-import { ArtifactType, CarouselTheme } from 'src/database/schemas';
+import { ArtifactType } from 'src/database/schemas';
 import { StylePreset } from 'src/agent/style-presets.config';
 
 /**
@@ -30,8 +30,11 @@ export class CreateArtifactDto {
   @IsEnum(StylePreset)
   stylePreset?: StylePreset;
 
-  // Carousel look — meaningful only for DOCUMENT artifacts (R4).
+  // DOCUMENT only: the Design System slug. Omitted means the default; whether
+  // it is selectable is checked against the live set at kickoff.
   @IsOptional()
-  @IsEnum(CarouselTheme)
-  theme?: CarouselTheme;
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  designSystemId?: string;
 }

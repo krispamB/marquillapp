@@ -1165,11 +1165,14 @@ describe('PostService artifact publishing', () => {
       fixtures.artifact.versions[0].content = {
         commentary: 'Swipe through',
         document: {
-          templateId: 'bold',
-          slides: [
-            { type: 'cover', fields: { title: 'First slide' } },
-            { type: 'cta', fields: { headline: 'Go', action: 'Try it' } },
-          ],
+          designSystemId: 'margin',
+          designSystemVersion: 2,
+          sourceKey: 'artifacts/deck/1/source.html',
+          sourceSha256:
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          candidateKey: 'artifacts/deck/1/candidate.html',
+          candidateSha256:
+            'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
           pdfKey: 'artifacts/deck/1/document.pdf',
           pageCount: 8,
         },
@@ -1187,7 +1190,37 @@ describe('PostService artifact publishing', () => {
       );
       const postCall = (apiFetch as jest.Mock).mock.calls.at(-1);
       expect(JSON.parse(postCall[1].body).content).toEqual({
-        media: { id: 'urn:li:document:1', title: 'First slide' },
+        media: { id: 'urn:li:document:1', title: 'Generated artifact title' },
+      });
+    });
+
+    it('should name an untitled DOCUMENT generically when publishing it', async () => {
+      const { service, fixtures } = makeService();
+      const artifact = fixtures.artifact as ArtifactFixture & {
+        title?: string;
+      };
+      artifact.type = 'DOCUMENT';
+      artifact.title = undefined;
+      artifact.versions[0].content = {
+        document: {
+          designSystemId: 'margin',
+          designSystemVersion: 2,
+          sourceKey: 'artifacts/deck/1/source.html',
+          sourceSha256:
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          candidateKey: 'artifacts/deck/1/candidate.html',
+          candidateSha256:
+            'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          pdfKey: 'artifacts/deck/1/document.pdf',
+          pageCount: 8,
+        },
+      };
+      (getFile as jest.Mock).mockResolvedValue(Buffer.from('rendered-pdf'));
+
+      await service.publishPost(fixtures.postId.toString());
+
+      expect(lastLinkedinBody().content).toEqual({
+        media: { id: 'urn:li:document:1', title: 'LinkedIn document' },
       });
     });
 
@@ -1196,11 +1229,14 @@ describe('PostService artifact publishing', () => {
       fixtures.artifact.type = 'DOCUMENT';
       fixtures.artifact.versions[0].content = {
         document: {
-          templateId: 'bold',
-          slides: [
-            { type: 'cover', fields: { title: 'First slide' } },
-            { type: 'cta', fields: { headline: 'Go', action: 'Try it' } },
-          ],
+          designSystemId: 'margin',
+          designSystemVersion: 2,
+          sourceKey: 'artifacts/deck/1/source.html',
+          sourceSha256:
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          candidateKey: 'artifacts/deck/1/candidate.html',
+          candidateSha256:
+            'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
           pdfKey: 'artifacts/deck/1/document.pdf',
           pageCount: 8,
         },
@@ -1254,7 +1290,14 @@ describe('PostService artifact publishing', () => {
           content: {
             commentary: 'Swipe through',
             document: {
-              slides: [{ type: 'cover', fields: { title: 'Pinned deck' } }],
+              designSystemId: 'margin',
+              designSystemVersion: 2,
+              sourceKey: 'artifacts/deck/1/source.html',
+              sourceSha256:
+                'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              candidateKey: 'artifacts/deck/1/candidate.html',
+              candidateSha256:
+                'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
               pdfKey: 'artifacts/deck/1/document.pdf',
               pageCount: 6,
             },
@@ -1265,7 +1308,14 @@ describe('PostService artifact publishing', () => {
           status: 'READY',
           content: {
             document: {
-              slides: [{ type: 'cover', fields: { title: 'Refined deck' } }],
+              designSystemId: 'margin',
+              designSystemVersion: 2,
+              sourceKey: 'artifacts/deck/2/source.html',
+              sourceSha256:
+                'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              candidateKey: 'artifacts/deck/2/candidate.html',
+              candidateSha256:
+                'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
               pdfKey: 'artifacts/deck/2/document.pdf',
               pageCount: 7,
             },
@@ -1288,7 +1338,7 @@ describe('PostService artifact publishing', () => {
         6,
       );
       expect(lastLinkedinBody().content).toEqual({
-        media: { id: 'urn:li:document:1', title: 'Pinned deck' },
+        media: { id: 'urn:li:document:1', title: 'Generated artifact title' },
       });
     });
 

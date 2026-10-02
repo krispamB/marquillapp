@@ -1,5 +1,6 @@
 import { ArtifactDeletedError } from '../../artifact/artifact-deleted.error';
 import { LLMError } from '../../llm/errors';
+import { FailureCode } from '../workflow.constants';
 
 /**
  * The engine's failure taxonomy. `retryable` decides whether a failure rides
@@ -15,16 +16,27 @@ export class WorkflowError extends Error {
   readonly reason: string;
   /** Announce nothing to the client: no `step.failed`, no `run.failed`. */
   readonly silent: boolean;
+  /**
+   * The stable code the run fails with if this failure ends it (spec §7.8).
+   * Absent means `internal`.
+   */
+  readonly code?: FailureCode;
 
   constructor(
     reason: string,
-    options: { retryable: boolean; silent?: boolean; cause?: unknown },
+    options: {
+      retryable: boolean;
+      silent?: boolean;
+      cause?: unknown;
+      code?: FailureCode;
+    },
   ) {
     super(reason, { cause: options.cause });
     this.name = 'WorkflowError';
     this.reason = reason;
     this.retryable = options.retryable;
     this.silent = options.silent ?? false;
+    if (options.code !== undefined) this.code = options.code;
   }
 }
 
@@ -33,12 +45,50 @@ export const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
 /** A cold replay cannot fix this. Stops retries immediately. */
-export const terminal = (reason: string, cause?: unknown): WorkflowError =>
-  new WorkflowError(reason, { retryable: false, cause });
+export const terminal = (
+  reason: string,
+  cause?: unknown,
+  code?: FailureCode,
+): WorkflowError =>
+  new WorkflowError(reason, { retryable: false, cause, code });
 
 /** A cold replay might succeed. Rides the attempt budget. */
-export const transient = (reason: string, cause?: unknown): WorkflowError =>
-  new WorkflowError(reason, { retryable: true, cause });
+export const transient = (
+  reason: string,
+  cause?: unknown,
+  code?: FailureCode,
+): WorkflowError => new WorkflowError(reason, { retryable: true, cause, code });
+
+/**
+ * The thrown error BullMQ hands the `failed` listener is not always the
+ * `WorkflowError` itself (a terminal one becomes `UnrecoverableError`), so the
+ * code rides on whatever is thrown as a plain property.
+ */
+const FAILURE_CODE = 'failureCode';
+
+export const withFailureCode = <E extends Error>(
+  error: E,
+  code: FailureCode | undefined,
+): E => {
+  if (code !== undefined) {
+    Object.defineProperty(error, FAILURE_CODE, {
+      value: code,
+      enumerable: false,
+    });
+  }
+  return error;
+};
+
+/** The code a failed job attempt carries, or `internal`. */
+export const failureCodeOf = (error: unknown): FailureCode => {
+  const code =
+    typeof error === 'object' && error !== null
+      ? (error as Record<string, unknown>)[FAILURE_CODE]
+      : undefined;
+  return Object.values(FailureCode).includes(code as FailureCode)
+    ? (code as FailureCode)
+    : FailureCode.INTERNAL;
+};
 
 /**
  * Normalize anything a step throws into a `WorkflowError`.

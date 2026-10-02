@@ -10,12 +10,6 @@ jest.mock(
       READY: 'READY',
       FAILED: 'FAILED',
     },
-    CarouselTheme: {
-      BOLD: 'bold',
-      MINIMAL: 'minimal',
-      EDITORIAL: 'editorial',
-      GRADIENT: 'gradient',
-    },
   }),
   { virtual: true },
 );
@@ -29,17 +23,18 @@ jest.mock(
   { virtual: true },
 );
 jest.mock(
+  '../design-system/design-systems.service',
+  () => ({ DesignSystemsService: class {} }),
+  { virtual: true },
+);
+jest.mock(
   'src/workflow/workflow-run.service',
   () => ({ WorkflowRunService: class {} }),
   { virtual: true },
 );
 
 import { Types } from 'mongoose';
-import {
-  ArtifactType,
-  CarouselTheme,
-  VersionStatus,
-} from 'src/database/schemas';
+import { ArtifactType, VersionStatus } from 'src/database/schemas';
 import { StylePreset } from '../agent/style-presets.config';
 import type { ArtifactContent } from './schemas';
 import { ArtifactService } from './artifact.service';
@@ -55,10 +50,12 @@ const makeService = () => {
   };
   const postModel = { exists: jest.fn().mockResolvedValue(false) };
   const workflowRuns = { findRunsForVersions: jest.fn().mockResolvedValue([]) };
+  const designSystems = { resolve: jest.fn() };
   const service = new ArtifactService(
     artifactModel as any,
     postModel as any,
     workflowRuns as any,
+    designSystems as any,
   );
 
   const userId = new Types.ObjectId().toString();
@@ -117,6 +114,27 @@ describe('ArtifactService', () => {
             prompt: 'Write about TDD',
             withResearch: false,
             stylePreset: 'bold',
+          },
+        }),
+      );
+    });
+
+    it("should record a requested Design System on a new DOCUMENT's source", async () => {
+      mocks.artifactModel.create.mockResolvedValue({});
+
+      await service.createArtifact(fixtures.userId, {
+        type: ArtifactType.DOCUMENT,
+        prompt: 'Three fixes',
+        withResearch: false,
+        designSystemId: 'schematic',
+      });
+
+      expect(mocks.artifactModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: {
+            prompt: 'Three fixes',
+            withResearch: false,
+            designSystemId: 'schematic',
           },
         }),
       );
@@ -217,53 +235,16 @@ describe('ArtifactService', () => {
       );
     });
 
-    it('should carry the document theme into the refine input when the user supplied one', async () => {
+    it('should refuse to refine a DOCUMENT before appending anything', async () => {
       mocks.artifactModel.findOne.mockResolvedValue({
         ...readyArtifact(),
         type: ArtifactType.DOCUMENT,
-        source: {
-          prompt: 'Build a carousel',
-          withResearch: false,
-          theme: CarouselTheme.MINIMAL,
-        },
       });
 
-      await expect(refine()).resolves.toMatchObject({
-        type: ArtifactType.DOCUMENT,
-        prompt: 'Build a carousel',
-        withResearch: false,
-        theme: CarouselTheme.MINIMAL,
+      await expect(refine()).rejects.toMatchObject({
+        name: 'UnprocessableEntityException',
       });
-    });
-
-    it('should carry a model-selected document theme into the refine input when the source has none', async () => {
-      mocks.artifactModel.findOne.mockResolvedValue({
-        ...readyArtifact(),
-        type: ArtifactType.DOCUMENT,
-        source: {
-          prompt: 'Build a carousel',
-          withResearch: false,
-        },
-        versions: [
-          {
-            version: 1,
-            status: VersionStatus.READY,
-            content: {
-              document: {
-                templateId: CarouselTheme.GRADIENT,
-                slides: [
-                  { type: 'cover', fields: { title: 'A carousel' } },
-                  { type: 'content', fields: { heading: 'A', body: 'B' } },
-                ],
-              },
-            },
-          },
-        ],
-      });
-
-      await expect(refine()).resolves.toMatchObject({
-        theme: CarouselTheme.GRADIENT,
-      });
+      expect(mocks.artifactModel.updateOne).not.toHaveBeenCalled();
     });
 
     it('should reject an unknown or soft-deleted artifact when appending a version', async () => {
@@ -434,14 +415,20 @@ describe('ArtifactService', () => {
       },
     });
 
-    // The slides-only shape GENERATE writes into state.content — no pdfKey yet.
-    const slidesOnlyDocument = (): ArtifactContent => ({
+    // The §6.3 Document Version PERSIST_VERSION promotes.
+    const documentContent = (
+      sourceSha256 = 'a'.repeat(64),
+    ): ArtifactContent => ({
+      commentary: 'Swipe through.',
       document: {
-        templateId: CarouselTheme.MINIMAL,
-        slides: [
-          { type: 'cover', fields: { title: 'A carousel' } },
-          { type: 'content', fields: { heading: 'One', body: 'A point' } },
-        ],
+        designSystemId: 'margin',
+        designSystemVersion: 2,
+        sourceKey: 'artifacts/abc/1/source.html',
+        sourceSha256,
+        candidateKey: 'artifacts/abc/1/candidate.html',
+        candidateSha256: 'b'.repeat(64),
+        pdfKey: 'artifacts/abc/1/document.pdf',
+        pageCount: 4,
       },
     });
 
@@ -604,39 +591,16 @@ describe('ArtifactService', () => {
       );
     });
 
-    it('should fold the render pdfKey and pageCount into the document before promoting', async () => {
+    it('should promote a complete Document Version as it is', async () => {
       mocks.artifactModel.findById.mockResolvedValue(generatingDocument());
 
-      await service.promoteVersion(
-        fixtures.artifactId,
-        1,
-        slidesOnlyDocument(),
-        {
-          render: {
-            pdfKey: 'artifacts/abc/1/document.pdf',
-            pageCount: 2,
-          },
-        },
-      );
+      await service.promoteVersion(fixtures.artifactId, 1, documentContent());
 
       expect(mocks.artifactModel.updateOne).toHaveBeenCalledWith(
         promotionFilter(1),
         {
           $set: {
-            'versions.$.content': {
-              document: {
-                templateId: 'minimal',
-                slides: [
-                  { type: 'cover', fields: { title: 'A carousel' } },
-                  {
-                    type: 'content',
-                    fields: { heading: 'One', body: 'A point' },
-                  },
-                ],
-                pdfKey: 'artifacts/abc/1/document.pdf',
-                pageCount: 2,
-              },
-            },
+            'versions.$.content': documentContent(),
             'versions.$.status': VersionStatus.READY,
             currentVersion: 1,
           },
@@ -644,15 +608,67 @@ describe('ArtifactService', () => {
       );
     });
 
-    it('should refuse to promote a document when no render pdfKey has been produced', async () => {
+    it('should refuse to promote a document without its objects, the READY gate', async () => {
       mocks.artifactModel.findById.mockResolvedValue(generatingDocument());
+      const content = documentContent() as {
+        document: Record<string, unknown>;
+      };
+      delete content.document.pdfKey;
 
-      // RENDER_PDF gates READY for documents; reaching PERSIST_VERSION without a
-      // render is a wiring bug, never a healthy state to persist.
       await expect(
-        service.promoteVersion(fixtures.artifactId, 1, slidesOnlyDocument()),
-      ).rejects.toThrow(/pdfKey/i);
+        service.promoteVersion(
+          fixtures.artifactId,
+          1,
+          content as unknown as ArtifactContent,
+        ),
+      ).rejects.toThrow(/pdfKey/);
       expect(mocks.artifactModel.updateOne).not.toHaveBeenCalled();
+    });
+
+    it('should succeed on a replay that finds the same Document Source already READY', async () => {
+      mocks.artifactModel.findById
+        .mockResolvedValueOnce(generatingDocument())
+        .mockResolvedValueOnce({
+          ...generatingDocument(),
+          currentVersion: 1,
+          versions: [
+            {
+              version: 1,
+              status: VersionStatus.READY,
+              content: documentContent(),
+            },
+          ],
+        });
+      mocks.artifactModel.updateOne.mockResolvedValue({ matchedCount: 0 });
+
+      await expect(
+        service.promoteVersion(fixtures.artifactId, 1, documentContent()),
+      ).resolves.toBeUndefined();
+    });
+
+    it('should throw a conflict on a replay that finds a different Document Source READY', async () => {
+      mocks.artifactModel.findById
+        .mockResolvedValueOnce(generatingDocument())
+        .mockResolvedValueOnce({
+          ...generatingDocument(),
+          currentVersion: 1,
+          versions: [
+            {
+              version: 1,
+              status: VersionStatus.READY,
+              content: documentContent(),
+            },
+          ],
+        });
+      mocks.artifactModel.updateOne.mockResolvedValue({ matchedCount: 0 });
+
+      await expect(
+        service.promoteVersion(
+          fixtures.artifactId,
+          1,
+          documentContent('c'.repeat(64)),
+        ),
+      ).rejects.toMatchObject({ name: 'ConflictException' });
     });
 
     it('should throw NotFoundException when the artifact does not exist', async () => {

@@ -1,6 +1,6 @@
-import type { ArtifactContent, ArtifactSlide, PollDurationDays } from "../lib/artifact-content";
+import type { ArtifactContent, PollDurationDays } from "../lib/artifact-content";
 export { POLL_DURATION_DAYS } from "../lib/artifact-content";
-export type { ArtifactContent, ArtifactSlide, PollDurationDays } from "../lib/artifact-content";
+export type { ArtifactContent, PollDurationDays } from "../lib/artifact-content";
 
 export type ArtifactType = "POST" | "POLL" | "DOCUMENT";
 
@@ -68,7 +68,12 @@ export type RunProgressEvent = {
   seq: number;
   ts: number;
   step: WorkflowStep;
+  /** RESEARCH. */
   sourcesFound?: number;
+  /** DOCUMENT `GENERATE` (`draft`) and `RENDER_PDF` (`render`). */
+  phase?: string;
+  /** DOCUMENT `RENDER_PDF`: the render session number. */
+  session?: number;
 };
 
 export type RunUsageEvent = {
@@ -122,8 +127,10 @@ export type ArtifactSummary = {
   updatedAt?: string;
   preview?: {
     commentary?: string;
-    firstSlide?: ArtifactSlide;
     pdfUrl?: string;
+    pageCount?: number;
+    /** DOCUMENT only: signed PNG of page 1, absent when the cover capture failed. */
+    coverUrl?: string;
   };
 };
 

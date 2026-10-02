@@ -25,9 +25,9 @@ Starts asynchronous initial generation. The server creates version `1` with stat
 | `prompt` | string | yes | Non-empty, maximum 2,000 characters. |
 | `withResearch` | boolean | yes | Enables research for an initial run; research is tier-gated. |
 | `stylePreset` | string | no | `professional`, `storytelling`, `educational`, `bold`, `contrarian`, or `founder`. |
-| `theme` | string | no | Document visual theme: `bold`, `minimal`, `editorial`, or `gradient`. |
+| `designSystemId` | string | no | `DOCUMENT` only: the Design System slug, from `GET /design-systems`. Omitted means `margin`. |
 
-`theme` controls carousel appearance. `stylePreset` controls writing voice; they are separate fields even though both can be `bold`.
+`designSystemId` controls a document's look; `stylePreset` controls the writing voice. The document is pinned to the slug's current `ACTIVE` version when the run starts, and that pin is reported on every version (`document.designSystemId`, `designSystemVersion`, `designSystemName`).
 
 Initial generation also creates a trimmed, descriptive `title` of 1–100 characters. The title is stored as artifact library metadata, outside versioned content, and becomes visible through artifact reads after `run.completed`. Refinements preserve the existing title.
 
@@ -44,7 +44,7 @@ Open the SSE stream in [runs.md](./runs.md) with `runId`. The version is ready o
 
 ### Common errors
 
-- `400` invalid body or enum value.
+- `400` invalid body or enum value; a `designSystemId` that is unknown, superseded, retired or not listed by `GET /design-systems`; or a `designSystemId` on a type other than `DOCUMENT`. Nothing is created or charged.
 - `403` insufficient credits or no research access when `withResearch` is `true`.
 
 ## `POST /artifacts/:id/refine`
@@ -79,6 +79,7 @@ At most one Attempt is in flight per artifact.
 
 - `404` artifact does not exist, is deleted, or is not owned by the caller.
 - `409` an Attempt is already `GENERATING`, the artifact has no `READY` version to refine, or another refine started concurrently.
+- `422` the artifact is a `DOCUMENT`. Refining a document is not available yet; nothing is appended or charged.
 - `403` insufficient credits.
 
 ## `GET /artifacts`
@@ -118,8 +119,9 @@ Search treats punctuation and regular-expression characters literally. It can be
       "updatedAt": "2026-07-14T10:20:30.000Z",
       "preview": {
         "commentary": "The safest deploy is the one you can undo…",
-        "firstSlide": { "type": "cover", "fields": { "title": "Deployment safety" } },
-        "pdfUrl": "https://signed.example/document.pdf"
+        "pdfUrl": "https://signed.example/document.pdf",
+        "pageCount": 5,
+        "coverUrl": "https://signed.example/cover.png"
       }
     }
   ],
@@ -132,7 +134,7 @@ Search treats punctuation and regular-expression characters literally. It can be
 }
 ```
 
-`preview.commentary` is a short snippet. `preview.firstSlide` and `preview.pdfUrl` are only present for documents when available. `pdfUrl` is short-lived; do not persist it as the artifact's permanent identifier. The preview is built from the Current Version only, so it is `{}` while an artifact has none.
+`preview.commentary` is a short snippet. `preview.pdfUrl`, `preview.pageCount` and `preview.coverUrl` are present only for documents. `coverUrl` is a PNG of page 1 and is absent when its capture failed. Both URLs are signed for one hour per read; do not persist them. The preview is built from the Current Version only, so it is `{}` while an artifact has none.
 
 ### Current Version, latest Attempt, and status
 
@@ -215,7 +217,7 @@ A read of a failed version, `GET /artifacts/:id?version=2` above, returns `"vers
 
 `versions` is omitted unless `includeVersions=true`. `editedAt`, `refineFeedback`, `failureCode`, and `failureReason` are omitted when absent; the failure fields appear only on `FAILED` versions.
 
-For documents, client-facing content uses a signed `document.pdfUrl`. The stored `pdfKey` is internal and is not the browser URL.
+For documents, `content.document` is an allowlist: the version's Design System pin and its display name, the page count, and a PDF URL signed for one hour per read, with its expiry. The generated HTML is internal: no key, hash or URL of it is ever returned.
 
 ### Content shapes
 
@@ -234,24 +236,19 @@ type PollContent = {
 };
 
 type DocumentContent = {
-  commentary?: string;
+  commentary?: string; // 1–3,000 LinkedIn characters
   document: {
-    templateId: 'bold' | 'minimal' | 'editorial' | 'gradient';
-    slides: Slide[]; // 2–15 slides
-    pageCount?: number;
-    pdfUrl?: string; // signed URL in GET responses
+    designSystemId: string; // this version's Design System pin
+    designSystemVersion: number;
+    designSystemName: string;
+    pageCount: number; // measured from the rendered PDF
+    pdfUrl: string; // signed, valid for one hour
+    pdfUrlExpiresAt: string; // ISO 8601
   };
 };
-
-type Slide =
-  | { type: 'cover'; fields: { eyebrow?: string; title: string; subtitle?: string } }
-  | { type: 'content'; fields: { heading: string; body: string } }
-  | { type: 'list'; fields: { heading: string; items: string[] } }
-  | { type: 'quote'; fields: { quote: string; attribution?: string } }
-  | { type: 'cta'; fields: { headline: string; action: string; handle?: string } };
 ```
 
-Poll options must be unique after trimming and case-folding. The server validates slide field lengths and counts when content is edited or generated.
+Poll options must be unique after trimming and case-folding.
 
 ## `PATCH /artifacts/:id`
 
@@ -272,7 +269,7 @@ The endpoint also accepts content fields directly:
 { "commentary": "Updated commentary" }
 ```
 
-Content is merged recursively with the current content and validated as the complete type-specific shape. For documents, `pdfKey`, `pageCount`, and `pdfUrl` are derived fields; do not edit them.
+Content is merged recursively with the current content and validated as the complete type-specific shape. A document is one immutable rendered document: its edit may change only `title` and `content.commentary`. Nothing is re-rendered.
 
 When supplied, `title` is trimmed and must contain 1–100 characters.
 
@@ -282,7 +279,7 @@ The response is the same artifact detail shape as `GET /artifacts/:id`, inside `
 
 ### Common errors
 
-- `400` invalid or incomplete content after merging the patch.
+- `400` invalid or incomplete content after merging the patch, or, for a document, any key other than `commentary`. The message names the field, for example `content.document.pageCount cannot be edited`.
 - `404` artifact not found, deleted, or not owned by the caller.
 - `409` there is no Current Version, a refine is in flight, the Current Version is pinned by a scheduled/published Post, or it changed before the edit was saved. Unschedule first or create/refine another version instead of mutating an approved composition.
 

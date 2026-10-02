@@ -1,5 +1,5 @@
 import type { ZodType } from 'zod';
-import type { ArtifactType, CarouselTheme } from '../database/schemas';
+import type { ArtifactType } from '../database/schemas';
 import type { ArtifactContent } from '../artifact/schemas';
 import type { LLMMessage, ToolCall, Usage } from '../llm/interfaces';
 import type { StylePreset } from './style-presets.config';
@@ -61,9 +61,26 @@ export interface GenerateInput {
   type: ArtifactType;
   prompt: string;
   stylePreset?: StylePreset;
-  theme?: CarouselTheme;
   research?: ResearchResult;
   refine?: { priorContent: ArtifactContent; feedback: string };
+}
+
+/** The INITIAL DOCUMENT draft (spec §7.5). Refinement arrives with #171. */
+export interface DocumentGenerateInput {
+  prompt: string;
+  stylePreset?: StylePreset;
+  research?: ResearchResult;
+  /** The pinned Design System's prompt fragment. */
+  fragment: string;
+  /** INITIAL runs ask for a title; nothing else does. */
+  includeTitle: boolean;
+}
+
+/** What the model wrote: `html` is the Candidate Source, still unchecked. */
+export interface DocumentDraftResult {
+  title?: string;
+  commentary: string;
+  html: string;
 }
 
 export interface ArtifactGenerationResult {
@@ -96,4 +113,13 @@ export interface AgentRunner {
     input: GenerateInput,
     hooks?: AgentHooks,
   ): Promise<ArtifactGenerationResult>;
+  /**
+   * One DOCUMENT draft. Throws `DocumentTruncatedError` when the output hit
+   * the token cap, and `ContentValidationError` when the envelope still fails
+   * Zod after one repair turn. It never checks the Candidate Source itself.
+   */
+  generateDocument(
+    input: DocumentGenerateInput,
+    hooks?: AgentHooks,
+  ): Promise<DocumentDraftResult>;
 }
