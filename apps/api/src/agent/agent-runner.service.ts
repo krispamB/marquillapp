@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { ZodType } from 'zod';
 import {
   ArtifactContent,
+  DocumentDraft,
   documentDraftSchemaFor,
   generationSchemaFor,
 } from '../artifact/schemas';
@@ -29,6 +30,8 @@ import type {
   AgentStep,
   DocumentDraftResult,
   DocumentGenerateInput,
+  DocumentRepairInput,
+  DocumentRepairResult,
   GenerateInput,
   ResearchInput,
   ResearchResult,
@@ -36,6 +39,7 @@ import type {
   Tool,
 } from './agent-runner.interface';
 import {
+  buildDocumentRepairUserPrompt,
   buildGenerationUserPrompt,
   buildRepairUserPrompt,
   documentGenerationSystemPrompt,
@@ -356,61 +360,126 @@ export class AgentRunnerService implements AgentRunner {
   /**
    * One DOCUMENT draft (spec §7.5): a structured completion whose `html` is the
    * Candidate Source. The system message is the generation prompt plus the
-   * pinned fragment. Truncation is checked before any parse, because a cut-off
-   * JSON envelope would otherwise read as a validation failure and spend a
-   * repair turn it cannot use.
-   *
-   * The envelope gets the same single Zod repair turn as `generate`. Checking
-   * the Candidate Source is the caller's job.
+   * pinned fragment. Checking the Candidate Source is the caller's job.
    */
   async generateDocument(
     input: DocumentGenerateInput,
     hooks?: AgentHooks,
   ): Promise<DocumentDraftResult> {
-    const schema = documentDraftSchemaFor(input.includeTitle);
-    const messages: LLMMessage[] = [
-      {
-        role: MessageRole.System,
-        content: documentGenerationSystemPrompt(
-          input.fragment,
-          input.includeTitle,
-        ),
-      },
-      {
-        role: MessageRole.User,
-        content: buildGenerationUserPrompt({
-          type: ArtifactType.DOCUMENT,
-          prompt: input.prompt,
-          stylePreset: input.stylePreset,
-          research: input.research,
-        }),
-      },
-    ];
-    const options = { maxTokens: this.documentMaxOutputTokens };
+    const { parsed, envelopeRepairs } = await this.completeDocument(
+      'draft',
+      [
+        {
+          role: MessageRole.System,
+          content: documentGenerationSystemPrompt(
+            input.fragment,
+            input.includeTitle,
+          ),
+        },
+        {
+          role: MessageRole.User,
+          content: buildGenerationUserPrompt({
+            type: ArtifactType.DOCUMENT,
+            prompt: input.prompt,
+            stylePreset: input.stylePreset,
+            research: input.research,
+          }),
+        },
+      ],
+      input,
+      hooks,
+    );
 
-    const draft = await this.complete(messages, hooks, schema, options);
-    this.assertNotTruncated(draft.finishReason);
+    return {
+      ...this.toDocumentDraft(parsed, input.includeTitle),
+      envelopeRepairs,
+    };
+  }
+
+  /**
+   * One Repair (spec §7.2): a fresh two-message call whose system message is
+   * byte-identical to the draft's, and whose user message is the Candidate
+   * Source and its bounded violations. The model still answers in the draft's
+   * JSON shape, but only `html` is kept.
+   */
+  async repairDocument(
+    input: DocumentRepairInput,
+    hooks?: AgentHooks,
+  ): Promise<DocumentRepairResult> {
+    const { parsed, envelopeRepairs } = await this.completeDocument(
+      'Repair',
+      [
+        {
+          role: MessageRole.System,
+          content: documentGenerationSystemPrompt(
+            input.fragment,
+            input.includeTitle,
+          ),
+        },
+        {
+          role: MessageRole.User,
+          content: buildDocumentRepairUserPrompt(
+            input.candidate,
+            input.violations,
+          ),
+        },
+      ],
+      input,
+      hooks,
+    );
+
+    return { html: parsed.html, envelopeRepairs };
+  }
+
+  /**
+   * The JSON envelope every DOCUMENT model call shares. Truncation is checked
+   * before any parse, because a cut-off envelope would otherwise read as a
+   * validation failure and spend a repair turn it cannot use.
+   *
+   * An invalid envelope gets one Zod repair turn when the caller's Repair
+   * budget allows it, and is final when it does not.
+   */
+  private async completeDocument(
+    call: 'draft' | 'Repair',
+    messages: LLMMessage[],
+    {
+      includeTitle,
+      maxEnvelopeRepairs,
+    }: { includeTitle: boolean; maxEnvelopeRepairs: number },
+    hooks?: AgentHooks,
+  ): Promise<{ parsed: DocumentDraft; envelopeRepairs: number }> {
+    const schema = documentDraftSchemaFor(includeTitle);
+    const options = { maxTokens: this.documentMaxOutputTokens };
+    const parse = (text: string): DocumentDraft =>
+      this.parser.parseWithSchema(text, schema, {
+        stripNullObjectValues: true,
+      });
+
+    const first = await this.complete(messages, hooks, schema, options);
+    this.assertNotTruncated(call, first.finishReason);
 
     let validationError: unknown;
     try {
-      return this.toDocumentDraft(
-        this.parser.parseWithSchema(draft.text, schema, {
-          stripNullObjectValues: true,
-        }),
-        input.includeTitle,
-      );
+      return { parsed: parse(first.text), envelopeRepairs: 0 };
     } catch (error: unknown) {
       validationError = error;
     }
 
+    if (maxEnvelopeRepairs < 1) {
+      throw new ContentValidationError(
+        `Generated DOCUMENT ${call} failed envelope validation with no repair turn left: ${describeError(validationError)}`,
+        { cause: validationError },
+      );
+    }
+
     this.logger.warn(
-      `Generated DOCUMENT draft failed envelope validation; attempting one repair: ${describeError(validationError)}`,
+      `Generated DOCUMENT ${call} failed envelope validation; attempting one repair: ${describeError(validationError)}`,
     );
 
     const repaired = await this.complete(
       [
         ...messages,
-        { role: MessageRole.Assistant, content: draft.text },
+        { role: MessageRole.Assistant, content: first.text },
         {
           role: MessageRole.User,
           content: buildRepairUserPrompt(describeError(validationError)),
@@ -420,35 +489,33 @@ export class AgentRunnerService implements AgentRunner {
       schema,
       options,
     );
-    this.assertNotTruncated(repaired.finishReason);
+    this.assertNotTruncated(call, repaired.finishReason);
 
     try {
-      return this.toDocumentDraft(
-        this.parser.parseWithSchema(repaired.text, schema, {
-          stripNullObjectValues: true,
-        }),
-        input.includeTitle,
-      );
+      return { parsed: parse(repaired.text), envelopeRepairs: 1 };
     } catch (error: unknown) {
       throw new ContentValidationError(
-        `Generated DOCUMENT draft failed validation after one repair retry: ${describeError(error)}`,
+        `Generated DOCUMENT ${call} failed validation after one repair retry: ${describeError(error)}`,
         { cause: error },
       );
     }
   }
 
-  private assertNotTruncated(finishReason: string | undefined): void {
+  private assertNotTruncated(
+    call: 'draft' | 'Repair',
+    finishReason: string | undefined,
+  ): void {
     if (finishReason === 'length') {
       throw new DocumentTruncatedError(
-        'The DOCUMENT draft hit the output token cap',
+        `The DOCUMENT ${call} hit the output token cap`,
       );
     }
   }
 
   private toDocumentDraft(
-    parsed: DocumentDraftResult,
+    parsed: DocumentDraft,
     includeTitle: boolean,
-  ): DocumentDraftResult {
+  ): Omit<DocumentDraftResult, 'envelopeRepairs'> {
     return {
       ...(includeTitle && parsed.title !== undefined
         ? { title: parsed.title }

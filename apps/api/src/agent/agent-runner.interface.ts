@@ -1,6 +1,7 @@
 import type { ZodType } from 'zod';
 import type { ArtifactType } from '../database/schemas';
 import type { ArtifactContent } from '../artifact/schemas';
+import type { BoundedViolations } from '../document-source/violation';
 import type { LLMMessage, ToolCall, Usage } from '../llm/interfaces';
 import type { StylePreset } from './style-presets.config';
 
@@ -74,6 +75,26 @@ export interface DocumentGenerateInput {
   fragment: string;
   /** INITIAL runs ask for a title; nothing else does. */
   includeTitle: boolean;
+  /**
+   * Zod repair turns this call may spend from the shared Repair budget
+   * (spec §7.2). At most one is ever used; `0` makes an invalid envelope
+   * final.
+   */
+  maxEnvelopeRepairs: number;
+}
+
+/**
+ * One static or render Repair (spec §7.2). The system message is the draft's,
+ * so `fragment` and `includeTitle` must be the draft's too.
+ */
+export interface DocumentRepairInput {
+  fragment: string;
+  includeTitle: boolean;
+  /** The Candidate Source the violations were found in. */
+  candidate: string;
+  violations: BoundedViolations;
+  /** As on `DocumentGenerateInput`. */
+  maxEnvelopeRepairs: number;
 }
 
 /** What the model wrote: `html` is the Candidate Source, still unchecked. */
@@ -81,6 +102,17 @@ export interface DocumentDraftResult {
   title?: string;
   commentary: string;
   html: string;
+  /** Zod repair turns spent, each one a turn of the Repair budget. */
+  envelopeRepairs: number;
+}
+
+/**
+ * A Repair's Candidate Source. Its `title` and `commentary` are ignored, so
+ * they never leave the agent.
+ */
+export interface DocumentRepairResult {
+  html: string;
+  envelopeRepairs: number;
 }
 
 export interface ArtifactGenerationResult {
@@ -115,11 +147,17 @@ export interface AgentRunner {
   ): Promise<ArtifactGenerationResult>;
   /**
    * One DOCUMENT draft. Throws `DocumentTruncatedError` when the output hit
-   * the token cap, and `ContentValidationError` when the envelope still fails
-   * Zod after one repair turn. It never checks the Candidate Source itself.
+   * the token cap, and `ContentValidationError` when the envelope is invalid
+   * and no repair turn is allowed or left. It never checks the Candidate
+   * Source itself.
    */
   generateDocument(
     input: DocumentGenerateInput,
     hooks?: AgentHooks,
   ): Promise<DocumentDraftResult>;
+  /** One Repair of a Candidate Source. Throws as `generateDocument` does. */
+  repairDocument(
+    input: DocumentRepairInput,
+    hooks?: AgentHooks,
+  ): Promise<DocumentRepairResult>;
 }

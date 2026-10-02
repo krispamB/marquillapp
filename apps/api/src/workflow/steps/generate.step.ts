@@ -113,6 +113,7 @@ async function generateDocument(
         research: state.research,
         fragment: designSystem.fragment,
         includeTitle: kind === RunKind.INITIAL,
+        maxEnvelopeRepairs: 1,
       },
       meteredHooks(ctx),
     );

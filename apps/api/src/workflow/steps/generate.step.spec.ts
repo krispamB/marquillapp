@@ -208,6 +208,7 @@ describe('generateStep', () => {
           research,
           fragment: 'FRAGMENT',
           includeTitle: true,
+          maxEnvelopeRepairs: 1,
         },
         expect.anything(),
       );
