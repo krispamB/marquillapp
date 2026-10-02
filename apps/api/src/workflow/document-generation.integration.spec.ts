@@ -43,7 +43,8 @@ import { ArtifactRunProcessor } from './workers/artifact-run.worker.handler';
  *
  * There is no render Repair yet (#168), so the paths are: clean; a static
  * Repair that succeeds; static Repairs that run out; a render finding;
- * truncation; a render that must be retried; egress; and a stale contract.
+ * truncation of the draft or a Repair; a render that must be retried;
+ * egress; and a stale contract.
  * Each asserts step events, `step.progress`, meter records and `failureCode`.
  */
 
@@ -512,19 +513,88 @@ describe('DOCUMENT generation, end to end', () => {
     });
   });
 
-  it('should fail as document.truncated when the draft hit the token cap', async () => {
-    run.agent.generateDocument.mockRejectedValue(
-      new DocumentTruncatedError('cut off'),
-    );
-
-    await runJob(run);
-
-    expect(failedWith(run)).toEqual({
+  describe('truncation', () => {
+    const TRUNCATED = {
       code: 'document.truncated',
       failureReason:
         'This document was too long to generate. Try fewer pages or a shorter brief.',
+    };
+
+    /** A model call that spent its turn and stopped at the token cap. */
+    const cutOff = (_input: unknown, hooks?: AgentHooks): Promise<never> => {
+      hooks?.onUsage?.({
+        promptTokens: 4000,
+        completionTokens: 16_384,
+        totalTokens: 20_384,
+        cost: 0.2,
+        model: 'test/generation-model',
+      });
+      return Promise.reject(new DocumentTruncatedError('cut off'));
+    };
+
+    it('should fail as document.truncated, spending no Repair, when the draft hit the token cap', async () => {
+      run.agent.generateDocument.mockImplementation(cutOff);
+
+      await runJob(run);
+
+      expect(lifecycle(run)).toContain('step.failed GENERATE');
+      expect(failedWith(run)).toEqual(TRUNCATED);
+      expect(run.artifacts.failVersion).toHaveBeenCalledWith(
+        'artifact-1',
+        1,
+        'document.truncated',
+        expect.any(String),
+      );
+      expect(run.agent.repairDocument).not.toHaveBeenCalled();
+      expect(progress(run)).toEqual([{ step: 'GENERATE', phase: 'draft' }]);
+      expect(run.runHandle.recordDocumentCheck).not.toHaveBeenCalled();
+      expect(meterRecords(run)).toEqual(['llm']);
+      expect(run.creditMeter.debit).not.toHaveBeenCalled();
+      expect(run.renderer.render).not.toHaveBeenCalled();
     });
-    expect(run.renderer.render).not.toHaveBeenCalled();
+
+    it('should fail as document.truncated, spending no Repair, when the draft is over 256 KB', async () => {
+      const draft = run.agent.generateDocument.getMockImplementation()!;
+      run.agent.generateDocument.mockImplementation(async (input, hooks) => ({
+        ...(await draft(input, hooks)),
+        html: MARGIN_SAMPLE.replace(
+          '</body>',
+          `<p>${'x'.repeat(300_000)}</p></body>`,
+        ),
+      }));
+
+      await runJob(run);
+
+      expect(failedWith(run)).toEqual(TRUNCATED);
+      expect(run.agent.repairDocument).not.toHaveBeenCalled();
+      expect(progress(run)).toEqual([{ step: 'GENERATE', phase: 'draft' }]);
+      const [[check]] = run.runHandle.recordDocumentCheck.mock.calls;
+      expect(check.violations).toEqual([
+        expect.objectContaining({ code: 'envelope.truncated' }),
+      ]);
+      expect(run.renderer.render).not.toHaveBeenCalled();
+    });
+
+    it('should fail as document.truncated, without another Repair, when a Repair hit the token cap', async () => {
+      const draft = run.agent.generateDocument.getMockImplementation()!;
+      run.agent.generateDocument.mockImplementation(async (input, hooks) => ({
+        ...(await draft(input, hooks)),
+        html: OFF_SCALE,
+      }));
+      run.agent.repairDocument.mockImplementation(cutOff);
+
+      await runJob(run);
+
+      expect(failedWith(run)).toEqual(TRUNCATED);
+      expect(run.agent.repairDocument).toHaveBeenCalledTimes(1);
+      expect(progress(run)).toEqual([
+        { step: 'GENERATE', phase: 'draft' },
+        { step: 'GENERATE', phase: 'repair', round: 1, violations: 1 },
+      ]);
+      expect(meterRecords(run)).toEqual(['llm', 'llm']);
+      expect(run.creditMeter.debit).not.toHaveBeenCalled();
+      expect(run.renderer.render).not.toHaveBeenCalled();
+    });
   });
 
   describe('a render that must be retried', () => {

@@ -472,31 +472,68 @@ describe('generateStep', () => {
       });
     });
 
-    it('should fail terminally as document.truncated when the source is over the size cap', async () => {
-      mockedCheck.mockReturnValue([
-        { code: 'envelope.truncated', detail: 'the document is too big' },
-      ]);
+    describe('truncation', () => {
+      const oversized = {
+        code: 'envelope.truncated',
+        detail: 'the document is too big',
+      };
 
-      await expect(
-        generateStep(fixtures.documentState, ctx),
-      ).rejects.toMatchObject({
-        retryable: false,
-        code: 'document.truncated',
+      it('should fail terminally as document.truncated, spending no Repair, when the draft is over the size cap', async () => {
+        mockedCheck.mockReturnValue([oversized]);
+
+        await expect(
+          generateStep(fixtures.documentState, ctx),
+        ).rejects.toMatchObject({
+          retryable: false,
+          code: 'document.truncated',
+        });
+        expect(mocks.agent.repairDocument).not.toHaveBeenCalled();
       });
-    });
 
-    it('should fail terminally as document.truncated when the draft hit the token cap', async () => {
-      mocks.agent.generateDocument.mockRejectedValue(
-        new DocumentTruncatedError('cut off'),
-      );
+      it('should fail terminally as document.truncated when the draft hit the token cap', async () => {
+        mocks.agent.generateDocument.mockRejectedValue(
+          new DocumentTruncatedError('cut off'),
+        );
 
-      await expect(
-        generateStep(fixtures.documentState, ctx),
-      ).rejects.toMatchObject({
-        retryable: false,
-        code: 'document.truncated',
+        await expect(
+          generateStep(fixtures.documentState, ctx),
+        ).rejects.toMatchObject({
+          retryable: false,
+          code: 'document.truncated',
+        });
+        expect(mockedCheck).not.toHaveBeenCalled();
+        expect(mocks.agent.repairDocument).not.toHaveBeenCalled();
       });
-      expect(mockedCheck).not.toHaveBeenCalled();
+
+      it('should fail terminally as document.truncated, without another Repair, when a Repair hit the token cap', async () => {
+        mockedCheck.mockReturnValueOnce([finding]);
+        mocks.agent.repairDocument.mockRejectedValue(
+          new DocumentTruncatedError('cut off'),
+        );
+
+        await expect(
+          generateStep(fixtures.documentState, ctx),
+        ).rejects.toMatchObject({
+          retryable: false,
+          code: 'document.truncated',
+        });
+        expect(mocks.agent.repairDocument).toHaveBeenCalledTimes(1);
+        expect(mockedCheck).toHaveBeenCalledTimes(1);
+      });
+
+      it('should fail terminally as document.truncated, without another Repair, when a Repair is over the size cap', async () => {
+        mockedCheck
+          .mockReturnValueOnce([finding])
+          .mockReturnValueOnce([oversized]);
+
+        await expect(
+          generateStep(fixtures.documentState, ctx),
+        ).rejects.toMatchObject({
+          retryable: false,
+          code: 'document.truncated',
+        });
+        expect(mocks.agent.repairDocument).toHaveBeenCalledTimes(1);
+      });
     });
 
     it('should fail terminally when the envelope is invalid after the repair retry', async () => {
