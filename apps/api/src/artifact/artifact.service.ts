@@ -18,6 +18,7 @@ import {
 import { getSignedUrl } from '../s3';
 import type { StylePreset } from 'src/agent/style-presets.config';
 import type { FailureCode } from 'src/workflow/workflow.constants';
+import { WorkflowRunService } from 'src/workflow/workflow-run.service';
 import {
   ArtifactDeletedError,
   ArtifactWriter,
@@ -33,6 +34,13 @@ import {
   artifactTitleSchema,
   parseArtifactContent,
 } from './schemas';
+import {
+  LatestAttempt,
+  artifactStatusFilter,
+  deriveArtifactStatus,
+  latestAttemptOf,
+  newestVersion,
+} from './attempt-reporting';
 
 export interface ArtifactSourceInput {
   prompt: string;
@@ -79,8 +87,12 @@ export interface ArtifactSummary {
   id: string;
   type: ArtifactType;
   title?: string;
+  /** Derived; see `deriveArtifactStatus`. */
   status: VersionStatus;
+  currentVersion?: number;
+  latestAttempt?: LatestAttempt;
   updatedAt: Date;
+  /** Built from the Current Version only; empty while there is none. */
   preview: ArtifactPreview;
 }
 
@@ -90,6 +102,8 @@ export interface ArtifactVersionMetadata {
   createdAt: Date;
   editedAt?: Date;
   refineFeedback?: string;
+  failureCode?: FailureCode;
+  failureReason?: string;
 }
 
 export interface ArtifactDetail {
@@ -97,9 +111,14 @@ export interface ArtifactDetail {
   type: ArtifactType;
   title?: string;
   currentVersion?: number;
+  latestAttempt?: LatestAttempt;
+  /** The returned version and its own status. */
   version: number;
   status: VersionStatus;
+  failureCode?: FailureCode;
+  failureReason?: string;
   updatedAt?: Date;
+  /** `{}` unless the returned version is `READY`. */
   content: Record<string, unknown>;
   versions?: ArtifactVersionMetadata[];
 }
@@ -122,16 +141,23 @@ interface ArtifactListRow {
   type: ArtifactType;
   title?: string;
   updatedAt: Date;
+  currentVersion?: number | null;
+  _attemptInFlight?: boolean;
   _latestVersion: {
     version: number;
     status: VersionStatus;
-    content?: Record<string, unknown>;
+    failureCode?: FailureCode;
+    failureReason?: string;
   } | null;
+  /** The Current Version's content, which the preview is built from. */
+  _currentContent?: Record<string, unknown> | null;
 }
 
 type ValidArtifactListRow = ArtifactListRow & {
   _latestVersion: NonNullable<ArtifactListRow['_latestVersion']>;
 };
+
+type AttemptWithoutRun = Omit<LatestAttempt, 'runId'>;
 
 interface ArtifactListAggregateResult {
   data: ArtifactListRow[];
@@ -149,6 +175,7 @@ export class ArtifactService implements ArtifactWriter {
   constructor(
     @InjectModel(Artifact.name) private readonly artifactModel: Model<Artifact>,
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
+    private readonly workflowRuns: WorkflowRunService,
   ) {}
 
   async createArtifact(
@@ -409,9 +436,9 @@ export class ArtifactService implements ArtifactWriter {
   }
 
   /**
-   * Lists only the current-version summary for each live artifact. The current
-   * version is selected in Mongo so a status filter can never match an older
-   * version in the embedded history.
+   * Lists a summary of each live artifact: its derived status, its Current
+   * Version, and its latest Attempt. The status filter is the same derivation
+   * expressed on stored fields, applied in Mongo before pagination.
    */
   async listArtifacts(
     userId: string,
@@ -448,6 +475,10 @@ export class ArtifactService implements ArtifactWriter {
       };
     }
 
+    if (query.status) {
+      Object.assign(pageMatch, artifactStatusFilter(query.status));
+    }
+
     // Versions are only ever appended as max + 1, so the last element is the
     // newest version: the Current Version, or an Attempt made after it.
     const versionsExpression = { $ifNull: ['$versions', []] };
@@ -460,15 +491,9 @@ export class ArtifactService implements ArtifactWriter {
       },
     };
 
-    const statusMatch = query.status
-      ? [{ $match: { '_latestVersion.status': query.status } }]
-      : [];
-
     const listPipeline = [
       { $match: pageMatch },
       hasVersionMatch,
-      { $set: { _latestVersion: latestVersionExpression } },
-      ...statusMatch,
       { $sort: { updatedAt: -1, _id: -1 } },
       {
         $facet: {
@@ -476,12 +501,43 @@ export class ArtifactService implements ArtifactWriter {
             { $skip: (page - 1) * ARTIFACT_PAGE_SIZE },
             { $limit: ARTIFACT_PAGE_SIZE },
             {
+              $set: {
+                _latestVersion: latestVersionExpression,
+                _currentVersionEntry: {
+                  $arrayElemAt: [
+                    {
+                      $filter: {
+                        input: versionsExpression,
+                        as: 'candidate',
+                        cond: {
+                          $eq: ['$$candidate.version', '$currentVersion'],
+                        },
+                      },
+                    },
+                    0,
+                  ],
+                },
+                _attemptInFlight: {
+                  $in: [
+                    VersionStatus.GENERATING,
+                    { $ifNull: ['$versions.status', []] },
+                  ],
+                },
+              },
+            },
+            {
               $project: {
                 _id: 1,
                 type: 1,
                 title: 1,
                 updatedAt: 1,
-                _latestVersion: 1,
+                currentVersion: 1,
+                _attemptInFlight: 1,
+                '_latestVersion.version': 1,
+                '_latestVersion.status': 1,
+                '_latestVersion.failureCode': 1,
+                '_latestVersion.failureReason': 1,
+                _currentContent: '$_currentVersionEntry.content',
               },
             },
           ],
@@ -526,14 +582,29 @@ export class ArtifactService implements ArtifactWriter {
 
     const aggregateResult = listResult[0] ?? { data: [], metadata: [] };
     const total = aggregateResult.metadata[0]?.total ?? 0;
+    // The aggregation excludes these rows; keep the boundary defensive in
+    // case a mock or future pipeline change returns malformed data.
+    const rows = aggregateResult.data.filter(
+      (row): row is ValidArtifactListRow => row._latestVersion != null,
+    );
+    const attempts = new Map(
+      rows.flatMap((row) => {
+        const attempt = latestAttemptOf(
+          row.currentVersion ?? undefined,
+          row._latestVersion,
+        );
+        return attempt ? [[row._id.toString(), attempt] as const] : [];
+      }),
+    );
+    const runIds = await this.findAttemptRunIds(attempts);
     const data = await Promise.all(
-      aggregateResult.data
-        // The aggregation excludes these rows; keep the boundary defensive in
-        // case a mock or future pipeline change returns malformed data.
-        .filter(
-          (row): row is ValidArtifactListRow => row._latestVersion !== null,
-        )
-        .map((row) => this.toSummary(row)),
+      rows.map((row) => {
+        const id = row._id.toString();
+        return this.toSummary(
+          row,
+          this.withRunId(id, attempts.get(id), runIds),
+        );
+      }),
     );
 
     const enumOrder = new Map(
@@ -558,8 +629,9 @@ export class ArtifactService implements ArtifactWriter {
 
   /**
    * Reads a selected version, including soft-deleted artifacts for direct
-   * links. Without one it reads the newest version, which is an Attempt while a
-   * refine is in flight or after one failed. Version history is deliberately
+   * links. Without one it reads the Current Version, or the latest Attempt
+   * while there is none; an Attempt newer than the Current Version is reported
+   * alongside as `latestAttempt`. Version history is deliberately
    * metadata-only.
    */
   async getArtifact(
@@ -570,7 +642,8 @@ export class ArtifactService implements ArtifactWriter {
     const artifact = await this.getOwnedArtifact(userId, artifactId, true);
     const versionNumber =
       options.version ??
-      artifact.versions[artifact.versions.length - 1]?.version;
+      artifact.currentVersion ??
+      newestVersion(artifact.versions)?.version;
     const version = artifact.versions.find(
       (candidate) => candidate.version === versionNumber,
     );
@@ -750,17 +823,65 @@ export class ArtifactService implements ArtifactWriter {
     };
   }
 
-  private async toSummary(row: ValidArtifactListRow): Promise<ArtifactSummary> {
-    const content = row._latestVersion.content ?? {};
-    const preview = await this.toPreview(row.type, content);
+  private async toSummary(
+    row: ValidArtifactListRow,
+    latestAttempt: LatestAttempt | undefined,
+  ): Promise<ArtifactSummary> {
+    const currentVersion = row.currentVersion ?? undefined;
+    const preview =
+      currentVersion !== undefined && row._currentContent
+        ? await this.toPreview(row.type, row._currentContent)
+        : {};
     return {
       id: row._id.toString(),
       type: row.type,
       ...(row.title !== undefined ? { title: row.title } : {}),
-      status: row._latestVersion.status,
+      status: deriveArtifactStatus(
+        row._attemptInFlight === true,
+        currentVersion,
+      ),
+      ...(currentVersion !== undefined ? { currentVersion } : {}),
+      ...(latestAttempt ? { latestAttempt } : {}),
       updatedAt: row.updatedAt,
       preview,
     };
+  }
+
+  /**
+   * One query for every Attempt on a page, keyed by artifact id. Runs come
+   * oldest first, so the newest run for a version wins.
+   */
+  private async findAttemptRunIds(
+    attempts: ReadonlyMap<string, AttemptWithoutRun>,
+  ): Promise<Map<string, string>> {
+    const runIds = new Map<string, string>();
+    if (attempts.size === 0) {
+      return runIds;
+    }
+    const runs = await this.workflowRuns.findRunsForVersions(
+      [...attempts].map(([artifactId, attempt]) => ({
+        artifactId,
+        version: attempt.version,
+      })),
+    );
+    for (const run of runs) {
+      if (attempts.get(run.artifactId)?.version === run.version) {
+        runIds.set(run.artifactId, run.runId);
+      }
+    }
+    return runIds;
+  }
+
+  private withRunId(
+    artifactId: string,
+    attempt: AttemptWithoutRun | undefined,
+    runIds: ReadonlyMap<string, string>,
+  ): LatestAttempt | undefined {
+    if (!attempt) {
+      return undefined;
+    }
+    const runId = runIds.get(artifactId);
+    return runId ? { ...attempt, runId } : attempt;
   }
 
   private async toPreview(
@@ -794,20 +915,42 @@ export class ArtifactService implements ArtifactWriter {
     version: Artifact['versions'][number],
     includeVersions: boolean,
   ): Promise<ArtifactDetail> {
+    const artifactId = artifact._id.toString();
+    const attempt = latestAttemptOf(
+      artifact.currentVersion ?? undefined,
+      newestVersion(artifact.versions),
+    );
+    const latestAttempt = this.withRunId(
+      artifactId,
+      attempt,
+      await this.findAttemptRunIds(
+        new Map(attempt ? [[artifactId, attempt]] : []),
+      ),
+    );
+    const failed = version.status === VersionStatus.FAILED;
+
     const detail: ArtifactDetail = {
-      id: artifact._id.toString(),
+      id: artifactId,
       type: artifact.type,
       ...(artifact.title !== undefined ? { title: artifact.title } : {}),
-      ...(artifact.currentVersion !== undefined
+      ...(artifact.currentVersion != null
         ? { currentVersion: artifact.currentVersion }
         : {}),
+      ...(latestAttempt ? { latestAttempt } : {}),
       version: version.version,
       status: version.status,
+      ...(failed && version.failureCode
+        ? { failureCode: version.failureCode }
+        : {}),
+      ...(failed && version.failureReason !== undefined
+        ? { failureReason: version.failureReason }
+        : {}),
       ...(artifact.updatedAt ? { updatedAt: artifact.updatedAt } : {}),
-      content: await this.serializeContent(
-        artifact.type,
-        version.content ?? {},
-      ),
+      // Only a READY version has content; an Attempt never shows any.
+      content:
+        version.status === VersionStatus.READY
+          ? await this.serializeContent(artifact.type, version.content ?? {})
+          : {},
     };
 
     if (includeVersions) {
@@ -822,6 +965,14 @@ export class ArtifactService implements ArtifactWriter {
         }
         if (candidate.refineFeedback !== undefined) {
           metadata.refineFeedback = candidate.refineFeedback;
+        }
+        if (candidate.status === VersionStatus.FAILED) {
+          if (candidate.failureCode) {
+            metadata.failureCode = candidate.failureCode;
+          }
+          if (candidate.failureReason !== undefined) {
+            metadata.failureReason = candidate.failureReason;
+          }
         }
         return metadata;
       });

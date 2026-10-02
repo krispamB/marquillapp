@@ -128,6 +128,18 @@ function statusLabel(status: ArtifactStatus) {
   return "Ready";
 }
 
+/** Names the Current Version and any newer Attempt, so a refine never hides the current document. */
+export function versionNote(artifact: ArtifactSummary) {
+  const attempt = artifact.latestAttempt;
+  if (artifact.currentVersion === undefined) {
+    return artifact.status === "READY" ? "Current version" : statusLabel(artifact.status);
+  }
+  const current = `Current v${artifact.currentVersion}`;
+  if (attempt?.status === "GENERATING") return `${current} · refining v${attempt.version}`;
+  if (attempt?.status === "FAILED") return `${current} · refinement v${attempt.version} failed`;
+  return current;
+}
+
 // Chosen motion direction: kinetic editorial — abstract format cues that reveal no artifact content.
 function ArtifactMotionPreview({ type }: { type: ArtifactType }) {
   if (type === "POST") {
@@ -208,7 +220,7 @@ export function ArtifactCard({
       </h2>
 
       <footer className="mq-artifact-card-footer">
-        <span>{artifact.status === "READY" ? "Current version" : statusLabel(artifact.status)}</span>
+        <span>{versionNote(artifact)}</span>
         <time dateTime={artifact.updatedAt}>{formatRelativeDate(artifact.updatedAt)}</time>
       </footer>
       {artifact.status === "READY" ? (

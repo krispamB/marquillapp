@@ -22,6 +22,11 @@ jest.mock(
   { virtual: true },
 );
 jest.mock('../s3', () => ({ getSignedUrl: jest.fn() }), { virtual: true });
+jest.mock(
+  'src/workflow/workflow-run.service',
+  () => ({ WorkflowRunService: class {} }),
+  { virtual: true },
+);
 
 import {
   BadRequestException,
@@ -44,10 +49,16 @@ const makeService = () => {
     updateOne: jest.fn(),
   };
   const postModel = { exists: jest.fn().mockResolvedValue(false) };
+  const workflowRuns = { findRunsForVersions: jest.fn().mockResolvedValue([]) };
   return {
-    service: new ArtifactService(artifactModel as never, postModel as never),
+    service: new ArtifactService(
+      artifactModel as never,
+      postModel as never,
+      workflowRuns as never,
+    ),
     artifactModel,
     postModel,
+    workflowRuns,
   };
 };
 
@@ -55,6 +66,7 @@ const ids = {
   artifact: new Types.ObjectId(),
   user: new Types.ObjectId(),
   otherUser: new Types.ObjectId(),
+  run: new Types.ObjectId().toString(),
 };
 
 const readyPost = (overrides: Record<string, unknown> = {}) => ({
@@ -83,8 +95,8 @@ describe('ArtifactService library API', () => {
   });
 
   describe('getArtifact', () => {
-    it('should return the newest Attempt and keep the Current Version when a refine is in flight', async () => {
-      const { service, artifactModel } = makeService();
+    it('should return the Current Version and report the in-flight Attempt when a refine is running', async () => {
+      const { service, artifactModel, workflowRuns } = makeService();
       artifactModel.findById.mockResolvedValue(
         readyPost({
           versions: [
@@ -99,15 +111,198 @@ describe('ArtifactService library API', () => {
           ],
         }),
       );
+      workflowRuns.findRunsForVersions.mockResolvedValue([
+        { artifactId: ids.artifact.toString(), version: 2, runId: ids.run },
+      ]);
 
       await expect(
         service.getArtifact(ids.user.toString(), ids.artifact.toString()),
       ).resolves.toMatchObject({
         currentVersion: 1,
-        version: 2,
+        latestAttempt: {
+          version: 2,
+          status: VersionStatus.GENERATING,
+          runId: ids.run,
+        },
+        version: 1,
+        status: VersionStatus.READY,
+        content: { commentary: 'A finished post' },
+      });
+      expect(workflowRuns.findRunsForVersions).toHaveBeenCalledWith([
+        { artifactId: ids.artifact.toString(), version: 2 },
+      ]);
+    });
+
+    it('should return the Current Version and report the failed Attempt when a refine failed', async () => {
+      const { service, artifactModel, workflowRuns } = makeService();
+      artifactModel.findById.mockResolvedValue(
+        readyPost({
+          versions: [
+            ...readyPost().versions,
+            {
+              version: 2,
+              status: VersionStatus.FAILED,
+              refineFeedback: 'Sharper',
+              parentVersion: 1,
+              failureCode: 'internal',
+              failureReason: 'The model timed out',
+              createdAt: new Date('2026-07-03T00:00:00.000Z'),
+            },
+          ],
+        }),
+      );
+      workflowRuns.findRunsForVersions.mockResolvedValue([
+        { artifactId: ids.artifact.toString(), version: 2, runId: ids.run },
+      ]);
+
+      const detail = await service.getArtifact(
+        ids.user.toString(),
+        ids.artifact.toString(),
+      );
+
+      expect(detail).toMatchObject({
+        currentVersion: 1,
+        latestAttempt: {
+          version: 2,
+          status: VersionStatus.FAILED,
+          failureCode: 'internal',
+          failureReason: 'The model timed out',
+          runId: ids.run,
+        },
+        version: 1,
+        status: VersionStatus.READY,
+        content: { commentary: 'A finished post' },
+      });
+      expect(detail).not.toHaveProperty('failureCode');
+    });
+
+    it('should omit latestAttempt without looking up a run when the newest version is the Current Version', async () => {
+      const { service, artifactModel, workflowRuns } = makeService();
+      artifactModel.findById.mockResolvedValue(readyPost());
+
+      const detail = await service.getArtifact(
+        ids.user.toString(),
+        ids.artifact.toString(),
+      );
+
+      expect(detail).not.toHaveProperty('latestAttempt');
+      expect(workflowRuns.findRunsForVersions).not.toHaveBeenCalled();
+    });
+
+    it('should return the latest Attempt with empty content when there is no Current Version', async () => {
+      const { service, artifactModel, workflowRuns } = makeService();
+      artifactModel.findById.mockResolvedValue(
+        readyPost({
+          currentVersion: undefined,
+          versions: [
+            {
+              version: 1,
+              status: VersionStatus.GENERATING,
+              createdAt: new Date('2026-07-01T00:00:00.000Z'),
+            },
+          ],
+        }),
+      );
+      workflowRuns.findRunsForVersions.mockResolvedValue([
+        { artifactId: ids.artifact.toString(), version: 1, runId: ids.run },
+      ]);
+
+      const detail = await service.getArtifact(
+        ids.user.toString(),
+        ids.artifact.toString(),
+      );
+
+      expect(detail).toMatchObject({
+        latestAttempt: {
+          version: 1,
+          status: VersionStatus.GENERATING,
+          runId: ids.run,
+        },
+        version: 1,
         status: VersionStatus.GENERATING,
         content: {},
       });
+      expect(detail).not.toHaveProperty('currentVersion');
+    });
+
+    it('should return empty content plus the failure when a FAILED version is read by number', async () => {
+      const { service, artifactModel } = makeService();
+      artifactModel.findById.mockResolvedValue(
+        readyPost({
+          currentVersion: 3,
+          versions: [
+            ...readyPost().versions,
+            {
+              version: 2,
+              status: VersionStatus.FAILED,
+              failureCode: 'document.truncated',
+              failureReason: 'The model ran out of tokens',
+              createdAt: new Date('2026-07-03T00:00:00.000Z'),
+            },
+            {
+              version: 3,
+              status: VersionStatus.READY,
+              content: { commentary: 'The third one' },
+              createdAt: new Date('2026-07-04T00:00:00.000Z'),
+            },
+          ],
+        }),
+      );
+
+      const detail = await service.getArtifact(
+        ids.user.toString(),
+        ids.artifact.toString(),
+        { version: 2, includeVersions: true },
+      );
+
+      expect(detail).toMatchObject({
+        currentVersion: 3,
+        version: 2,
+        status: VersionStatus.FAILED,
+        failureCode: 'document.truncated',
+        failureReason: 'The model ran out of tokens',
+        content: {},
+      });
+      expect(detail).not.toHaveProperty('latestAttempt');
+      expect(detail.versions?.[1]).toEqual({
+        version: 2,
+        status: VersionStatus.FAILED,
+        createdAt: new Date('2026-07-03T00:00:00.000Z'),
+        failureCode: 'document.truncated',
+        failureReason: 'The model ran out of tokens',
+      });
+    });
+
+    it('should return empty content without a failure when a GENERATING version is read by number', async () => {
+      const { service, artifactModel } = makeService();
+      artifactModel.findById.mockResolvedValue(
+        readyPost({
+          versions: [
+            ...readyPost().versions,
+            {
+              version: 2,
+              status: VersionStatus.GENERATING,
+              content: { commentary: 'half-written' },
+              createdAt: new Date('2026-07-03T00:00:00.000Z'),
+            },
+          ],
+        }),
+      );
+
+      const detail = await service.getArtifact(
+        ids.user.toString(),
+        ids.artifact.toString(),
+        { version: 2 },
+      );
+
+      expect(detail).toMatchObject({
+        version: 2,
+        status: VersionStatus.GENERATING,
+        content: {},
+        latestAttempt: { version: 2, status: VersionStatus.GENERATING },
+      });
+      expect(detail).not.toHaveProperty('failureCode');
+      expect(detail).not.toHaveProperty('failureReason');
     });
 
     it('should omit currentVersion when no version has become READY', async () => {
@@ -278,8 +473,9 @@ describe('ArtifactService library API', () => {
       expect(titleSearch.test('A DEPLOY.*SAFELY checklist')).toBe(true);
       expect(promptSearch.test('How to deploy.*safely today')).toBe(true);
       expect(titleSearch.test('Deploy carelessly')).toBe(false);
-      expect(listPipeline).toContainEqual({
-        $match: { '_latestVersion.status': VersionStatus.READY },
+      expect(pageMatch).toMatchObject({
+        'versions.status': { $ne: VersionStatus.GENERATING },
+        currentVersion: { $ne: null },
       });
       const facet = listPipeline.find((stage) => stage.$facet)?.$facet;
       expect(facet?.data).toContainEqual({ $skip: 20 });
@@ -315,17 +511,16 @@ describe('ArtifactService library API', () => {
         type: ArtifactType.DOCUMENT,
         title: 'A deck',
         updatedAt: new Date('2026-07-02T00:00:00.000Z'),
-        _latestVersion: {
-          version: 1,
-          status: VersionStatus.READY,
-          content: {
-            commentary: 'A deck intro',
-            document: {
-              templateId: 'minimal',
-              slides: [firstSlide],
-              pdfKey: 'artifacts/deck/1/document.pdf',
-              pageCount: 1,
-            },
+        currentVersion: 1,
+        _attemptInFlight: false,
+        _latestVersion: { version: 1, status: VersionStatus.READY },
+        _currentContent: {
+          commentary: 'A deck intro',
+          document: {
+            templateId: 'minimal',
+            slides: [firstSlide],
+            pdfKey: 'artifacts/deck/1/document.pdf',
+            pageCount: 1,
           },
         },
       };
@@ -352,6 +547,7 @@ describe('ArtifactService library API', () => {
             type: ArtifactType.DOCUMENT,
             title: 'A deck',
             status: VersionStatus.READY,
+            currentVersion: 1,
             updatedAt: row.updatedAt,
             preview: {
               commentary: 'A deck intro',
@@ -408,12 +604,15 @@ describe('ArtifactService library API', () => {
       };
       expect(listPipeline).toContainEqual(hasVersionMatch);
       // An artifact without a Current Version still lists, by its newest Attempt.
-      expect(listPipeline).toContainEqual({
-        $set: {
+      const facet = (
+        listPipeline as Array<{ $facet?: { data: unknown[] } }>
+      ).find((stage) => stage.$facet)?.$facet;
+      expect(facet?.data).toContainEqual({
+        $set: expect.objectContaining({
           _latestVersion: {
             $arrayElemAt: [{ $ifNull: ['$versions', []] }, -1],
           },
-        },
+        }),
       });
 
       const availableMonthsPipeline = artifactModel.aggregate.mock.calls[1][0];
@@ -422,6 +621,210 @@ describe('ArtifactService library API', () => {
         'type',
         expect.objectContaining(hasVersionMatch.$match),
       );
+    });
+  });
+
+  describe('listArtifacts status derivation', () => {
+    const listWith = (
+      artifactModel: ReturnType<typeof makeService>['artifactModel'],
+      rows: unknown[],
+    ) => {
+      artifactModel.aggregate.mockImplementation((pipeline: unknown[]) => ({
+        exec: jest
+          .fn()
+          .mockResolvedValue(
+            pipeline.some((stage) => '$facet' in (stage as object))
+              ? [{ data: rows, metadata: [{ total: rows.length }] }]
+              : [],
+          ),
+      }));
+      artifactModel.distinct.mockResolvedValue([]);
+    };
+    const row = (overrides: Record<string, unknown>) => ({
+      _id: ids.artifact,
+      type: ArtifactType.POST,
+      title: 'A post',
+      updatedAt: new Date('2026-07-02T00:00:00.000Z'),
+      ...overrides,
+    });
+
+    it.each([
+      [
+        'GENERATING',
+        {
+          'versions.status': VersionStatus.GENERATING,
+        },
+      ],
+      [
+        'READY',
+        {
+          'versions.status': { $ne: VersionStatus.GENERATING },
+          currentVersion: { $ne: null },
+        },
+      ],
+      [
+        'FAILED',
+        {
+          'versions.status': { $ne: VersionStatus.GENERATING },
+          currentVersion: null,
+        },
+      ],
+    ])(
+      'should filter on the derived status in the first match stage when ?status=%s',
+      async (status, expected) => {
+        const { service, artifactModel } = makeService();
+        listWith(artifactModel, []);
+
+        await service.listArtifacts(ids.user.toString(), {
+          status: status as VersionStatus,
+          page: 3,
+        });
+
+        const aggregateCalls = artifactModel.aggregate.mock
+          .calls as unknown as Array<[Array<Record<string, unknown>>]>;
+        const listPipeline = aggregateCalls[0][0];
+        // The filter precedes the facet, so total and pages count only matches.
+        const facetIndex = listPipeline.findIndex((stage) => '$facet' in stage);
+        expect(listPipeline[0]).toEqual({
+          $match: {
+            user: ids.user,
+            deletedAt: { $exists: false },
+            ...expected,
+          },
+        });
+        expect(
+          listPipeline.slice(facetIndex + 1).some((stage) => '$match' in stage),
+        ).toBe(false);
+      },
+    );
+
+    it('should report GENERATING and the in-flight Attempt with its run when a refine of the Current Version is running', async () => {
+      const { service, artifactModel, workflowRuns } = makeService();
+      listWith(artifactModel, [
+        row({
+          currentVersion: 1,
+          _attemptInFlight: true,
+          _latestVersion: { version: 2, status: VersionStatus.GENERATING },
+          _currentContent: { commentary: 'The current post' },
+        }),
+      ]);
+      workflowRuns.findRunsForVersions.mockResolvedValue([
+        { artifactId: ids.artifact.toString(), version: 2, runId: ids.run },
+      ]);
+
+      const { data } = await service.listArtifacts(ids.user.toString());
+
+      expect(data[0]).toMatchObject({
+        status: VersionStatus.GENERATING,
+        currentVersion: 1,
+        latestAttempt: {
+          version: 2,
+          status: VersionStatus.GENERATING,
+          runId: ids.run,
+        },
+        preview: { commentary: 'The current post' },
+      });
+      expect(workflowRuns.findRunsForVersions).toHaveBeenCalledWith([
+        { artifactId: ids.artifact.toString(), version: 2 },
+      ]);
+    });
+
+    it('should report READY with the failed Attempt when a refine failed after a Current Version', async () => {
+      const { service, artifactModel } = makeService();
+      listWith(artifactModel, [
+        row({
+          currentVersion: 1,
+          _attemptInFlight: false,
+          _latestVersion: {
+            version: 2,
+            status: VersionStatus.FAILED,
+            failureCode: 'internal',
+            failureReason: 'boom',
+          },
+          _currentContent: { commentary: 'The current post' },
+        }),
+      ]);
+
+      const { data } = await service.listArtifacts(ids.user.toString());
+
+      expect(data[0]).toMatchObject({
+        status: VersionStatus.READY,
+        currentVersion: 1,
+        latestAttempt: {
+          version: 2,
+          status: VersionStatus.FAILED,
+          failureCode: 'internal',
+          failureReason: 'boom',
+        },
+        preview: { commentary: 'The current post' },
+      });
+      // No run record matched, so runId is omitted rather than invented.
+      expect(data[0].latestAttempt).not.toHaveProperty('runId');
+    });
+
+    it('should report READY without latestAttempt when the newest version is the Current Version', async () => {
+      const { service, artifactModel, workflowRuns } = makeService();
+      listWith(artifactModel, [
+        row({
+          currentVersion: 2,
+          _attemptInFlight: false,
+          _latestVersion: { version: 2, status: VersionStatus.READY },
+          _currentContent: { commentary: 'v2' },
+        }),
+      ]);
+
+      const { data } = await service.listArtifacts(ids.user.toString());
+
+      expect(data[0]).toMatchObject({
+        status: VersionStatus.READY,
+        currentVersion: 2,
+      });
+      expect(data[0]).not.toHaveProperty('latestAttempt');
+      expect(workflowRuns.findRunsForVersions).not.toHaveBeenCalled();
+    });
+
+    it('should report GENERATING with an empty preview when the first version is still generating', async () => {
+      const { service, artifactModel } = makeService();
+      listWith(artifactModel, [
+        row({
+          _attemptInFlight: true,
+          _latestVersion: { version: 1, status: VersionStatus.GENERATING },
+        }),
+      ]);
+
+      const { data } = await service.listArtifacts(ids.user.toString());
+
+      expect(data[0]).toMatchObject({
+        status: VersionStatus.GENERATING,
+        latestAttempt: { version: 1, status: VersionStatus.GENERATING },
+        preview: {},
+      });
+      expect(data[0]).not.toHaveProperty('currentVersion');
+    });
+
+    it('should report FAILED when no version ever became READY', async () => {
+      const { service, artifactModel } = makeService();
+      listWith(artifactModel, [
+        row({
+          currentVersion: null,
+          _attemptInFlight: false,
+          _latestVersion: {
+            version: 1,
+            status: VersionStatus.FAILED,
+            failureCode: 'internal',
+            failureReason: 'boom',
+          },
+        }),
+      ]);
+
+      const { data } = await service.listArtifacts(ids.user.toString());
+
+      expect(data[0]).toMatchObject({
+        status: VersionStatus.FAILED,
+        latestAttempt: { version: 1, status: VersionStatus.FAILED },
+        preview: {},
+      });
+      expect(data[0]).not.toHaveProperty('currentVersion');
     });
   });
 

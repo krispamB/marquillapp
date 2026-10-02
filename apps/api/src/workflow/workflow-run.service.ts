@@ -15,6 +15,13 @@ export interface CreateRunInput {
   input: BuildInput;
 }
 
+/** The run behind one `(artifact, version)`; see `findRunsForVersions`. */
+export interface VersionRun {
+  artifactId: string;
+  version: number;
+  runId: string;
+}
+
 @Injectable()
 export class WorkflowRunService {
   constructor(
@@ -58,6 +65,45 @@ export class WorkflowRunService {
       .sort({ createdAt: -1 });
 
     return run?.researchContext;
+  }
+
+  /**
+   * The runs behind the given `(artifact, version)` Attempts, oldest first, so
+   * a caller that keys them by target keeps the newest when a version somehow
+   * has several. A pair with no run record yet (the moment between appending
+   * an Attempt and creating its run) is absent.
+   */
+  async findRunsForVersions(
+    targets: ReadonlyArray<{ artifactId: string; version: number }>,
+  ): Promise<VersionRun[]> {
+    const valid = targets.filter((target) =>
+      isValidObjectId(target.artifactId),
+    );
+    if (valid.length === 0) return [];
+
+    const runs = await this.workflowRunModel
+      .find({
+        $or: valid.map((target) => ({
+          artifact: new Types.ObjectId(target.artifactId),
+          targetVersion: target.version,
+        })),
+      })
+      .select({ _id: 1, artifact: 1, targetVersion: 1 })
+      .sort({ createdAt: 1 })
+      .lean<
+        Array<{
+          _id: Types.ObjectId;
+          artifact: Types.ObjectId;
+          targetVersion: number;
+        }>
+      >()
+      .exec();
+
+    return runs.map((run) => ({
+      artifactId: run.artifact.toString(),
+      version: run.targetVersion,
+      runId: run._id.toString(),
+    }));
   }
 
   /**

@@ -113,14 +113,20 @@ export function useArtifactRun({
 
   const clearRun = useCallback(() => setRun(null), []);
 
-  const showDurableFailure = useCallback((type: ArtifactType, kind: ArtifactRunKind) => {
+  const showDurableFailure = useCallback((
+    type: ArtifactType,
+    kind: ArtifactRunKind,
+    failureCode?: RunFailureCode,
+    failureReason?: string,
+  ) => {
     setRun({
       status: "failed",
       kind,
       type,
       steps: [],
       credits: 0,
-      failureReason: "This artifact run failed before completion.",
+      failureCode,
+      failureReason: failureReason || "This artifact run failed before completion.",
       failureAction: kind === "INITIAL" ? "retry-create" : undefined,
     });
   }, []);
