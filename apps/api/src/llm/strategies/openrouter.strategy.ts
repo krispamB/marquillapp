@@ -208,6 +208,17 @@ export class OpenRouterStrategy implements LLMStrategy {
     const choice = result.choices[0];
     const text = readText(choice?.message?.content);
 
+    // A call cut off at the token cap before any text (reasoning can spend the
+    // whole budget) is still a cut-off, and its turn was still spent. The
+    // caller reads `finishReason` before it looks at the text.
+    if (text === undefined && choice?.finishReason === 'length') {
+      return {
+        text: '',
+        usage: toUsage(result.usage),
+        finishReason: choice.finishReason,
+      };
+    }
+
     if (text === undefined) {
       throw new LLMError('OpenRouter returned no text content', {
         retryable: false,

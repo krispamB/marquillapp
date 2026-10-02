@@ -40,6 +40,7 @@ import { AgentRunnerService } from './agent-runner.service';
 import type {
   AgentRunConfig,
   DocumentGenerateInput,
+  DocumentRepairInput,
   GenerateInput,
   Tool,
 } from './agent-runner.interface';
@@ -483,6 +484,7 @@ describe('AgentRunnerService', () => {
       prompt: 'Three fixes for documents',
       fragment: 'DESIGN SYSTEM: Margin (margin v2)',
       includeTitle: true,
+      maxEnvelopeRepairs: 1,
     };
 
     it('should return the title, commentary and Candidate Source the model wrote', async () => {
@@ -492,6 +494,7 @@ describe('AgentRunnerService', () => {
         title: 'Three fixes',
         commentary: 'Swipe through.',
         html: HTML,
+        envelopeRepairs: 0,
       });
       expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
     });
@@ -515,7 +518,11 @@ describe('AgentRunnerService', () => {
         includeTitle: false,
       });
 
-      expect(draft).toEqual({ commentary: 'Swipe through.', html: HTML });
+      expect(draft).toEqual({
+        commentary: 'Swipe through.',
+        html: HTML,
+        envelopeRepairs: 0,
+      });
     });
 
     it('should cap the output at 16384 tokens by default', async () => {
@@ -549,7 +556,7 @@ describe('AgentRunnerService', () => {
       expect(onUsage).toHaveBeenCalledTimes(1);
     });
 
-    it('should repair an invalid envelope once and meter both turns', async () => {
+    it('should repair an invalid envelope once, report the turn, and meter both turns', async () => {
       mocks.llmService.complete
         .mockResolvedValueOnce(completion(draftJson({ html: '' }), 0.03))
         .mockResolvedValueOnce(completion(draftJson(), 0.04));
@@ -557,7 +564,7 @@ describe('AgentRunnerService', () => {
 
       await expect(
         service.generateDocument(documentInput, { onUsage }),
-      ).resolves.toMatchObject({ html: HTML });
+      ).resolves.toMatchObject({ html: HTML, envelopeRepairs: 1 });
       expect(onUsage).toHaveBeenCalledTimes(2);
       const repairPrompt = messagesOfCall(2).at(-1)?.content ?? '';
       expect(repairPrompt).toContain('rejected');
@@ -585,6 +592,169 @@ describe('AgentRunnerService', () => {
       await expect(
         service.generateDocument(documentInput),
       ).rejects.toBeInstanceOf(DocumentTruncatedError);
+    });
+
+    it('should throw ContentValidationError without a repair turn when none is allowed', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        completion(draftJson({ html: '' })),
+      );
+
+      await expect(
+        service.generateDocument({ ...documentInput, maxEnvelopeRepairs: 0 }),
+      ).rejects.toBeInstanceOf(ContentValidationError);
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('repairDocument', () => {
+    const HTML = '<!doctype html><html><body></body></html>';
+    const CANDIDATE = '<!doctype html><html><body>13px</body></html>';
+    const repairJson = (overrides: Record<string, unknown> = {}) =>
+      JSON.stringify({
+        title: 'A different title',
+        commentary: 'Different commentary.',
+        html: HTML,
+        ...overrides,
+      });
+
+    const repairInput: DocumentRepairInput = {
+      fragment: 'DESIGN SYSTEM: Margin (margin v2)',
+      includeTitle: true,
+      candidate: CANDIDATE,
+      violations: {
+        violations: [
+          {
+            code: 'typography.rules.minPx',
+            detail: 'font-size 13px is below 14px',
+            page: 2,
+            line: 7,
+          },
+          { code: 'envelope.link', detail: '<link> is not allowed' },
+        ],
+        omitted: [{ code: 'typography.rules.minPx', count: 4 }],
+      },
+      maxEnvelopeRepairs: 1,
+    };
+
+    it('should keep only the Candidate Source, ignoring the title and commentary', async () => {
+      mocks.llmService.complete.mockResolvedValue(completion(repairJson()));
+
+      await expect(service.repairDocument(repairInput)).resolves.toEqual({
+        html: HTML,
+        envelopeRepairs: 0,
+      });
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+    });
+
+    it('should send a fresh two-message call whose system message is byte-identical to the draft call', async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(
+          completion(
+            JSON.stringify({ title: 'T', commentary: 'C', html: CANDIDATE }),
+          ),
+        )
+        .mockResolvedValueOnce(completion(repairJson()));
+
+      await service.generateDocument({
+        prompt: 'Three fixes for documents',
+        stylePreset: StylePreset.CONTRARIAN,
+        research: { findings: 'RESEARCH FINDINGS TEXT', sources: [] },
+        fragment: repairInput.fragment,
+        includeTitle: true,
+        maxEnvelopeRepairs: 1,
+      });
+      await service.repairDocument(repairInput);
+
+      const repair = messagesOfCall(2);
+      expect(repair).toHaveLength(2);
+      expect(repair[0]).toEqual(messagesOfCall(1)[0]);
+      expect(repair[1].role).toBe(MessageRole.User);
+    });
+
+    it('should hand the model the Candidate Source and the bounded violations, and drop the brief and research', async () => {
+      mocks.llmService.complete.mockResolvedValue(completion(repairJson()));
+
+      await service.repairDocument(repairInput);
+
+      const user = messagesOfCall(1)[1].content ?? '';
+      expect(user).toContain(CANDIDATE);
+      expect(user).toContain(
+        '- typography.rules.minPx (page 2, line 7): font-size 13px is below 14px',
+      );
+      expect(user).toContain('- envelope.link: <link> is not allowed');
+      expect(user).toContain('4 more typography.rules.minPx');
+      expect(user).toContain('Change nothing else.');
+      expect(user).not.toContain('Three fixes for documents');
+      expect(user).not.toContain('RESEARCH FINDINGS');
+    });
+
+    it('should cap the output with the DOCUMENT cap', async () => {
+      mocks.llmService.complete.mockResolvedValue(completion(repairJson()));
+
+      await service.repairDocument(repairInput);
+
+      expectGenerationOptions(completeCalls()[0][2], 16384);
+    });
+
+    it('should repair an invalid envelope once when allowed, report the turn, and meter both turns', async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(completion(repairJson({ html: '' }), 0.03))
+        .mockResolvedValueOnce(completion(repairJson(), 0.04));
+      const onUsage = jest.fn();
+
+      await expect(
+        service.repairDocument(repairInput, { onUsage }),
+      ).resolves.toEqual({ html: HTML, envelopeRepairs: 1 });
+      expect(onUsage).toHaveBeenCalledTimes(2);
+    });
+
+    it('should throw ContentValidationError without a repair turn when none is left', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        completion(repairJson({ html: '' })),
+      );
+
+      await expect(
+        service.repairDocument({ ...repairInput, maxEnvelopeRepairs: 0 }),
+      ).rejects.toBeInstanceOf(ContentValidationError);
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw DocumentTruncatedError before parsing, without a repair turn, when the Repair hit the cap', async () => {
+      mocks.llmService.complete.mockResolvedValue({
+        ...completion('{"commentary": "Swipe', 0.05),
+        finishReason: 'length',
+      });
+      const onUsage = jest.fn();
+
+      await expect(
+        service.repairDocument(repairInput, { onUsage }),
+      ).rejects.toBeInstanceOf(DocumentTruncatedError);
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+      expect(onUsage).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw DocumentTruncatedError when the Repair hit the cap with no text at all', async () => {
+      mocks.llmService.complete.mockResolvedValue({
+        ...completion(''),
+        finishReason: 'length',
+      });
+
+      await expect(service.repairDocument(repairInput)).rejects.toThrow(
+        'The DOCUMENT Repair hit the output token cap',
+      );
+    });
+
+    it("should throw DocumentTruncatedError when the Repair's Zod repair turn hit the cap", async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(completion(repairJson({ html: '' })))
+        .mockResolvedValueOnce({
+          ...completion('{"commentary"'),
+          finishReason: 'length',
+        });
+
+      await expect(service.repairDocument(repairInput)).rejects.toBeInstanceOf(
+        DocumentTruncatedError,
+      );
     });
   });
 

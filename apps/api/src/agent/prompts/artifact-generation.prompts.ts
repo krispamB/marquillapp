@@ -1,4 +1,5 @@
 import { ArtifactType } from 'src/database/schemas';
+import type { BoundedViolations } from '../../document-source/violation';
 import type { GenerateInput } from '../agent-runner.interface';
 import { resolveStylePresetInstruction } from '../style-presets.config';
 
@@ -210,6 +211,39 @@ export function buildRepairUserPrompt(validationError: string): string {
 ${validationError}
 
 Return a corrected JSON object that satisfies the schema. Output only the JSON object.`;
+}
+
+/**
+ * A Repair's user message (spec §7.2): the current Candidate Source and the
+ * bounded violations, nothing else. The brief, research and feedback are
+ * dropped, so the model fixes what it wrote rather than writing it again.
+ */
+export function buildDocumentRepairUserPrompt(
+  candidate: string,
+  { violations, omitted }: BoundedViolations,
+): string {
+  const lines = violations.map(({ code, detail, page, line }) => {
+    const where = [
+      page !== undefined ? `page ${page}` : undefined,
+      line !== undefined ? `line ${line}` : undefined,
+    ].filter((part) => part !== undefined);
+    return `- ${code}${where.length > 0 ? ` (${where.join(', ')})` : ''}: ${detail}`;
+  });
+  if (omitted.length > 0) {
+    lines.push(
+      `- Not listed: ${omitted.map(({ code, count }) => `${count} more ${code}`).join(', ')}.`,
+    );
+  }
+
+  return `Your document was rejected by the Design System checker.
+
+VIOLATIONS:
+${lines.join('\n')}
+
+DOCUMENT:
+${candidate}
+
+Fix these violations and re-emit the complete document as "html", in the same JSON shape. Change nothing else.`;
 }
 
 /**

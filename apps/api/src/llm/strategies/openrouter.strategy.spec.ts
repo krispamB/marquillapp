@@ -105,6 +105,26 @@ describe('OpenRouterStrategy', () => {
       expect(result.finishReason).toBe('length');
     });
 
+    it('should report a cut-off with no text as length rather than an error', async () => {
+      send.mockResolvedValue({
+        choices: [{ message: { content: null }, finishReason: 'length' }],
+        usage,
+      });
+
+      await expect(
+        strategy.complete([{ role: MessageRole.User, content: 'hi' }]),
+      ).resolves.toEqual({
+        text: '',
+        usage: {
+          promptTokens: 120,
+          completionTokens: 30,
+          totalTokens: 150,
+          cost: 0.00042,
+        },
+        finishReason: 'length',
+      });
+    });
+
     it('should report a zero cost when the provider omits it', async () => {
       send.mockResolvedValue({
         choices: [{ message: { content: 'x' } }],

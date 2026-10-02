@@ -22,8 +22,11 @@ jest.mock(
 import { DocumentTruncatedError } from '../agent/agent-runner.error';
 import type {
   AgentHooks,
+  AgentTurnUsage,
   DocumentDraftResult,
   DocumentGenerateInput,
+  DocumentRepairInput,
+  DocumentRepairResult,
 } from '../agent/agent-runner.interface';
 import { parseDesignSystemDefinition } from '../design-system/design-system-definition';
 import { DESIGN_SYSTEM_SEED_DIR } from '../design-system/design-system.constants';
@@ -38,10 +41,11 @@ import { ArtifactRunProcessor } from './workers/artifact-run.worker.handler';
  * agent and renderer. The renderer replays probe facts the real session
  * recorded (`test:render`), so the judge decides on real measurements.
  *
- * There is no Repair yet (#167, #168), so the paths are: clean; a static
- * finding; a render finding; truncation; a render that must be retried;
- * egress; and a stale contract. Each asserts step events, `step.progress`,
- * meter records and `failureCode`.
+ * There is no render Repair yet (#168), so the paths are: clean; a static
+ * Repair that succeeds; static Repairs that run out; a render finding;
+ * truncation of the draft or a Repair; a render that must be retried;
+ * egress; and a stale contract.
+ * Each asserts step events, `step.progress`, meter records and `failureCode`.
  */
 
 const readSeed = (file: string) =>
@@ -65,6 +69,12 @@ const recorded = (name: string): RenderFacts =>
       'utf8',
     ),
   ) as RenderFacts;
+
+/** The draft with a type size off the scale: one static violation. */
+const OFF_SCALE = MARGIN_SAMPLE.replace(
+  '<style>',
+  '<style>p { font-size: 13px; }',
+);
 
 const PDF = new Uint8Array([37, 80, 68, 70, 45]);
 const PNG = new Uint8Array([137, 80, 78, 71]);
@@ -114,6 +124,13 @@ const makeRun = () => {
     xadd: jest.fn<Promise<string>, unknown[]>().mockResolvedValue('1-0'),
     expire: jest.fn().mockResolvedValue(1),
   };
+  const turn: AgentTurnUsage = {
+    promptTokens: 4000,
+    completionTokens: 6000,
+    totalTokens: 10_000,
+    cost: 0.09,
+    model: 'test/generation-model',
+  };
   const agent = {
     generate: jest.fn(),
     research: jest.fn(),
@@ -122,18 +139,22 @@ const makeRun = () => {
         _input: DocumentGenerateInput,
         hooks?: AgentHooks,
       ): Promise<DocumentDraftResult> => {
-        hooks?.onUsage?.({
-          promptTokens: 4000,
-          completionTokens: 6000,
-          totalTokens: 10_000,
-          cost: 0.09,
-          model: 'test/generation-model',
-        });
+        hooks?.onUsage?.(turn);
         return Promise.resolve({
           title: 'Three fixes',
           commentary: 'Three fixes, one per page. Swipe through.',
           html: MARGIN_SAMPLE,
+          envelopeRepairs: 0,
         });
+      },
+    ),
+    repairDocument: jest.fn(
+      (
+        _input: DocumentRepairInput,
+        hooks?: AgentHooks,
+      ): Promise<DocumentRepairResult> => {
+        hooks?.onUsage?.(turn);
+        return Promise.resolve({ html: MARGIN_SAMPLE, envelopeRepairs: 0 });
       },
     ),
   };
@@ -345,16 +366,95 @@ describe('DOCUMENT generation, end to end', () => {
     });
   });
 
-  describe('a static finding, with no Repair yet', () => {
+  describe('a static finding that one Repair fixes', () => {
     beforeEach(() => {
       const draft = run.agent.generateDocument.getMockImplementation()!;
       run.agent.generateDocument.mockImplementation(async (input, hooks) => ({
         ...(await draft(input, hooks)),
-        html: MARGIN_SAMPLE.replace('<style>', '<style>p { font-size: 13px; }'),
+        html: OFF_SCALE,
       }));
     });
 
-    it('should fail GENERATE as document.repair_exhausted before any render', async () => {
+    it('should repair in GENERATE, then render and promote the repaired source', async () => {
+      await expect(runJob(run)).resolves.toBeUndefined();
+
+      expect(lifecycle(run)).toEqual([
+        'run.started',
+        'step.started RESOLVE_INPUT',
+        'step.completed RESOLVE_INPUT',
+        'step.started GENERATE',
+        'step.completed GENERATE',
+        'step.started RENDER_PDF',
+        'step.completed RENDER_PDF',
+        'step.started PERSIST_VERSION',
+        'step.completed PERSIST_VERSION',
+        'run.completed',
+      ]);
+      expect(progress(run)).toEqual([
+        { step: 'GENERATE', phase: 'draft' },
+        { step: 'GENERATE', phase: 'repair', round: 1, violations: 1 },
+        { step: 'RENDER_PDF', phase: 'render', session: 1 },
+      ]);
+      const [[input]] = run.agent.repairDocument.mock.calls;
+      expect(input.candidate).toBe(OFF_SCALE);
+      expect(input.violations.violations).toEqual([
+        expect.objectContaining({ code: 'typography.rules.minPx' }),
+      ]);
+      expect(run.renderer.render).toHaveBeenCalledTimes(1);
+      expect(run.artifacts.promoteVersion).toHaveBeenCalledWith(
+        'artifact-1',
+        1,
+        expect.objectContaining({
+          commentary: 'Three fixes, one per page. Swipe through.',
+        }),
+        { title: 'Three fixes' },
+      );
+    });
+
+    it('should bill the draft and the Repair as separate LLM turns, with usage.tick climbing', async () => {
+      await runJob(run);
+
+      expect(meterRecords(run)).toEqual(['llm', 'llm', 'pdf_render']);
+      expect(
+        emitted(run)
+          .filter(({ type }) => type === 'usage.tick')
+          .map(({ data }) => data.totalCredits),
+      ).toEqual([180, 360, 368]);
+      expect(run.creditMeter.debit).toHaveBeenCalledTimes(1);
+    });
+
+    it('should record both static checks, and keep violation details out of every event', async () => {
+      await runJob(run);
+
+      expect(
+        run.runHandle.recordDocumentCheck.mock.calls.map(([check]) => [
+          check.phase,
+          check.violations.length,
+        ]),
+      ).toEqual([
+        ['static', 1],
+        ['static', 0],
+        ['render', 0],
+      ]);
+      expect(JSON.stringify(emitted(run))).not.toContain('13px');
+    });
+  });
+
+  describe('static findings that outlast the Repair budget', () => {
+    beforeEach(() => {
+      const draft = run.agent.generateDocument.getMockImplementation()!;
+      run.agent.generateDocument.mockImplementation(async (input, hooks) => ({
+        ...(await draft(input, hooks)),
+        html: OFF_SCALE,
+      }));
+      const repair = run.agent.repairDocument.getMockImplementation()!;
+      run.agent.repairDocument.mockImplementation(async (input, hooks) => ({
+        ...(await repair(input, hooks)),
+        html: OFF_SCALE,
+      }));
+    });
+
+    it('should fail GENERATE as document.repair_exhausted after two Repairs, before any render', async () => {
       await runJob(run);
 
       expect(lifecycle(run)).toEqual([
@@ -364,6 +464,11 @@ describe('DOCUMENT generation, end to end', () => {
         'step.started GENERATE',
         'step.failed GENERATE',
         'run.failed',
+      ]);
+      expect(progress(run)).toEqual([
+        { step: 'GENERATE', phase: 'draft' },
+        { step: 'GENERATE', phase: 'repair', round: 1, violations: 1 },
+        { step: 'GENERATE', phase: 'repair', round: 2, violations: 1 },
       ]);
       expect(failedWith(run)).toEqual({
         code: 'document.repair_exhausted',
@@ -379,21 +484,10 @@ describe('DOCUMENT generation, end to end', () => {
       expect(run.renderer.render).not.toHaveBeenCalled();
     });
 
-    it('should keep violation details on the run and out of every event', async () => {
+    it('should meter all three LLM turns but never commit credits', async () => {
       await runJob(run);
 
-      const [[check]] = run.runHandle.recordDocumentCheck.mock.calls;
-      expect(check.violations).toContainEqual(
-        expect.objectContaining({ code: 'typography.rules.minPx' }),
-      );
-      expect(JSON.stringify(emitted(run))).not.toContain('13px');
-      expect(progress(run)).toEqual([{ step: 'GENERATE', phase: 'draft' }]);
-    });
-
-    it('should meter the LLM turn but never commit credits', async () => {
-      await runJob(run);
-
-      expect(meterRecords(run)).toEqual(['llm']);
+      expect(meterRecords(run)).toEqual(['llm', 'llm', 'llm']);
       expect(run.creditMeter.debit).not.toHaveBeenCalled();
     });
   });
@@ -419,19 +513,88 @@ describe('DOCUMENT generation, end to end', () => {
     });
   });
 
-  it('should fail as document.truncated when the draft hit the token cap', async () => {
-    run.agent.generateDocument.mockRejectedValue(
-      new DocumentTruncatedError('cut off'),
-    );
-
-    await runJob(run);
-
-    expect(failedWith(run)).toEqual({
+  describe('truncation', () => {
+    const TRUNCATED = {
       code: 'document.truncated',
       failureReason:
         'This document was too long to generate. Try fewer pages or a shorter brief.',
+    };
+
+    /** A model call that spent its turn and stopped at the token cap. */
+    const cutOff = (_input: unknown, hooks?: AgentHooks): Promise<never> => {
+      hooks?.onUsage?.({
+        promptTokens: 4000,
+        completionTokens: 16_384,
+        totalTokens: 20_384,
+        cost: 0.2,
+        model: 'test/generation-model',
+      });
+      return Promise.reject(new DocumentTruncatedError('cut off'));
+    };
+
+    it('should fail as document.truncated, spending no Repair, when the draft hit the token cap', async () => {
+      run.agent.generateDocument.mockImplementation(cutOff);
+
+      await runJob(run);
+
+      expect(lifecycle(run)).toContain('step.failed GENERATE');
+      expect(failedWith(run)).toEqual(TRUNCATED);
+      expect(run.artifacts.failVersion).toHaveBeenCalledWith(
+        'artifact-1',
+        1,
+        'document.truncated',
+        expect.any(String),
+      );
+      expect(run.agent.repairDocument).not.toHaveBeenCalled();
+      expect(progress(run)).toEqual([{ step: 'GENERATE', phase: 'draft' }]);
+      expect(run.runHandle.recordDocumentCheck).not.toHaveBeenCalled();
+      expect(meterRecords(run)).toEqual(['llm']);
+      expect(run.creditMeter.debit).not.toHaveBeenCalled();
+      expect(run.renderer.render).not.toHaveBeenCalled();
     });
-    expect(run.renderer.render).not.toHaveBeenCalled();
+
+    it('should fail as document.truncated, spending no Repair, when the draft is over 256 KB', async () => {
+      const draft = run.agent.generateDocument.getMockImplementation()!;
+      run.agent.generateDocument.mockImplementation(async (input, hooks) => ({
+        ...(await draft(input, hooks)),
+        html: MARGIN_SAMPLE.replace(
+          '</body>',
+          `<p>${'x'.repeat(300_000)}</p></body>`,
+        ),
+      }));
+
+      await runJob(run);
+
+      expect(failedWith(run)).toEqual(TRUNCATED);
+      expect(run.agent.repairDocument).not.toHaveBeenCalled();
+      expect(progress(run)).toEqual([{ step: 'GENERATE', phase: 'draft' }]);
+      const [[check]] = run.runHandle.recordDocumentCheck.mock.calls;
+      expect(check.violations).toEqual([
+        expect.objectContaining({ code: 'envelope.truncated' }),
+      ]);
+      expect(run.renderer.render).not.toHaveBeenCalled();
+    });
+
+    it('should fail as document.truncated, without another Repair, when a Repair hit the token cap', async () => {
+      const draft = run.agent.generateDocument.getMockImplementation()!;
+      run.agent.generateDocument.mockImplementation(async (input, hooks) => ({
+        ...(await draft(input, hooks)),
+        html: OFF_SCALE,
+      }));
+      run.agent.repairDocument.mockImplementation(cutOff);
+
+      await runJob(run);
+
+      expect(failedWith(run)).toEqual(TRUNCATED);
+      expect(run.agent.repairDocument).toHaveBeenCalledTimes(1);
+      expect(progress(run)).toEqual([
+        { step: 'GENERATE', phase: 'draft' },
+        { step: 'GENERATE', phase: 'repair', round: 1, violations: 1 },
+      ]);
+      expect(meterRecords(run)).toEqual(['llm', 'llm']);
+      expect(run.creditMeter.debit).not.toHaveBeenCalled();
+      expect(run.renderer.render).not.toHaveBeenCalled();
+    });
   });
 
   describe('a render that must be retried', () => {
