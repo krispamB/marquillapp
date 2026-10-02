@@ -2,7 +2,9 @@
 
 Base path: `/api/v1/posts`. All endpoints require authentication and are owner-scoped.
 
-A Post is a mutable publishing composition. It pins one READY artifact version to one immutable LinkedIn connected account and may carry user-uploaded image or video media. The user previews the completed composition in `DRAFT`, then explicitly publishes or schedules it.
+A Post is a mutable publishing composition. It pins one exact READY artifact version to one immutable LinkedIn connected account and may carry user-uploaded image or video media. The user previews the completed composition in `DRAFT`, then explicitly publishes or schedules it.
+
+A Post pins `(artifact, version)`. Any `READY` version is pinnable, not only the artifact's Current Version, and a pinned Post **never follows** later refinements: a refinement appends a new version but leaves every existing Post's pinned version unchanged. Moving a Post to the latest version is a client action through `PATCH /posts/:id` with the new `version`.
 
 ## Create and edit a draft
 
@@ -23,7 +25,7 @@ Creates a `DRAFT`. It never publishes or schedules.
 |---|---:|---|
 | `title` | no | Trimmed, 1–100 characters. Defaults to the artifact title, then to the source prompt truncated to 100 characters. |
 | `artifactId` | yes | Owned artifact. |
-| `version` | no | Defaults to the current version; must be `READY`. |
+| `version` | no | Any `READY` version. Defaults to the Current Version (the newest `READY` version). `400` when omitted and the artifact has no Current Version yet. |
 | `connectedAccount` | yes | Owned, active LinkedIn account. It cannot be changed later. |
 
 `scheduledAt` is rejected. Use `/schedule` after reviewing the draft.
@@ -40,7 +42,7 @@ Partially updates the title and/or selected artifact version on a `DRAFT` or `FA
 
 `title`, `artifactId`, and `version` are optional, but at least `title` or `artifactId` must be supplied. `version` is valid only with `artifactId`. An omitted title remains unchanged when replacing the artifact. Titles are trimmed and must contain 1–100 characters.
 
-The replacement artifact must be owned and READY. A Post with uploaded media can select only a `POST` artifact because LinkedIn cannot combine uploaded media with polls or documents. Editing a `FAILED` Post returns it to `DRAFT` and clears stale failure/schedule fields.
+The replacement artifact must be owned, and the selected `version` must be `READY`. As on create, `version` may be any `READY` version and defaults to the Current Version; omitting it when the artifact has no Current Version is a `400`. Re-selecting the same artifact with its newer `version` is how a client updates a draft after a refinement. A Post with uploaded media can select only a `POST` artifact because LinkedIn cannot combine uploaded media with polls or documents. Editing a `FAILED` Post returns it to `DRAFT` and clears stale failure/schedule fields.
 
 ## Uploaded media
 
@@ -110,6 +112,8 @@ The older `GET /posts/linkedin/image/:urn` route remains available for compatibi
 
 Publishes a `DRAFT`, `FAILED`, or `SCHEDULED` Post immediately. After the connected-account preflight succeeds, a pending schedule job is removed. `PUBLISHED` is terminal.
 
+Publishing uses the Post's pinned version, even when a refinement has since produced a newer Current Version. If that version is no longer `READY`, publish returns `409`. For a `DOCUMENT` artifact, the server uploads the pinned version's stored PDF bytes to LinkedIn; it never re-renders the document.
+
 Publishing is blocked with `409` while any media item is `PENDING`, `UPLOADING`, or `FAILED`; failed media must be removed or uploaded again. READY media is composed as one `content.media` object or an ordered `content.multiImage` object.
 
 LinkedIn failures persist `status: "FAILED"` and `failureReason`. The Post may be edited, retried, or scheduled again.
@@ -124,7 +128,7 @@ Schedules a `DRAFT` or `FAILED` Post, or reschedules a `SCHEDULED` Post.
 { "scheduledAt": "2026-07-16T14:30:00.000Z" }
 ```
 
-The date must be in the future. The same media-readiness rules as immediate publishing apply. First-time scheduling consumes the existing scheduled-post quota; rescheduling and unscheduling do not refund or charge it again.
+The date must be in the future. The same media-readiness rules as immediate publishing apply. Scheduling pins the Post's selected version, which may be any `READY` version, and returns `409` if that version is no longer `READY`. First-time scheduling consumes the existing scheduled-post quota; rescheduling and unscheduling do not refund or charge it again.
 
 Expired LinkedIn access returns `409` with `Reconnect connected account to schedule posts.` before quota usage, artifact pinning, queue changes, or Post mutation.
 
@@ -183,4 +187,4 @@ type PostStatus = 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'FAILED';
 - `PUBLISHED`: terminal successful LinkedIn publication.
 - `FAILED`: failed attempt; editable, retryable, and schedulable. Any edit returns it to `DRAFT`.
 
-Artifact versions referenced by `SCHEDULED` or `PUBLISHED` Posts cannot be edited in place. Unschedule first or create/refine another artifact version.
+Artifact versions referenced by `SCHEDULED` or `PUBLISHED` Posts cannot be edited in place. Only the Current Version's commentary is ever edited in place (`PATCH /artifacts/:id`), and that is the edit pinning guards against. Unschedule first or create/refine another artifact version.

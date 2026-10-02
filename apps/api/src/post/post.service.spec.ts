@@ -773,7 +773,10 @@ describe('PostService.schedulePost', () => {
 
     expect(remove).toHaveBeenCalledTimes(1);
     expect(mocks.updateArtifactPinRevision).toHaveBeenCalledWith(
-      { _id: artifactId, currentVersion: 1 },
+      {
+        _id: artifactId,
+        versions: { $elemMatch: { version: 1, status: 'READY' } },
+      },
       { $inc: { pinRevision: 1 } },
     );
     expect(mocks.addScheduleJob).toHaveBeenCalledTimes(2);
@@ -789,6 +792,26 @@ describe('PostService.schedulePost', () => {
 });
 
 describe('PostService artifact publishing', () => {
+  interface ArtifactFixture {
+    type: string;
+    currentVersion?: number;
+    versions: Array<{
+      version: number;
+      status: string;
+      content: Record<string, unknown>;
+    }>;
+  }
+  interface PostFixture {
+    status: string;
+    artifacts: unknown;
+    save: jest.Mock;
+  }
+  const lastLinkedinBody = (): Record<string, unknown> => {
+    const body = jest.mocked(apiFetch).mock.calls.at(-1)?.[1]?.body;
+    if (typeof body !== 'string') throw new Error('No LinkedIn post body');
+    return JSON.parse(body) as Record<string, unknown>;
+  };
+
   const makeService = () => {
     const service = Object.create(PostService.prototype) as PostService;
     const userId = new Types.ObjectId();
@@ -979,6 +1002,46 @@ describe('PostService artifact publishing', () => {
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
+    it('should pin an older READY version when it is requested explicitly', async () => {
+      const { service, mocks, fixtures } = makeService();
+      const artifact = fixtures.artifact as ArtifactFixture;
+      artifact.currentVersion = 2;
+      artifact.versions.push({
+        version: 2,
+        status: 'READY',
+        content: { commentary: 'Refined text' },
+      });
+
+      await service.createPost({ _id: fixtures.userId } as unknown as User, {
+        artifactId: fixtures.artifactId.toString(),
+        version: 1,
+        connectedAccount: fixtures.accountId.toString(),
+      });
+
+      expect(mocks.postModel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          artifacts: [{ artifact: fixtures.artifactId, version: 1 }],
+        }),
+      );
+    });
+
+    it('should reject a missing version when the artifact has no Current Version', async () => {
+      const { service, mocks, fixtures } = makeService();
+      const artifact = fixtures.artifact as ArtifactFixture;
+      artifact.currentVersion = undefined;
+      artifact.versions[0].status = 'GENERATING';
+
+      await expect(
+        service.createPost({ _id: fixtures.userId } as unknown as User, {
+          artifactId: fixtures.artifactId.toString(),
+          connectedAccount: fixtures.accountId.toString(),
+        }),
+      ).rejects.toThrow(
+        'Artifact has no Current Version; specify a READY version to pin',
+      );
+      expect(mocks.postModel).not.toHaveBeenCalled();
+    });
+
     it('should reject scheduledAt because scheduling is an explicit action', async () => {
       const { service, fixtures } = makeService();
       const scheduledAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
@@ -1149,6 +1212,94 @@ describe('PostService artifact publishing', () => {
       const postCall = (apiFetch as jest.Mock).mock.calls.at(-1);
       const body = JSON.parse(postCall[1].body);
       expect(body.commentary).toBe('');
+    });
+
+    it('should publish the pinned version after a refinement promotes a newer Current Version', async () => {
+      const { service, mocks, fixtures } = makeService();
+      const artifact = fixtures.artifact as ArtifactFixture;
+      const post = fixtures.post as PostFixture;
+      artifact.currentVersion = 2;
+      artifact.versions.push({
+        version: 2,
+        status: 'READY',
+        content: { commentary: 'Refined text' },
+      });
+
+      await service.publishPost(fixtures.postId.toString());
+
+      expect(mocks.updateArtifactPinRevision).toHaveBeenCalledWith(
+        {
+          _id: fixtures.artifactId,
+          versions: { $elemMatch: { version: 1, status: 'READY' } },
+        },
+        { $inc: { pinRevision: 1 } },
+      );
+      expect(lastLinkedinBody().commentary).toBe('Approved text');
+      expect(post.artifacts).toEqual([
+        { artifact: fixtures.artifactId, version: 1 },
+      ]);
+      expect(post.status).toBe('PUBLISHED');
+    });
+
+    it('should upload the stored pdfKey bytes of the pinned version without re-rendering', async () => {
+      const { service, mocks, fixtures } = makeService();
+      const artifact = fixtures.artifact as ArtifactFixture;
+      const storedPdf = Buffer.from('stored-v1-pdf');
+      artifact.type = 'DOCUMENT';
+      artifact.currentVersion = 2;
+      artifact.versions = [
+        {
+          version: 1,
+          status: 'READY',
+          content: {
+            commentary: 'Swipe through',
+            document: {
+              slides: [{ type: 'cover', fields: { title: 'Pinned deck' } }],
+              pdfKey: 'artifacts/deck/1/document.pdf',
+              pageCount: 6,
+            },
+          },
+        },
+        {
+          version: 2,
+          status: 'READY',
+          content: {
+            document: {
+              slides: [{ type: 'cover', fields: { title: 'Refined deck' } }],
+              pdfKey: 'artifacts/deck/2/document.pdf',
+              pageCount: 7,
+            },
+          },
+        },
+      ];
+      (getFile as jest.Mock).mockResolvedValue(storedPdf);
+
+      await service.publishPost(fixtures.postId.toString());
+
+      // The only storage read is the pinned version's stored PDF, and those
+      // exact bytes are what LinkedIn receives: nothing renders at publish.
+      expect(getFile).toHaveBeenCalledTimes(1);
+      expect(getFile).toHaveBeenCalledWith('artifacts/deck/1/document.pdf');
+      expect(mocks.uploadDocument).toHaveBeenCalledTimes(1);
+      expect(mocks.uploadDocument).toHaveBeenCalledWith(
+        'urn:li:person:person-1',
+        'token',
+        storedPdf,
+        6,
+      );
+      expect(lastLinkedinBody().content).toEqual({
+        media: { id: 'urn:li:document:1', title: 'Pinned deck' },
+      });
+    });
+
+    it('should reject publishing with 409 when the pinned version is no longer READY', async () => {
+      const { service, mocks, fixtures } = makeService();
+      mocks.updateArtifactPinRevision.mockResolvedValue({ matchedCount: 0 });
+
+      await expect(
+        service.publishPost(fixtures.postId.toString()),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(apiFetch).not.toHaveBeenCalled();
     });
 
     it('should fail safely when the pinned version is unavailable', async () => {
@@ -1364,6 +1515,46 @@ describe('PostService artifact publishing', () => {
         { artifact: fixtures.artifactId, version: 1 },
       ]);
       expect(fixtures.post.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('should pin an older READY version through the post-edit path', async () => {
+      const { service, fixtures } = makeService();
+      const artifact = fixtures.artifact as ArtifactFixture;
+      const post = fixtures.post as PostFixture;
+      post.status = 'DRAFT';
+      artifact.currentVersion = 2;
+      artifact.versions.push({
+        version: 2,
+        status: 'READY',
+        content: { commentary: 'Refined text' },
+      });
+
+      const result = await service.updatePost(
+        { _id: fixtures.userId } as unknown as User,
+        fixtures.postId.toString(),
+        { artifactId: fixtures.artifactId.toString(), version: 1 },
+      );
+
+      expect(result.artifacts).toEqual([
+        { artifact: fixtures.artifactId, version: 1 },
+      ]);
+    });
+
+    it('should reject an artifact without a Current Version when no version is given', async () => {
+      const { service, fixtures } = makeService();
+      const artifact = fixtures.artifact as ArtifactFixture;
+      const post = fixtures.post as PostFixture;
+      post.status = 'DRAFT';
+      artifact.currentVersion = undefined;
+
+      await expect(
+        service.updatePost(
+          { _id: fixtures.userId } as unknown as User,
+          fixtures.postId.toString(),
+          { artifactId: fixtures.artifactId.toString() },
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(post.save).not.toHaveBeenCalled();
     });
 
     it('should return a FAILED post to DRAFT when its selection changes', async () => {
