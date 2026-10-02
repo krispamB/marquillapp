@@ -63,6 +63,8 @@ export interface ResolvedDesignSystem {
 export interface DocumentDraftState {
   commentary: string;
   candidate: string;
+  /** Turns of `DOCUMENT_REPAIR_BUDGET` already spent in this job attempt. */
+  repairsSpent: number;
 }
 
 /**

@@ -18,6 +18,14 @@ export const SCHEDULED_POST_PUBLISHED_EMAIL_JOB_NAME =
   'scheduled-post-published-email';
 
 /**
+ * Repair turns per job attempt (document generation spec §7.2), shared by
+ * static and render Repairs. For DOCUMENT, a Zod repair turn spends one too.
+ * A module constant, so a document never generates differently per
+ * environment.
+ */
+export const DOCUMENT_REPAIR_BUDGET = 2;
+
+/**
  * The stable code `run.failed` carries beside `failureReason`, and that a failed
  * Attempt stores (document generation spec §7.8). POST and POLL emit only
  * `internal`; the DOCUMENT codes arrive with the document pipeline.

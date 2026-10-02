@@ -47,6 +47,7 @@ const makeStep = () => {
   const agent = {
     generate: jest.fn(),
     generateDocument: jest.fn(),
+    repairDocument: jest.fn(),
     research: jest.fn(),
   };
   const meter = { record: jest.fn() };
@@ -185,11 +186,22 @@ describe('generateStep', () => {
       title: 'Three fixes',
       commentary: 'Swipe through.',
       html: '<!doctype html><html></html>',
+      envelopeRepairs: 0,
+    };
+    const REPAIRED = '<!doctype html><html><body>fixed</body></html>';
+    const finding = {
+      code: 'typography.scale',
+      detail: 'font-size 13px',
+      line: 4,
     };
 
     beforeEach(() => {
       mockedCheck.mockReturnValue([]);
       mocks.agent.generateDocument.mockResolvedValue(draft);
+      mocks.agent.repairDocument.mockResolvedValue({
+        html: REPAIRED,
+        envelopeRepairs: 0,
+      });
     });
 
     it('should draft with the pinned fragment and patch the statically clean Candidate Source', async () => {
@@ -199,7 +211,11 @@ describe('generateStep', () => {
         generateStep({ ...fixtures.documentState, research }, ctx),
       ).resolves.toEqual({
         generatedTitle: 'Three fixes',
-        draft: { commentary: 'Swipe through.', candidate: draft.html },
+        draft: {
+          commentary: 'Swipe through.',
+          candidate: draft.html,
+          repairsSpent: 0,
+        },
       });
       expect(mocks.agent.generateDocument).toHaveBeenCalledWith(
         {
@@ -213,6 +229,7 @@ describe('generateStep', () => {
         expect.anything(),
       );
       expect(mocks.agent.generate).not.toHaveBeenCalled();
+      expect(mocks.agent.repairDocument).not.toHaveBeenCalled();
       expect(mockedCheck).toHaveBeenCalledWith(fixtures.definition, draft.html);
     });
 
@@ -227,12 +244,9 @@ describe('generateStep', () => {
     });
 
     it('should record the static check with its full violation list on the run', async () => {
-      const violations = [
-        { code: 'typography.scale', detail: 'font-size 13px', line: 4 },
-      ];
-      mockedCheck.mockReturnValue(violations);
+      mockedCheck.mockReturnValueOnce([finding]);
 
-      await generateStep(fixtures.documentState, ctx).catch(() => undefined);
+      await generateStep(fixtures.documentState, ctx);
 
       const [check] = mocks.run.recordDocumentCheck.mock.calls[0] as [
         DocumentCheck,
@@ -240,21 +254,221 @@ describe('generateStep', () => {
       expect(check).toMatchObject({
         phase: 'static',
         candidateSha256: sha256Hex(draft.html),
-        violations,
+        violations: [finding],
       });
       expect(check.checkedAt).toBeInstanceOf(Date);
     });
 
-    it('should fail terminally as document.repair_exhausted when the static check finds anything', async () => {
-      mockedCheck.mockReturnValue([
-        { code: 'typography.scale', detail: 'font-size 13px', line: 4 },
-      ]);
+    describe('static Repair', () => {
+      it('should repair the Candidate Source and keep the draft title and commentary', async () => {
+        mockedCheck.mockReturnValueOnce([finding]);
 
-      await expect(
-        generateStep(fixtures.documentState, ctx),
-      ).rejects.toMatchObject({
-        retryable: false,
-        code: 'document.repair_exhausted',
+        await expect(
+          generateStep(fixtures.documentState, ctx),
+        ).resolves.toEqual({
+          generatedTitle: 'Three fixes',
+          draft: {
+            commentary: 'Swipe through.',
+            candidate: REPAIRED,
+            repairsSpent: 1,
+          },
+        });
+        expect(mocks.agent.repairDocument).toHaveBeenCalledWith(
+          {
+            fragment: 'FRAGMENT',
+            includeTitle: true,
+            candidate: draft.html,
+            violations: { violations: [finding], omitted: [] },
+            maxEnvelopeRepairs: 1,
+          },
+          expect.anything(),
+        );
+        expect(mockedCheck).toHaveBeenLastCalledWith(
+          fixtures.definition,
+          REPAIRED,
+        );
+      });
+
+      it('should send the model a bounded violation list', async () => {
+        mockedCheck.mockReturnValueOnce(
+          Array.from({ length: 5 }, (_, i) => ({ ...finding, line: i + 1 })),
+        );
+
+        await generateStep(fixtures.documentState, ctx);
+
+        const [input] = mocks.agent.repairDocument.mock.calls[0] as [
+          { violations: { violations: unknown[]; omitted: unknown[] } },
+        ];
+        expect(input.violations.violations).toHaveLength(3);
+        expect(input.violations.omitted).toEqual([
+          { code: 'typography.scale', count: 2 },
+        ]);
+      });
+
+      it('should emit each Repair round with its violation count and no details', async () => {
+        mockedCheck
+          .mockReturnValueOnce([finding, finding])
+          .mockReturnValueOnce([finding]);
+
+        await generateStep(fixtures.documentState, ctx);
+
+        expect(
+          mocks.emit.mock.calls.map(([event]: [unknown]) => event),
+        ).toEqual([
+          { type: 'step.progress', data: { step: 'GENERATE', phase: 'draft' } },
+          {
+            type: 'step.progress',
+            data: {
+              step: 'GENERATE',
+              phase: 'repair',
+              round: 1,
+              violations: 2,
+            },
+          },
+          {
+            type: 'step.progress',
+            data: {
+              step: 'GENERATE',
+              phase: 'repair',
+              round: 2,
+              violations: 1,
+            },
+          },
+        ]);
+      });
+
+      it('should record every static check on the run', async () => {
+        mockedCheck.mockReturnValueOnce([finding]);
+
+        await generateStep(fixtures.documentState, ctx);
+
+        expect(
+          mocks.run.recordDocumentCheck.mock.calls.map(
+            ([check]: [DocumentCheck]) => [
+              check.candidateSha256,
+              check.violations,
+            ],
+          ),
+        ).toEqual([
+          [sha256Hex(draft.html), [finding]],
+          [sha256Hex(REPAIRED), []],
+        ]);
+      });
+
+      it('should fail terminally as document.repair_exhausted when two Repairs leave violations', async () => {
+        mockedCheck.mockReturnValue([finding]);
+
+        await expect(
+          generateStep(fixtures.documentState, ctx),
+        ).rejects.toMatchObject({
+          retryable: false,
+          code: 'document.repair_exhausted',
+        });
+        expect(mocks.agent.repairDocument).toHaveBeenCalledTimes(2);
+        const [[first], [second]] = mocks.agent.repairDocument.mock.calls as [
+          [{ candidate: string; maxEnvelopeRepairs: number }],
+          [{ candidate: string; maxEnvelopeRepairs: number }],
+        ];
+        expect(first).toMatchObject({
+          candidate: draft.html,
+          maxEnvelopeRepairs: 1,
+        });
+        expect(second).toMatchObject({
+          candidate: REPAIRED,
+          maxEnvelopeRepairs: 0,
+        });
+      });
+
+      it("should charge the draft's Zod repair turn to the budget", async () => {
+        mocks.agent.generateDocument.mockResolvedValue({
+          ...draft,
+          envelopeRepairs: 1,
+        });
+        mockedCheck.mockReturnValue([finding]);
+
+        await expect(
+          generateStep(fixtures.documentState, ctx),
+        ).rejects.toMatchObject({ code: 'document.repair_exhausted' });
+        expect(mocks.agent.repairDocument).toHaveBeenCalledTimes(1);
+        expect(mocks.agent.repairDocument).toHaveBeenCalledWith(
+          expect.objectContaining({ maxEnvelopeRepairs: 0 }),
+          expect.anything(),
+        );
+        expect(mocks.emit).toHaveBeenLastCalledWith({
+          type: 'step.progress',
+          data: { step: 'GENERATE', phase: 'repair', round: 2, violations: 1 },
+        });
+      });
+
+      it("should charge a Repair's Zod repair turn to the budget", async () => {
+        mocks.agent.repairDocument.mockResolvedValue({
+          html: REPAIRED,
+          envelopeRepairs: 1,
+        });
+        mockedCheck.mockReturnValue([finding]);
+
+        await expect(
+          generateStep(fixtures.documentState, ctx),
+        ).rejects.toMatchObject({ code: 'document.repair_exhausted' });
+        expect(mocks.agent.repairDocument).toHaveBeenCalledTimes(1);
+      });
+
+      it('should report the turns spent when a Repair comes back clean', async () => {
+        mocks.agent.repairDocument.mockResolvedValue({
+          html: REPAIRED,
+          envelopeRepairs: 1,
+        });
+        mockedCheck.mockReturnValueOnce([finding]);
+
+        await expect(
+          generateStep(fixtures.documentState, ctx),
+        ).resolves.toMatchObject({ draft: { repairsSpent: 2 } });
+      });
+
+      it('should fail terminally as document.repair_exhausted when a Repair envelope is invalid with no turn left', async () => {
+        mockedCheck.mockReturnValue([finding]);
+        mocks.agent.repairDocument
+          .mockResolvedValueOnce({ html: REPAIRED, envelopeRepairs: 0 })
+          .mockRejectedValueOnce(new ContentValidationError('html empty'));
+
+        await expect(
+          generateStep(fixtures.documentState, ctx),
+        ).rejects.toMatchObject({
+          retryable: false,
+          code: 'document.repair_exhausted',
+        });
+      });
+
+      it('should fail terminally as internal when a Repair envelope is invalid after its repair turn', async () => {
+        mockedCheck.mockReturnValueOnce([finding]);
+        mocks.agent.repairDocument.mockRejectedValue(
+          new ContentValidationError('html empty'),
+        );
+
+        const error = await generateStep(fixtures.documentState, ctx).catch(
+          (e: unknown) => e,
+        );
+        expect(error).toMatchObject({ retryable: false });
+        expect((error as WorkflowError).code).toBeUndefined();
+      });
+
+      it('should meter every LLM turn of every Repair', async () => {
+        mockedCheck.mockReturnValueOnce([finding]);
+        mocks.agent.repairDocument.mockImplementation(
+          (_input: unknown, hooks: AgentHooks) => {
+            hooks.onUsage?.(turnUsage({ cost: 0.07 }));
+            hooks.onUsage?.(turnUsage({ cost: 0.08 }));
+            return Promise.resolve({ html: REPAIRED, envelopeRepairs: 1 });
+          },
+        );
+
+        await generateStep(fixtures.documentState, ctx);
+
+        expect(
+          mocks.meter.record.mock.calls.map(
+            ([record]: [{ amount: number }]) => record.amount,
+          ),
+        ).toEqual([0.07, 0.08]);
       });
     });
 

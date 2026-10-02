@@ -73,6 +73,7 @@ type RunEventData =
   | { seq: number; ts: number; step: WorkflowStep; index: number; total: number }
   | { seq: number; ts: number; step: WorkflowStep; sourcesFound: number }
   | { seq: number; ts: number; step: 'GENERATE'; phase: 'draft' }
+  | { seq: number; ts: number; step: 'GENERATE'; phase: 'repair'; round: 1 | 2; violations: number }
   | { seq: number; ts: number; step: 'RENDER_PDF'; phase: 'render'; session: number }
   | { seq: number; ts: number; kind: 'llm' | 'web_search' | 'pdf_render'; credits: number; totalCredits: number; detail?: unknown }
   | { seq: number; ts: number; step: WorkflowStep; retryable: boolean; message: string }
@@ -91,10 +92,10 @@ type RunFailureCode =
 `step.progress` signals:
 
 - `RESEARCH`: `sourcesFound`.
-- DOCUMENT `GENERATE`: `{ phase: 'draft' }` when the model starts writing the document.
+- DOCUMENT `GENERATE`: `{ phase: 'draft' }` when the model starts writing the document, then `{ phase: 'repair', round, violations }` each time the model is sent the rule breaks it must fix. `round` counts the run's Repairs (at most 2 per job attempt); `violations` is how many rule breaks were found.
 - DOCUMENT `RENDER_PDF`: `{ phase: 'render', session }` when a render session starts.
 
-DOCUMENT progress carries counts only, never what a check found. More phases (`repair`, `retry`) arrive with document Repairs; ignore a `phase` you do not recognise.
+DOCUMENT progress carries counts only, never what a check found. More `RENDER_PDF` phases (`repair`, `retry`) arrive with render Repairs; ignore a `phase` you do not recognise.
 
 ### Failure reason policy
 
@@ -117,7 +118,7 @@ DOCUMENT runs emit these codes, each with fixed display text:
 
 | `code` | Cause | `failureReason` |
 |---|---|---|
-| `document.repair_exhausted` | the generated document broke a Design System or render rule (documents are not repaired yet) | We couldn't get this design to fit cleanly. Try refining with a shorter brief or another design. |
+| `document.repair_exhausted` | the generated document still broke a Design System rule after 2 Repairs, or broke a render rule (render Repairs are not built yet) | We couldn't get this design to fit cleanly. Try refining with a shorter brief or another design. |
 | `document.truncated` | the document was too long to generate | This document was too long to generate. Try fewer pages or a shorter brief. |
 | `design_system.unavailable` | the pinned Design System cannot be used | This design is unavailable. Try again with another design. |
 | `render.unavailable` | rendering failed after retries | We couldn't render your document right now. Please try again. |
