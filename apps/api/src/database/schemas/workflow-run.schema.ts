@@ -3,7 +3,8 @@ import { Document, Types } from 'mongoose';
 import { User } from './user.schema';
 import { Artifact } from './artifact.schema';
 import type { ResearchResult } from '../../agent/agent-runner.interface';
-import type { RenderAttemptUsage } from '../../carousel/render-usage.types';
+import type { RenderAttemptUsage } from '../../document-render/render-usage.types';
+import type { DocumentCheck } from '../../workflow/engine/workflow.types';
 // Type-only, and to the leaf module rather than the engine barrel: the engine
 // imports RunKind from here, so a value import either way would be a cycle.
 import type { BuildInput } from '../../workflow/engine/workflow.types';
@@ -63,6 +64,12 @@ export class WorkflowRun extends Document {
 
   @Prop({ type: [Object], default: [] })
   renderAttempts: RenderAttemptUsage[];
+
+  // DOCUMENT only: every check of a Candidate Source, static or render, with
+  // its full violation list. Violation details live here and nowhere else:
+  // never in events and never in logs.
+  @Prop({ type: [Object], default: undefined })
+  documentChecks?: DocumentCheck[];
 
   // Attempt-scoped: reset at the start of each attempt so a whole-job retry
   // cannot double-count. Only the winning attempt's total is ever debited.

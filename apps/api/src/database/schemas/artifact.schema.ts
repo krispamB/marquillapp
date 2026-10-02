@@ -16,14 +16,6 @@ export enum VersionStatus {
   FAILED = 'FAILED',
 }
 
-// Visual theme of a DOCUMENT carousel — distinct from the writing-voice StylePreset.
-export enum CarouselTheme {
-  BOLD = 'bold',
-  MINIMAL = 'minimal',
-  EDITORIAL = 'editorial',
-  GRADIENT = 'gradient',
-}
-
 @Schema({ _id: false })
 export class ArtifactSource {
   @Prop({ required: true })
@@ -35,8 +27,13 @@ export class ArtifactSource {
   @Prop({ enum: StylePreset })
   stylePreset?: StylePreset;
 
-  @Prop({ enum: CarouselTheme })
-  theme?: CarouselTheme;
+  /**
+   * The Design System slug the user asked for at creation, DOCUMENT only, and
+   * only when they named one. It records the request and is never rewritten:
+   * each Document Version stamps its own resolved pin server-side.
+   */
+  @Prop()
+  designSystemId?: string;
 }
 
 export const ArtifactSourceSchema =

@@ -1,5 +1,5 @@
 import puppeteer, { type Browser, type HTTPRequest } from 'puppeteer-core';
-import type { BrowserlessUsage } from '../carousel/render-usage.types';
+import type { BrowserlessUsage } from './render-usage.types';
 import type { DesignSystemDefinition } from '../design-system/design-system-definition';
 import { isFontRequest } from '../document-source/assemble';
 import {
