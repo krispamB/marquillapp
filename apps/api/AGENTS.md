@@ -24,6 +24,7 @@ bun run typecheck        # tsc against tsconfig.build.json, i.e. exactly what sh
 bun run test             # Jest: all *.spec.ts under src/
 bunx jest src/auth/auth.service.spec.ts   # a single file
 bun run test:e2e         # end-to-end (test/jest-e2e.json)
+CHROME_PATH=<chrome> bun run test:render  # real-browser document render (*.render-spec.ts); not in `check`, required before merging renderer or judge changes
 
 bun run lint             # ESLint, report only (large existing backlog)
 bun run lint:fix         # ESLint --fix; only on files you are changing

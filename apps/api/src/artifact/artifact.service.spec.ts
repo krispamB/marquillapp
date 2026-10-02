@@ -28,6 +28,11 @@ jest.mock(
   }),
   { virtual: true },
 );
+jest.mock(
+  'src/workflow/workflow-run.service',
+  () => ({ WorkflowRunService: class {} }),
+  { virtual: true },
+);
 
 import { Types } from 'mongoose';
 import {
@@ -49,7 +54,12 @@ const makeService = () => {
     updateOne: jest.fn().mockResolvedValue({ matchedCount: 1 }),
   };
   const postModel = { exists: jest.fn().mockResolvedValue(false) };
-  const service = new ArtifactService(artifactModel as any, postModel as any);
+  const workflowRuns = { findRunsForVersions: jest.fn().mockResolvedValue([]) };
+  const service = new ArtifactService(
+    artifactModel as any,
+    postModel as any,
+    workflowRuns as any,
+  );
 
   const userId = new Types.ObjectId().toString();
   const artifactId = new Types.ObjectId().toString();

@@ -24,6 +24,7 @@ describe('WorkflowRunService', () => {
       updateOne: jest.fn().mockResolvedValue({ matchedCount: 1 }),
       findById: jest.fn(),
       findOne: jest.fn(),
+      find: jest.fn(),
     };
     const service = new WorkflowRunService(workflowRunModel as any);
 
@@ -132,6 +133,71 @@ describe('WorkflowRunService', () => {
         service.getLatestCompletedResearch('not-an-object-id'),
       ).resolves.toBeUndefined();
       expect(mocks.workflowRunModel.findOne).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findRunsForVersions', () => {
+    const chain = (runs: unknown[]) => {
+      const exec = jest.fn().mockResolvedValue(runs);
+      const lean = jest.fn().mockReturnValue({ exec });
+      const sort = jest.fn().mockReturnValue({ lean });
+      const select = jest.fn().mockReturnValue({ sort });
+      mocks.workflowRunModel.find.mockReturnValue({ select });
+      return { select, sort };
+    };
+
+    it('should return each run by its target in one oldest-first query when given several Attempts', async () => {
+      const otherArtifactId = new Types.ObjectId().toString();
+      const otherRunId = new Types.ObjectId();
+      const { select, sort } = chain([
+        {
+          _id: new Types.ObjectId(fixtures.runId),
+          artifact: new Types.ObjectId(fixtures.artifactId),
+          targetVersion: 2,
+        },
+        {
+          _id: otherRunId,
+          artifact: new Types.ObjectId(otherArtifactId),
+          targetVersion: 1,
+        },
+      ]);
+
+      await expect(
+        service.findRunsForVersions([
+          { artifactId: fixtures.artifactId, version: 2 },
+          { artifactId: otherArtifactId, version: 1 },
+        ]),
+      ).resolves.toEqual([
+        { artifactId: fixtures.artifactId, version: 2, runId: fixtures.runId },
+        {
+          artifactId: otherArtifactId,
+          version: 1,
+          runId: otherRunId.toString(),
+        },
+      ]);
+      expect(mocks.workflowRunModel.find).toHaveBeenCalledTimes(1);
+      expect(mocks.workflowRunModel.find).toHaveBeenCalledWith({
+        $or: [
+          {
+            artifact: new Types.ObjectId(fixtures.artifactId),
+            targetVersion: 2,
+          },
+          { artifact: new Types.ObjectId(otherArtifactId), targetVersion: 1 },
+        ],
+      });
+      expect(select).toHaveBeenCalledWith({
+        _id: 1,
+        artifact: 1,
+        targetVersion: 1,
+      });
+      expect(sort).toHaveBeenCalledWith({ createdAt: 1 });
+    });
+
+    it('should not query when no target has a valid artifact id', async () => {
+      await expect(
+        service.findRunsForVersions([{ artifactId: 'nope', version: 1 }]),
+      ).resolves.toEqual([]);
+      expect(mocks.workflowRunModel.find).not.toHaveBeenCalled();
     });
   });
 

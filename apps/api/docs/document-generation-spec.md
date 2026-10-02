@@ -63,7 +63,7 @@ deleted when its production equivalent lands (§12).
 | Prototype | Ticket | Path |
 |---|---|---|
 | Design System Definition contract, prompt fragment, static checker | #134, #136 | deleted; production in `src/design-system/` and `src/document-source/` (#158, #160) |
-| Render session, probe, judge, assembly | #137 | `src/carousel/prototype-render-validation/` |
+| Render session, probe, judge, assembly | #137 | deleted; production in `src/document-source/` (assembly, #161) and `src/document-render/` (#162) |
 | Six default systems, previews | #140 | `src/carousel/prototype-design-systems/` |
 
 ## 1. What changes
@@ -395,6 +395,17 @@ One deadline covers the whole session, not only `setContent`.
 - Render findings have no `line`. The `detail` names the page, the element with a text snippet, and
   the distance, e.g. `page 2: p.body "Then cut the page…" crosses the bottom safe edge by 58px`.
 - Glyph boxes are converted to line boxes (half-leading removed) with 1px tolerance.
+- Measured against the six seed samples (#162):
+  - An absolutely positioned element was placed, not laid out (a cropped numeral, a bleeding
+    shape, a frame, a callout), so it is exempt from `page.safeArea`. Placed text that lies
+    entirely off its page is still a finding.
+  - A line's effective background is hit-tested at its centre, walking down the paint stack and
+    counting a positioned `::before`/`::after` (the usual full-page backdrop). A gradient, an image,
+    a translucent or a composited paint (`opacity`, `mix-blend-mode`, `filter`) is skipped.
+  - A web font reports the name in its file, which can carry the instance (`Manrope ExtraLight`), so
+    a platform font matches a declared family exactly or as a word prefix.
+  - The probe never passes a callback to a DOM method: with JavaScript disabled, the browser
+    refuses to run it.
 - Only `repair` findings reach the model (§7.2). `retry` is handled by rendering again (§7.3).
   `defect` is a bug: terminal, alerted, never prompted.
 - Known blind spots, measured by §11: pairings over gradients or images are skipped, as are

@@ -21,6 +21,22 @@ export type ArtifactVersionSummary = {
   createdAt?: string;
   editedAt?: string;
   refineFeedback?: string;
+  /** FAILED versions only. */
+  failureCode?: RunFailureCode;
+  failureReason?: string;
+};
+
+/**
+ * The newest version when it is not the Current Version: a refine in flight,
+ * a refine that failed, or a first version that never became READY.
+ */
+export type LatestAttempt = {
+  version: number;
+  status: Exclude<ArtifactStatus, "READY">;
+  failureCode?: RunFailureCode;
+  failureReason?: string;
+  /** Absent only in the instant before the Attempt's run is recorded. */
+  runId?: string;
 };
 
 export type CreateArtifactResponse = {
@@ -99,7 +115,10 @@ export type ArtifactSummary = {
   id: string;
   type: ArtifactType;
   title?: string;
+  /** Derived: GENERATING while an Attempt is in flight, else READY with a Current Version, else FAILED. */
   status: ArtifactStatus;
+  currentVersion?: number;
+  latestAttempt?: LatestAttempt;
   updatedAt?: string;
   preview?: {
     commentary?: string;
@@ -126,9 +145,16 @@ export type ArtifactDetailData = {
   title?: string;
   /** The newest READY version; absent until the first version is READY. */
   currentVersion?: number;
+  latestAttempt?: LatestAttempt;
+  /** The returned version: the Current Version unless ?version= asked for another, or there is none. */
   version: number;
+  /** The returned version's own status, not the artifact's. */
   status: ArtifactStatus;
+  /** FAILED versions only. */
+  failureCode?: RunFailureCode;
+  failureReason?: string;
   updatedAt?: string;
+  /** Empty unless the returned version is READY. */
   content: ArtifactContent;
   versions?: ArtifactVersionSummary[];
 };

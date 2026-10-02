@@ -39,6 +39,7 @@ import ConnectedAccountPicker, {
   resolveAttachAccountChoice,
 } from "./ConnectedAccountPicker";
 import { readArtifactPrompt } from "./artifactStudioStorage";
+import { latestAttemptFeedback, resumeLatestAttempt } from "./artifactAttempt";
 import {
   API_BASE,
   ApiRequestError,
@@ -189,30 +190,33 @@ export default function ArtifactConversationClient({
         setArtifactType(detail.type);
         if (detail.title?.trim()) setArtifactTitle(detail.title.trim());
 
-        if (detail.status === "READY") {
-          appendArtifact(detail);
+        // Without ?version= the detail is the Current Version, or the latest
+        // Attempt while there is none. An Attempt newer than the Current
+        // Version (in flight or failed) is reported beside it.
+        if (detail.status === "READY") appendArtifact(detail);
+
+        const attempt = detail.latestAttempt;
+        if (!attempt) {
           setActiveRunId(undefined);
           clearRun();
           if (initialRunIdRef.current) router.replace(cleanArtifactUrl);
           return;
         }
 
-        const readyVersions = (detail.versions ?? [])
-          .filter((version) => version.status === "READY")
-          .sort((left, right) => right.version - left.version);
-        if (readyVersions[0]) {
-          const previous = await readArtifact(readyVersions[0].version);
-          if (!cancelled) appendArtifact(previous);
-        }
+        const feedback = latestAttemptFeedback(detail);
+        if (feedback) appendUser(feedback, `feedback-${attempt.version}`);
 
-        // Without ?version= the detail is the newest version: the Attempt a
-        // refine appended, which is not the Current Version until it is READY.
-        const latestAttempt = detail.versions?.find((version) => version.version === detail.version);
-        if (latestAttempt?.refineFeedback) {
-          appendUser(latestAttempt.refineFeedback, `feedback-${detail.version}`);
-        }
-        if (!initialRunIdRef.current && detail.status === "FAILED") {
-          showDurableFailure(detail.type, readyVersions.length ? "REFINE" : "INITIAL");
+        const resumption = resumeLatestAttempt(detail, Boolean(initialRunIdRef.current));
+        if (resumption.action === "follow") {
+          beginRun(resumption.kind, detail.type);
+          setActiveRunId(resumption.runId);
+        } else if (resumption.action === "show-failure") {
+          showDurableFailure(
+            detail.type,
+            resumption.kind,
+            resumption.failureCode,
+            resumption.failureReason,
+          );
         }
       } catch (reason) {
         if (!cancelled) {
@@ -229,6 +233,7 @@ export default function ArtifactConversationClient({
     appendArtifact,
     appendUser,
     artifactId,
+    beginRun,
     cleanArtifactUrl,
     clearRun,
     readArtifact,

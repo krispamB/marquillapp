@@ -1,0 +1,1452 @@
+{
+ "timedOut": false,
+ "pages": [
+  {
+   "index": 1,
+   "role": "title",
+   "rect": {
+    "x": 0,
+    "y": 0,
+    "w": 1080,
+    "h": 1350
+   }
+  },
+  {
+   "index": 2,
+   "role": "statement",
+   "rect": {
+    "x": 0,
+    "y": 1350,
+    "w": 1080,
+    "h": 1350
+   }
+  },
+  {
+   "index": 3,
+   "role": "statement",
+   "rect": {
+    "x": 0,
+    "y": 2700,
+    "w": 1080,
+    "h": 1350
+   }
+  },
+  {
+   "index": 4,
+   "role": "list",
+   "rect": {
+    "x": 0,
+    "y": 4050,
+    "w": 1080,
+    "h": 1350
+   }
+  },
+  {
+   "index": 5,
+   "role": "end",
+   "rect": {
+    "x": 0,
+    "y": 5400,
+    "w": 1080,
+    "h": 1350
+   }
+  }
+ ],
+ "elements": [
+  {
+   "idx": 0,
+   "page": 1,
+   "label": "div.leaf \"The first swipe01/05 Three fixes…\"",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 112,
+    "w": 856,
+    "h": 1126
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 1,
+   "page": 1,
+   "label": "div.head \"The first swipe01/05\"",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 112,
+    "w": 856,
+    "h": 31.1875
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 2,
+   "page": 1,
+   "label": "p.meta \"The first swipe\"",
+   "tag": "p",
+   "rect": {
+    "x": 112,
+    "y": 112,
+    "w": 150.9375,
+    "h": 31.1875
+   },
+   "textRects": [
+    {
+     "x": 112,
+     "y": 113,
+     "w": 150.9375,
+     "h": 29
+    }
+   ],
+   "color": "rgb(110, 110, 110)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 31.2
+  },
+  {
+   "idx": 3,
+   "page": 1,
+   "label": "p.meta \"01/05\"",
+   "tag": "p",
+   "rect": {
+    "x": 902.90625,
+    "y": 112,
+    "w": 65.09375,
+    "h": 31.1875
+   },
+   "textRects": [
+    {
+     "x": 902.90625,
+     "y": 113,
+     "w": 65.09375,
+     "h": 29
+    }
+   ],
+   "color": "rgb(110, 110, 110)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 31.2
+  },
+  {
+   "idx": 4,
+   "page": 1,
+   "label": "div.fill",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 143.1875,
+    "w": 856,
+    "h": 943.625
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 5,
+   "page": 1,
+   "label": "h1.title \"Three fixes for carousels people…\"",
+   "tag": "h1",
+   "rect": {
+    "x": 112,
+    "y": 1086.8125,
+    "w": 856,
+    "h": 151.1875
+   },
+   "textRects": [
+    {
+     "x": 112,
+     "y": 1080.8125,
+     "w": 710.34375,
+     "h": 87
+    },
+    {
+     "x": 112,
+     "y": 1156.40625,
+     "w": 383.46875,
+     "h": 87
+    }
+   ],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)",
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 75.6
+  },
+  {
+   "idx": 6,
+   "page": 2,
+   "label": "div.leaf \"The first swipe02/05 Promise one…\"",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 1462,
+    "w": 856,
+    "h": 1126
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 7,
+   "page": 2,
+   "label": "div.head \"The first swipe02/05\"",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 1462,
+    "w": 856,
+    "h": 31.1875
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 8,
+   "page": 2,
+   "label": "p.meta \"The first swipe\"",
+   "tag": "p",
+   "rect": {
+    "x": 112,
+    "y": 1462,
+    "w": 150.9375,
+    "h": 31.1875
+   },
+   "textRects": [
+    {
+     "x": 112,
+     "y": 1463,
+     "w": 150.9375,
+     "h": 29
+    }
+   ],
+   "color": "rgb(110, 110, 110)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 31.2
+  },
+  {
+   "idx": 9,
+   "page": 2,
+   "label": "p.meta \"02/05\"",
+   "tag": "p",
+   "rect": {
+    "x": 902.90625,
+    "y": 1462,
+    "w": 65.09375,
+    "h": 31.1875
+   },
+   "textRects": [
+    {
+     "x": 902.90625,
+     "y": 1463,
+     "w": 65.09375,
+     "h": 29
+    }
+   ],
+   "color": "rgb(110, 110, 110)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 31.2
+  },
+  {
+   "idx": 10,
+   "page": 2,
+   "label": "div.fill",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 1493.1875,
+    "w": 856,
+    "h": 920.625
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 11,
+   "page": 2,
+   "label": "h2.heading \"Promise one outcome on the cover…\"",
+   "tag": "h2",
+   "rect": {
+    "x": 112,
+    "y": 2413.8125,
+    "w": 760,
+    "h": 55.1875
+   },
+   "textRects": [
+    {
+     "x": 112,
+     "y": 2411.8125,
+     "w": 704.9375,
+     "h": 59
+    }
+   ],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 55.2
+  },
+  {
+   "idx": 12,
+   "page": 2,
+   "label": "p.body \"A cover that lists everything pr…\"",
+   "tag": "p",
+   "rect": {
+    "x": 112,
+    "y": 2501,
+    "w": 700,
+    "h": 87
+   },
+   "textRects": [
+    {
+     "x": 112,
+     "y": 2504,
+     "w": 660.6875,
+     "h": 36
+    },
+    {
+     "x": 112,
+     "y": 2547.5,
+     "w": 460.390625,
+     "h": 36
+    }
+   ],
+   "color": "rgb(110, 110, 110)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)",
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 43.5
+  },
+  {
+   "idx": 13,
+   "page": 3,
+   "label": "div.leaf \"The first swipe03/05 One idea pe…\"",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 2812,
+    "w": 856,
+    "h": 1126
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 14,
+   "page": 3,
+   "label": "div.head \"The first swipe03/05\"",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 2812,
+    "w": 856,
+    "h": 31.1875
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 15,
+   "page": 3,
+   "label": "p.meta \"The first swipe\"",
+   "tag": "p",
+   "rect": {
+    "x": 112,
+    "y": 2812,
+    "w": 150.9375,
+    "h": 31.1875
+   },
+   "textRects": [
+    {
+     "x": 112,
+     "y": 2813,
+     "w": 150.9375,
+     "h": 29
+    }
+   ],
+   "color": "rgb(110, 110, 110)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 31.2
+  },
+  {
+   "idx": 16,
+   "page": 3,
+   "label": "p.meta \"03/05\"",
+   "tag": "p",
+   "rect": {
+    "x": 902.90625,
+    "y": 2812,
+    "w": 65.09375,
+    "h": 31.1875
+   },
+   "textRects": [
+    {
+     "x": 902.90625,
+     "y": 2813,
+     "w": 65.09375,
+     "h": 29
+    }
+   ],
+   "color": "rgb(110, 110, 110)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 31.2
+  },
+  {
+   "idx": 17,
+   "page": 3,
+   "label": "div.fill",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 2843.1875,
+    "w": 856,
+    "h": 920.625
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 18,
+   "page": 3,
+   "label": "h2.heading \"One idea per page.\"",
+   "tag": "h2",
+   "rect": {
+    "x": 112,
+    "y": 3763.8125,
+    "w": 760,
+    "h": 55.1875
+   },
+   "textRects": [
+    {
+     "x": 112,
+     "y": 3761.8125,
+     "w": 375.1875,
+     "h": 59
+    }
+   ],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 55.2
+  },
+  {
+   "idx": 19,
+   "page": 3,
+   "label": "p.body \"If a page needs two headings, it…\"",
+   "tag": "p",
+   "rect": {
+    "x": 112,
+    "y": 3851,
+    "w": 700,
+    "h": 87
+   },
+   "textRects": [
+    {
+     "x": 112,
+     "y": 3854,
+     "w": 624.4375,
+     "h": 36
+    },
+    {
+     "x": 112,
+     "y": 3897.5,
+     "w": 394.296875,
+     "h": 36
+    }
+   ],
+   "color": "rgb(110, 110, 110)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)",
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 43.5
+  },
+  {
+   "idx": 20,
+   "page": 4,
+   "label": "div.leaf \"The first swipe04/05 Before you …\"",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 4162,
+    "w": 856,
+    "h": 1126
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 21,
+   "page": 4,
+   "label": "div.head \"The first swipe04/05\"",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 4162,
+    "w": 856,
+    "h": 31.1875
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 22,
+   "page": 4,
+   "label": "p.meta \"The first swipe\"",
+   "tag": "p",
+   "rect": {
+    "x": 112,
+    "y": 4162,
+    "w": 150.9375,
+    "h": 31.1875
+   },
+   "textRects": [
+    {
+     "x": 112,
+     "y": 4163,
+     "w": 150.9375,
+     "h": 29
+    }
+   ],
+   "color": "rgb(110, 110, 110)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 31.2
+  },
+  {
+   "idx": 23,
+   "page": 4,
+   "label": "p.meta \"04/05\"",
+   "tag": "p",
+   "rect": {
+    "x": 902.90625,
+    "y": 4162,
+    "w": 65.09375,
+    "h": 31.1875
+   },
+   "textRects": [
+    {
+     "x": 902.90625,
+     "y": 4163,
+     "w": 65.09375,
+     "h": 29
+    }
+   ],
+   "color": "rgb(110, 110, 110)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 31.2
+  },
+  {
+   "idx": 24,
+   "page": 4,
+   "label": "div.fill",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 4193.1875,
+    "w": 856,
+    "h": 679.125
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 25,
+   "page": 4,
+   "label": "h2.heading \"Before you publish\"",
+   "tag": "h2",
+   "rect": {
+    "x": 112,
+    "y": 4872.3125,
+    "w": 760,
+    "h": 55.1875
+   },
+   "textRects": [
+    {
+     "x": 112,
+     "y": 4870.3125,
+     "w": 368.09375,
+     "h": 59
+    }
+   ],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 55.2
+  },
+  {
+   "idx": 26,
+   "page": 4,
+   "label": "ul.items \"01The cover names one outcome 02…\"",
+   "tag": "ul",
+   "rect": {
+    "x": 112,
+    "y": 4991.5,
+    "w": 856,
+    "h": 296.5
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 27,
+   "page": 4,
+   "label": "li \"01The cover names one outcome\"",
+   "tag": "li",
+   "rect": {
+    "x": 112,
+    "y": 4991.5,
+    "w": 856,
+    "h": 109.5
+   },
+   "textRects": [
+    {
+     "x": 208,
+     "y": 5028.5,
+     "w": 399.921875,
+     "h": 36
+    }
+   ],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": true,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 43.5
+  },
+  {
+   "idx": 28,
+   "page": 4,
+   "label": "span.meta \"01\"",
+   "tag": "span",
+   "rect": {
+    "x": 112,
+    "y": 5025.5,
+    "w": 48,
+    "h": 43.5
+   },
+   "textRects": [
+    {
+     "x": 112,
+     "y": 5026.5,
+     "w": 28.828125,
+     "h": 29
+    }
+   ],
+   "color": "rgb(110, 110, 110)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 31.2
+  },
+  {
+   "idx": 29,
+   "page": 4,
+   "label": "li \"02Every page holds one idea\"",
+   "tag": "li",
+   "rect": {
+    "x": 112,
+    "y": 5101,
+    "w": 856,
+    "h": 109.5
+   },
+   "textRects": [
+    {
+     "x": 208,
+     "y": 5138,
+     "w": 338.5625,
+     "h": 36
+    }
+   ],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": true,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 43.5
+  },
+  {
+   "idx": 30,
+   "page": 4,
+   "label": "span.meta \"02\"",
+   "tag": "span",
+   "rect": {
+    "x": 112,
+    "y": 5135,
+    "w": 48,
+    "h": 43.5
+   },
+   "textRects": [
+    {
+     "x": 112,
+     "y": 5136,
+     "w": 28.828125,
+     "h": 29
+    }
+   ],
+   "color": "rgb(110, 110, 110)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 31.2
+  },
+  {
+   "idx": 31,
+   "page": 4,
+   "label": "li \"03The last page asks for one thi…\"",
+   "tag": "li",
+   "rect": {
+    "x": 112,
+    "y": 5210.5,
+    "w": 856,
+    "h": 77.5
+   },
+   "textRects": [
+    {
+     "x": 208,
+     "y": 5247.5,
+     "w": 410.171875,
+     "h": 36
+    }
+   ],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": true,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 43.5
+  },
+  {
+   "idx": 32,
+   "page": 4,
+   "label": "span.meta \"03\"",
+   "tag": "span",
+   "rect": {
+    "x": 112,
+    "y": 5244.5,
+    "w": 48,
+    "h": 43.5
+   },
+   "textRects": [
+    {
+     "x": 112,
+     "y": 5245.5,
+     "w": 28.828125,
+     "h": 29
+    }
+   ],
+   "color": "rgb(110, 110, 110)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 31.2
+  },
+  {
+   "idx": 33,
+   "page": 5,
+   "label": "div.leaf \"The first swipe05/05 Save this f…\"",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 5512,
+    "w": 856,
+    "h": 1126
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 34,
+   "page": 5,
+   "label": "div.head \"The first swipe05/05\"",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 5512,
+    "w": 856,
+    "h": 31.1875
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 35,
+   "page": 5,
+   "label": "p.meta \"The first swipe\"",
+   "tag": "p",
+   "rect": {
+    "x": 112,
+    "y": 5512,
+    "w": 150.9375,
+    "h": 31.1875
+   },
+   "textRects": [
+    {
+     "x": 112,
+     "y": 5513,
+     "w": 150.9375,
+     "h": 29
+    }
+   ],
+   "color": "rgb(110, 110, 110)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 31.2
+  },
+  {
+   "idx": 36,
+   "page": 5,
+   "label": "p.meta \"05/05\"",
+   "tag": "p",
+   "rect": {
+    "x": 902.90625,
+    "y": 5512,
+    "w": 65.09375,
+    "h": 31.1875
+   },
+   "textRects": [
+    {
+     "x": 902.90625,
+     "y": 5513,
+     "w": 65.09375,
+     "h": 29
+    }
+   ],
+   "color": "rgb(110, 110, 110)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 31.2
+  },
+  {
+   "idx": 37,
+   "page": 5,
+   "label": "div.fill",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 5543.1875,
+    "w": 856,
+    "h": 921.25
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 38,
+   "page": 5,
+   "label": "h2.heading \"Save this for the next carousel …\"",
+   "tag": "h2",
+   "rect": {
+    "x": 112,
+    "y": 6464.4375,
+    "w": 760,
+    "h": 110.375
+   },
+   "textRects": [
+    {
+     "x": 112,
+     "y": 6462.4375,
+     "w": 678.984375,
+     "h": 59
+    },
+    {
+     "x": 112,
+     "y": 6517.625,
+     "w": 109.921875,
+     "h": 59
+    }
+   ],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)",
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 55.2
+  },
+  {
+   "idx": 39,
+   "page": 5,
+   "label": "p.meta.ask \"Follow for more\"",
+   "tag": "p",
+   "rect": {
+    "x": 112,
+    "y": 6606.8125,
+    "w": 856,
+    "h": 31.1875
+   },
+   "textRects": [
+    {
+     "x": 152,
+     "y": 6607.8125,
+     "w": 157.875,
+     "h": 29
+    }
+   ],
+   "color": "rgb(110, 110, 110)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 31.2
+  },
+  {
+   "idx": 40,
+   "page": 5,
+   "label": "svg[data-icon=arrow-right]",
+   "tag": "svg",
+   "rect": {
+    "x": 112,
+    "y": 6610.40625,
+    "w": 24,
+    "h": 24
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": true,
+   "placed": false,
+   "clip": {
+    "label": "svg[data-icon=arrow-right]",
+    "rect": {
+     "x": 112,
+     "y": 6610.40625,
+     "w": 24,
+     "h": 24
+    }
+   },
+   "icon": "arrow-right",
+   "lineHeight": 31.2
+  }
+ ],
+ "faces": [
+  {
+   "family": "Inter Tight",
+   "weight": "400",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "400",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "400",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "400",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "400",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "400",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "400",
+   "style": "normal",
+   "status": "loaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "500",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "500",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "500",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "500",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "500",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "500",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "500",
+   "style": "normal",
+   "status": "loaded"
+  }
+ ],
+ "platformFonts": {
+  "2": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 15
+   }
+  ],
+  "3": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 5
+   }
+  ],
+  "5": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 39
+   }
+  ],
+  "8": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 15
+   }
+  ],
+  "9": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 5
+   }
+  ],
+  "11": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 33
+   }
+  ],
+  "12": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 91
+   }
+  ],
+  "15": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 15
+   }
+  ],
+  "16": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 5
+   }
+  ],
+  "18": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 18
+   }
+  ],
+  "19": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 81
+   }
+  ],
+  "22": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 15
+   }
+  ],
+  "23": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 5
+   }
+  ],
+  "25": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 18
+   }
+  ],
+  "27": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 29
+   }
+  ],
+  "28": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 2
+   }
+  ],
+  "29": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 27
+   }
+  ],
+  "30": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 2
+   }
+  ],
+  "31": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 34
+   }
+  ],
+  "32": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 2
+   }
+  ],
+  "35": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 15
+   }
+  ],
+  "36": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 5
+   }
+  ],
+  "38": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 41
+   }
+  ],
+  "39": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 15
+   }
+  ]
+ },
+ "refusedRequests": [],
+ "pdfPageCount": 5
+}

@@ -1,0 +1,242 @@
+{
+ "timedOut": false,
+ "pages": [
+  {
+   "index": 1,
+   "role": "title",
+   "rect": {
+    "x": 0,
+    "y": 0,
+    "w": 1080,
+    "h": 1350
+   }
+  },
+  {
+   "index": 2,
+   "role": "end",
+   "rect": {
+    "x": 0,
+    "y": 1350,
+    "w": 1080,
+    "h": 1350
+   }
+  }
+ ],
+ "elements": [
+  {
+   "idx": 0,
+   "page": 1,
+   "label": "div.leaf \"Three fixes for carousels people…\"",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 112,
+    "w": 856,
+    "h": 1126
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 1,
+   "page": 1,
+   "label": "h1.title.nudge \"Three fixes for carousels people…\"",
+   "tag": "h1",
+   "rect": {
+    "x": 64,
+    "y": 112,
+    "w": 856,
+    "h": 151.1875
+   },
+   "textRects": [
+    {
+     "x": 64,
+     "y": 106,
+     "w": 710.34375,
+     "h": 87
+    },
+    {
+     "x": 64,
+     "y": 181.59375,
+     "w": 384.84375,
+     "h": 87
+    }
+   ],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)",
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 75.6
+  },
+  {
+   "idx": 2,
+   "page": 2,
+   "label": "div.leaf \"Save this for the next one.\"",
+   "tag": "div",
+   "rect": {
+    "x": 112,
+    "y": 1462,
+    "w": 856,
+    "h": 1126
+   },
+   "textRects": [],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": null
+  },
+  {
+   "idx": 3,
+   "page": 2,
+   "label": "h1.title \"Save this for the next one.\"",
+   "tag": "h1",
+   "rect": {
+    "x": 112,
+    "y": 1462,
+    "w": 856,
+    "h": 75.59375
+   },
+   "textRects": [
+    {
+     "x": 112,
+     "y": 1456,
+     "w": 750.140625,
+     "h": 87
+    }
+   ],
+   "color": "rgb(10, 10, 10)",
+   "translucent": false,
+   "backgrounds": [
+    "rgb(255, 255, 255)"
+   ],
+   "paints": false,
+   "placed": false,
+   "clip": null,
+   "icon": null,
+   "lineHeight": 75.6
+  }
+ ],
+ "faces": [
+  {
+   "family": "Inter Tight",
+   "weight": "400",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "400",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "400",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "400",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "400",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "400",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "400",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "500",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "500",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "500",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "500",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "500",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "500",
+   "style": "normal",
+   "status": "unloaded"
+  },
+  {
+   "family": "Inter Tight",
+   "weight": "500",
+   "style": "normal",
+   "status": "loaded"
+  }
+ ],
+ "platformFonts": {
+  "1": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 39
+   }
+  ],
+  "3": [
+   {
+    "familyName": "Inter Tight",
+    "postScriptName": "InterTight-Regular",
+    "isCustomFont": true,
+    "glyphCount": 27
+   }
+  ]
+ },
+ "refusedRequests": [],
+ "pdfPageCount": 2
+}

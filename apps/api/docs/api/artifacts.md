@@ -90,7 +90,7 @@ Lists live artifacts as lightweight summaries, newest first, with 20 results per
 | Parameter | Type | Notes |
 |---|---|---|
 | `type` | `POST \| POLL \| DOCUMENT` | Optional type filter. |
-| `status` | `GENERATING \| READY \| FAILED` | Optional filter on the newest version's status. |
+| `status` | `GENERATING \| READY \| FAILED` | Optional filter on the artifact's derived `status` (see below). Applied before pagination. |
 | `month` | `YYYY-MM` | Optional `updatedAt` month filter. |
 | `search` | string | Optional case-insensitive literal substring match against `title` and the original `source.prompt`. Surrounding whitespace is ignored. |
 | `page` | positive integer | Optional one-based page; defaults to `1`. |
@@ -108,7 +108,13 @@ Search treats punctuation and regular-expression characters literally. It can be
       "id": "665f1a7f8f1e2c3d4a5b6c7d",
       "type": "DOCUMENT",
       "title": "Deployment safety",
-      "status": "READY",
+      "status": "GENERATING",
+      "currentVersion": 1,
+      "latestAttempt": {
+        "version": 2,
+        "status": "GENERATING",
+        "runId": "665f1a7f8f1e2c3d4a5b6c80"
+      },
       "updatedAt": "2026-07-14T10:20:30.000Z",
       "preview": {
         "commentary": "The safest deploy is the one you can undo…",
@@ -126,19 +132,41 @@ Search treats punctuation and regular-expression characters literally. It can be
 }
 ```
 
-`preview.commentary` is a short snippet. `preview.firstSlide` and `preview.pdfUrl` are only present for documents when available. `pdfUrl` is short-lived; do not persist it as the artifact's permanent identifier.
+`preview.commentary` is a short snippet. `preview.firstSlide` and `preview.pdfUrl` are only present for documents when available. `pdfUrl` is short-lived; do not persist it as the artifact's permanent identifier. The preview is built from the Current Version only, so it is `{}` while an artifact has none.
+
+### Current Version, latest Attempt, and status
+
+Every artifact read reports the Current Version and the latest Attempt separately:
+
+```ts
+currentVersion?: number;
+latestAttempt?: {
+  version: number;
+  status: 'GENERATING' | 'FAILED';
+  failureCode?: RunFailureCode; // FAILED only; the same codes as run.failed in runs.md
+  failureReason?: string;       // FAILED only
+  runId?: string;               // the run that generates (or generated) this Attempt
+};
+status: 'GENERATING' | 'READY' | 'FAILED'; // derived, on summaries
+```
+
+- `currentVersion` is the newest `READY` version, omitted until the first version becomes `READY`.
+- `latestAttempt` is present only when the newest version is not the Current Version: a refine in flight, a refine that failed, or a first version that has not become `READY`. Open `GET /runs/:runId/events` with its `runId` to follow an in-flight Attempt. `runId` is absent only in the instant between the Attempt being appended and its run being recorded.
+- A summary's `status` is derived: `GENERATING` if an Attempt is in flight, else `READY` if a Current Version exists, else `FAILED`. A failed refine therefore leaves the artifact `READY`, with the failure in `latestAttempt`. The `?status=` filter uses the same derivation.
 
 ## `GET /artifacts/:id`
 
-Returns a selected version in full. Without query parameters it returns the artifact's newest version: the Current Version, or a newer Attempt that is `GENERATING` or `FAILED`. A summary's `status` in `GET /artifacts` is the same newest version's status.
+Returns a selected version in full. Without `?version=` it returns the Current Version, or the latest Attempt (with `content: {}`) when there is no Current Version. An Attempt never replaces the Current Version in this read: while a refine is in flight or after one failed, the response is still the Current Version, and the Attempt is reported in `latestAttempt`.
 
-`currentVersion` is the newest `READY` version. It is omitted until the first version becomes `READY`. A version that is not `READY` has `content: {}`.
+`currentVersion` and `latestAttempt` have the same meaning as in [`GET /artifacts`](#current-version-latest-attempt-and-status). Here `version` and `status` describe the returned version itself, not the artifact; the artifact's derived status is `GENERATING` when `latestAttempt.status` is `GENERATING`, else `READY` when `currentVersion` is present, else `FAILED`.
+
+A version that is not `READY`, including one read with `?version=`, has `content: {}`. A `FAILED` version also carries `failureCode` and `failureReason`.
 
 ### Query parameters
 
 | Parameter | Type | Notes |
 |---|---|---|
-| `version` | positive integer | Return this version instead of the newest one. |
+| `version` | positive integer | Return this version instead of the Current Version. |
 | `includeVersions` | `true \| false` | When true, add version metadata; history does not repeat full content. |
 
 ### Response: `200 OK`
@@ -152,6 +180,13 @@ Returns a selected version in full. Without query parameters it returns the arti
     "type": "POST",
     "title": "Deployment safety",
     "currentVersion": 1,
+    "latestAttempt": {
+      "version": 2,
+      "status": "FAILED",
+      "failureCode": "internal",
+      "failureReason": "The model did not return a usable post.",
+      "runId": "665f1a7f8f1e2c3d4a5b6c80"
+    },
     "version": 1,
     "status": "READY",
     "updatedAt": "2026-07-14T10:20:30.000Z",
@@ -161,15 +196,24 @@ Returns a selected version in full. Without query parameters it returns the arti
         "version": 1,
         "status": "READY",
         "createdAt": "2026-07-14T10:15:00.000Z",
-        "editedAt": "2026-07-14T10:20:30.000Z",
-        "refineFeedback": "Make the opening sharper."
+        "editedAt": "2026-07-14T10:20:30.000Z"
+      },
+      {
+        "version": 2,
+        "status": "FAILED",
+        "createdAt": "2026-07-14T10:22:00.000Z",
+        "refineFeedback": "Make the opening sharper.",
+        "failureCode": "internal",
+        "failureReason": "The model did not return a usable post."
       }
     ]
   }
 }
 ```
 
-`versions` is omitted unless `includeVersions=true`. `editedAt` and `refineFeedback` are omitted when absent.
+A read of a failed version, `GET /artifacts/:id?version=2` above, returns `"version": 2`, `"status": "FAILED"`, the same `failureCode` and `failureReason`, and `"content": {}`.
+
+`versions` is omitted unless `includeVersions=true`. `editedAt`, `refineFeedback`, `failureCode`, and `failureReason` are omitted when absent; the failure fields appear only on `FAILED` versions.
 
 For documents, client-facing content uses a signed `document.pdfUrl`. The stored `pdfKey` is internal and is not the browser URL.
 
@@ -263,7 +307,7 @@ Soft-deletes an artifact. It disappears from list results and cannot be refined,
 
 1. Submit `POST /artifacts` or `POST /artifacts/:id/refine`.
 2. Store the returned `artifactId`, `runId`, and refine `version` if present.
-3. Connect to `GET /runs/:runId/events`.
+3. Connect to `GET /runs/:runId/events`. After a reload, `latestAttempt.runId` from `GET /artifacts/:id` finds an in-flight run again.
 4. On `run.completed`, refetch `GET /artifacts/:id?version=<version>`.
-5. Allow manual edits only when the returned version is `READY`.
+5. Allow manual edits only to the Current Version, and only while no Attempt is `GENERATING`.
 6. Bind the artifact version to LinkedIn with `POST /posts`.
