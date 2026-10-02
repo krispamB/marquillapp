@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Manrope:wght@400;600&display=swap">
 <style>
 :root {
   --ds-night: #0d0b1f;
@@ -13,19 +12,12 @@
   --ds-tangerine: #ff8a4c;
 }
 html, body { margin: 0; padding: 0; }
-.page {
-  width: 1080px;
-  height: 1350px;
-  padding: 88px;
-  box-sizing: border-box;
-  background: var(--ds-night);
+.leaf {
+  height: 100%;
   color: var(--ds-moon);
   font-family: 'Manrope', -apple-system, 'Segoe UI', sans-serif;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  position: relative;
-  isolation: isolate;
 }
 .glow { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.7; z-index: -1; }
 .glow--violet { background: var(--ds-violet); }
@@ -64,60 +56,70 @@ html, body { margin: 0; padding: 0; }
 .rows svg { color: var(--ds-tangerine); flex: none; }
 
 /* closing */
-.closing { background: linear-gradient(145deg, var(--ds-violet), var(--ds-rose) 55%, var(--ds-tangerine)); }
+.closing::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(145deg, var(--ds-violet), var(--ds-rose) 55%, var(--ds-tangerine)); }
 .closing > .label { color: var(--ds-moon); }
 .card { background: var(--ds-night); border-radius: 40px; padding: 64px; display: flex; flex-direction: column; gap: 48px; }
 .button { align-self: flex-start; display: flex; gap: 16px; align-items: center; background: var(--ds-tangerine); color: var(--ds-night); border-radius: 88px; padding: 24px 40px; }
 </style>
 </head>
 <body>
-<section class="page cover" data-role="cover">
-  <div class="glow glow--violet"></div>
-  <div class="glow glow--tangerine"></div>
-  <div class="glass pill"><svg data-icon="plus" data-size="24" width="24" height="24" aria-hidden="true"></svg><p class="label">Carousel teardown</p></div>
-  <div class="fill"></div>
-  <h1 class="sora display">Win the <span class="fire">first swipe.</span></h1>
-  <p class="lead">Three fixes for carousels people actually finish.</p>
-</section>
-
-<section class="page insight" data-role="insight">
-  <div class="glow glow--rose"></div>
-  <p class="label">Fix one</p>
-  <div class="fill"></div>
-  <h2 class="sora heading">Promise one outcome on the cover.</h2>
-  <div class="glass">
-    <p class="body">A cover that lists everything promises nothing.</p>
-    <p class="body">Name the single result a reader leaves with, and every page after it has a job to do.</p>
+<section class="page" data-role="cover">
+  <div class="leaf cover">
+    <div class="glow glow--violet"></div>
+    <div class="glow glow--tangerine"></div>
+    <div class="glass pill"><svg data-icon="plus" data-size="24"></svg><p class="label">Carousel teardown</p></div>
+    <div class="fill"></div>
+    <h1 class="sora display">Win the <span class="fire">first swipe.</span></h1>
+    <p class="lead">Three fixes for carousels people actually finish.</p>
   </div>
 </section>
 
-<section class="page stat-page" data-role="stat">
-  <div class="glow glow--violet"></div>
-  <p class="label">Fix two</p>
-  <div class="fill"></div>
-  <p class="sora stat fire">1 idea</p>
-  <h2 class="sora heading">per page. That is the whole rule.</h2>
-  <p class="lead">If a page needs two headings, it is two pages.</p>
-</section>
-
-<section class="page steps" data-role="steps">
-  <div class="glow glow--violet"></div>
-  <p class="label">Before you publish</p>
-  <div class="fill"></div>
-  <h2 class="sora heading">The 30-second check</h2>
-  <div class="rows">
-    <div class="glass"><svg data-icon="check" data-size="32" width="32" height="32" aria-hidden="true"></svg><p class="body">The cover names one outcome</p></div>
-    <div class="glass"><svg data-icon="check" data-size="32" width="32" height="32" aria-hidden="true"></svg><p class="body">Every page carries one idea</p></div>
-    <div class="glass"><svg data-icon="circle-dot" data-size="32" width="32" height="32" aria-hidden="true"></svg><p class="body">The last page asks for one thing</p></div>
+<section class="page" data-role="insight">
+  <div class="leaf insight">
+    <div class="glow glow--rose"></div>
+    <p class="label">Fix one</p>
+    <div class="fill"></div>
+    <h2 class="sora heading">Promise one outcome on the cover.</h2>
+    <div class="glass">
+      <p class="body">A cover that lists everything promises nothing.</p>
+      <p class="body">Name the single result a reader leaves with, and every page after it has a job to do.</p>
+    </div>
   </div>
 </section>
 
-<section class="page closing" data-role="closing">
-  <p class="label">Fix three</p>
-  <div class="fill"></div>
-  <div class="card">
-    <h2 class="sora heading">End on one ask. Make it an easy yes.</h2>
-    <div class="button"><p class="label">Save this post</p><svg data-icon="arrow-right" data-size="32" width="32" height="32" aria-hidden="true"></svg></div>
+<section class="page" data-role="stat">
+  <div class="leaf stat-page">
+    <div class="glow glow--violet"></div>
+    <p class="label">Fix two</p>
+    <div class="fill"></div>
+    <p class="sora stat fire">1 idea</p>
+    <h2 class="sora heading">per page. That is the whole rule.</h2>
+    <p class="lead">If a page needs two headings, it is two pages.</p>
+  </div>
+</section>
+
+<section class="page" data-role="steps">
+  <div class="leaf steps">
+    <div class="glow glow--violet"></div>
+    <p class="label">Before you publish</p>
+    <div class="fill"></div>
+    <h2 class="sora heading">The 30-second check</h2>
+    <div class="rows">
+      <div class="glass"><svg data-icon="check" data-size="32"></svg><p class="body">The cover names one outcome</p></div>
+      <div class="glass"><svg data-icon="check" data-size="32"></svg><p class="body">Every page carries one idea</p></div>
+      <div class="glass"><svg data-icon="circle-dot" data-size="32"></svg><p class="body">The last page asks for one thing</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="page" data-role="closing">
+  <div class="leaf closing">
+    <p class="label">Fix three</p>
+    <div class="fill"></div>
+    <div class="card">
+      <h2 class="sora heading">End on one ask. Make it an easy yes.</h2>
+      <div class="button"><p class="label">Save this post</p><svg data-icon="arrow-right" data-size="32"></svg></div>
+    </div>
   </div>
 </section>
 </body>

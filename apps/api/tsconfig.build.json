@@ -5,7 +5,6 @@
     "test",
     "dist",
     "**/*spec.ts",
-    "src/carousel/prototype-design-system",
     "src/carousel/prototype-render-validation",
     "src/carousel/prototype-design-systems"
   ],

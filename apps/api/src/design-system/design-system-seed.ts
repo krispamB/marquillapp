@@ -142,10 +142,13 @@ export function seedChecks(
   return errors;
 }
 
-const previewImages = (dir: string): string[] => {
+/** A seed directory's preview image file names, in page order. */
+export const previewImages = (dir: string): string[] => {
   const previews = join(dir, PREVIEWS_DIR);
   return existsSync(previews)
-    ? readdirSync(previews).filter((name) => PREVIEW_FILE.test(name))
+    ? readdirSync(previews)
+        .filter((name) => PREVIEW_FILE.test(name))
+        .sort()
     : [];
 };
 

@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;600;800&display=swap">
 <style>
 :root {
   --ds-newsprint: #f2ede3;
@@ -12,18 +11,12 @@
   --ds-signal: #c8281a;
 }
 html, body { margin: 0; padding: 0; }
-.page {
-  width: 1080px;
-  height: 1350px;
-  padding: 80px;
-  box-sizing: border-box;
-  background: var(--ds-newsprint);
+.leaf {
+  height: 100%;
   color: var(--ds-ink);
   font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  position: relative;
 }
 .bar { height: 16px; background: var(--ds-signal); }
 .poster { font-family: 'Anton', Impact, 'Arial Narrow', sans-serif; font-weight: 400; text-transform: uppercase; margin: 0; }
@@ -58,73 +51,84 @@ html, body { margin: 0; padding: 0; }
 .panel--after .poster { color: var(--ds-cobalt); }
 
 /* closing */
-.page--cobalt { background: var(--ds-cobalt); color: var(--ds-newsprint); }
-.page--cobalt .bar { margin: 48px 0 0; }
+.leaf--cobalt { color: var(--ds-newsprint); }
+.leaf--cobalt::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--ds-cobalt); }
+.leaf--cobalt .bar { margin: 48px 0 0; }
 .foot { margin: 32px 0 0; }
 </style>
 </head>
 <body>
 <section class="page" data-role="cover">
-  <div class="bar"></div>
-  <div class="cover-grid">
-    <div class="slab"></div>
-    <h1 class="poster display">The<br>first<br>swipe</h1>
-  </div>
-  <div class="bar"></div>
-  <div class="cover-foot">
-    <p class="poster deck">Three fixes for carousels people finish</p>
-    <p class="lead">Most readers decide on page one. Here is how to win them there.</p>
+  <div class="leaf">
+    <div class="bar"></div>
+    <div class="cover-grid">
+      <div class="slab"></div>
+      <h1 class="poster display">The<br>first<br>swipe</h1>
+    </div>
+    <div class="bar"></div>
+    <div class="cover-foot">
+      <p class="poster deck">Three fixes for carousels people finish</p>
+      <p class="lead">Most readers decide on page one. Here is how to win them there.</p>
+    </div>
   </div>
 </section>
 
 <section class="page" data-role="rule">
-  <div class="index"><p class="label">Fix 01</p><p class="label">The first swipe</p></div>
-  <div class="rule-head">
-    <p class="poster numeral">1</p>
-    <h2 class="poster headline">Promise one outcome on the cover</h2>
+  <div class="leaf">
+    <div class="index"><p class="label">Fix 01</p><p class="label">The first swipe</p></div>
+    <div class="rule-head">
+      <p class="poster numeral">1</p>
+      <h2 class="poster headline">Promise one outcome on the cover</h2>
+    </div>
+    <div class="fill"></div>
+    <div class="hair"></div>
+    <p class="body">A cover that lists everything promises nothing. Name the single result a reader walks away with, and every page after it has a job.</p>
   </div>
-  <div class="fill"></div>
-  <div class="hair"></div>
-  <p class="body">A cover that lists everything promises nothing. Name the single result a reader walks away with, and every page after it has a job.</p>
 </section>
 
 <section class="page" data-role="rule">
-  <div class="index"><p class="label">Fix 02</p><p class="label">The first swipe</p></div>
-  <div class="rule-head">
-    <p class="poster numeral">2</p>
-    <h2 class="poster headline">One idea per page. No exceptions.</h2>
+  <div class="leaf">
+    <div class="index"><p class="label">Fix 02</p><p class="label">The first swipe</p></div>
+    <div class="rule-head">
+      <p class="poster numeral">2</p>
+      <h2 class="poster headline">One idea per page. No exceptions.</h2>
+    </div>
+    <div class="fill"></div>
+    <div class="hair"></div>
+    <p class="body">If a page needs two headlines, it is two pages. The swipe is free; the reader's patience is not.</p>
   </div>
-  <div class="fill"></div>
-  <div class="hair"></div>
-  <p class="body">If a page needs two headlines, it is two pages. The swipe is free; the reader's patience is not.</p>
 </section>
 
 <section class="page" data-role="compare">
-  <div class="index"><p class="label">Fix 03</p><p class="label">The first swipe</p></div>
-  <h2 class="poster headline">End on one ask</h2>
-  <div class="panels">
-    <div class="panel">
-      <p class="label tab">Before</p>
-      <p class="poster deck">Like, share, follow, comment, save</p>
-      <div class="fill"></div>
-      <p class="body">Five asks. Zero taken.</p>
-    </div>
-    <svg data-icon="arrow-right" data-size="64" width="64" height="64" aria-hidden="true"></svg>
-    <div class="panel panel--after">
-      <p class="label tab">After</p>
-      <p class="poster deck">Save this for your next post</p>
-      <div class="fill"></div>
-      <p class="body">One ask. Easy yes.</p>
+  <div class="leaf">
+    <div class="index"><p class="label">Fix 03</p><p class="label">The first swipe</p></div>
+    <h2 class="poster headline">End on one ask</h2>
+    <div class="panels">
+      <div class="panel">
+        <p class="label tab">Before</p>
+        <p class="poster deck">Like, share, follow, comment, save</p>
+        <div class="fill"></div>
+        <p class="body">Five asks. Zero taken.</p>
+      </div>
+      <svg data-icon="arrow-right" data-size="64"></svg>
+      <div class="panel panel--after">
+        <p class="label tab">After</p>
+        <p class="poster deck">Save this for your next post</p>
+        <div class="fill"></div>
+        <p class="body">One ask. Easy yes.</p>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="page page--cobalt" data-role="closing">
-  <p class="label">The first swipe</p>
-  <div class="fill"></div>
-  <h2 class="poster headline">Make page one earn page two.</h2>
-  <p class="label foot">Follow for the next teardown</p>
-  <div class="bar"></div>
+<section class="page" data-role="closing">
+  <div class="leaf leaf--cobalt">
+    <p class="label">The first swipe</p>
+    <div class="fill"></div>
+    <h2 class="poster headline">Make page one earn page two.</h2>
+    <p class="label foot">Follow for the next teardown</p>
+    <div class="bar"></div>
+  </div>
 </section>
 </body>
 </html>

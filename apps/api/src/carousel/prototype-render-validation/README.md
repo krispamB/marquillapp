@@ -5,8 +5,9 @@ a candidate Document Source so it can prove page count and geometry, font
 readiness, overflow safety and PDF page count, then return useful bounded
 repair diagnostics without executing untrusted content?*
 
-Builds on #134's prototype (`../prototype-design-system`, whose `contract.ts`
-and `editorial-serif.ds.yaml` it imports) and #136's settled contract. Not wired
+Builds on #134's prototype (now promoted to `src/design-system`, whose
+Definition contract it imports; `samples/editorial-serif.ds.yaml` is the
+definition it renders) and #136's settled contract. Not wired
 into the app; excluded from `tsconfig.build.json` because it is Bun-only.
 
 ```

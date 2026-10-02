@@ -1,9 +1,9 @@
 /** PROTOTYPE tests (issue #137) for the pure helpers around the render pass. */
 import { beforeAll, describe, expect, test } from 'bun:test';
 import {
-  parseDesignSystem,
-  type DesignSystem,
-} from '../prototype-design-system/contract';
+  parseDesignSystemDefinition,
+  type DesignSystemDefinition as DesignSystem,
+} from '../../design-system/design-system-definition';
 import { assemble, fontHref, frameCss, IconInliningError } from './assemble';
 import { boundForModel, remedyOf } from './diagnostics';
 import { countPdfPages } from './pdf';
@@ -11,13 +11,13 @@ import type { Violation } from './types';
 
 let ds: DesignSystem;
 beforeAll(async () => {
-  const parsed = parseDesignSystem(
+  const parsed = parseDesignSystemDefinition(
     await Bun.file(
-      `${import.meta.dir}/../prototype-design-system/editorial-serif.ds.yaml`,
+      `${import.meta.dir}/samples/editorial-serif.ds.yaml`,
     ).text(),
   );
-  if (!parsed.success) throw parsed.error;
-  ds = parsed.data;
+  if (!parsed.success) throw new Error(parsed.errors.join('\n'));
+  ds = parsed.definition;
 });
 
 describe('countPdfPages', () => {

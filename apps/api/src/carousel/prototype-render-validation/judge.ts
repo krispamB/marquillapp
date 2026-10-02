@@ -5,7 +5,7 @@
  * that key's path (`page.safeArea`, `palette.pairings`, `icons.colors`), and a
  * finding about the render itself is `render.*`.
  */
-import type { DesignSystem } from '../prototype-design-system/contract';
+import type { DesignSystemDefinition as DesignSystem } from '../../design-system/design-system-definition';
 import type { ProbeElement, Rect, RenderFacts, Violation } from './types';
 
 /**

@@ -8,6 +8,7 @@ The API is versioned under `/api/v1`:
 | ----------------------------------- | ------------------------------ |
 | Artifact library and generation     | [artifacts.md](./artifacts.md) |
 | Generation progress over SSE        | [runs.md](./runs.md)           |
+| Design Systems and their previews   | [design-systems.md](./design-systems.md) |
 | Binding artifacts to LinkedIn posts | [posts.md](./posts.md)         |
 | LinkedIn connected accounts         | [linkedin.md](./linkedin.md)   |
 | Paddle checkout and billing         | [payment.md](./payment.md)     |

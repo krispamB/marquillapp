@@ -7,7 +7,7 @@
  * passed the static checker, which is why string insertion is tolerable here;
  * production would serialise through parse5 like the checker parses.
  */
-import type { DesignSystem } from '../prototype-design-system/contract';
+import type { DesignSystemDefinition as DesignSystem } from '../../design-system/design-system-definition';
 import { DESIGN_SYSTEM_FONT_ALLOWLIST } from './font-allowlist';
 import { ICON_CATALOG } from './icons';
 

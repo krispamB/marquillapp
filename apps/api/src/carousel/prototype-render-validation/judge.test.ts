@@ -4,20 +4,20 @@
  */
 import { beforeAll, describe, expect, test } from 'bun:test';
 import {
-  parseDesignSystem,
-  type DesignSystem,
-} from '../prototype-design-system/contract';
+  parseDesignSystemDefinition,
+  type DesignSystemDefinition as DesignSystem,
+} from '../../design-system/design-system-definition';
 import { judge } from './judge';
 import type { ProbeElement, RenderFacts } from './types';
 
 let ds: DesignSystem;
 beforeAll(async () => {
   const text = await Bun.file(
-    `${import.meta.dir}/../prototype-design-system/editorial-serif.ds.yaml`,
+    `${import.meta.dir}/samples/editorial-serif.ds.yaml`,
   ).text();
-  const parsed = parseDesignSystem(text);
-  if (!parsed.success) throw parsed.error;
-  ds = parsed.data;
+  const parsed = parseDesignSystemDefinition(text);
+  if (!parsed.success) throw new Error(parsed.errors.join('\n'));
+  ds = parsed.definition;
 });
 
 // editorial-serif: 1080x1350, safe area 96 all round, paper #faf7f2, ink #14110f,

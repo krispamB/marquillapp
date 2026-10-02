@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
 :root {
   --ds-blueprint: #123f7a;
@@ -12,23 +11,23 @@
   --ds-amber: #ffc857;
 }
 html, body { margin: 0; padding: 0; }
-.page {
-  width: 1080px;
-  height: 1350px;
-  padding: 72px;
-  box-sizing: border-box;
-  background-color: var(--ds-blueprint);
+.leaf {
+  height: 100%;
+  color: var(--ds-chalk);
+  font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
+  display: flex;
+  flex-direction: column;
+}
+.leaf::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   background-image:
     linear-gradient(var(--ds-grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--ds-grid) 1px, transparent 1px);
   background-size: 24px 24px;
   background-position: -1px -1px;
-  color: var(--ds-chalk);
-  font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: relative;
 }
 .sheet { position: absolute; top: 24px; right: 24px; bottom: 24px; left: 24px; border: 2px solid var(--ds-pale); pointer-events: none; }
 .grot { font-family: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif; margin: 0; }
@@ -77,73 +76,83 @@ html, body { margin: 0; padding: 0; }
 </head>
 <body>
 <section class="page" data-role="cover">
-  <div class="sheet"></div>
-  <p class="label amber">Fig. 00 / General arrangement</p>
-  <div class="fill"></div>
-  <h1 class="grot display">The first swipe: a carousel spec</h1>
-  <div class="dim"><p class="label pale">5 sheets</p></div>
-  <p class="body pale">Three fixes for carousels people finish, drawn to scale.</p>
-  <div class="fill"></div>
-  <div class="titleblock">
-    <div class="wide"><p class="label pale">Project</p><p class="body">Carousel teardown</p></div>
-    <div><p class="label pale">Sheet</p><p class="body">01 of 05</p></div>
-    <div><p class="label pale">Rev</p><p class="body">A</p></div>
+  <div class="leaf">
+    <div class="sheet"></div>
+    <p class="label amber">Fig. 00 / General arrangement</p>
+    <div class="fill"></div>
+    <h1 class="grot display">The first swipe: a carousel spec</h1>
+    <div class="dim"><p class="label pale">5 sheets</p></div>
+    <p class="body pale">Three fixes for carousels people finish, drawn to scale.</p>
+    <div class="fill"></div>
+    <div class="titleblock">
+      <div class="wide"><p class="label pale">Project</p><p class="body">Carousel teardown</p></div>
+      <div><p class="label pale">Sheet</p><p class="body">01 of 05</p></div>
+      <div><p class="label pale">Rev</p><p class="body">A</p></div>
+    </div>
   </div>
 </section>
 
 <section class="page" data-role="figure">
-  <div class="sheet"></div>
-  <p class="label amber">Fig. 01</p>
-  <h2 class="grot heading">How a reader moves through a carousel</h2>
-  <div class="diagram">
-    <div class="box"><span class="callout label">1</span><p class="grot node">Cover promises one outcome</p></div>
-    <div class="link"><svg data-icon="arrow-right" data-size="32" width="32" height="32" aria-hidden="true"></svg></div>
-    <div class="box box--key"><span class="callout label">2</span><p class="grot node">Each page delivers one idea</p></div>
-    <div class="link"><svg data-icon="arrow-right" data-size="32" width="32" height="32" aria-hidden="true"></svg></div>
-    <div class="box"><span class="callout label">3</span><p class="grot node">Last page asks for one action</p></div>
+  <div class="leaf">
+    <div class="sheet"></div>
+    <p class="label amber">Fig. 01</p>
+    <h2 class="grot heading">How a reader moves through a carousel</h2>
+    <div class="diagram">
+      <div class="box"><span class="callout label">1</span><p class="grot node">Cover promises one outcome</p></div>
+      <div class="link"><svg data-icon="arrow-right" data-size="32"></svg></div>
+      <div class="box box--key"><span class="callout label">2</span><p class="grot node">Each page delivers one idea</p></div>
+      <div class="link"><svg data-icon="arrow-right" data-size="32"></svg></div>
+      <div class="box"><span class="callout label">3</span><p class="grot node">Last page asks for one action</p></div>
+    </div>
+    <div class="fill"></div>
+    <p class="body pale caption">Fig. 01: Any step that carries two items breaks the chain.</p>
   </div>
-  <div class="fill"></div>
-  <p class="body pale caption">Fig. 01: Any step that carries two items breaks the chain.</p>
 </section>
 
 <section class="page" data-role="spec">
-  <div class="sheet"></div>
-  <p class="label amber">Fig. 02 / Page spec</p>
-  <h2 class="grot heading">Tolerances for a single page</h2>
-  <div class="table">
-    <div class="row"><p class="label">Ideas</p><p class="body">Exactly 1</p></div>
-    <div class="row"><p class="label">Headings</p><p class="body">1, set large</p></div>
-    <div class="row"><p class="label">Body text</p><p class="body">2 sentences max</p></div>
-    <div class="row"><p class="label">Asks</p><p class="body">0, except the last page</p></div>
-    <div class="row"><p class="label">Read time</p><p class="body">Under 5 seconds</p></div>
+  <div class="leaf">
+    <div class="sheet"></div>
+    <p class="label amber">Fig. 02 / Page spec</p>
+    <h2 class="grot heading">Tolerances for a single page</h2>
+    <div class="table">
+      <div class="row"><p class="label">Ideas</p><p class="body">Exactly 1</p></div>
+      <div class="row"><p class="label">Headings</p><p class="body">1, set large</p></div>
+      <div class="row"><p class="label">Body text</p><p class="body">2 sentences max</p></div>
+      <div class="row"><p class="label">Asks</p><p class="body">0, except the last page</p></div>
+      <div class="row"><p class="label">Read time</p><p class="body">Under 5 seconds</p></div>
+    </div>
   </div>
 </section>
 
 <section class="page" data-role="note">
-  <div class="sheet"></div>
-  <p class="label amber">Fig. 03</p>
-  <h2 class="grot heading">Where most carousels fail inspection</h2>
-  <div class="fill"></div>
-  <div class="notebox">
-    <p class="label amber">Note</p>
-    <p class="body">A cover that lists everything promises nothing.</p>
-    <p class="body pale">Name the single outcome. Every sheet after it then has a job.</p>
+  <div class="leaf">
+    <div class="sheet"></div>
+    <p class="label amber">Fig. 03</p>
+    <h2 class="grot heading">Where most carousels fail inspection</h2>
+    <div class="fill"></div>
+    <div class="notebox">
+      <p class="label amber">Note</p>
+      <p class="body">A cover that lists everything promises nothing.</p>
+      <p class="body pale">Name the single outcome. Every sheet after it then has a job.</p>
+    </div>
   </div>
 </section>
 
 <section class="page" data-role="closing">
-  <div class="sheet"></div>
-  <p class="label amber">Fig. 04 / Sign-off</p>
-  <div class="fill"></div>
-  <div class="askbox">
-    <h2 class="grot heading">Save this spec for your next carousel.</h2>
-    <p class="label stamp"><svg data-icon="check" data-size="24" width="24" height="24" aria-hidden="true"></svg>Approved to publish</p>
-  </div>
-  <div class="fill"></div>
-  <div class="titleblock">
-    <div class="wide"><p class="label pale">Project</p><p class="body">Carousel teardown</p></div>
-    <div><p class="label pale">Sheet</p><p class="body">05 of 05</p></div>
-    <div><p class="label pale">Rev</p><p class="body">A</p></div>
+  <div class="leaf">
+    <div class="sheet"></div>
+    <p class="label amber">Fig. 04 / Sign-off</p>
+    <div class="fill"></div>
+    <div class="askbox">
+      <h2 class="grot heading">Save this spec for your next carousel.</h2>
+      <p class="label stamp"><svg data-icon="check" data-size="24"></svg>Approved to publish</p>
+    </div>
+    <div class="fill"></div>
+    <div class="titleblock">
+      <div class="wide"><p class="label pale">Project</p><p class="body">Carousel teardown</p></div>
+      <div><p class="label pale">Sheet</p><p class="body">05 of 05</p></div>
+      <div><p class="label pale">Rev</p><p class="body">A</p></div>
+    </div>
   </div>
 </section>
 </body>
