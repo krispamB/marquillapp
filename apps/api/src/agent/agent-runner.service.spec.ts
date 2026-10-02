@@ -718,6 +718,44 @@ describe('AgentRunnerService', () => {
       ).rejects.toBeInstanceOf(ContentValidationError);
       expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
     });
+
+    it('should throw DocumentTruncatedError before parsing, without a repair turn, when the Repair hit the cap', async () => {
+      mocks.llmService.complete.mockResolvedValue({
+        ...completion('{"commentary": "Swipe', 0.05),
+        finishReason: 'length',
+      });
+      const onUsage = jest.fn();
+
+      await expect(
+        service.repairDocument(repairInput, { onUsage }),
+      ).rejects.toBeInstanceOf(DocumentTruncatedError);
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+      expect(onUsage).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw DocumentTruncatedError when the Repair hit the cap with no text at all', async () => {
+      mocks.llmService.complete.mockResolvedValue({
+        ...completion(''),
+        finishReason: 'length',
+      });
+
+      await expect(service.repairDocument(repairInput)).rejects.toThrow(
+        'The DOCUMENT Repair hit the output token cap',
+      );
+    });
+
+    it("should throw DocumentTruncatedError when the Repair's Zod repair turn hit the cap", async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(completion(repairJson({ html: '' })))
+        .mockResolvedValueOnce({
+          ...completion('{"commentary"'),
+          finishReason: 'length',
+        });
+
+      await expect(service.repairDocument(repairInput)).rejects.toBeInstanceOf(
+        DocumentTruncatedError,
+      );
+    });
   });
 
   describe('the tool loop (run)', () => {
