@@ -4,6 +4,7 @@ import { ScheduleQueue } from './schedule.queue';
 import { LinkedinAvatarRefreshQueue } from './linkedin-avatar-refresh.queue';
 import { EmailQueue } from './email.queue';
 import { MediaUploadQueue } from './media-upload.queue';
+import { InflightRunLimiter } from './inflight-run-limiter';
 
 // Queue producers only. Run persistence lives in `WorkflowRunModule`: this
 // module is imported broadly (the Clerk auth graph pulls it in for EmailQueue),
@@ -15,6 +16,7 @@ import { MediaUploadQueue } from './media-upload.queue';
     LinkedinAvatarRefreshQueue,
     EmailQueue,
     MediaUploadQueue,
+    InflightRunLimiter,
   ],
   exports: [
     WorkflowQueue,
@@ -22,6 +24,7 @@ import { MediaUploadQueue } from './media-upload.queue';
     LinkedinAvatarRefreshQueue,
     EmailQueue,
     MediaUploadQueue,
+    InflightRunLimiter,
   ],
 })
 export class WorkflowModule {}

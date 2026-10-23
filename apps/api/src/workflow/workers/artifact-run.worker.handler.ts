@@ -33,6 +33,7 @@ import type {
   RunRecordHandle,
   StepContext,
 } from '../engine/workflow.types';
+import type { InflightRunLimiter } from '../inflight-run-limiter';
 import { artifactStepHandlers } from '../steps';
 import { STALLED_FAILURE_REASON } from './stalled-failure';
 
@@ -50,6 +51,8 @@ export interface ArtifactRunDeps {
   creditMeter: CreditMeterService;
   featureGating: FeatureGatingService;
   runs: RunRecordStore;
+  /** The per-user in-flight cap; a no-op while it is off. */
+  inflight: Pick<InflightRunLimiter, 'refresh' | 'release'>;
   redis: RunEventRedis;
   logger: Logger;
 }
@@ -100,6 +103,9 @@ export class ArtifactRunProcessor {
     const runId = this.runIdOf(job);
     const { logger, redis, creditMeter, runs } = this.deps;
     const run = runs.handleFor(runId);
+
+    // The run is still going: push its in-flight lease out for this attempt.
+    await this.deps.inflight.refresh(job.data.userId, runId);
 
     // One entitlement per job attempt: the research check, the balance check
     // and the debit all reuse it, so gating costs a subscription read and a
@@ -167,6 +173,8 @@ export class ArtifactRunProcessor {
       emitter,
       handlers: artifactStepHandlers,
     });
+
+    await this.deps.inflight.release(job.data.userId, runId);
 
     // Only on success: a failure hands the job attempt, and its emitter's
     // `seq`, to `onFailed`.
@@ -265,20 +273,27 @@ export class ArtifactRunProcessor {
         ? describeError(error)
         : TEMPORARY_FAILURE_REASON);
 
-    const storedCode = await handleTerminalFailure(
-      {
-        artifacts: this.deps.artifacts,
-        run: jobAttempt?.run ?? this.deps.runs.handleFor(runId),
-        emitter,
-        logger,
-      },
-      {
-        artifactId: job.data.artifactId,
-        version: job.data.version,
-        failureCode,
-        failureReason,
-      },
-    );
+    let storedCode: Awaited<ReturnType<typeof handleTerminalFailure>>;
+    try {
+      storedCode = await handleTerminalFailure(
+        {
+          artifacts: this.deps.artifacts,
+          run: jobAttempt?.run ?? this.deps.runs.handleFor(runId),
+          emitter,
+          logger,
+        },
+        {
+          artifactId: job.data.artifactId,
+          version: job.data.version,
+          failureCode,
+          failureReason,
+        },
+      );
+    } finally {
+      // Every terminal report, a stalled job's included, ends here; releasing
+      // twice for one run is harmless.
+      await this.deps.inflight.release(job.data.userId, runId);
+    }
 
     // The run had already ended, and been described, through another report.
     if (storedCode === null) return;

@@ -121,6 +121,10 @@ const makeProcessor = () => {
     recordModelCall: jest.fn(),
   };
   const runs = { handleFor: jest.fn().mockReturnValue(runHandle) };
+  const inflight = {
+    refresh: jest.fn().mockResolvedValue(undefined),
+    release: jest.fn().mockResolvedValue(undefined),
+  };
   const creditMeter = {
     assertBalance: jest.fn().mockResolvedValue(undefined),
     toCredits: jest.fn().mockReturnValue(20),
@@ -140,6 +144,7 @@ const makeProcessor = () => {
     creditMeter: creditMeter as any,
     featureGating: featureGating as any,
     runs: runs as any,
+    inflight,
     redis: redis as any,
     logger,
   });
@@ -153,6 +158,7 @@ const makeProcessor = () => {
       artifacts,
       runs,
       runHandle,
+      inflight,
       creditMeter,
       featureGating,
     },
@@ -350,6 +356,26 @@ describe('ArtifactRunProcessor', () => {
       );
       expect(mocks.runHandle.complete).toHaveBeenCalledTimes(1);
       expect(mocks.artifacts.failVersion).not.toHaveBeenCalled();
+    });
+
+    it("should refresh the run's in-flight lease at the start of each attempt", async () => {
+      await processor.process(makeJob());
+
+      expect(mocks.inflight.refresh).toHaveBeenCalledWith('user-1', 'run-1');
+    });
+
+    it('should release the in-flight slot when the run succeeds', async () => {
+      await processor.process(makeJob());
+
+      expect(mocks.inflight.release).toHaveBeenCalledWith('user-1', 'run-1');
+    });
+
+    it('should keep the in-flight slot when an attempt fails and will be retried', async () => {
+      mocks.agent.generate.mockRejectedValue(new Error('transient'));
+
+      await expect(processor.process(makeJob())).rejects.toThrow('transient');
+
+      expect(mocks.inflight.release).not.toHaveBeenCalled();
     });
 
     it('should record how long the job waited in the queue when its first attempt is picked up', async () => {
@@ -620,7 +646,7 @@ describe('ArtifactRunProcessor', () => {
         usageModel as never,
         {} as never,
         {} as never,
-        {},
+        {} as never,
       );
       const creditMeter = new CreditMeterService(
         { get: () => undefined } as never,
@@ -649,6 +675,7 @@ describe('ArtifactRunProcessor', () => {
         creditMeter,
         featureGating,
         runs: mocks.runs as never,
+        inflight: mocks.inflight,
         redis: mocks.redis as never,
         logger: mocks.logger,
       });
@@ -714,6 +741,52 @@ describe('ArtifactRunProcessor', () => {
         code: 'internal',
         failureReason: 'commentary must not be empty',
       });
+    });
+
+    it('should release the in-flight slot on a terminal failure', async () => {
+      await processor.onFailed(
+        makeJob(),
+        new UnrecoverableError('commentary must not be empty'),
+      );
+
+      expect(mocks.inflight.release).toHaveBeenCalledWith('user-1', 'run-1');
+    });
+
+    it('should release the in-flight slot when the job stalled out', async () => {
+      await processor.onFailed(
+        makeJob(),
+        new UnrecoverableError(STALLED_FAILURE_REASON),
+      );
+
+      expect(mocks.inflight.release).toHaveBeenCalledWith('user-1', 'run-1');
+    });
+
+    it('should release the in-flight slot even when the run had already ended', async () => {
+      mocks.runHandle.fail.mockResolvedValue('ALREADY_ENDED');
+
+      await processor.onFailed(
+        makeJob(),
+        new UnrecoverableError(STALLED_FAILURE_REASON),
+      );
+
+      expect(mocks.inflight.release).toHaveBeenCalledWith('user-1', 'run-1');
+    });
+
+    it('should release the in-flight slot when the version cannot be marked FAILED', async () => {
+      mocks.artifacts.failVersion.mockRejectedValue(new Error('mongo down'));
+
+      await processor.onFailed(makeJob(), new UnrecoverableError('boom'));
+
+      expect(mocks.inflight.release).toHaveBeenCalledWith('user-1', 'run-1');
+    });
+
+    it('should keep the in-flight slot when the attempt will be retried', async () => {
+      await processor.onFailed(
+        makeJob({ attemptsMade: 1 }),
+        new Error('flaky'),
+      );
+
+      expect(mocks.inflight.release).not.toHaveBeenCalled();
     });
 
     it("should fail the run through the job attempt's own handle, which holds its LLM usage", async () => {

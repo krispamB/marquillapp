@@ -10,6 +10,8 @@ jest.mock(
 import * as judgeModule from './judge';
 import { DocumentRendererService } from './document-renderer.service';
 import type { RenderSessionResult } from './render-session';
+import { RenderSessionError } from './render-session.error';
+import { RenderSlotUnavailableError } from './render-slots';
 
 describe('DocumentRendererService', () => {
   const makeService = (env: Record<string, string | undefined>) => {
@@ -20,7 +22,14 @@ describe('DocumentRendererService', () => {
         return value;
       }),
     };
-    const service = new DocumentRendererService(config as never);
+    const release = jest.fn(() => Promise.resolve());
+    const slots = {
+      acquire: jest.fn(() => Promise.resolve({ waitedMs: 1_500, release })),
+    };
+    const service = new DocumentRendererService(
+      config as never,
+      slots as never,
+    );
     const result = { pageCount: 3 } as unknown as RenderSessionResult;
     const renderSession = jest
       .spyOn(
@@ -28,7 +37,11 @@ describe('DocumentRendererService', () => {
         'renderSession',
       )
       .mockResolvedValue(result);
-    return { service, mocks: { config, renderSession }, fixtures: { result } };
+    return {
+      service,
+      mocks: { config, renderSession, slots, release },
+      fixtures: { result },
+    };
   };
 
   describe('render', () => {
@@ -39,9 +52,9 @@ describe('DocumentRendererService', () => {
       });
       const definition = { id: 'margin' } as never;
 
-      await expect(service.render(definition, '<html></html>')).resolves.toBe(
-        fixtures.result,
-      );
+      await expect(
+        service.render(definition, '<html></html>'),
+      ).resolves.toMatchObject(fixtures.result);
 
       const [endpoint, passedDefinition, source] = mocks.renderSession.mock
         .calls[0] as unknown as [string, unknown, string];
@@ -86,6 +99,74 @@ describe('DocumentRendererService', () => {
         service.render({} as never, '<html></html>'),
       ).rejects.toThrow('BROWSERLESS_URL is not configured');
       expect(mocks.renderSession).not.toHaveBeenCalled();
+      expect(mocks.slots.acquire).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('render with a slot', () => {
+    const env = {
+      BROWSERLESS_URL: 'https://production-sfo.browserless.io',
+      BROWSERLESS_TOKEN: 'secret-token',
+    };
+
+    it('should take a slot before the session and release it after when the session passes', async () => {
+      const { service, mocks } = makeService(env);
+      const order: string[] = [];
+      mocks.slots.acquire.mockImplementationOnce(() => {
+        order.push('acquire');
+        return Promise.resolve({ waitedMs: 1_500, release: mocks.release });
+      });
+      mocks.renderSession.mockImplementationOnce(() => {
+        order.push('session');
+        return Promise.resolve({ pageCount: 3 });
+      });
+      mocks.release.mockImplementationOnce(() => {
+        order.push('release');
+        return Promise.resolve();
+      });
+
+      const result = await service.render({} as never, '<html></html>', {
+        maxSlotWaitMs: 40_000,
+      });
+
+      expect(order).toEqual(['acquire', 'session', 'release']);
+      expect(mocks.slots.acquire).toHaveBeenCalledWith(40_000);
+      expect(result.slotWaitMs).toBe(1_500);
+    });
+
+    it('should release the slot and carry the wait on the error when the session fails', async () => {
+      const { service, mocks } = makeService(env);
+      const failure = new RenderSessionError('socket hang up', {
+        durationMs: 2_000,
+        units: 1,
+      });
+      mocks.renderSession.mockRejectedValueOnce(failure);
+
+      await expect(
+        service.render({} as never, '<html></html>', { maxSlotWaitMs: 1_000 }),
+      ).rejects.toBe(failure);
+      expect(failure.slotWaitMs).toBe(1_500);
+      expect(mocks.release).toHaveBeenCalledTimes(1);
+    });
+
+    it('should open no session when no slot comes free', async () => {
+      const { service, mocks } = makeService(env);
+      mocks.slots.acquire.mockRejectedValueOnce(
+        new RenderSlotUnavailableError(2, 40_000),
+      );
+
+      await expect(
+        service.render({} as never, '<html></html>', { maxSlotWaitMs: 40_000 }),
+      ).rejects.toBeInstanceOf(RenderSlotUnavailableError);
+      expect(mocks.renderSession).not.toHaveBeenCalled();
+    });
+
+    it('should wait as long as the semaphore allows when the caller gives no bound', async () => {
+      const { service, mocks } = makeService(env);
+
+      await service.render({} as never, '<html></html>');
+
+      expect(mocks.slots.acquire).toHaveBeenCalledWith(Infinity);
     });
   });
 });

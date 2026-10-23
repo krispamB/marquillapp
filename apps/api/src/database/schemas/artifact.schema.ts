@@ -24,7 +24,7 @@ export class ArtifactSource {
   @Prop({ required: true })
   withResearch: boolean;
 
-  @Prop({ enum: StylePreset })
+  @Prop({ type: String, enum: StylePreset })
   stylePreset?: StylePreset;
 
   /**
@@ -67,7 +67,7 @@ export class ArtifactVersion {
   @Prop()
   editedAt?: Date;
 
-  @Prop({ enum: FailureCode })
+  @Prop({ type: String, enum: FailureCode })
   failureCode?: FailureCode;
 
   @Prop()
@@ -114,3 +114,20 @@ export class Artifact extends Document {
 }
 
 export const ArtifactSchema = SchemaFactory.createForClass(Artifact);
+
+/**
+ * Serves the artifact library: `user` equality, then `updatedAt` and `_id`
+ * descending. Build it in production with
+ * `bun run db:migrate:artifact-library-index -- --apply` before this line
+ * deploys (see `src/scripts/artifact-library-index-migration.ts`).
+ */
+export const ARTIFACT_LIBRARY_INDEX_NAME = 'artifact_user_updated_at_id';
+export const ARTIFACT_LIBRARY_INDEX_KEY = {
+  user: 1,
+  updatedAt: -1,
+  _id: -1,
+} as const;
+
+ArtifactSchema.index(ARTIFACT_LIBRARY_INDEX_KEY, {
+  name: ARTIFACT_LIBRARY_INDEX_NAME,
+});

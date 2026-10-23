@@ -25,9 +25,12 @@ export class RunDeadline implements RunDeadlineGuard {
   /**
    * Milliseconds until the deadline, never negative. A model call uses it to
    * bound its own timeout and retries, so it cannot outlive the attempt.
+   *
+   * @param reserveMs time kept back for what must still run afterwards: a
+   *   render's wait for a Browserless slot keeps room for the session itself.
    */
-  remainingMs(): number {
-    return Math.max(0, this.endsAt - this.now());
+  remainingMs(reserveMs = 0): number {
+    return Math.max(0, this.endsAt - this.now() - reserveMs);
   }
 
   /**

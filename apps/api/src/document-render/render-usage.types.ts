@@ -66,4 +66,9 @@ export interface RenderAttemptUsage
   timedOut?: boolean;
   /** Why `cover.png` is missing, when the capture or its upload failed. */
   coverFailure?: string;
+  /**
+   * How long the render waited for a Browserless slot before the session
+   * connected; `0` when a slot was free or the semaphore is off (M4.2).
+   */
+  slotWaitMs?: number;
 }

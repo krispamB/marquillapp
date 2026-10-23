@@ -2,6 +2,7 @@ import { Job, QueueEvents, Worker } from 'bullmq';
 import {
   EMAIL_QUEUE_NAME,
   LINKEDIN_AVATAR_REFRESH_QUEUE_NAME,
+  DOCUMENT_QUEUE_NAME,
   MEDIA_UPLOAD_QUEUE_NAME,
   QUEUE_NAME,
   SCHEDULE_QUEUE_NAME,
@@ -27,6 +28,7 @@ import { DesignSystemsService } from '../../design-system/design-systems.service
 import { findFile, uploadFile } from '../../s3';
 import { CreditMeterService } from '../../feature-gating/credit-meter.service';
 import { FeatureGatingService } from '../../feature-gating/feature-gating.service';
+import { InflightRunLimiter } from '../inflight-run-limiter';
 import { RedisService } from '../../redis/redis.service';
 import { WorkflowRunService } from '../workflow-run.service';
 import { BuildInput } from '../engine/workflow.types';
@@ -41,6 +43,7 @@ import {
   installWorkerShutdown,
   readWorkerShutdownTimeoutMs,
 } from './worker-shutdown';
+import { workflowWorkerOptions } from './workflow-worker-options';
 
 async function bootstrapWorker() {
   const logger = new Logger(
@@ -49,6 +52,7 @@ async function bootstrapWorker() {
   );
   // Read before the app boots, so a bad value fails fast.
   const shutdownTimeoutMs = readWorkerShutdownTimeoutMs(process.env);
+  const runWorkerOptions = workflowWorkerOptions(process.env);
   logger.log('Bootstrapping workflow context...');
   const app = await NestFactory.createApplicationContext(WorkerModule);
 
@@ -77,48 +81,54 @@ async function bootstrapWorker() {
     creditMeter: app.get(CreditMeterService),
     featureGating: app.get(FeatureGatingService),
     runs: app.get(WorkflowRunService),
+    inflight: app.get(InflightRunLimiter),
     redis: app.get(RedisService).getClient(),
     logger,
   });
 
-  const workflowWorker = new Worker(
-    QUEUE_NAME,
-    (job: Job<BuildInput>) => artifactRuns.process(job),
-    {
-      connection: {
-        url: process.env.REDIS_URL!,
-        maxRetriesPerRequest: null,
-        enableReadyCheck: false,
-      },
-      // A job whose lock lapsed is restarted twice, then failed.
-      maxStalledCount: 2,
-      stalledInterval: 10_000,
-    },
-  );
+  // Two workers on the same processor: `workflow` (POST, POLL, and DOCUMENT
+  // jobs enqueued before the split; the processor is type-agnostic) and
+  // `workflow-document`, each with its own concurrency.
+  const workflowQueues = app.get(WorkflowQueue);
+  const runConnection = {
+    url: process.env.REDIS_URL!,
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+  };
+  const runWorkers: Worker[] = [];
+  const runEvents: QueueEvents[] = [];
+  for (const queueName of [QUEUE_NAME, DOCUMENT_QUEUE_NAME] as const) {
+    const options = runWorkerOptions[queueName];
+    const worker = new Worker(
+      queueName,
+      (job: Job<BuildInput>) => artifactRuns.process(job),
+      { connection: runConnection, ...options },
+    );
+    logger.log(
+      `Worker on ${queueName}: concurrency ${options.concurrency}, lock ${options.lockDuration} ms`,
+    );
 
-  // Fires on every failed attempt; the processor decides which one ends the run.
-  workflowWorker.on('failed', (job, error) => {
-    if (!job) return;
-    artifactRuns.onFailed(job, error).catch((err) => logger.error(err));
-  });
+    // Fires on every failed attempt; the processor decides which one ends the run.
+    worker.on('failed', (job, error) => {
+      if (!job) return;
+      artifactRuns.onFailed(job, error).catch((err) => logger.error(err));
+    });
 
-  // Queue-wide: a job that stalled out ends its run even when no worker in
-  // this process reports it. `onFailed` ends a run at most once.
-  const workflowQueue = app.get(WorkflowQueue).queue;
-  const workflowEvents = new QueueEvents(QUEUE_NAME, {
-    connection: {
-      url: process.env.REDIS_URL!,
-      maxRetriesPerRequest: null,
-      enableReadyCheck: false,
-    },
-  });
-  workflowEvents.on('failed', (event) => {
-    handleStalledFailure(event, {
-      getJob: (jobId) => workflowQueue.getJob(jobId),
-      onFailed: (job, error) => artifactRuns.onFailed(job, error),
-      logger,
-    }).catch((err) => logger.error(err));
-  });
+    // Queue-wide: a job that stalled out ends its run even when no worker in
+    // this process reports it. `onFailed` ends a run at most once.
+    const queue = workflowQueues.queueFor(queueName);
+    const events = new QueueEvents(queueName, { connection: runConnection });
+    events.on('failed', (event) => {
+      handleStalledFailure(event, {
+        getJob: (jobId) => queue.getJob(jobId),
+        onFailed: (job, error) => artifactRuns.onFailed(job, error),
+        logger,
+      }).catch((err) => logger.error(err));
+    });
+
+    runWorkers.push(worker);
+    runEvents.push(events);
+  }
 
   const scheduleWorker = new Worker(
     SCHEDULE_QUEUE_NAME,
@@ -241,13 +251,13 @@ async function bootstrapWorker() {
   installWorkerShutdown({
     signals: process,
     closables: [
-      workflowWorker,
+      ...runWorkers,
       scheduleWorker,
       avatarRefreshWorker,
       emailWorker,
       mediaUploadWorker,
     ],
-    listeners: [workflowEvents],
+    listeners: runEvents,
     idle: () => artifactRuns.idle(),
     app,
     exit: (code) => process.exit(code),

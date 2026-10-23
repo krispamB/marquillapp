@@ -83,6 +83,12 @@ Every feature Marquill has, is building, or has discussed. `live` means deployed
 
 ## Planned and building
 
+### Creation
+
+| Id | Feature | Status | Date | What it does | Landing; plans | Links |
+| --- | --- | --- | --- | --- | --- | --- |
+| `run-in-flight-cap` | Per-user cap on runs in flight | building |  | A user can have at most MAX_INFLIGHT_RUNS_PER_USER artifact runs going at once, so one batch cannot fill the queue for everyone. A launch over the cap gets a 429 run.too_many_in_flight whose message the app shows; nothing is created or charged.<br>_Built but shipped off: MAX_INFLIGHT_RUNS_PER_USER defaults to 0 (no cap). The plan is to turn it on at 3 if queueWaitMs shows users waiting behind another user's batch. Set live (with since and a changelog entry) only once it is switched on in production._ |  | #230, [artifact-generation-performance-plan.md](../../apps/api/docs/artifact-generation-performance-plan.md) |
+
 ### Documents
 
 | Id | Feature | Status | Date | What it does | Landing; plans | Links |

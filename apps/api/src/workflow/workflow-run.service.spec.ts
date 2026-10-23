@@ -99,6 +99,26 @@ describe('WorkflowRunService', () => {
     });
   });
 
+  describe('createRun with a chosen id', () => {
+    it("should use the caller's run id as the run's _id", async () => {
+      const runId = new Types.ObjectId().toString();
+
+      await service.createRun({
+        runId,
+        userId: fixtures.userId,
+        artifactId: fixtures.artifactId,
+        targetVersion: 1,
+        kind: RunKind.INITIAL,
+        input: fixtures.input as never,
+      });
+
+      const [created] = mocks.workflowRunModel.create.mock.calls[0] as [
+        { _id: Types.ObjectId },
+      ];
+      expect(created._id.toString()).toBe(runId);
+    });
+  });
+
   describe('getRun', () => {
     it('should load the run by id when the id is a valid ObjectId', async () => {
       const run = { _id: fixtures.runId };

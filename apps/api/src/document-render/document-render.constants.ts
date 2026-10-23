@@ -24,6 +24,15 @@ export const BROWSERLESS_UNIT_MS = 30_000;
 export const BROWSERLESS_SESSION_GRACE_MS = 10_000;
 
 /**
+ * How long a Browserless slot lease lives (M4.2): past the session deadline
+ * and the grace after which Browserless closes the session itself, plus 5 s.
+ * A worker that crashed mid-render never releases its slot; the lease expires
+ * just after Browserless has freed the session, so no heartbeat is needed.
+ */
+export const RENDER_SLOT_LEASE_MS =
+  RENDER_SESSION_DEADLINE_MS + BROWSERLESS_SESSION_GRACE_MS + 5_000;
+
+/**
  * Tolerance, in px, for every geometry rule. Blink rounds a font's ascent and
  * descent separately, so a line box sits up to 1px from where half-leading
  * arithmetic puts it (#137 measured 0.86px). A finding within it is rounding.

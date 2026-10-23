@@ -11,6 +11,8 @@ import type { BrowserlessUsage, RenderTrace } from './render-usage.types';
  */
 export class RenderSessionError extends Error {
   readonly trace?: RenderTrace;
+  /** How long the render waited for a Browserless slot; set by the renderer. */
+  slotWaitMs?: number;
 
   constructor(
     message: string,

@@ -63,6 +63,18 @@ export const features: Feature[] = [
     docs: ['apps/api/docs/sse-progress-contract-design.md', 'apps/api/docs/api/runs.md'],
   },
   {
+    id: 'run-in-flight-cap',
+    name: 'Per-user cap on runs in flight',
+    area: 'creation',
+    status: 'building',
+    summary: 'A user can have at most MAX_INFLIGHT_RUNS_PER_USER artifact runs going at once, so one batch cannot fill the queue for everyone. A launch over the cap gets a 429 run.too_many_in_flight whose message the app shows; nothing is created or charged.',
+    issues: [230],
+    docs: ['apps/api/docs/artifact-generation-performance-plan.md'],
+    notes: [
+      'Built but shipped off: MAX_INFLIGHT_RUNS_PER_USER defaults to 0 (no cap). The plan is to turn it on at 3 if queueWaitMs shows users waiting behind another user\'s batch. Set live (with since and a changelog entry) only once it is switched on in production.',
+    ],
+  },
+  {
     id: 'artifact-refine',
     name: 'Refine an artifact',
     area: 'creation',

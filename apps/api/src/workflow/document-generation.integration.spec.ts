@@ -257,6 +257,10 @@ const makeRun = () => {
       assertResearchAccess: jest.fn(),
     } as never,
     runs: { handleFor: jest.fn().mockReturnValue(runHandle) } as never,
+    inflight: {
+      refresh: jest.fn().mockResolvedValue(undefined),
+      release: jest.fn().mockResolvedValue(undefined),
+    },
     redis: redis as never,
     logger,
   };

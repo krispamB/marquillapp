@@ -29,6 +29,7 @@ import type {
 import {
   FailureCode,
   RENDER_RETRY_DELAY_MS,
+  RENDER_SLOT_WAIT_RESERVE_MS,
   WorkflowStep,
 } from '../workflow.constants';
 import { sha256Hex } from '../../document-source/sha256';
@@ -91,6 +92,11 @@ export const documentObjectKey = (
  *
  * A session that fails outright is transient, `render.unavailable` if it ends
  * the run. A failed cover capture is recorded and never blocks the version.
+ *
+ * Each session first waits for a Browserless slot, at most until
+ * `RENDER_SLOT_WAIT_RESERVE_MS` of the attempt is left. No slot in time is a
+ * transient `render.unavailable` with no session recorded and nothing billed.
+ * The retry pause and Repairs hold no slot.
  */
 export const renderPdfStep: StepHandler = async (state, ctx) => {
   const { artifactId, version, kind } = state.input;
@@ -277,11 +283,13 @@ function attemptOf({
   usage,
   trace,
   facts,
+  slotWaitMs,
 }: RenderSessionResult): Omit<RenderAttemptUsage, 'outcome' | 'billed'> {
   return {
     ...usage,
     ...trace,
     ...(facts.timedOut ? { timedOut: true } : {}),
+    ...(slotWaitMs !== undefined ? { slotWaitMs } : {}),
   };
 }
 
@@ -311,19 +319,27 @@ async function recordRenderAttempt(
   ctx.diagnostics.recordRenderSession();
 }
 
-/** One render session. A session that fails outright is recorded, unbilled. */
+/**
+ * One render session. A session that fails outright is recorded, unbilled.
+ * A render that got no Browserless slot ran no session, so nothing is recorded.
+ */
 async function renderSession(
   ctx: StepContext,
   definition: DesignSystemDefinition,
   documentSource: string,
 ): Promise<RenderSessionResult> {
   try {
-    return await ctx.renderer.render(definition, documentSource);
+    return await ctx.renderer.render(definition, documentSource, {
+      maxSlotWaitMs: ctx.deadline.remainingMs(RENDER_SLOT_WAIT_RESERVE_MS),
+    });
   } catch (error: unknown) {
     if (error instanceof RenderSessionError) {
       await recordRenderAttempt(ctx, {
         ...error.usage,
         ...error.trace,
+        ...(error.slotWaitMs !== undefined
+          ? { slotWaitMs: error.slotWaitMs }
+          : {}),
         outcome: 'ERROR',
         billed: false,
       });

@@ -20,6 +20,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { judge } from '../../document-render/judge';
 import { check } from '../../document-source/candidate-check';
 import { RenderSessionError } from '../../document-render/render-session.error';
+import { RenderSlotUnavailableError } from '../../document-render/render-slots';
 import { assemble } from '../../document-source/assemble';
 import { IconInliningError } from '../../document-source/icon-inlining.error';
 import type { RenderAttemptUsage } from '../../document-render/render-usage.types';
@@ -58,7 +59,7 @@ const makeStep = () => {
   };
   const deadline = {
     assertTimeLeft: jest.fn(),
-    remainingMs: jest.fn(() => 120_000),
+    remainingMs: jest.fn((reserveMs: number = 0) => 120_000 - reserveMs),
   };
   const meter = { record: jest.fn() };
   const emit = jest.fn();
@@ -173,6 +174,7 @@ describe('renderPdfStep', () => {
       expect(mocks.renderer.render).toHaveBeenCalledWith(
         fixtures.definition,
         SOURCE,
+        expect.any(Object),
       );
       expect(mockedJudge).toHaveBeenCalledWith(fixtures.definition, {
         measured: true,
@@ -473,6 +475,7 @@ describe('renderPdfStep', () => {
       expect(mocks.renderer.render).toHaveBeenLastCalledWith(
         fixtures.definition,
         SOURCE,
+        expect.any(Object),
       );
       expect(mockedAssemble).toHaveBeenLastCalledWith(
         fixtures.definition,
@@ -728,6 +731,7 @@ describe('renderPdfStep', () => {
         2,
         fixtures.definition,
         SOURCE,
+        expect.any(Object),
       );
       expect(sleep).toHaveBeenCalledWith(2000);
       expect(mocks.agent.repairDocument).not.toHaveBeenCalled();
@@ -861,6 +865,86 @@ describe('renderPdfStep', () => {
 
       await expect(renderPdfStep(fixtures.state, ctx)).rejects.toBe(passed);
       expect(mocks.renderer.render).not.toHaveBeenCalled();
+    });
+
+    it('should let a render wait for a slot only while 20 s of the attempt would be left', async () => {
+      await renderPdfStep(fixtures.state, ctx);
+
+      expect(mocks.deadline.remainingMs).toHaveBeenCalledWith(20_000);
+      expect(mocks.renderer.render).toHaveBeenCalledWith(
+        fixtures.definition,
+        SOURCE,
+        { maxSlotWaitMs: 100_000 },
+      );
+    });
+  });
+
+  describe('when no Browserless slot comes free', () => {
+    beforeEach(() => {
+      mocks.renderer.render.mockRejectedValue(
+        new RenderSlotUnavailableError(2, 100_000),
+      );
+    });
+
+    it('should fail transiently as render.unavailable', async () => {
+      await expect(renderPdfStep(fixtures.state, ctx)).rejects.toMatchObject({
+        retryable: true,
+        code: 'render.unavailable',
+      });
+    });
+
+    it('should record no render attempt and bill nothing', async () => {
+      await expect(renderPdfStep(fixtures.state, ctx)).rejects.toBeInstanceOf(
+        WorkflowError,
+      );
+
+      expect(mocks.run.recordRenderAttempt).not.toHaveBeenCalled();
+      expect(mocks.diagnostics.recordRenderSession).not.toHaveBeenCalled();
+      expect(mocks.meter.record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('slot wait', () => {
+    it('should record how long a passing session waited for its slot', async () => {
+      mocks.renderer.render.mockResolvedValue(
+        fixtures.session({ slotWaitMs: 1_500 }),
+      );
+
+      await renderPdfStep(fixtures.state, ctx);
+
+      expect(attemptsOf(mocks)).toEqual([
+        expect.objectContaining({ outcome: 'PASSED', slotWaitMs: 1_500 }),
+      ]);
+    });
+
+    it('should record how long a session with findings waited for its slot', async () => {
+      mockedJudge.mockReturnValueOnce([SAFE_AREA]);
+      mocks.renderer.render
+        .mockResolvedValueOnce(fixtures.session({ slotWaitMs: 4_000 }))
+        .mockResolvedValueOnce(fixtures.session({ slotWaitMs: 0 }));
+
+      await renderPdfStep(fixtures.state, ctx);
+
+      expect(attemptsOf(mocks)).toEqual([
+        expect.objectContaining({ outcome: 'FINDINGS', slotWaitMs: 4_000 }),
+        expect.objectContaining({ outcome: 'PASSED', slotWaitMs: 0 }),
+      ]);
+    });
+
+    it('should record how long a failed session waited for its slot', async () => {
+      const failure = new RenderSessionError('socket hang up', {
+        durationMs: 2_000,
+        units: 1,
+      });
+      failure.slotWaitMs = 700;
+      mocks.renderer.render.mockRejectedValue(failure);
+
+      await expect(renderPdfStep(fixtures.state, ctx)).rejects.toMatchObject({
+        code: 'render.unavailable',
+      });
+      expect(attemptsOf(mocks)).toEqual([
+        expect.objectContaining({ outcome: 'ERROR', slotWaitMs: 700 }),
+      ]);
     });
   });
 

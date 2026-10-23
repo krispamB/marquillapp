@@ -27,6 +27,7 @@ bunx jest src/auth/auth.service.spec.ts   # a single file
 bun run test:e2e         # end-to-end (test/jest-e2e.json)
 CHROME_PATH=<chrome> bun run test:render  # real-browser document render (*.render-spec.ts); not in `check`, required before merging renderer or judge changes
 bun run test:render                       # same, against the compose Browserless when BROWSERLESS_URL/BROWSERLESS_TOKEN are set (see .env.example)
+bun run test:redis                        # Lua scripts against the compose Redis (*.redis-spec.ts, REDIS_URL from .env); not in `check`
 
 bun run lint             # ESLint, report only (large existing backlog)
 bun run lint:fix         # ESLint --fix; only on files you are changing
@@ -44,11 +45,15 @@ This is a NestJS v11 backend that generates and schedules LinkedIn posts using A
 The application runs as **two separate processes**:
 
 1. **HTTP server** (`src/main.ts`) — handles REST API requests
-2. **Worker** (`src/workflow/workers/workflow.worker.ts`) — a standalone BullMQ worker that bootstraps a full NestJS `ApplicationContext` (not `NestFactory.create`) to get access to injected services. It processes four queues:
-   - `workflow` — AI post generation pipelines
+2. **Worker** (`src/workflow/workers/workflow.worker.ts`) — a standalone BullMQ worker that bootstraps a full NestJS `ApplicationContext` (not `NestFactory.create`) to get access to injected services. It processes these queues:
+   - `workflow` — POST and POLL artifact runs (and DOCUMENT jobs enqueued before the queues split)
+   - `workflow-document` — DOCUMENT artifact runs, on their own queue so a burst of documents can't hold up text runs. `WorkflowQueue.addArtifactRunJob` picks the queue with `queueNameFor(type)`; one `ArtifactRunProcessor` serves both
    - `post-schedule` — publishes LinkedIn posts at scheduled times
    - `linkedin-avatar-refresh` — refreshes expiring LinkedIn profile photos
    - `email` — transactional email via Resend
+   - `media-upload` — uploads post media to LinkedIn
+
+   **Deploy order:** a release that adds or renames a queue ships the worker first, then the API, so nothing is enqueued on a queue no worker consumes.
 
 ### AI Workflow engine
 
@@ -127,6 +132,10 @@ Optional integer settings are read with `readIntEnv` (`src/common/env.ts`): unse
 - `MONGO_MAX_POOL_SIZE` (default `10`, min 1), `MONGO_MIN_POOL_SIZE` (default `2`, must not exceed max) — Mongo connection pool, per process (`mongoOptionsFrom` in `src/database/mongo-options.ts`). **Sizing rule:** the worker's pool must be at least its total worker concurrency + 10.
 - `FEATURE_TIER_CACHE_TTL_MS` (default `60000`; `0` disables) — API and worker. How long `FeatureGatingService` caches a tier document in process. Tiers change only through the seed script, so a re-seed applies within this window; the subscription is never cached.
 - `OPENROUTER_TIMEOUT_MS` (default `240000`, min 1), `OPENROUTER_MAX_ATTEMPTS` (default `3`, min 1), `OPENROUTER_RETRY_BASE_MS` (default `1000`), `OPENROUTER_RETRY_MAX_DELAY_MS` (default `15000`), `OPENROUTER_RETRY_BUDGET_MS` (default `45000`) — the app-owned retry loop in `OpenRouterStrategy` (`src/llm/strategies/openrouter-retry.ts`); the SDK's retries are off. Per try: a timeout of `min(OPENROUTER_TIMEOUT_MS, the call's timeoutMs, time left before its deadlineAt)` (research turns ask 45 s; DOCUMENT drafts and Repairs pass the run deadline). Retryable failures (`toLLMError`: 408, 429, 5xx, transport and timeout errors, provider errors after `200 OK`) sleep `Retry-After` or full jitter; a call stops when tries run out, when its total sleep would pass the budget, or when the next try would start past its deadline. A caller's abort is never retried. `OPENROUTER_MAX_ATTEMPTS=1` restores single-try behaviour. Read by both processes, so a bad value fails either boot.
+- `WORKFLOW_TEXT_CONCURRENCY`, `WORKFLOW_DOCUMENT_CONCURRENCY` (default `1`, min 1; worker only) — how many jobs the `workflow` and `workflow-document` workers run at once (`workflowWorkerOptions` in `src/workflow/workers/workflow-worker-options.ts`). Production starts at 10 and 2; 2 matches the Browserless Free plan's concurrent browsers. Count both in the Mongo pool sizing rule.
+- `WORKFLOW_LOCK_DURATION_MS` (default `30000`, min 1000; worker only) — the BullMQ job lock on both artifact-run queues.
+- `MAX_INFLIGHT_RUNS_PER_USER` (default `0` = off, min 0; API and worker), `RUN_INFLIGHT_LEASE_SECONDS` (default `1800`, min 1) — per-user cap on artifact runs in flight (`InflightRunLimiter`, `src/workflow/inflight-run-limiter.ts`). A Redis ZSET `workflow:inflight:{userId}` holds run ids scored by lease expiry; `ArtifactGenerationService` reserves a slot (atomic Lua, Redis `TIME`) after `assertLaunch` and before any write, under the run's pre-generated `_id`. Over the cap is a `429 run.too_many_in_flight`. The slot is released on enqueue failure, run success, and terminal failure (stalled jobs included, via `onFailed`), and the worker refreshes the lease each job attempt; a run still queued when its lease runs out has lost its slot (the refresh does not re-add it), so keep the lease well above the longest queue wait. Off means no Redis calls; a Redis error never fails a run (reserve fails open).
+- `BROWSERLESS_MAX_CONCURRENT_SESSIONS` (default `0`: off), `BROWSERLESS_SLOT_WAIT_MAX_MS` (default `120000`) — the Browserless slot semaphore (`RenderSlots` in `src/document-render/render-slots.ts`). Each render session holds a lease in the Redis sorted set `browserless:slots` from just before it connects until it ends, so renders across every worker stay within the plan's concurrent-browser limit and wait instead of being refused. A lease lives `RENDER_SESSION_DEADLINE_MS + BROWSERLESS_SESSION_GRACE_MS + 5 s` (75 s), so a crashed worker's slot frees itself. A render waits up to `min(BROWSERLESS_SLOT_WAIT_MAX_MS, run deadline left − 20 s)`, then fails as transient `render.unavailable` with no render attempt recorded and nothing billed; each render attempt records its `slotWaitMs`. `0` makes no Redis calls; Redis errors fail open (a warning, and the render goes ahead). **Production on Browserless Free: `BROWSERLESS_MAX_CONCURRENT_SESSIONS=2`.** Only the worker renders, but both processes read the keys at boot. `bun run test:redis` (`*.redis-spec.ts`, not in `check`) runs the acquire script against the compose Redis.
 - `WORKER_SHUTDOWN_TIMEOUT_MS` (default `120000`; worker only) — on the first `SIGTERM` or `SIGINT` the worker stops taking jobs, lets running ones finish, waits for their failure handlers, closes the app and exits 0; past this timeout it exits 1, and the unfinished job stalls and resumes on the next worker (`worker-shutdown.ts`). The host's drain window must be longer: on Railway, `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=130` (see `docs/monorepo.md`). Start the worker with `node` directly; a package-manager wrapper can swallow `SIGTERM`.
 
 ## Production

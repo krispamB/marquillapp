@@ -53,6 +53,7 @@ import { BadRequestException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { FeatureGatingService } from '../feature-gating/feature-gating.service';
 import { ArtifactType, RunKind } from 'src/database/schemas';
+import { RunTooManyInFlightException } from '../workflow/run-too-many-in-flight.exception';
 import { ArtifactGenerationService } from './artifact-generation.service';
 
 describe('ArtifactGenerationService', () => {
@@ -75,6 +76,10 @@ describe('ArtifactGenerationService', () => {
     const workflowQueue = {
       addArtifactRunJob: jest.fn().mockResolvedValue(undefined),
     };
+    const inflight = {
+      reserve: jest.fn().mockResolvedValue(undefined),
+      release: jest.fn().mockResolvedValue(undefined),
+    };
     const designSystems = {
       getActive: jest.fn((id: string) => {
         if (id === 'retired') {
@@ -92,6 +97,7 @@ describe('ArtifactGenerationService', () => {
       featureGating as any,
       workflowQueue as any,
       designSystems as any,
+      inflight as never,
     );
 
     const dto = {
@@ -108,10 +114,15 @@ describe('ArtifactGenerationService', () => {
         featureGating,
         workflowQueue,
         designSystems,
+        inflight,
       },
       fixtures: { userId: 'user123', dto },
     };
   };
+
+  /** The run id the first launch reserved an in-flight slot for. */
+  const reservedRunId = (): string =>
+    (mocks.inflight.reserve.mock.calls[0] as [string, string])[1];
 
   /** The `BuildInput` the first `createRun` stored. */
   const storedInput = (): Record<string, unknown> =>
@@ -174,9 +185,15 @@ describe('ArtifactGenerationService', () => {
     });
 
     it('should return the artifactId and runId when the run is launched', async () => {
-      await expect(
-        service.launchInitialRun(fixtures.userId, fixtures.dto),
-      ).resolves.toEqual({ artifactId: 'artifact123', runId: 'run123' });
+      const result = await service.launchInitialRun(
+        fixtures.userId,
+        fixtures.dto,
+      );
+
+      expect(result).toEqual({
+        artifactId: 'artifact123',
+        runId: reservedRunId(),
+      });
     });
 
     it('should pre-check the balance before creating anything', async () => {
@@ -294,6 +311,7 @@ describe('ArtifactGenerationService', () => {
       await service.launchInitialRun(fixtures.userId, fixtures.dto);
 
       expect(mocks.workflowRunService.createRun).toHaveBeenCalledWith({
+        runId: reservedRunId(),
         userId: 'user123',
         artifactId: 'artifact123',
         targetVersion: 1,
@@ -316,7 +334,7 @@ describe('ArtifactGenerationService', () => {
       const storedInput =
         mocks.workflowRunService.createRun.mock.calls[0][0].input;
       expect(mocks.workflowQueue.addArtifactRunJob).toHaveBeenCalledWith(
-        'run123',
+        reservedRunId(),
         storedInput,
       );
     });
@@ -324,16 +342,16 @@ describe('ArtifactGenerationService', () => {
 
   describe('launchRefineRun', () => {
     it('should return the artifactId, new version, and runId when the refine run is launched', async () => {
-      await expect(
-        service.launchRefineRun(
-          'user123',
-          'artifact123',
-          'Make the hook sharper',
-        ),
-      ).resolves.toEqual({
+      const result = await service.launchRefineRun(
+        'user123',
+        'artifact123',
+        'Make the hook sharper',
+      );
+
+      expect(result).toEqual({
         artifactId: 'artifact123',
         version: 2,
-        runId: 'run123',
+        runId: reservedRunId(),
       });
     });
 
@@ -420,6 +438,7 @@ describe('ArtifactGenerationService', () => {
       );
 
       expect(mocks.workflowRunService.createRun).toHaveBeenCalledWith({
+        runId: reservedRunId(),
         userId: 'user123',
         artifactId: 'artifact123',
         targetVersion: 3,
@@ -439,7 +458,7 @@ describe('ArtifactGenerationService', () => {
       const storedInput =
         mocks.workflowRunService.createRun.mock.calls[0][0].input;
       expect(mocks.workflowQueue.addArtifactRunJob).toHaveBeenCalledWith(
-        'run123',
+        reservedRunId(),
         storedInput,
       );
     });
@@ -456,6 +475,122 @@ describe('ArtifactGenerationService', () => {
       expect(mocks.artifactService.appendRefineVersion).not.toHaveBeenCalled();
       expect(mocks.workflowRunService.createRun).not.toHaveBeenCalled();
       expect(mocks.workflowQueue.addArtifactRunJob).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('in-flight cap', () => {
+    const overTheCap = () =>
+      mocks.inflight.reserve.mockRejectedValue(
+        new RunTooManyInFlightException(2),
+      );
+
+    const expectNothingWritten = () => {
+      expect(mocks.artifactService.createArtifact).not.toHaveBeenCalled();
+      expect(mocks.artifactService.appendRefineVersion).not.toHaveBeenCalled();
+      expect(mocks.workflowRunService.createRun).not.toHaveBeenCalled();
+      expect(mocks.workflowQueue.addArtifactRunJob).not.toHaveBeenCalled();
+    };
+
+    it('should write nothing when a new artifact run is over the cap', async () => {
+      overTheCap();
+
+      await expect(
+        service.launchInitialRun(fixtures.userId, fixtures.dto),
+      ).rejects.toBeInstanceOf(RunTooManyInFlightException);
+
+      expectNothingWritten();
+      expect(mocks.inflight.release).not.toHaveBeenCalled();
+    });
+
+    it('should write nothing when a refine run is over the cap', async () => {
+      overTheCap();
+
+      await expect(
+        service.launchRefineRun('user123', 'artifact123', 'Try again'),
+      ).rejects.toBeInstanceOf(RunTooManyInFlightException);
+
+      expectNothingWritten();
+    });
+
+    it('should reserve after the launch check and before any write', async () => {
+      const order: string[] = [];
+      mocks.featureGating.assertLaunch.mockImplementation(() => {
+        order.push('assertLaunch');
+        return Promise.resolve({});
+      });
+      mocks.inflight.reserve.mockImplementation(() => {
+        order.push('reserve');
+        return Promise.resolve();
+      });
+      mocks.artifactService.createArtifact.mockImplementation(() => {
+        order.push('createArtifact');
+        return Promise.resolve({ _id: 'artifact123' });
+      });
+
+      await service.launchInitialRun(fixtures.userId, fixtures.dto);
+
+      expect(order).toEqual(['assertLaunch', 'reserve', 'createArtifact']);
+    });
+
+    it('should not reserve when the launch check fails', async () => {
+      mocks.featureGating.assertLaunch.mockRejectedValue(new Error('no'));
+
+      await expect(
+        service.launchInitialRun(fixtures.userId, fixtures.dto),
+      ).rejects.toThrow('no');
+
+      expect(mocks.inflight.reserve).not.toHaveBeenCalled();
+    });
+
+    it('should reserve the id the run and the job are created with', async () => {
+      await service.launchInitialRun(fixtures.userId, fixtures.dto);
+
+      const [userId, reservedId] = mocks.inflight.reserve.mock.calls[0] as [
+        string,
+        string,
+      ];
+      expect(userId).toBe(fixtures.userId);
+      expect(Types.ObjectId.isValid(reservedId)).toBe(true);
+      const [created] = mocks.workflowRunService.createRun.mock.calls[0] as [
+        { runId: string },
+      ];
+      expect(created.runId).toBe(reservedId);
+      expect(
+        (mocks.workflowQueue.addArtifactRunJob.mock.calls[0] as unknown[])[0],
+      ).toBe(reservedId);
+      expect(mocks.inflight.release).not.toHaveBeenCalled();
+    });
+
+    it('should release the slot when enqueueing fails', async () => {
+      mocks.workflowQueue.addArtifactRunJob.mockRejectedValue(
+        new Error('redis down'),
+      );
+
+      await expect(
+        service.launchInitialRun(fixtures.userId, fixtures.dto),
+      ).rejects.toThrow('redis down');
+
+      const reservedId = reservedRunId();
+      expect(mocks.inflight.release).toHaveBeenCalledWith(
+        fixtures.userId,
+        reservedId,
+      );
+    });
+
+    it('should release the slot when a refine cannot append its version', async () => {
+      mocks.artifactService.appendRefineVersion.mockRejectedValue(
+        new Error('already generating'),
+      );
+
+      await expect(
+        service.launchRefineRun('user123', 'artifact123', 'Try again'),
+      ).rejects.toThrow('already generating');
+
+      const reservedId = reservedRunId();
+      expect(mocks.inflight.release).toHaveBeenCalledWith(
+        'user123',
+        reservedId,
+      );
     });
   });
 
@@ -499,7 +634,7 @@ describe('ArtifactGenerationService', () => {
         usageModel as never,
         {} as never,
         {} as never,
-        {},
+        {} as never,
       );
       const gated = makeService();
       const service = new ArtifactGenerationService(
@@ -508,6 +643,7 @@ describe('ArtifactGenerationService', () => {
         gate,
         gated.mocks.workflowQueue as never,
         gated.mocks.designSystems as never,
+        gated.mocks.inflight as never,
       );
       const reads = () =>
         subscriptionModel.findOne.mock.calls.length +

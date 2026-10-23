@@ -760,6 +760,9 @@ Nothing below is in `docs/api/` until then.
 | `DOCUMENT_GENERATION_MAX_OUTPUT_TOKENS` | env var | `16384` | §7.5 |
 | `CHROME_PATH` | env var, test only | local Chrome for `test:render` | §11.2 |
 | `BROWSERLESS_URL` + `BROWSERLESS_TOKEN` | env var, test only | alternative to `CHROME_PATH`: the docker Browserless | §11.2 |
+| `BROWSERLESS_MAX_CONCURRENT_SESSIONS` | env var, worker | unset (off); `2` on Browserless Free | §11.1 |
+| `BROWSERLESS_SLOT_WAIT_MAX_MS` | env var, worker | `120000` | §11.1 |
+| `RENDER_SLOT_WAIT_RESERVE_MS` | module constant | 20 s of the run deadline kept free of slot waiting | §7.5 |
 | Candidate retention on runs | module constant | 90 days | §11.5 |
 
 Module constants change by deploy, never by environment, so a document never renders differently per
@@ -780,7 +783,10 @@ Each DOCUMENT run records a **`documentDiagnostics`** block on `WorkflowRun`:
   ended: `pdf` for a session that finished, the phase that hung or threw otherwise) and `phaseMs`
   (milliseconds per phase entered, the last one up to the moment the session ended), and
   `timedOut: true` when the session hit its deadline. The phases are those of §5.1. Entries from
-  before #192 carry none of these. The Browserless session id is not recorded: a plain
+  before #192 carry none of these. Each entry also records `slotWaitMs` (#227): how long the render
+  waited for a Browserless slot before the session connected, outside `phaseMs` and the session
+  deadline; `0` when a slot was free or the semaphore is off. A render that got no slot in time ran
+  no session, so it records no entry. Entries from before #227 carry none. The Browserless session id is not recorded: a plain
   `puppeteer.connect` gets none from Browserless (its docs return an id only from the session API,
   `POST /session`), so a `connect` timeout cannot yet be matched to a Browserless-side session.
 - `acceptedCandidate` (§7.3) and, on failure, the failed Candidate Source

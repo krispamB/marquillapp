@@ -30,6 +30,8 @@ import {
 } from './workflow.constants';
 
 export interface CreateRunInput {
+  /** The run's `_id`, when the caller chose it before the write. */
+  runId?: string;
   userId: string;
   artifactId: string;
   targetVersion: number;
@@ -55,6 +57,7 @@ export class WorkflowRunService {
 
   async createRun(input: CreateRunInput): Promise<WorkflowRun> {
     return this.workflowRunModel.create({
+      ...(input.runId ? { _id: new Types.ObjectId(input.runId) } : {}),
       user: new Types.ObjectId(input.userId),
       artifact: new Types.ObjectId(input.artifactId),
       targetVersion: input.targetVersion,

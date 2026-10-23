@@ -51,6 +51,11 @@ export interface RenderSessionResult {
   usage: BrowserlessUsage;
   /** The phase the session reached and the time each phase took (§11.1). */
   trace: RenderTrace;
+  /**
+   * How long the render waited for a Browserless slot before connecting
+   * (§11.1); set by `DocumentRendererService`, not by the session.
+   */
+  slotWaitMs?: number;
 }
 
 /**
