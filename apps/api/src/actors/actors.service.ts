@@ -64,9 +64,9 @@ export class ActorsService {
   }
 
   async transcribeVideo(videoUrl: string) {
-    const actorId = `pintostudio/youtube-transcript-scraper`;
+    const actorId = `johnvc/YoutubeTranscripts`;
     const input: YoutubeTranscriptConfig = {
-      videoUrl,
+      youtube_url: videoUrl,
     };
     const run = await this.apifyService.startActor(actorId, input);
     const completedRun = await this.apifyService.waitForRun(run.id);
