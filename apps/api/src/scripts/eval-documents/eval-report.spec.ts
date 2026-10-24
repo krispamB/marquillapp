@@ -24,7 +24,9 @@ const makeRow = (overrides: Partial<DocumentRunRow>): DocumentRunRow => ({
   ...overrides,
 });
 
-const makeResult = (config: { failMargin?: boolean } = {}): EvalResult => {
+const makeResult = (
+  config: { failMargin?: boolean; repairs?: DocumentRunRow['repairs'] } = {},
+): EvalResult => {
   const records: EvalRunRecord[] = [];
   const rows: DocumentRunRow[] = [];
   for (const designSystemId of SYSTEMS) {
@@ -47,6 +49,9 @@ const makeResult = (config: { failMargin?: boolean } = {}): EvalResult => {
           runId,
           designSystemId,
           pageCount: pages,
+          ...(config.repairs && designSystemId === 'margin' && pages === 4
+            ? { repairs: config.repairs }
+            : {}),
           ...(failed
             ? {
                 outcome: 'FAILED',
@@ -249,5 +254,83 @@ describe('formatEvalReport', () => {
     expect(report).toMatch(/run\s+pages\s+state\s+run id\s+note/);
     expect(report).toMatch(/margin\/4p\s+4\s+COMPLETED/);
     expect(report).toMatch(/margin\/8p\s+8\s+COMPLETED/);
+  });
+
+  describe('patch-mode Repairs', () => {
+    const patch = (edits: number, fallback = false) => ({
+      kind: 'static' as const,
+      mode: 'patch' as const,
+      edits,
+      fallback,
+    });
+
+    it('should print nothing about patch mode when no round ran in it', () => {
+      const report = formatEvalReport(
+        makeResult({
+          repairs: [
+            { kind: 'static', mode: 'full', edits: 0, fallback: false },
+          ],
+        }),
+      );
+
+      expect(report).not.toContain('Patch Repairs');
+      expect(report).not.toContain('fallback rate');
+    });
+
+    it('should print the counts, fallback rate and mean edits, overall and per system', () => {
+      const report = formatEvalReport(
+        makeResult({
+          repairs: [patch(3), patch(1, true), patch(0), patch(4), patch(2)],
+        }),
+      );
+
+      expect(report).toContain(
+        'Patch Repairs: 5 rounds; 4 answered with edits, 1 with html; 1 fell back; mean 2.5 edits per edit round',
+      );
+      expect(report).toContain(
+        '[margin] Patch Repairs: 5 rounds; 4 answered with edits, 1 with html; 1 fell back; mean 2.5 edits per edit round',
+      );
+      expect(report).not.toContain('[afterglow] Patch Repairs');
+      expect(report).toContain(
+        'Patch fallback rate: 25.0% (1 of 4 edit rounds)',
+      );
+    });
+
+    it('should say the rate is under the 20% go/no-go threshold when it is', () => {
+      const edits = Array.from({ length: 9 }, () => patch(2));
+      const report = formatEvalReport(
+        makeResult({ repairs: [...edits, patch(2, true)] }),
+      );
+
+      expect(report).toContain(
+        'Patch fallback rate: 10.0% (1 of 10 edit rounds)',
+      );
+      expect(report).toContain(
+        'PATCH GO: fallback rate is under 20% (DOCUMENT_REPAIR_MODE may switch to patch if no other gate is worse)',
+      );
+    });
+
+    it('should say NO-GO at or above the threshold', () => {
+      const report = formatEvalReport(
+        makeResult({
+          repairs: [patch(2, true), patch(2), patch(2), patch(2), patch(2)],
+        }),
+      );
+
+      expect(report).toContain(
+        'Patch fallback rate: 20.0% (1 of 5 edit rounds)',
+      );
+      expect(report).toContain(
+        'PATCH NO-GO: fallback rate is not under 20% (keep DOCUMENT_REPAIR_MODE at full)',
+      );
+    });
+
+    it('should print n/a and no verdict when no round answered with edits', () => {
+      const report = formatEvalReport(makeResult({ repairs: [patch(0)] }));
+
+      expect(report).toContain('Patch fallback rate: n/a (0 of 0 edit rounds)');
+      expect(report).not.toContain('PATCH GO');
+      expect(report).not.toContain('PATCH NO-GO');
+    });
   });
 });

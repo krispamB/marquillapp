@@ -7,6 +7,7 @@ import type {
   CheckOutcome,
   DocumentCheck,
   DocumentDiagnostics,
+  RepairDiagnostic,
 } from '../workflow/engine/workflow.types';
 import { remedyOf } from '../document-render/render-remedy';
 import { FailureCode } from '../workflow/workflow.constants';
@@ -27,6 +28,8 @@ export interface DocumentRunRow {
   jobAttemptFailureCodes: FailureCode[];
   candidates: CandidateDiagnostics[];
   repairRounds: number;
+  /** One entry per Repair round; absent on runs recorded before patch mode. */
+  repairs?: RepairDiagnostic[];
   wallTimeMs: number;
   /** What the latest job attempt metered; it is charged only when `READY`. */
   credits: number;
@@ -58,6 +61,22 @@ export interface ViolationTally {
   count: number;
 }
 
+/** What `patch`-mode Repair rounds did (spec §11.1), for the go/no-go on `DOCUMENT_REPAIR_MODE`. */
+export interface PatchRepairStats {
+  /** Rounds that ran in `patch` mode. */
+  rounds: number;
+  /** Rounds the model answered with edits. */
+  editRounds: number;
+  /** Rounds the model answered with the whole html. */
+  htmlRounds: number;
+  /** Rounds whose edits did not apply. */
+  fallbacks: number;
+  /** `fallbacks / editRounds`; null when no round answered with edits. */
+  fallbackRate: number | null;
+  /** Edits per edit round; null when there is none. */
+  meanEdits: number | null;
+}
+
 /** The metrics of one group of runs: all of them, or one Design System's. */
 export interface DocumentMetricsBucket {
   runs: number;
@@ -75,6 +94,8 @@ export interface DocumentMetricsBucket {
   firstCandidate: { runs: number; passed: number; passRate: number | null };
   /** Runs per Repair rounds spent (`"0"`, `"1"`, ...). */
   repairRounds: Record<string, number>;
+  /** Present only when at least one Repair round ran in `patch` mode. */
+  patchRepairs?: PatchRepairStats;
   /** The ten most frequent violation codes, per check phase. */
   violations: { static: ViolationTally[]; render: ViolationTally[] };
   /** Runs where any job attempt failed with `document.truncated`. */
@@ -146,6 +167,7 @@ function bucketOf(rows: DocumentRunRow[]): DocumentMetricsBucket {
     failures,
     firstCandidate: firstCandidateOf(rows),
     repairRounds: repairRoundsOf(rows),
+    ...patchRepairsOf(rows),
     violations: {
       static: topViolations(rows, 'static'),
       render: topViolations(rows, 'render'),
@@ -204,6 +226,28 @@ function repairRoundsOf(rows: DocumentRunRow[]): Record<string, number> {
     histogram[repairRounds] = (histogram[repairRounds] ?? 0) + 1;
   }
   return histogram;
+}
+
+function patchRepairsOf(
+  rows: DocumentRunRow[],
+): { patchRepairs: PatchRepairStats } | Record<string, never> {
+  const patch = rows
+    .flatMap((row) => row.repairs ?? [])
+    .filter(({ mode }) => mode === 'patch');
+  if (patch.length === 0) return {};
+  const edited = patch.filter(({ edits }) => edits > 0);
+  const fallbacks = patch.filter(({ fallback }) => fallback).length;
+  const totalEdits = edited.reduce((sum, { edits }) => sum + edits, 0);
+  return {
+    patchRepairs: {
+      rounds: patch.length,
+      editRounds: edited.length,
+      htmlRounds: patch.length - edited.length,
+      fallbacks,
+      fallbackRate: rate(fallbacks, edited.length),
+      meanEdits: edited.length === 0 ? null : totalEdits / edited.length,
+    },
+  };
 }
 
 function topViolations(
