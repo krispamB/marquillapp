@@ -24,6 +24,7 @@ import { ArtifactRunProcessor } from './artifact-run.worker.handler';
 import { AgentRunnerService } from '../../agent/agent-runner.service';
 import { ArtifactService } from '../../artifact/artifact.service';
 import { DocumentRendererService } from '../../document-render/document-renderer.service';
+import { FontInlinerService } from '../../document-render/font-inliner.service';
 import { DesignSystemsService } from '../../design-system/design-systems.service';
 import { findFile, uploadFile } from '../../s3';
 import { CreditMeterService } from '../../feature-gating/credit-meter.service';
@@ -72,6 +73,7 @@ async function bootstrapWorker() {
     artifacts: app.get(ArtifactService),
     designSystems: app.get(DesignSystemsService),
     renderer: app.get(DocumentRendererService),
+    fonts: app.get(FontInlinerService),
     objects: {
       put: async (key, body, contentType) => {
         await uploadFile(key, body, contentType);

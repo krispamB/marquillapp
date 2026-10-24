@@ -1,7 +1,7 @@
 import puppeteer, { type Browser, type HTTPRequest } from 'puppeteer-core';
 import type { BrowserlessUsage, RenderTrace } from './render-usage.types';
 import type { DesignSystemDefinition } from '../design-system/design-system-definition';
-import { isFontRequest } from '../document-source/assemble';
+import { isFontRequest, isInlinedFont } from '../document-source/assemble';
 import {
   BROWSERLESS_SESSION_GRACE_MS,
   BROWSERLESS_UNIT_MS,
@@ -137,7 +137,9 @@ export async function renderDocumentSession(
     page.on('request', (request: HTTPRequest) => {
       if (request.isInterceptResolutionHandled()) return;
       const url = request.url();
-      if (isFontRequest(url)) {
+      // Inlined fonts emit a request too, and aborting one is a no-op: let
+      // them through before the refusal branch, or every render is egress.
+      if (isInlinedFont(url) || isFontRequest(url)) {
         request.continue().catch(() => undefined);
       } else {
         // Chrome may ask twice for one URL (preload scanner, then parser).

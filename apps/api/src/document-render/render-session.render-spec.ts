@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { setDefaultAutoSelectFamilyAttemptTimeout } from 'node:net';
 import { dirname, join } from 'node:path';
 import puppeteer, { type Browser } from 'puppeteer-core';
 import { readSeedFiles } from '../design-system/design-system-seed';
@@ -6,6 +7,7 @@ import { DESIGN_SYSTEM_SEED_DIR } from '../design-system/design-system.constants
 import { assemble } from '../document-source/assemble';
 import { judge } from './judge';
 import { remedyOf } from './render-remedy';
+import { FontInlinerService } from './font-inliner.service';
 import { browserlessEndpoint, renderDocumentSession } from './render-session';
 
 /**
@@ -47,6 +49,22 @@ const corpus = (name: string) =>
 const verdict = (violations: { code: string; page?: number }[]) =>
   violations.map((v) => (v.page ? `${v.code}@${v.page}` : v.code)).sort();
 
+/**
+ * The inliner, retried: a fetch from this process to Google can fail on a
+ * developer network, and a failure is evicted, so the next try refetches.
+ */
+const inliner = new FontInlinerService();
+const inlineWithRetries = async (
+  definition: (typeof seeds)[number]['definition'],
+  sample: string,
+): Promise<string | null> => {
+  let css: string | null = null;
+  for (let attempt = 0; attempt < 4 && css === null; attempt++) {
+    css = await inliner.inlineCss(definition, sample);
+  }
+  return css;
+};
+
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47];
 
 let browser: Browser | undefined;
@@ -58,6 +76,10 @@ const endpoint = (): string =>
     : browserlessEndpoint(BROWSERLESS_URL!, BROWSERLESS_TOKEN!);
 
 beforeAll(async () => {
+  // The inlined-font cases fetch from Google in this process. Node gives each
+  // address family 250 ms to connect, which a slow developer network (or one
+  // without IPv6) misses; the worker's network does not.
+  setDefaultAutoSelectFamilyAttemptTimeout(2_000);
   if (!CHROME_PATH) return;
   // The CI and sandbox user may be root, and outbound HTTPS may need the
   // environment's proxy; neither changes what is rendered.
@@ -97,6 +119,34 @@ describe('renderDocumentSession', () => {
       expect(result.usage.units).toBeGreaterThanOrEqual(1);
     });
   });
+
+  // The worker's path (§4.5 item 2): fonts fetched here and inlined as data
+  // URLs, so the page requests nothing but its own `data:font/` faces.
+  describe.each(seeds)(
+    'seed $id with inlined fonts',
+    ({ definition, sample }) => {
+      it('should render with no violations, no refused requests and loaded faces', async () => {
+        const fontCss = await inlineWithRetries(definition, sample);
+        expect(fontCss).toContain('data:font/woff2;base64,');
+        const documentSource = assemble(definition, sample, fontCss!);
+        expect(documentSource).not.toContain('fonts.googleapis.com');
+
+        const result = await renderDocumentSession(
+          endpoint(),
+          definition,
+          documentSource,
+        );
+
+        expect(judge(definition, result.facts)).toEqual([]);
+        expect(result.refusedRequests).toEqual([]);
+        expect(result.facts.faces.length).toBeGreaterThan(0);
+        expect(result.facts.faces.some((f) => f.status === 'loaded')).toBe(
+          true,
+        );
+        expect(result.pageCount).toBe(result.facts.pages.length);
+      });
+    },
+  );
 
   describe('hostile and defect corpus', () => {
     it.each([

@@ -49,6 +49,7 @@ const PNG = new Uint8Array([137, 80, 78, 71]);
 
 const makeStep = () => {
   const renderer = { render: jest.fn() };
+  const fonts = { inlineCss: jest.fn().mockResolvedValue(null) };
   const objects = { put: jest.fn().mockResolvedValue(undefined) };
   const run = {
     runId: 'run-1',
@@ -85,6 +86,7 @@ const makeStep = () => {
     deadline,
     diagnostics,
     renderer,
+    fonts,
     objects,
     run,
     meter,
@@ -127,6 +129,7 @@ const makeStep = () => {
       deadline,
       diagnostics,
       renderer,
+      fonts,
       objects,
       run,
       meter,
@@ -171,6 +174,7 @@ describe('renderPdfStep', () => {
       expect(mockedAssemble).toHaveBeenCalledWith(
         fixtures.definition,
         CANDIDATE,
+        undefined,
       );
       expect(mocks.renderer.render).toHaveBeenCalledWith(
         fixtures.definition,
@@ -180,6 +184,34 @@ describe('renderPdfStep', () => {
       expect(mockedJudge).toHaveBeenCalledWith(fixtures.definition, {
         measured: true,
       });
+    });
+
+    it('should assemble with the inlined font CSS when the inliner returns it', async () => {
+      mocks.fonts.inlineCss.mockResolvedValue(
+        '@font-face { src: url(data:font/woff2;base64,AA); }',
+      );
+
+      await renderPdfStep(fixtures.state, ctx);
+
+      expect(mocks.fonts.inlineCss).toHaveBeenCalledWith(
+        fixtures.definition,
+        CANDIDATE,
+      );
+      expect(mockedAssemble).toHaveBeenCalledWith(
+        fixtures.definition,
+        CANDIDATE,
+        '@font-face { src: url(data:font/woff2;base64,AA); }',
+      );
+    });
+
+    it('should assemble with the stylesheet link when the inliner returns null', async () => {
+      await renderPdfStep(fixtures.state, ctx);
+
+      expect(mockedAssemble).toHaveBeenCalledWith(
+        fixtures.definition,
+        CANDIDATE,
+        undefined,
+      );
     });
 
     it('should upload the four objects under the version prefix', async () => {
@@ -381,6 +413,11 @@ describe('renderPdfStep', () => {
         2,
         fixtures.definition,
         REPAIRED,
+        undefined,
+      );
+      expect(mocks.fonts.inlineCss).toHaveBeenLastCalledWith(
+        fixtures.definition,
+        REPAIRED,
       );
       expect(mocks.renderer.render).toHaveBeenCalledTimes(2);
       expect(checksOf(mocks).map((c) => [c.phase, c.candidateSha256])).toEqual([
@@ -481,6 +518,7 @@ describe('renderPdfStep', () => {
       expect(mockedAssemble).toHaveBeenLastCalledWith(
         fixtures.definition,
         FIXED,
+        undefined,
       );
       expect(patch.draft?.repairsSpent).toBe(2);
     });

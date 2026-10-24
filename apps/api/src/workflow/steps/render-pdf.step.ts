@@ -203,7 +203,7 @@ export const renderPdfStep: StepHandler = async (state, ctx) => {
   };
 
   for (;;) {
-    const documentSource = assembleSource(
+    const documentSource = await assembleSource(
       ctx,
       definition,
       current.candidate,
@@ -259,17 +259,20 @@ interface JudgedSession {
 }
 
 /**
- * Assembles the Document Source. An icon assembly cannot fill is terminal and
- * alerts; the icon's name stays out of the alert and in the run's failure.
+ * Assembles the Document Source, with the fonts inlined when the worker could
+ * fetch them and the Google Fonts `<link>` when it could not (spec §4.5). An
+ * icon assembly cannot fill is terminal and alerts; the icon's name stays out
+ * of the alert and in the run's failure.
  */
-function assembleSource(
+async function assembleSource(
   ctx: StepContext,
   definition: DesignSystemDefinition,
   candidate: string,
   subject: AlertSubject,
-): string {
+): Promise<string> {
+  const fontCss = await ctx.fonts.inlineCss(definition, candidate);
   try {
-    return assemble(definition, candidate);
+    return assemble(definition, candidate, fontCss ?? undefined);
   } catch (error: unknown) {
     if (error instanceof IconInliningError) {
       alert(ctx.logger, error.alertTag, subject);
