@@ -148,10 +148,8 @@ describe('documentPatchRepairSchema', () => {
     expect(() => documentPatchRepairSchema.parse({})).toThrow(ZodError);
   });
 
-  it('should reject an empty edits list', () => {
-    expect(() => documentPatchRepairSchema.parse({ edits: [] })).toThrow(
-      ZodError,
-    );
+  it('should accept an empty edits list, which applyEdits then fails', () => {
+    expect(() => documentPatchRepairSchema.parse({ edits: [] })).not.toThrow();
   });
 
   it('should accept 40 edits and reject 41', () => {
@@ -166,10 +164,10 @@ describe('documentPatchRepairSchema', () => {
     );
   });
 
-  it('should reject an edit with an empty find, and accept an empty replace', () => {
+  it('should accept an empty find, which applyEdits then fails, and an empty replace', () => {
     expect(() =>
       documentPatchRepairSchema.parse({ edits: [{ find: '', replace: 'x' }] }),
-    ).toThrow(ZodError);
+    ).not.toThrow();
     expect(() =>
       documentPatchRepairSchema.parse({ edits: [{ find: 'x', replace: '' }] }),
     ).not.toThrow();
@@ -191,11 +189,10 @@ describe('documentPatchRepairSchema', () => {
     expect(jsonSchema.required ?? []).toEqual([]);
     expect(jsonSchema.properties?.edits).toMatchObject({
       type: 'array',
-      minItems: 1,
       maxItems: 40,
       items: {
         properties: {
-          find: { type: 'string', minLength: 1 },
+          find: { type: 'string' },
           replace: { type: 'string' },
         },
         required: ['find', 'replace'],

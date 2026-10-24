@@ -174,7 +174,9 @@ export async function repair(
 
   const spent = round + answered.envelopeRepairs;
   ctx.diagnostics.recordRepairsSpent(spent);
-  ctx.diagnostics.recordRepair({ kind, mode, ...answered.diagnostic });
+  if (answered.diagnostic !== null) {
+    ctx.diagnostics.recordRepair({ kind, mode, ...answered.diagnostic });
+  }
   return {
     candidate: answered.candidate,
     repairsSpent: spent,
@@ -190,7 +192,8 @@ interface RoundAnswer {
   /** Zod repair turns spent across the round's calls. */
   envelopeRepairs: number;
   fallbacksSpent?: number;
-  diagnostic: Pick<RepairDiagnostic, 'edits' | 'fallback'>;
+  /** `null` when the round recorded its own entry: edits that did not apply. */
+  diagnostic: Pick<RepairDiagnostic, 'edits' | 'fallback'> | null;
 }
 
 async function repairInFull(
@@ -211,8 +214,8 @@ async function repairInFull(
 }
 
 /**
- * A `patch`-mode round. Failed edits are never retried as edits: the fallback
- * asks for the whole Candidate Source, and once the job attempt has spent it,
+ * A `patch`-mode round. Failed edits never get a second set of edits: the
+ * fallback asks for the whole Candidate Source, and once the job attempt has spent it,
  * failed edits are terminal.
  */
 async function repairWithEdits(
@@ -246,17 +249,18 @@ async function repairWithEdits(
     };
   }
 
+  // Recorded now, before the fallback can end the run, so the eval's
+  // fallback rate counts every round whose edits did not apply.
+  ctx.diagnostics.recordRepair({
+    kind,
+    mode: 'patch',
+    edits: edits.length,
+    fallback: true,
+  });
   const spent = fallbacksSpent ?? 0;
   if (spent >= DOCUMENT_REPAIR_FALLBACKS) {
-    // Recorded so the eval's fallback rate counts this round too. The
-    // problems quote the edits, so only their count is named.
+    // The problems quote the edits, so only their count is named.
     ctx.diagnostics.recordRepairsSpent(round + answer.envelopeRepairs);
-    ctx.diagnostics.recordRepair({
-      kind,
-      mode: 'patch',
-      edits: edits.length,
-      fallback: true,
-    });
     throw terminal(
       `The ${edits.length} edit(s) Repair round ${round} answered for ${label} did not apply (${patched.problems.length} problem(s)), and the job attempt's fallback is spent`,
       undefined,
@@ -285,7 +289,7 @@ async function repairWithEdits(
     candidate: fallback.html,
     envelopeRepairs: answer.envelopeRepairs + fallback.envelopeRepairs,
     fallbacksSpent: spent + 1,
-    diagnostic: { edits: edits.length, fallback: true },
+    diagnostic: null,
   };
 }
 

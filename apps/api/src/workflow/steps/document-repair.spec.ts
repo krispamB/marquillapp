@@ -266,6 +266,28 @@ describe('document-repair', () => {
           });
         });
 
+        it('should still record the round as a fallback when the fallback call fails', async () => {
+          mocks.agent.repairDocumentFallback.mockRejectedValue(
+            new Error('provider down'),
+          );
+
+          await expect(
+            repair(
+              scope('patch'),
+              { candidate: CANDIDATE, repairsSpent: 0 },
+              [finding],
+              'static',
+            ),
+          ).rejects.toThrow('provider down');
+
+          expect(mocks.diagnostics.recordRepair).toHaveBeenCalledWith({
+            kind: 'static',
+            mode: 'patch',
+            edits: 1,
+            fallback: true,
+          });
+        });
+
         it('should bill the fallback through the metered hooks', async () => {
           mocks.agent.repairDocumentFallback.mockImplementation(
             (_input, hooks: { onUsage: (usage: unknown) => void }) => {

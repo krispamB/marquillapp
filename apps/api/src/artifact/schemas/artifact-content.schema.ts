@@ -153,8 +153,10 @@ export const documentRepairSchema = z.object({
 /** The most edits one patch-mode Repair may answer with (§7.2). */
 export const MAX_REPAIR_EDITS = 40;
 
+// No minimum on `edits` or `find`: an empty list or find is an `applyEdits`
+// failure, which earns the `{ html }` fallback rather than an envelope repair.
 const candidateEditSchema = z.object({
-  find: z.string().min(1, 'find must not be empty'),
+  find: z.string(),
   replace: z.string(),
 });
 
@@ -168,15 +170,13 @@ const candidateEditSchema = z.object({
  */
 export const documentPatchRepairSchema = z
   .object({
-    edits: z.array(candidateEditSchema).min(1).max(MAX_REPAIR_EDITS).optional(),
+    edits: z.array(candidateEditSchema).max(MAX_REPAIR_EDITS).optional(),
     html: candidateHtmlSchema.optional(),
   })
   .refine(
     ({ edits, html }) => (edits === undefined) !== (html === undefined),
     'answer with exactly one of edits and html; the other must be null',
   );
-
-export type DocumentPatchRepair = z.infer<typeof documentPatchRepairSchema>;
 
 export type DocumentDraft = z.infer<typeof documentDraftSchema> & {
   title?: string;

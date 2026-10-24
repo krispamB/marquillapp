@@ -58,7 +58,7 @@ const lineBudget = (ds: DesignSystemDefinition): string => {
     (height - safeArea.top - safeArea.bottom) / (body.px * body.lineHeight),
   );
   const fill = Math.floor(lines * LINE_BUDGET_FILL);
-  return `\n- At ${body.px}px/${body.lineHeight} body text the usable box holds about ${lines} lines, headings and gaps included. Fill at most 80% of that (about ${fill} lines); cut words rather than shrink type.`;
+  return `\n- At ${body.px}px/${body.lineHeight} body text the usable box holds about ${lines} lines, headings and gaps included. Fill at most ${LINE_BUDGET_FILL * 100}% of that (about ${fill} lines); cut words rather than shrink type.`;
 };
 
 function buildPromptFragment(ds: DesignSystemDefinition): string {

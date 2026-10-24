@@ -629,7 +629,9 @@ or page-scoped repair proves necessary.
   result is unchecked, so it goes back through `check()` and render like any Repair answer.
 - **Fallback.** When the edits do not apply, the same round sends one warm follow-up in the same
   conversation, listing the problems, answered with `{ html }`. It is billed but does not count
-  against `DOCUMENT_REPAIR_BUDGET`, and a job attempt gets at most one. If that fallback is already
+  against `DOCUMENT_REPAIR_BUDGET`, and a job attempt gets at most one. An envelope repair turn
+  inside the fallback still counts, as it does for any call. Empty `edits` or an empty `find` pass
+  the schema and fail in `applyEdits`, so they earn the fallback too. If that fallback is already
   spent, failed edits end the run as `document.repair_exhausted`. A worst case per job attempt in
   `patch` mode is therefore one more model call than above.
 
