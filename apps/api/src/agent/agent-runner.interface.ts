@@ -73,12 +73,20 @@ export interface ResearchSource {
   url: string;
 }
 
-// `findings` is the agent's own synthesis after searching, not a dump of raw
-// search bodies. Stored verbatim on WorkflowRun.researchContext so a refine
-// reuses it with zero re-search.
+/**
+ * How research was done (`RESEARCH_MODE`). Absent means `agent`, which is what
+ * every research result stored before snippet mode existed was.
+ */
+export type ResearchMode = 'agent' | 'snippets';
+
+// In `agent` mode `findings` is the agent's own synthesis after searching, not
+// a dump of raw search bodies. In `snippets` mode it is the numbered raw web
+// excerpts ("[n] Title (url)" blocks), and `mode` says so. Stored verbatim on
+// WorkflowRun.researchContext so a refine reuses it with zero re-search.
 export interface ResearchResult {
   findings: string;
   sources: ResearchSource[];
+  mode?: ResearchMode;
 }
 
 export interface ResearchInput extends SessionAffinity {
