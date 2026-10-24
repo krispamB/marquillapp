@@ -124,6 +124,7 @@ Copy `.env.example` and fill in real values. Required keys not in the example:
 - `GENERATION_MODEL`, `RESEARCH_MODEL` — OpenRouter model identifiers used by `AgentRunnerService`
 
 Optional keys in the example (worker):
+- `POST_GENERATION_MODEL`, `POLL_GENERATION_MODEL` (default `GENERATION_MODEL`; unset or blank falls back) — the OpenRouter model for POST or POLL generation and its Zod repair turn (`resolveTextGenerationModels`, `src/agent/generation-model.ts`). DOCUMENT always uses `GENERATION_MODEL`. Pick them with `bun run eval:text` (`docs/text-eval-runbook.md`).
 - `TAVILY_TIMEOUT_S` (default `10`) — per-search Tavily timeout in seconds
 - `TAVILY_SEARCH_DEPTH` (default `advanced`, or `basic`) — Tavily search depth
 - `RESEARCH_REASONING_EFFORT`, `GENERATION_REASONING_EFFORT`, `DOCUMENT_DRAFT_REASONING_EFFORT`, `DOCUMENT_REPAIR_REASONING_EFFORT` (default unset: no effort sent) — reasoning effort for each call site of `AgentRunnerService`; an unknown value fails worker boot. Which efforts a model accepts differs per model, so check the model before setting one (see `.env.example`).
