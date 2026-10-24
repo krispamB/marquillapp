@@ -73,6 +73,8 @@ type RunEventData =
   | { seq: number; ts: number; step: WorkflowStep; index: number; total: number }
   | { seq: number; ts: number; step: WorkflowStep; sourcesFound: number }
   | { seq: number; ts: number; step: 'GENERATE'; phase: 'draft' }
+  | { seq: number; ts: number; step: 'GENERATE'; phase: 'writing'; partial: { commentary: string } }
+  | { seq: number; ts: number; step: 'GENERATE'; phase: 'rewrite' }
   | { seq: number; ts: number; step: 'GENERATE'; phase: 'repair'; round: 1 | 2; violations: number }
   | { seq: number; ts: number; step: 'RENDER_PDF'; phase: 'render'; session: number }
   | { seq: number; ts: number; step: 'RENDER_PDF'; phase: 'repair'; round: 1 | 2; violations: number }
@@ -94,6 +96,7 @@ type RunFailureCode =
 `step.progress` signals:
 
 - `RESEARCH`: `sourcesFound`.
+- POST and POLL `GENERATE`, only while the worker's `STREAM_POST_COMMENTARY` switch is on: `{ phase: 'writing', partial: { commentary } }` at most every 250 ms while the model writes, where `commentary` is the whole commentary written so far (replace your preview with it; it is not a delta). `{ phase: 'rewrite' }` when the draft failed validation and the model writes it again: drop the preview. Drop it too on a `step.failed` with `retryable: true`, since the retry starts over. The preview is never the saved content; render the artifact from `run.completed`. A POLL whose commentary is `null` sends no `writing` phase.
 - DOCUMENT `GENERATE`: `{ phase: 'draft' }` when the model starts writing the document, then `{ phase: 'repair', round, violations }` each time the model is sent the rule breaks it must fix. `round` counts the run's Repairs (at most 2 per job attempt); `violations` is how many rule breaks were found.
 - DOCUMENT `RENDER_PDF`: `{ phase: 'render', session }` when a render session starts, and `{ phase: 'repair', round, violations }` each time the model is sent what the render found, or rule breaks in its fix. `round` is the same counter as in `GENERATE`: the run shares one budget of 2 Repairs per job attempt. `{ phase: 'retry', cause }` when a session timed out or a font failed to load, and the same document is rendered once more; a `render` phase with the next `session` number follows.
 

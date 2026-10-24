@@ -126,6 +126,7 @@ Copy `.env.example` and fill in real values. Required keys not in the example:
 
 Optional keys in the example (worker):
 - `POST_GENERATION_MODEL`, `POLL_GENERATION_MODEL` (default `GENERATION_MODEL`; unset or blank falls back) — the OpenRouter model for POST or POLL generation and its Zod repair turn (`resolveTextGenerationModels`, `src/agent/generation-model.ts`). DOCUMENT always uses `GENERATION_MODEL`. Pick them with `bun run eval:text` (`docs/text-eval-runbook.md`).
+- `STREAM_POST_COMMENTARY` (default `false`; `true`/`1` or `false`/`0`, anything else fails boot) — POST and POLL `generate` streams the model's answer (`CompletionOptions.onTextDelta`, same per-try timeout and retry loop), `extractStringField` reads the partial `commentary` out of the JSON so far, and `GENERATE` emits it as `step.progress { phase: 'writing', partial: { commentary } }` at most every 250 ms (`commentaryPreview`, `src/workflow/steps/commentary-preview.ts`), with `phase: 'rewrite'` before a Zod repair. Off changes nothing.
 - `TAVILY_TIMEOUT_S` (default `10`) — per-search Tavily timeout in seconds
 - `TAVILY_SEARCH_DEPTH` (default `advanced`, or `basic`) — Tavily search depth
 - `RESEARCH_REASONING_EFFORT`, `GENERATION_REASONING_EFFORT`, `DOCUMENT_DRAFT_REASONING_EFFORT`, `DOCUMENT_REPAIR_REASONING_EFFORT` (default unset: no effort sent) — reasoning effort for each call site of `AgentRunnerService`; an unknown value fails worker boot. Which efforts a model accepts differs per model, so check the model before setting one (see `.env.example`).
