@@ -46,6 +46,10 @@ import type {
   ResearchSource,
   Tool,
 } from './agent-runner.interface';
+import {
+  resolveTextGenerationModels,
+  type TextGenerationModels,
+} from './generation-model';
 import { readReasoningEffort } from './reasoning-effort';
 import {
   buildDocumentGenerationUserPrompt,
@@ -165,6 +169,8 @@ const toToolDefinition = (tool: Tool): ToolDefinition => ({
 export class AgentRunnerService implements AgentRunner {
   private readonly logger = new Logger(AgentRunnerService.name);
   private readonly generationModel: string;
+  // POST and POLL generation (and its Zod repair); DOCUMENT keeps generationModel.
+  private readonly textModels: TextGenerationModels;
   private readonly researchModel: string;
   private readonly researchMaxSteps: number;
   private readonly researchMaxSuccessfulSearches: number;
@@ -185,6 +191,9 @@ export class AgentRunnerService implements AgentRunner {
   ) {
     this.generationModel =
       this.configService.getOrThrow<string>('GENERATION_MODEL');
+    this.textModels = resolveTextGenerationModels(this.generationModel, (key) =>
+      this.configService.get<string | number>(key),
+    );
     this.researchModel =
       this.configService.getOrThrow<string>('RESEARCH_MODEL');
     this.researchMaxSteps = this.readMaxSteps();
@@ -419,7 +428,8 @@ export class AgentRunnerService implements AgentRunner {
     };
 
     const options = {
-      model: this.generationModel,
+      model:
+        this.textModels[input.type === ArtifactType.POLL ? 'POLL' : 'POST'],
       ...callOptions(this.generationReasoningEffort, input.sessionId),
     };
 
