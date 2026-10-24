@@ -127,6 +127,21 @@ const fromEmbeddedError = (error: unknown): LLMError => {
 };
 
 /**
+ * A provider failure in the middle of a stream: the status was already
+ * `200 OK`, so the error arrives as a chunk's `error`, and its `code` carries
+ * the verdict as an HTTP status would. A code that is not an error status is
+ * retryable, as an unreadable code after `200 OK` is.
+ */
+export const fromStreamError = (error: {
+  code: number;
+  message: string;
+}): LLMError =>
+  new LLMError(error.message || 'Provider failed mid-stream', {
+    retryable: error.code < 400 || isRetryableStatus(error.code),
+    statusCode: error.code,
+  });
+
+/**
  * Normalize anything thrown by a provider SDK into an `LLMError`.
  *
  * Matches structurally rather than with `instanceof` against the SDK's error

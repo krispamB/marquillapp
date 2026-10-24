@@ -1,4 +1,4 @@
-import { LLMError, toLLMError } from './llm.error';
+import { LLMError, fromStreamError, toLLMError } from './llm.error';
 
 /** Stand-in for the SDK's `OpenRouterError`, which carries `statusCode`. */
 const makeHttpError = (statusCode: number, message = 'boom') =>
@@ -262,6 +262,33 @@ describe('toLLMError', () => {
       expect(error).toBeInstanceOf(LLMError);
       expect(error.retryable).toBe(false);
       expect(error.cause).toBe('a bare string');
+    });
+  });
+});
+
+describe('fromStreamError', () => {
+  it.each([429, 502, 503])(
+    'should mark it retryable when the chunk carries code %i',
+    (code) => {
+      const error = fromStreamError({ code, message: 'Upstream died' });
+      expect(error).toMatchObject({
+        retryable: true,
+        statusCode: code,
+        message: 'Upstream died',
+      });
+    },
+  );
+
+  it('should mark it terminal when the chunk carries a client error code', () => {
+    expect(fromStreamError({ code: 400, message: 'bad' }).retryable).toBe(
+      false,
+    );
+  });
+
+  it('should mark it retryable when the code is not an error status', () => {
+    expect(fromStreamError({ code: 0, message: '' })).toMatchObject({
+      retryable: true,
+      message: 'Provider failed mid-stream',
     });
   });
 });

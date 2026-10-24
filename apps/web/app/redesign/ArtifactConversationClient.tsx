@@ -597,6 +597,9 @@ export default function ArtifactConversationClient({
                   artifactId={artifactId}
                   onRetryLoad={retryCompletedVersion}
                 />
+                {run.draftCommentary ? (
+                  <p className="mq-studio-post-copy mq-studio-draft-preview">{run.draftCommentary}</p>
+                ) : null}
               </div>
             </div>
           ) : null}

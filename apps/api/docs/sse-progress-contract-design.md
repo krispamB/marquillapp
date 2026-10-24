@@ -156,6 +156,15 @@ the client contract:
   a step emits it via `ctx.emit` only when it has a meaningful sub-signal
   (research `sourcesFound`, PDF `pageRendered`). Clients must treat it as
   best-effort UI polish, never as a required checkpoint.
+- **Streamed commentary (`STREAM_POST_COMMENTARY`, #238).** With the switch
+  on, POST and POLL `GENERATE` stream the model's answer and emit
+  `{ step: 'GENERATE', phase: 'writing', partial: { commentary } }` at most
+  every 250 ms while the commentary grows. `partial.commentary` is the whole
+  commentary written so far, not a delta, so a client replaces its preview
+  with it and loses nothing when an event is skipped. `{ phase: 'rewrite' }`
+  comes before a Zod repair turn, which writes the commentary again: the
+  client drops its preview. A retrying `step.failed` drops it too. The preview
+  is never the result; `run.completed` is. With the switch off nothing changes.
 - **Progress-bar math** is `index/total` from `step.started/completed`, where
   `total = steps.length` from `run.started`. Because #98 §2's builder emits an
   **honest** step list (only steps that actually run), `total` is exact — no

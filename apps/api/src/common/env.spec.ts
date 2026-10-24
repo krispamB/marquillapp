@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { readIntEnv } from './env';
+import { readBoolEnv, readIntEnv } from './env';
 
 describe('readIntEnv', () => {
   it('should return the default when the key is unset or blank', () => {
@@ -42,4 +42,36 @@ describe('readIntEnv', () => {
   it('should allow negatives only when min permits', () => {
     expect(readIntEnv({ K: '-1' }, 'K', { default: 0, min: -5 })).toBe(-1);
   });
+});
+
+describe('readBoolEnv', () => {
+  it('should return the default when the key is unset or blank', () => {
+    expect(readBoolEnv({}, 'K', false)).toBe(false);
+    expect(readBoolEnv({ K: ' ' }, 'K', true)).toBe(true);
+  });
+
+  it.each([
+    ['true', true],
+    ['TRUE', true],
+    ['1', true],
+    [' false ', false],
+    ['0', false],
+  ])('should read %p as %p', (value, expected) => {
+    expect(readBoolEnv({ K: value }, 'K', !expected)).toBe(expected);
+  });
+
+  it('should read the value when the source is a ConfigService', () => {
+    expect(readBoolEnv(new ConfigService({ K: 'true' }), 'K', false)).toBe(
+      true,
+    );
+  });
+
+  it.each(['yes', 'on', '2'])(
+    'should throw naming the key and the value when the value is %s',
+    (value) => {
+      expect(() => readBoolEnv({ K: value }, 'K', false)).toThrow(
+        new RegExp(`K.*${value}`),
+      );
+    },
+  );
 });

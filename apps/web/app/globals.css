@@ -743,6 +743,7 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
 .mq-studio-overflow-menu button:disabled { cursor: not-allowed; opacity: .45; }
 .mq-delete-error { padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--neg) 7%, var(--surface)); color: var(--neg) !important; font-size: 11px !important; }
 .mq-studio-post-copy { color: var(--ink-900); font-size: 15px; line-height: 1.72; white-space: pre-wrap; }
+.mq-studio-draft-preview { margin: 14px 0 0; color: var(--ink-700); }
 .mq-studio-poll-copy { display: flex; flex-direction: column; gap: 14px; }
 .mq-studio-poll-copy > p { margin: 0 0 2px; color: var(--ink-700); font-size: 14px; line-height: 1.65; white-space: pre-wrap; }
 .mq-studio-poll-copy label { display: flex; flex-direction: column; gap: 6px; }

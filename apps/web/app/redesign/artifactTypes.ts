@@ -87,8 +87,13 @@ export type RunProgressEvent = {
   step: WorkflowStep;
   /** RESEARCH. */
   sourcesFound?: number;
-  /** DOCUMENT `GENERATE` (`draft`) and `RENDER_PDF` (`render`). */
+  /**
+   * DOCUMENT `GENERATE` (`draft`) and `RENDER_PDF` (`render`); POST and POLL
+   * `GENERATE` (`writing`, `rewrite`) when commentary streams.
+   */
   phase?: string;
+  /** POST and POLL `GENERATE` `writing`: the whole commentary written so far. */
+  partial?: { commentary?: string };
   /** DOCUMENT `RENDER_PDF`: the render session number. */
   session?: number;
 };
