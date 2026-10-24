@@ -9,6 +9,7 @@ import type {
   ChatFunctionTool,
   ChatMessages,
   ChatResult,
+  ChatStreamChunk,
   ChatUsage,
 } from '@openrouter/sdk/models';
 import { z } from 'zod';
@@ -23,7 +24,7 @@ import {
   ToolTurnResult,
   Usage,
 } from '../interfaces';
-import { LLMError, toLLMError } from '../errors';
+import { LLMError, fromStreamError, toLLMError } from '../errors';
 import {
   jitterMs,
   readRetryPolicy,
@@ -344,10 +345,75 @@ export class OpenRouterStrategy implements LLMStrategy {
       stream: false as const,
     };
 
+    const onTextDelta = tools ? undefined : options?.onTextDelta;
+    if (onTextDelta) {
+      return this.sendWithRetries(
+        (signal) =>
+          this.streamOnce({ ...chatRequest, stream: true }, signal, onTextDelta),
+        options,
+      );
+    }
+
     return this.sendWithRetries(
       (signal) => this.client.chat.send({ chatRequest }, { signal }),
       options,
     );
+  }
+
+  /**
+   * One streamed try, gathered back into the `ChatResult` a non-streamed try
+   * returns. The per-try timeout covers the whole stream, and there is no
+   * shorter idle timer: a reasoning model sends nothing while it thinks. A
+   * provider error mid-stream is classified as an HTTP status would be. A
+   * delta callback that throws loses its preview, never the call.
+   */
+  private async streamOnce(
+    chatRequest: Parameters<OpenRouter['chat']['send']>[0]['chatRequest'] & {
+      stream: true;
+    },
+    signal: AbortSignal,
+    onTextDelta: (delta: string, text: string) => void,
+  ): Promise<ChatResult> {
+    const stream = await this.client.chat.send({ chatRequest }, { signal });
+    let text = '';
+    let finishReason: ChatResult['choices'][number]['finishReason'] = null;
+    let usage: ChatUsage | undefined;
+    let last: ChatStreamChunk | undefined;
+
+    for await (const chunk of stream) {
+      if (chunk.error) throw fromStreamError(chunk.error);
+      last = chunk;
+      usage = chunk.usage ?? usage;
+      const choice = chunk.choices[0];
+      finishReason = choice?.finishReason ?? finishReason;
+      const delta = choice?.delta?.content;
+      if (!delta) continue;
+      text += delta;
+      try {
+        onTextDelta(delta, text);
+      } catch (error: unknown) {
+        this.logger.warn(
+          `A text delta callback failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    return {
+      id: last?.id ?? '',
+      created: last?.created ?? 0,
+      model: last?.model ?? '',
+      object: 'chat.completion',
+      systemFingerprint: null,
+      choices: [
+        {
+          index: 0,
+          finishReason,
+          // No text reads as no content, as it does unstreamed.
+          message: { role: 'assistant', content: text === '' ? null : text },
+        },
+      ],
+      ...(usage ? { usage } : {}),
+    };
   }
 
   /**

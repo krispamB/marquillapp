@@ -1145,4 +1145,188 @@ describe('OpenRouterStrategy', () => {
       expect((await outcome).value).toMatchObject({ text: 'done' });
     });
   });
+
+  describe('streaming', () => {
+    const user: LLMMessage[] = [{ role: MessageRole.User, content: 'hi' }];
+    const chunk = (
+      content: string | undefined,
+      extra: Record<string, unknown> = {},
+      finishReason: string | null = null,
+    ) => ({
+      id: 'gen-1',
+      created: 1,
+      model: 'provider/answered-model',
+      object: 'chat.completion.chunk',
+      choices: [{ index: 0, delta: { content }, finishReason }],
+      ...extra,
+    });
+    /** What `chat.send` resolves to with `stream: true`: an async iterable of chunks. */
+    const streamOf = (...chunks: unknown[]) => ({
+      // eslint-disable-next-line @typescript-eslint/require-await
+      async *[Symbol.asyncIterator]() {
+        for (const c of chunks) yield c;
+      },
+    });
+    const settle = <T>(
+      promise: Promise<T>,
+    ): Promise<{ value?: T; error?: unknown }> =>
+      promise.then(
+        (value) => ({ value }),
+        (error: unknown) => ({ error }),
+      );
+
+    let random: jest.SpyInstance;
+
+    beforeEach(() => {
+      random = jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    });
+
+    afterEach(() => random.mockRestore());
+
+    it('should send stream: true when the call asks for text deltas', async () => {
+      send.mockResolvedValue(streamOf(chunk('ok', {}, 'stop')));
+
+      await strategy.complete(user, { onTextDelta: jest.fn() });
+
+      expect(lastChatRequest().stream).toBe(true);
+    });
+
+    it('should keep stream: false when the call asks for no text deltas', async () => {
+      send.mockResolvedValue({ choices: [{ message: { content: 'ok' } }] });
+
+      await strategy.complete(user);
+
+      expect(lastChatRequest().stream).toBe(false);
+    });
+
+    it('should pass each delta and the text so far, and return the whole text with usage, finish reason and model', async () => {
+      send.mockResolvedValue(
+        streamOf(
+          chunk('{"comm'),
+          chunk(undefined),
+          chunk('entary":"Hi"}', {}, 'stop'),
+          chunk('', { usage, choices: [] }),
+        ),
+      );
+      const onTextDelta = jest.fn();
+
+      const result = await strategy.complete(user, { onTextDelta });
+
+      expect(onTextDelta.mock.calls).toEqual([
+        ['{"comm', '{"comm'],
+        ['entary":"Hi"}', '{"commentary":"Hi"}'],
+      ]);
+      expect(result).toEqual({
+        text: '{"commentary":"Hi"}',
+        usage: {
+          promptTokens: 120,
+          completionTokens: 30,
+          totalTokens: 150,
+          cost: 0.00042,
+          latencyMs: 0,
+        },
+        finishReason: 'stop',
+        model: 'provider/answered-model',
+      });
+    });
+
+    it('should return empty text when the stream is cut off at the token cap before any text', async () => {
+      send.mockResolvedValue(streamOf(chunk(undefined, { usage }, 'length')));
+
+      await expect(
+        strategy.complete(user, { onTextDelta: jest.fn() }),
+      ).resolves.toMatchObject({ text: '', finishReason: 'length' });
+    });
+
+    it('should throw a terminal error when the stream ends with no text', async () => {
+      send.mockResolvedValue(streamOf(chunk(undefined, {}, 'stop')));
+
+      await expect(
+        strategy.complete(user, { onTextDelta: jest.fn() }),
+      ).rejects.toMatchObject({ name: 'LLMError', retryable: false });
+    });
+
+    it('should retry from empty text when the provider sends an error mid-stream', async () => {
+      send
+        .mockResolvedValueOnce(
+          streamOf(
+            chunk('{"commentary":"Dra'),
+            chunk(undefined, { error: { code: 502, message: 'Upstream died' } }, 'error'),
+          ),
+        )
+        .mockResolvedValueOnce(streamOf(chunk('{"commentary":"New"}', {}, 'stop')));
+      const onTextDelta = jest.fn();
+
+      const outcome = settle(strategy.complete(user, { onTextDelta }));
+      await jest.runAllTimersAsync();
+
+      expect((await outcome).value).toMatchObject({
+        text: '{"commentary":"New"}',
+      });
+      expect(send).toHaveBeenCalledTimes(2);
+      expect(onTextDelta).toHaveBeenLastCalledWith(
+        '{"commentary":"New"}',
+        '{"commentary":"New"}',
+      );
+    });
+
+    it('should not retry when the provider sends a client error mid-stream', async () => {
+      send.mockResolvedValue(
+        streamOf(chunk(undefined, { error: { code: 400, message: 'bad' } })),
+      );
+
+      await expect(
+        strategy.complete(user, { onTextDelta: jest.fn() }),
+      ).rejects.toMatchObject({ retryable: false, statusCode: 400 });
+      expect(send).toHaveBeenCalledTimes(1);
+    });
+
+    it('should end a stream that stalls at the per-try timeout and run the next try', async () => {
+      send
+        .mockImplementationOnce(
+          (_request: unknown, { signal }: { signal: AbortSignal }) =>
+            Promise.resolve({
+              async *[Symbol.asyncIterator]() {
+                yield chunk('{"comm');
+                await new Promise((_resolve, reject) => {
+                  signal.addEventListener('abort', () =>
+                    reject(signal.reason as Error),
+                  );
+                });
+              },
+            }),
+        )
+        .mockResolvedValueOnce(streamOf(chunk('{"commentary":"x"}', {}, 'stop')));
+
+      const outcome = settle(strategy.complete(user, { onTextDelta: jest.fn() }));
+      // No short idle timer: a silent stream survives until the try's timeout.
+      await jest.advanceTimersByTimeAsync(239_999);
+      expect(send).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(1);
+      await jest.advanceTimersByTimeAsync(500);
+
+      expect((await outcome).value).toMatchObject({ text: '{"commentary":"x"}' });
+      expect(send).toHaveBeenCalledTimes(2);
+    });
+
+    it('should finish the call when the delta callback throws', async () => {
+      send.mockResolvedValue(streamOf(chunk('ok', {}, 'stop')));
+
+      await expect(
+        strategy.complete(user, {
+          onTextDelta: () => {
+            throw new Error('preview broke');
+          },
+        }),
+      ).resolves.toMatchObject({ text: 'ok' });
+    });
+
+    it('should not stream completeWithTools when it is given a delta callback', async () => {
+      send.mockResolvedValue({ choices: [{ message: { content: 'done' } }] });
+
+      await strategy.completeWithTools(user, [], { onTextDelta: jest.fn() });
+
+      expect(lastChatRequest().stream).toBe(false);
+    });
+  });
 });

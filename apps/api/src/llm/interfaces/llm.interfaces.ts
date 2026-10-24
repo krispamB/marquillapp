@@ -126,6 +126,13 @@ export type CompletionOptions = {
   deadlineAt?: number;
   /** Aborts the call. An abort is final: it is never retried. */
   signal?: AbortSignal;
+  /**
+   * Streams a `complete` call: called with each piece of text as it arrives,
+   * and the try's text so far. A retried try starts its text again from
+   * empty. The result is unchanged: the same text, usage and finish reason
+   * once the stream ends. Ignored by `completeWithTools`.
+   */
+  onTextDelta?: (delta: string, text: string) => void;
   responseSchema?: {
     name: string;
     schema: ZodType;
