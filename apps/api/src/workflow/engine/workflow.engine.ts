@@ -1,5 +1,7 @@
 import { UnrecoverableError } from 'bullmq';
 import type { Logger } from '@nestjs/common';
+import { ArtifactType, RunKind } from '../../database/schemas';
+import type { ArtifactContent } from '../../artifact/schemas';
 import { FailureCode, WorkflowStep } from '../workflow.constants';
 import { RunEventEmitter } from './run-event.emitter';
 import { RunEventType } from './run-event.types';
@@ -103,7 +105,11 @@ export async function runWorkflow(
   // Promise.all complete + commit: the run must be persisted first.
   emitter.emit({
     type: RunEventType.RUN_COMPLETED,
-    data: { artifactId: input.artifactId, version: input.version },
+    data: {
+      artifactId: input.artifactId,
+      version: input.version,
+      ...inlineResult(input, state),
+    },
   });
   try {
     await ctx.meter.commit();
@@ -114,6 +120,25 @@ export async function runWorkflow(
   }
 
   return state;
+}
+
+/**
+ * POST and POLL only: what `PERSIST_VERSION` promoted, so the web can render
+ * the finished version without the follow-up read. `title` rides along on an
+ * INITIAL run, the only run `promoteVersion` writes one for. A DOCUMENT's
+ * content is a signed PDF link minted per read, so it is never inlined.
+ */
+function inlineResult(
+  input: BuildInput,
+  state: RunState,
+): { content?: ArtifactContent; title?: string } {
+  if (input.type === ArtifactType.DOCUMENT || !state.content) return {};
+  return {
+    content: state.content,
+    ...(input.kind === RunKind.INITIAL && state.generatedTitle !== undefined
+      ? { title: state.generatedTitle }
+      : {}),
+  };
 }
 
 /**

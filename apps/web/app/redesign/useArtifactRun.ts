@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
+  ArtifactContent,
   ArtifactRunKind,
   ArtifactType,
   RunCompletedEvent,
@@ -37,12 +38,50 @@ export type RunState = {
   retryVersion?: number;
 };
 
+/** A live `run.completed`'s own copy of the finished version, in place of the follow-up GET. */
+export type InlineArtifactResult = {
+  artifactId: string;
+  type: ArtifactType;
+  content: ArtifactContent;
+  title?: string;
+};
+
+/**
+ * A `run.completed` older than this was replayed from the retained stream
+ * rather than observed live, so the GET is the source of truth.
+ */
+const LIVE_COMPLETION_MAX_AGE_MS = 30_000;
+
+function inlineResultOf(
+  data: RunCompletedEvent,
+  started: { kind: ArtifactRunKind; type: ArtifactType } | null,
+  artifactId: string | undefined,
+): InlineArtifactResult | undefined {
+  if (!started || !artifactId || data.artifactId !== artifactId) return undefined;
+  if (started.type !== "POST" && started.type !== "POLL") return undefined;
+  if (Date.now() - data.ts > LIVE_COMPLETION_MAX_AGE_MS) return undefined;
+  const { content } = data;
+  if (!content || typeof content !== "object") return undefined;
+  if (started.type === "POST" && typeof content.commentary !== "string") return undefined;
+  if (started.type === "POLL" && !content.poll) return undefined;
+  const title = data.title?.trim();
+  if (started.kind === "INITIAL" && !title) return undefined;
+  return { artifactId, type: started.type, content, ...(title ? { title } : {}) };
+}
+
 type UseArtifactRunOptions = {
+  /** The artifact this page shows; a completion for another artifact never renders inline. */
+  artifactId?: string;
   runId?: string;
   enabled: boolean;
   initialType?: ArtifactType;
   onType: (type: ArtifactType) => void;
-  onArtifactReady: (version: number, credits: number) => Promise<void>;
+  /** `inline` is present only for a live POST or POLL completion that carried its content. */
+  onArtifactReady: (
+    version: number,
+    credits: number,
+    inline?: InlineArtifactResult,
+  ) => Promise<void>;
   onTerminalFailure: () => void;
 };
 
@@ -51,6 +90,7 @@ function updateStep(steps: ProgressStep[], step: WorkflowStep, patch: Partial<Pr
 }
 
 export function useArtifactRun({
+  artifactId,
   runId,
   enabled,
   initialType,
@@ -69,8 +109,11 @@ export function useArtifactRun({
   const terminalRef = useRef(false);
   const initialTypeRef = useRef(initialType);
   initialTypeRef.current = initialType;
+  const artifactIdRef = useRef(artifactId);
+  artifactIdRef.current = artifactId;
+  const startedRef = useRef<{ kind: ArtifactRunKind; type: ArtifactType } | null>(null);
 
-  const loadCompletedVersion = useCallback(async (version: number) => {
+  const loadCompletedVersion = useCallback(async (version: number, inline?: InlineArtifactResult) => {
     setRun((current) => current ? {
       ...current,
       status: "loading-result",
@@ -86,7 +129,13 @@ export function useArtifactRun({
     });
 
     try {
-      await onArtifactReady(version, runCreditsRef.current);
+      try {
+        await onArtifactReady(version, runCreditsRef.current, inline);
+      } catch (reason) {
+        // The inline copy could not be shown; the GET is the fallback.
+        if (!inline) throw reason;
+        await onArtifactReady(version, runCreditsRef.current);
+      }
       setRun(null);
     } catch (reason) {
       setRun((current) => ({
@@ -108,6 +157,7 @@ export function useArtifactRun({
     lastSeqRef.current = 0;
     runCreditsRef.current = 0;
     terminalRef.current = false;
+    startedRef.current = null;
     setRun({ status: "connecting", kind, type, steps: [], credits: 0 });
   }, []);
 
@@ -141,6 +191,7 @@ export function useArtifactRun({
     lastSeqRef.current = 0;
     runCreditsRef.current = 0;
     terminalRef.current = false;
+    startedRef.current = null;
     const events = new EventSource(
       `${API_BASE}/runs/${encodeURIComponent(runId)}/events`,
       { withCredentials: true },
@@ -170,6 +221,7 @@ export function useArtifactRun({
       const data = accept<RunStartedEvent>(event as MessageEvent<string>);
       if (!data) return;
       onType(data.type);
+      startedRef.current = { kind: data.kind, type: data.type };
       runCreditsRef.current = 0;
       setRun({
         status: "running",
@@ -230,7 +282,10 @@ export function useArtifactRun({
       if (!data) return;
       terminalRef.current = true;
       events.close();
-      void loadCompletedVersion(data.version);
+      void loadCompletedVersion(
+        data.version,
+        inlineResultOf(data, startedRef.current, artifactIdRef.current),
+      );
     };
 
     const onFailed = (event: Event) => {

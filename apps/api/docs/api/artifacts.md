@@ -324,6 +324,6 @@ Soft-deletes an artifact. It disappears from list results and cannot be refined,
 1. Submit `POST /artifacts` or `POST /artifacts/:id/refine`.
 2. Store the returned `artifactId`, `runId`, and refine `version` if present.
 3. Connect to `GET /runs/:runId/events`. After a reload, `latestAttempt.runId` from `GET /artifacts/:id` finds an in-flight run again.
-4. On `run.completed`, refetch `GET /artifacts/:id?version=<version>`.
+4. On `run.completed`, render its `content` (and `title` on INITIAL) when a live POST or POLL completion carries it. Otherwise refetch `GET /artifacts/:id?version=<version>`: a DOCUMENT run, a replayed or snapshot event, or a `content` that does not match the artifact or version you expect. The refetch is always safe.
 5. Allow manual edits only to the Current Version, and only while no Attempt is `GENERATING`.
 6. Bind the artifact version to LinkedIn with `POST /posts`.

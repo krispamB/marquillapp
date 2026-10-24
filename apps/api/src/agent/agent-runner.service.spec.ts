@@ -536,6 +536,102 @@ describe('AgentRunnerService', () => {
       });
     });
 
+    describe('the per-type model', () => {
+      const invalidPoll = generatedJson({
+        poll: { question: '', options: [] },
+      });
+      const validPoll = generatedJson({
+        poll: {
+          question: 'Tabs or spaces?',
+          options: ['Tabs', 'Spaces'],
+          durationDays: 3,
+        },
+      });
+      const pollInput: GenerateInput = {
+        type: ArtifactType.POLL,
+        prompt: 'Tabs or spaces?',
+      };
+
+      it('should use GENERATION_MODEL for POST and POLL when neither key is set', async () => {
+        mocks.llmService.complete.mockResolvedValue(
+          completion(generatedJson({ commentary: 'Hi.' })),
+        );
+        await service.generate(fixtures.input);
+        expect(completeCalls()[0][2]?.model).toBe(GENERATION_MODEL);
+
+        mocks.llmService.complete.mockResolvedValue(completion(validPoll));
+        await service.generate(pollInput);
+        expect(completeCalls()[1][2]?.model).toBe(GENERATION_MODEL);
+      });
+
+      it('should send POST_GENERATION_MODEL to POST only, repair turn included', async () => {
+        ({ service, mocks } = makeService({
+          env: { POST_GENERATION_MODEL: 'fast/post' },
+        }));
+        mocks.llmService.complete
+          .mockResolvedValueOnce(completion(generatedJson({ commentary: '' })))
+          .mockResolvedValueOnce(
+            completion(generatedJson({ commentary: 'Fixed.' })),
+          )
+          .mockResolvedValueOnce(completion(validPoll));
+
+        await service.generate(fixtures.input);
+        await service.generate(pollInput);
+
+        expect(completeCalls().map((call) => call[2]?.model)).toEqual([
+          'fast/post',
+          'fast/post',
+          GENERATION_MODEL,
+        ]);
+      });
+
+      it('should send POLL_GENERATION_MODEL to POLL only, repair turn included', async () => {
+        ({ service, mocks } = makeService({
+          env: { POLL_GENERATION_MODEL: 'fast/poll' },
+        }));
+        mocks.llmService.complete
+          .mockResolvedValueOnce(completion(invalidPoll))
+          .mockResolvedValueOnce(completion(validPoll))
+          .mockResolvedValueOnce(
+            completion(generatedJson({ commentary: 'Hi.' })),
+          );
+
+        await service.generate(pollInput);
+        await service.generate(fixtures.input);
+
+        expect(completeCalls().map((call) => call[2]?.model)).toEqual([
+          'fast/poll',
+          'fast/poll',
+          GENERATION_MODEL,
+        ]);
+      });
+
+      it('should leave DOCUMENT drafts on GENERATION_MODEL', async () => {
+        ({ service, mocks } = makeService({
+          env: {
+            POST_GENERATION_MODEL: 'fast/post',
+            POLL_GENERATION_MODEL: 'fast/poll',
+          },
+        }));
+        mocks.llmService.complete.mockResolvedValue(
+          completion(
+            JSON.stringify({
+              title: 'T',
+              commentary: 'C',
+              html: '<p>x</p>',
+            }),
+          ),
+        );
+        await service.generateDocument({
+          prompt: 'Three fixes',
+          fragment: 'FRAGMENT',
+          includeTitle: true,
+          maxEnvelopeRepairs: 1,
+        });
+        expect(completeCalls()[0][2]?.model).toBe(GENERATION_MODEL);
+      });
+    });
+
     describe('the inline repair retry', () => {
       it('should re-prompt with the validation error and return the repaired content', async () => {
         mocks.llmService.complete

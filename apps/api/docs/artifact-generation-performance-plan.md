@@ -234,7 +234,7 @@ Decide from M0.2 production `phaseMs`.
 - Switch: `STREAM_POST_COMMENTARY` (false). Verify streaming + `json_schema` + `requireParameters` on the production model.
 - Docs: `docs/api/runs.md:74-102`, `sse-progress-contract-design.md` §3; a product ledger entry (user-visible).
 
-**M7.4 — P3 faster model for POLL/POST.** S + eval. `POLL_GENERATION_MODEL`, `POST_GENERATION_MODEL`, falling back to `GENERATION_MODEL`. Needs a text eval script modelled on `scripts/eval-documents` (N briefs per type, outputs side by side, latency and tokens).
+**M7.4 — P3 faster model for POLL/POST.** S + eval. `POLL_GENERATION_MODEL`, `POST_GENERATION_MODEL`, falling back to `GENERATION_MODEL`. Needs a text eval script modelled on `scripts/eval-documents` (N briefs per type, outputs side by side, latency and tokens). Built as `bun run eval:text` ([text-eval-runbook.md](text-eval-runbook.md)); choosing the models is a human step.
 
 **M7.5 — A5 content in `run.completed`.** M, low priority (0.1–0.25 s). For POST/POLL only, `run.completed` carries `content` (and `title` on INITIAL); the web appends it without the GET and falls back to the GET on replay, snapshot, mismatch or error. Verify `promoteVersion` stores content unchanged. Docs: `docs/api/runs.md:48,~170`, `sse-progress-contract-design.md:146,182`, `docs/api/artifacts.md:325`.
 
