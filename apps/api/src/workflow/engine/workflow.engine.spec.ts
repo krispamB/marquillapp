@@ -381,6 +381,50 @@ describe('runWorkflow', () => {
 
       await runWorkflow(input, deps);
 
+      expect(emittedOf(RunEventType.RUN_COMPLETED)[0]).toMatchObject({
+        artifactId: input.artifactId,
+        version: input.version,
+      });
+    });
+
+    it('should carry the promoted content on run.completed for a POST', async () => {
+      await runWorkflow(makeInput({ kind: RunKind.REFINE }), deps);
+
+      expect(emittedOf(RunEventType.RUN_COMPLETED)[0]).toMatchObject({
+        content: { commentary: 'hello' },
+      });
+      expect(emittedOf(RunEventType.RUN_COMPLETED)[0]).not.toHaveProperty(
+        'title',
+      );
+    });
+
+    it('should carry the content and title on an INITIAL POLL', async () => {
+      const content = {
+        poll: { question: 'q?', options: ['a', 'b'], durationDays: 3 },
+      };
+      (mocks.handlers[GENERATE] as jest.Mock).mockResolvedValue({
+        content,
+        generatedTitle: 'A title',
+      });
+
+      await runWorkflow(makeInput({ type: ArtifactType.POLL }), deps);
+
+      expect(emittedOf(RunEventType.RUN_COMPLETED)[0]).toMatchObject({
+        content,
+        title: 'A title',
+      });
+    });
+
+    it('should not carry content on run.completed for a DOCUMENT', async () => {
+      (mocks.handlers[GENERATE] as jest.Mock).mockResolvedValue({
+        content: { commentary: 'hello' },
+        generatedTitle: 'A title',
+      });
+      mocks.handlers[WorkflowStep.RENDER_PDF] = jest.fn().mockResolvedValue({});
+
+      const input = makeInput({ type: ArtifactType.DOCUMENT });
+      await runWorkflow(input, deps);
+
       expect(emittedOf(RunEventType.RUN_COMPLETED)[0]).toEqual({
         artifactId: input.artifactId,
         version: input.version,

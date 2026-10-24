@@ -143,7 +143,7 @@ the client contract:
 | `step.progress` | Fine-grained within a step (optional) | `{ step, ...signal }` e.g. `{ sourcesFound }` (#99 §7) |
 | `usage.tick` | Credits consumed | `{ kind, credits, detail? }` (#100 `UsageKind`) |
 | `step.failed` | Step failed **but will retry** (non-terminal) | `{ step, retryable: true, message }` |
-| `run.completed` | Terminal ✔ — version is now `READY` | `{ artifactId, version }` |
+| `run.completed` | Terminal ✔ — version is now `READY` | `{ artifactId, version, content?, title? }` — POST and POLL only: `content` is the promoted version's content, `title` is added on INITIAL runs. Both are absent for DOCUMENT runs and for the snapshot written when the stream has expired. |
 | `run.failed` | Terminal ✘ | `{ failureReason }` |
 
 - **"Artifact ready" = `run.completed`.** The issue lists "artifact ready" in the
@@ -179,7 +179,7 @@ type ProgressEvent =
   | { event: 'step.progress'; data: { seq: number; ts: number; step: WorkflowStep; [k: string]: unknown } }
   | { event: 'usage.tick';    data: { seq: number; ts: number; kind: string; credits: number; detail?: unknown } }
   | { event: 'step.failed';   data: { seq: number; ts: number; step: WorkflowStep; retryable: true; message: string } }
-  | { event: 'run.completed'; data: { seq: number; ts: number; artifactId: string; version: number } }
+  | { event: 'run.completed'; data: { seq: number; ts: number; artifactId: string; version: number; content?: ArtifactContent; title?: string } }
   | { event: 'run.failed';    data: { seq: number; ts: number; failureReason: string } };
 ```
 
@@ -365,8 +365,9 @@ es.addEventListener('usage.tick',     (e) => bumpCredits(JSON.parse(e.data)));
 es.addEventListener('step.failed',    (e) => showRetrying(JSON.parse(e.data)));
 
 es.addEventListener('run.completed', (e) => {
-  const { artifactId, version } = JSON.parse(e.data);
-  refetchArtifact(artifactId, version);   // now READY
+  const { artifactId, version, content } = JSON.parse(e.data);
+  if (content) renderVersion(JSON.parse(e.data));  // live POST/POLL: no refetch
+  else refetchArtifact(artifactId, version);       // now READY
   es.close();                             // deliberate close — no reconnect
 });
 es.addEventListener('run.failed', (e) => {

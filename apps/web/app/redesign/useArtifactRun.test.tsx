@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import type { ArtifactType } from "./artifactTypes";
 import { API_BASE } from "./api";
 import { FakeEventSource, installFakeEventSource } from "./fakeEventSource";
-import { useArtifactRun } from "./useArtifactRun";
+import { useArtifactRun, type InlineArtifactResult } from "./useArtifactRun";
 
 GlobalRegistrator.register();
 let restoreEventSource: () => void = () => {};
@@ -22,12 +22,17 @@ type Options = Parameters<typeof useArtifactRun>[0];
 function renderArtifactRun(overrides: Partial<Options> = {}) {
   const types: ArtifactType[] = [];
   const ready: Array<{ version: number; credits: number }> = [];
+  const inlined: Array<InlineArtifactResult | undefined> = [];
   let terminalFailures = 0;
   const options: Options = {
     runId: "run-1",
     enabled: true,
     onType: (type) => { types.push(type); },
-    onArtifactReady: async (version, credits) => { ready.push({ version, credits }); },
+    artifactId: "artifact-1",
+    onArtifactReady: async (version, credits, inline) => {
+      ready.push({ version, credits });
+      inlined.push(inline);
+    },
     onTerminalFailure: () => { terminalFailures += 1; },
     ...overrides,
   };
@@ -38,6 +43,7 @@ function renderArtifactRun(overrides: Partial<Options> = {}) {
     rerender: (changes: Partial<Options>) => hook.rerender({ ...options, ...changes }),
     types,
     ready,
+    inlined,
     get terminalFailures() { return terminalFailures; },
     stream: () => FakeEventSource.latest(),
   };
@@ -144,5 +150,90 @@ describe("useArtifactRun", () => {
     harness.rerender({ runId: undefined });
 
     expect(stream.closed).toBe(true);
+  });
+
+  describe("run.completed carrying content", () => {
+    const content = { commentary: "Hello" };
+    const complete = async (extra: Record<string, unknown>, startedEvent: Record<string, unknown> = started) => {
+      const harness = renderArtifactRun();
+      await act(async () => {
+        harness.stream()!.emit("run.started", startedEvent);
+        harness.stream()!.emit("run.completed", {
+          seq: 2, ts: Date.now(), artifactId: "artifact-1", version: 1, ...extra,
+        });
+      });
+      return harness;
+    };
+
+    test("hands a live POST completion's content on without a read", async () => {
+      const harness = await complete({ content, title: " A title " });
+
+      expect(harness.inlined).toEqual([
+        { artifactId: "artifact-1", type: "POST", content, title: "A title" },
+      ]);
+    });
+
+    test("falls back to the read when the event has no content (snapshot)", async () => {
+      const harness = await complete({});
+
+      expect(harness.ready).toHaveLength(1);
+      expect(harness.inlined).toEqual([undefined]);
+    });
+
+    test("falls back to the read for a replayed completion", async () => {
+      const harness = await complete({ content, title: "T", ts: Date.now() - 120_000 });
+
+      expect(harness.inlined).toEqual([undefined]);
+    });
+
+    test("falls back to the read for another artifact", async () => {
+      const harness = await complete({ content, title: "T", artifactId: "artifact-2" });
+
+      expect(harness.inlined).toEqual([undefined]);
+    });
+
+    test("falls back to the read when an INITIAL completion has no title", async () => {
+      const harness = await complete({ content });
+
+      expect(harness.inlined).toEqual([undefined]);
+    });
+
+    test("falls back to the read when the content does not match the run type", async () => {
+      const harness = await complete({ content, title: "T" }, { ...started, type: "POLL" });
+
+      expect(harness.inlined).toEqual([undefined]);
+    });
+
+    test("falls back to the read for a DOCUMENT run", async () => {
+      const harness = await complete({ content, title: "T" }, { ...started, type: "DOCUMENT" });
+
+      expect(harness.inlined).toEqual([undefined]);
+    });
+
+    test("accepts a REFINE completion without a title", async () => {
+      const harness = await complete({ content }, { ...started, kind: "REFINE" });
+
+      expect(harness.inlined).toEqual([{ artifactId: "artifact-1", type: "POST", content }]);
+    });
+
+    test("reads the version when showing the inline copy fails", async () => {
+      const calls: Array<InlineArtifactResult | undefined> = [];
+      const harness = renderArtifactRun({
+        onArtifactReady: async (_version, _credits, inline) => {
+          calls.push(inline);
+          if (inline) throw new Error("render failed");
+        },
+      });
+
+      await act(async () => {
+        harness.stream()!.emit("run.started", started);
+        harness.stream()!.emit("run.completed", {
+          seq: 2, ts: Date.now(), artifactId: "artifact-1", version: 1, content, title: "T",
+        });
+      });
+
+      expect(calls.map(Boolean)).toEqual([true, false]);
+      expect(harness.hook.result.current.run).toBeNull();
+    });
   });
 });

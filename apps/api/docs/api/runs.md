@@ -45,7 +45,7 @@ data: {"seq":4,"ts":1752500000123,"step":"GENERATE","index":2,"total":4}
 | `step.progress` | `step`, plus step-specific fields | Optional UI detail; never a required checkpoint. |
 | `usage.tick` | `kind`, `credits`, `totalCredits`, optional `detail` | Update the live credit display. |
 | `step.failed` | `step`, `retryable`, `message` | When `retryable` is true, show a transient retry notice. When false, `run.failed` follows. |
-| `run.completed` | `artifactId`, `version` | The version is `READY` and is now the artifact's `currentVersion`; refetch the artifact and close the stream. |
+| `run.completed` | `artifactId`, `version`, optional `content`, optional `title` | The version is `READY` and is now the artifact's `currentVersion`. POST and POLL runs also carry the promoted `content` (the same object a `GET` returns), and INITIAL runs carry `title`; render them directly and skip the refetch. DOCUMENT runs, and the snapshot of a run whose stream has expired, carry neither: refetch the artifact. Close the stream. |
 | `run.failed` | `code`, `failureReason` | Show the failure and close the stream. The Attempt stays `FAILED` and the Current Version is unchanged. Retry-exhausted infrastructure failures use a client-safe generic reason. |
 
 The possible workflow steps are `RESOLVE_INPUT`, `RESEARCH`, `GENERATE`, `RENDER_PDF`, and `PERSIST_VERSION`.
@@ -168,9 +168,12 @@ events.addEventListener('step.failed', (event) => {
 });
 
 events.addEventListener('run.completed', async (event) => {
-  const { artifactId, version } = JSON.parse(event.data);
+  const { artifactId, version, content, title } = JSON.parse(event.data);
   events.close();
-  await refetchArtifact(artifactId, version);
+  // `content` is optional: absent for DOCUMENT runs and snapshots, and a
+  // replayed event may be stale, so fall back to the read.
+  if (content && isLive(event)) renderVersion(artifactId, version, content, title);
+  else await refetchArtifact(artifactId, version);
 });
 
 events.addEventListener('run.failed', (event) => {
