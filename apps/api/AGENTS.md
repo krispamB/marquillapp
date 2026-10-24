@@ -23,6 +23,7 @@ bun run start:worker     # the worker process (node dist/workflow/workers/workfl
 bun run seed:design-systems  # seed Design Systems from assets/design-systems; the API and worker refuse to boot without it
 bun run typecheck        # tsc against tsconfig.build.json, i.e. exactly what ships
 bun run eval:text         # POST/POLL model comparison: latency and tokens per model (spends OpenRouter budget; docs/text-eval-runbook.md)
+bun run eval:research     # agent vs snippet research A/B on fixed briefs (spends OpenRouter and Tavily credit; RESEARCH_MODE below)
 bun run test             # Jest: all *.spec.ts under src/
 bunx jest src/auth/auth.service.spec.ts   # a single file
 bun run test:e2e         # end-to-end (test/jest-e2e.json)
