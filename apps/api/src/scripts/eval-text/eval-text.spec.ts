@@ -48,14 +48,14 @@ const record = (over: Partial<TextEvalRecord>): TextEvalRecord => ({
 });
 
 describe('briefs', () => {
-  it('has five unique briefs per type', () => {
+  it('should hold five unique briefs when grouped by type', () => {
     for (const type of [ArtifactType.POST, ArtifactType.POLL]) {
       expect(TEXT_EVAL_BRIEFS.filter((b) => b.type === type)).toHaveLength(5);
     }
     expect(new Set(TEXT_EVAL_BRIEFS.map((b) => b.id)).size).toBe(10);
   });
 
-  it('selects the first n of each requested type', () => {
+  it('should select the first n of each type when a count and types are given', () => {
     expect(
       selectBriefs([ArtifactType.POLL], 2).map((brief) => brief.id),
     ).toEqual(['poll-1', 'poll-2']);
@@ -63,7 +63,7 @@ describe('briefs', () => {
 });
 
 describe('parseTextEvalArgs', () => {
-  it('defaults to both types, all briefs and no models', () => {
+  it('should default to both types, all briefs and no models when no flags are given', () => {
     expect(parseTextEvalArgs([])).toMatchObject({
       models: [],
       types: ['POST', 'POLL'],
@@ -72,7 +72,7 @@ describe('parseTextEvalArgs', () => {
     });
   });
 
-  it('reads models from the flag, deduped, and falls back to TEXT_EVAL_MODELS', () => {
+  it('should read deduped models from --models when given and fall back to TEXT_EVAL_MODELS when not', () => {
     expect(parseTextEvalArgs(['--models', 'a/x, b/y,a/x']).models).toEqual([
       'a/x',
       'b/y',
@@ -85,7 +85,7 @@ describe('parseTextEvalArgs', () => {
     ).toEqual(['a/x']);
   });
 
-  it('parses the other flags and rejects bad ones', () => {
+  it('should parse the other flags when valid and reject them when not', () => {
     expect(
       parseTextEvalArgs(['--types=poll', '--briefs', '3', '--effort', 'low']),
     ).toMatchObject({ types: ['POLL'], briefsPerType: 3, effort: 'low' });
@@ -97,13 +97,13 @@ describe('parseTextEvalArgs', () => {
 });
 
 describe('summarizeTextEval', () => {
-  it('uses nearest-rank percentiles', () => {
+  it('should use nearest-rank percentiles when computing p50 and p90', () => {
     expect(percentile([5, 1, 3, 2, 4], 0.5)).toBe(3);
     expect(percentile([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 0.9)).toBe(9);
     expect(percentile([], 0.5)).toBeNull();
   });
 
-  it('aggregates per model and type over successful runs', () => {
+  it('should aggregate per model and type over successful runs when some fail', () => {
     const records = [
       record({ latencyMs: 1000, totalTokens: 100 }),
       record({ latencyMs: 3000, totalTokens: 300, calls: 2 }),
@@ -129,7 +129,7 @@ describe('summarizeTextEval', () => {
     expect(fast).toMatchObject({ model: 'b/fast', latencyMs: { p50: 500 } });
   });
 
-  it('reports nulls when every run failed', () => {
+  it('should report nulls when every run failed', () => {
     const [row] = summarizeTextEval([record({ ok: false })], ['a/base']);
     expect(row.latencyMs).toEqual({ p50: null, p90: null });
     expect(row.tokens.total).toBeNull();
@@ -162,7 +162,7 @@ describe('runTextEval', () => {
     };
   };
 
-  it('runs every brief on every model and records usage, failures included', async () => {
+  it('should run every brief on every model and record usage when some calls fail', async () => {
     const deps = fakeDeps();
     const result = await runTextEval(deps, {
       models: ['a/base', 'bad/model'],
@@ -189,7 +189,7 @@ describe('runTextEval', () => {
     });
   });
 
-  it('renders the console report and the side-by-side markdown', async () => {
+  it('should render the console report and side-by-side markdown when outputs are requested', async () => {
     const result = await runTextEval(fakeDeps(), {
       models: ['a/base', 'bad/model'],
       types: [ArtifactType.POST],
@@ -208,7 +208,7 @@ describe('runTextEval', () => {
 });
 
 describe('createTextEvalDeps', () => {
-  it('sends the compared model to the completion call for POST and POLL', async () => {
+  it('should send the compared model to the completion call when generating POST and POLL', async () => {
     const complete = jest.fn().mockResolvedValue({
       text: JSON.stringify({ title: 'T', commentary: 'C' }),
       usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2, cost: 0 },

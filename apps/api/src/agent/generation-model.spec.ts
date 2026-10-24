@@ -4,14 +4,14 @@ const read = (env: Record<string, string | undefined>) => (key: string) =>
   env[key];
 
 describe('resolveTextGenerationModels', () => {
-  it('falls back to GENERATION_MODEL for both types when the keys are unset', () => {
+  it('should fall back to GENERATION_MODEL for both types when the keys are unset', () => {
     expect(resolveTextGenerationModels('base/model', read({}))).toEqual({
       POST: 'base/model',
       POLL: 'base/model',
     });
   });
 
-  it('treats blank keys as unset', () => {
+  it('should fall back to GENERATION_MODEL when a key is blank', () => {
     expect(
       resolveTextGenerationModels(
         'base/model',
@@ -23,7 +23,7 @@ describe('resolveTextGenerationModels', () => {
     ).toEqual({ POST: 'base/model', POLL: 'base/model' });
   });
 
-  it('overrides each type on its own key', () => {
+  it('should override only its own type when one key is set', () => {
     const env = {};
     expect(
       resolveTextGenerationModels(
