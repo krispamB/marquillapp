@@ -209,7 +209,8 @@ the path inside `research()`; `agent` (the default) is everything above, unchang
    `web_search` charge is the agent loop's; a failed search charges nothing.
 3. `buildSnippetResearch` (`src/agent/research-snippets.ts`) interleaves results by
    query (each query's best first), dedupes by normalised URL (lowercase host without
-   `www.`, no fragment, tracking parameters or trailing slash), and keeps at most
+   `www.`, no fragment, tracking parameters or trailing slash; the first URL is kept
+   as returned, since normalising can break a link), and keeps at most
    `RESEARCH_MAX_SNIPPETS` (10) excerpts of at most `RESEARCH_SNIPPET_CHARS` (600)
    characters, whitespace collapsed.
 
