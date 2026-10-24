@@ -104,7 +104,7 @@ Feature limits return HTTP `403` with a structured message payload:
 
 ### Artifact lifecycle
 
-An artifact is account-agnostic until it is posted. A generation or refine request creates a `GENERATING` version and returns a `runId`; the client watches that run and refetches the artifact after `run.completed`.
+An artifact is account-agnostic until it is posted. A generation or refine request creates a `GENERATING` version and returns a `runId`; the client watches that run and refetches the artifact after `run.completed`. For a live POST or POLL run, `run.completed` carries the promoted `content` (and `title` on an INITIAL run), so the refetch is optional; see [runs.md](./runs.md).
 
 ```text
 POST /artifacts or POST /artifacts/:id/refine

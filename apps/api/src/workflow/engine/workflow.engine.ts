@@ -125,8 +125,12 @@ export async function runWorkflow(
 /**
  * POST and POLL only: what `PERSIST_VERSION` promoted, so the web can render
  * the finished version without the follow-up read. `title` rides along on an
- * INITIAL run, the only run `promoteVersion` writes one for. A DOCUMENT's
- * content is a signed PDF link minted per read, so it is never inlined.
+ * INITIAL run, the only run `promoteVersion` writes one for. Verified equal
+ * to what is stored: GENERATE already parsed `state.content` with the
+ * per-type content schema that `promoteVersion` re-parses it with, and that
+ * parse only strips unknown keys, so the second one changes nothing. A
+ * DOCUMENT's content is a signed PDF link minted per read, so it is never
+ * inlined.
  */
 function inlineResult(
   input: BuildInput,
