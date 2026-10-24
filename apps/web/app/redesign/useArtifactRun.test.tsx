@@ -237,3 +237,84 @@ describe("useArtifactRun", () => {
     });
   });
 });
+
+describe("useArtifactRun draft commentary", () => {
+  const writing = (seq: number, commentary: string) => ({
+    seq,
+    ts: seq,
+    step: "GENERATE",
+    phase: "writing",
+    partial: { commentary },
+  });
+
+  test("shows the latest streamed commentary while the run writes", () => {
+    const harness = renderArtifactRun();
+    const stream = harness.stream()!;
+
+    act(() => {
+      stream.emit("run.started", started);
+      stream.emit("step.progress", writing(2, "Write"));
+      stream.emit("step.progress", writing(3, "Write more,\nship more."));
+    });
+
+    expect(harness.hook.result.current.run?.draftCommentary).toBe("Write more,\nship more.");
+  });
+
+  test("clears the preview on a rewrite", () => {
+    const harness = renderArtifactRun();
+    const stream = harness.stream()!;
+
+    act(() => {
+      stream.emit("run.started", started);
+      stream.emit("step.progress", writing(2, "Bad draft"));
+      stream.emit("step.progress", { seq: 3, ts: 3, step: "GENERATE", phase: "rewrite" });
+    });
+
+    expect(harness.hook.result.current.run?.draftCommentary).toBeUndefined();
+  });
+
+  test("clears the preview when a step fails and will retry", () => {
+    const harness = renderArtifactRun();
+    const stream = harness.stream()!;
+
+    act(() => {
+      stream.emit("run.started", started);
+      stream.emit("step.progress", writing(2, "Half a dra"));
+      stream.emit("step.failed", { seq: 3, ts: 3, step: "GENERATE", retryable: true, message: "Blip" });
+    });
+
+    expect(harness.hook.result.current.run?.draftCommentary).toBeUndefined();
+  });
+
+  test("keeps the preview until the artifact is ready, then drops it with the run", async () => {
+    let finishLoad: () => void = () => {};
+    const harness = renderArtifactRun({
+      onArtifactReady: () => new Promise<void>((resolve) => { finishLoad = resolve; }),
+    });
+    const stream = harness.stream()!;
+
+    await act(async () => {
+      stream.emit("run.started", started);
+      stream.emit("step.progress", writing(2, "Final words."));
+      stream.emit("run.completed", { seq: 3, ts: 3, artifactId: "artifact-1", version: 1 });
+    });
+    expect(harness.hook.result.current.run?.status).toBe("loading-result");
+    expect(harness.hook.result.current.run?.draftCommentary).toBe("Final words.");
+
+    await act(async () => { finishLoad(); });
+
+    expect(harness.hook.result.current.run).toBeNull();
+  });
+
+  test("ignores a progress event whose partial is not commentary text", () => {
+    const harness = renderArtifactRun();
+    const stream = harness.stream()!;
+
+    act(() => {
+      stream.emit("run.started", started);
+      stream.emit("step.progress", { seq: 2, ts: 2, step: "GENERATE", phase: "writing", partial: {} });
+    });
+
+    expect(harness.hook.result.current.run?.draftCommentary).toBeUndefined();
+  });
+});

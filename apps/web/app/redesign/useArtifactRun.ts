@@ -36,6 +36,8 @@ export type RunState = {
   failureReason?: string;
   failureAction?: "retry-create" | "retry-load";
   retryVersion?: number;
+  /** The commentary streamed so far, shown until the artifact arrives. */
+  draftCommentary?: string;
 };
 
 /** A live `run.completed`'s own copy of the finished version, in place of the follow-up GET. */
@@ -256,6 +258,13 @@ export function useArtifactRun({
       if (data?.step === "RESEARCH" && typeof data.sourcesFound === "number") {
         setRun((current) => current ? { ...current, sourcesFound: data.sourcesFound } : current);
       }
+      if (data?.step !== "GENERATE") return;
+      const commentary = data.partial?.commentary;
+      if (data.phase === "writing" && typeof commentary === "string") {
+        setRun((current) => current ? { ...current, draftCommentary: commentary } : current);
+      } else if (data.phase === "rewrite") {
+        setRun((current) => current ? { ...current, draftCommentary: undefined } : current);
+      }
     };
 
     const onUsage = (event: Event) => {
@@ -270,6 +279,8 @@ export function useArtifactRun({
       if (!data) return;
       setRun((current) => current ? {
         ...current,
+        // A retry writes the commentary again from the start.
+        ...(data.retryable ? { draftCommentary: undefined } : {}),
         steps: updateStep(current.steps, data.step, {
           status: data.retryable ? "retrying" : "failed",
           message: data.message,
