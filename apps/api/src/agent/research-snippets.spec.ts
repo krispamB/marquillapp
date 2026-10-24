@@ -76,7 +76,7 @@ describe('research snippets', () => {
       ]);
     });
 
-    it('should dedupe results whose normalised URLs match, keeping the first seen', () => {
+    it('should dedupe results whose normalised URLs match, keeping the first seen as returned', () => {
       const searches: SnippetSearch[] = [
         { query: 'q1', results: [result('https://www.a.com/x/', 'First')] },
         {
@@ -91,7 +91,7 @@ describe('research snippets', () => {
       const { findings, sources } = buildSnippetResearch(searches, LIMITS);
 
       expect(sources).toEqual([
-        { title: 'First', url: 'https://a.com/x' },
+        { title: 'First', url: 'https://www.a.com/x/' },
         { title: 'Other', url: 'https://b.com/y' },
       ]);
       expect(findings).toContain('[2] Other (https://b.com/y)');
@@ -176,7 +176,7 @@ describe('research snippets', () => {
       ];
 
       expect(buildSnippetResearch(searches, LIMITS).findings).toBe(
-        '[1] A (https://a.com/)\na\n\n[2] B (https://b.com/)\nb',
+        '[1] A (https://a.com)\na\n\n[2] B (https://b.com)\nb',
       );
     });
 

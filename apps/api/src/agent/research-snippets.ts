@@ -85,7 +85,7 @@ export interface SnippetLimits {
 const TRACKING_PARAM = /^(utm_\w+|fbclid|gclid|mc_cid|mc_eid|ref)$/i;
 
 /**
- * A URL in the form two results are compared by: lowercase host without
+ * The dedupe key of a URL, never shown or stored. The form two results are compared by: lowercase host without
  * `www.`, no default port, no fragment, no tracking parameters, and no
  * trailing slash on a path. A value that does not parse is only trimmed.
  */
@@ -146,11 +146,13 @@ export const buildSnippetResearch = (
 
   for (const result of interleave(searches)) {
     if (kept.length >= maxSnippets) break;
-    const url = normaliseSnippetUrl(result.url);
-    if (seen.has(url)) continue;
+    // Compared normalised, kept as returned: normalising can break a link.
+    const key = normaliseSnippetUrl(result.url);
+    if (seen.has(key)) continue;
     const text = excerpt(result.content ?? '', snippetChars);
     if (text === '') continue;
-    seen.add(url);
+    seen.add(key);
+    const url = result.url.trim();
     kept.push({ title: result.title?.trim() || url, url, text });
   }
 
