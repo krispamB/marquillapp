@@ -136,6 +136,12 @@ FRAME:
   svg. An svg uses the color it inherits, and that must be an ICONS colour.
 - Use only characters the declared fonts cover. Draw check marks and bullets
   with a CSS shape: icons are capped per page.
+- Put text on a solid palette token. Never set text on color-mix(), a
+  translucent colour or a background with opacity.
+- Decorative text, such as an oversized numeral or letter, is still text.
+  Never place other text over it.
+- Markers stay inside their item. Give a bullet or number no negative offset
+  that pushes it past the wrapper.
 
 CONSTRAINTS:
 - Follow the DESIGN SYSTEM exactly. It is the only source of colours, type

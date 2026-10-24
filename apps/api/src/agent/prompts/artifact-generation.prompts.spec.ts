@@ -63,5 +63,23 @@ describe('GENERATE_DOCUMENT_SYSTEM_PROMPT', () => {
     it('should restrict characters to the declared fonts when it lists glyph rules', () => {
       expect(prompt).toMatch(/Use only characters the declared fonts cover/);
     });
+
+    it('should put text on a solid token when it forbids mixed and translucent colour', () => {
+      expect(prompt).toContain(
+        'Put text on a solid palette token. Never set text on color-mix(), a translucent colour or a background with opacity.',
+      );
+    });
+
+    it('should keep other text off decorative glyphs when it describes oversized type', () => {
+      expect(prompt).toContain(
+        'Decorative text, such as an oversized numeral or letter, is still text. Never place other text over it.',
+      );
+    });
+
+    it('should keep markers inside their item when it describes bullets and numbers', () => {
+      expect(prompt).toContain(
+        'Markers stay inside their item. Give a bullet or number no negative offset that pushes it past the wrapper.',
+      );
+    });
   });
 });
