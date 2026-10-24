@@ -233,6 +233,35 @@ describe('renderDocumentSession', () => {
     expect(result.facts.refusedRequests).toEqual(result.refusedRequests);
   });
 
+  it('should continue an inlined font data URL and not record it as refused', async () => {
+    const inlined = request('data:font/woff2;base64,d09GMgABAAAAAA');
+    mocks.page.setContent.mockImplementation(() => {
+      sendRequest(inlined);
+      return Promise.resolve();
+    });
+
+    const result = await renderDocumentSession('ws://b', definition, '');
+
+    expect(inlined.continue).toHaveBeenCalled();
+    expect(inlined.abort).not.toHaveBeenCalled();
+    expect(result.refusedRequests).toEqual([]);
+  });
+
+  it('should refuse a data URL that is not a font', async () => {
+    const image = request('data:image/png;base64,iVBORw0KGgo');
+    mocks.page.setContent.mockImplementation(() => {
+      sendRequest(image);
+      return Promise.resolve();
+    });
+
+    const result = await renderDocumentSession('ws://b', definition, '');
+
+    expect(image.abort).toHaveBeenCalledWith('blockedbyclient');
+    expect(result.refusedRequests).toEqual([
+      'data:image/png;base64,iVBORw0KGgo',
+    ]);
+  });
+
   it('should record why the cover failed and still print when the screenshot fails', async () => {
     mocks.page.screenshot.mockRejectedValue(new Error('capture failed'));
 

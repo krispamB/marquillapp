@@ -29,6 +29,7 @@ import type {
   DesignSystemResolver,
   DocumentObjectStore,
   DocumentDiagnostics,
+  DocumentFontInliner,
   DocumentRenderer,
   RunRecordHandle,
   StepContext,
@@ -47,6 +48,7 @@ export interface ArtifactRunDeps {
   artifacts: ArtifactWriter;
   designSystems: DesignSystemResolver;
   renderer: DocumentRenderer;
+  fonts: DocumentFontInliner;
   objects: DocumentObjectStore;
   creditMeter: CreditMeterService;
   featureGating: FeatureGatingService;
@@ -159,6 +161,7 @@ export class ArtifactRunProcessor {
       artifacts: this.deps.artifacts,
       designSystems: this.deps.designSystems,
       renderer: this.deps.renderer,
+      fonts: this.deps.fonts,
       objects: this.deps.objects,
       meter,
       // Per job attempt: a retry gets a fresh budget.

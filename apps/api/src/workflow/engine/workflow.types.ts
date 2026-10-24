@@ -299,6 +299,18 @@ export interface DocumentRenderer {
   ): Promise<RenderSessionResult>;
 }
 
+/**
+ * DOCUMENT-only: the Design System's fonts as self-contained CSS for
+ * `assemble()` (spec §4.5 item 2), or `null` to assemble with the Google
+ * Fonts `<link>`. It never throws; a failed fetch is `null`.
+ */
+export interface DocumentFontInliner {
+  inlineCss(
+    definition: DesignSystemDefinition,
+    candidate: string,
+  ): Promise<string | null>;
+}
+
 /** DOCUMENT-only: the private object store a Document Version lives in. */
 export interface DocumentObjectStore {
   put(key: string, body: Buffer, contentType: string): Promise<void>;
@@ -429,6 +441,7 @@ export interface StepContext {
   meter: CreditMeter;
   designSystems: DesignSystemResolver;
   renderer: DocumentRenderer;
+  fonts: DocumentFontInliner;
   objects: DocumentObjectStore;
   deadline: RunDeadlineGuard;
   diagnostics: RunDiagnostics;

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { RedisModule } from '../redis/redis.module';
 import { RedisService } from '../redis/redis.service';
 import { DocumentRendererService } from './document-renderer.service';
+import { FontInlinerService } from './font-inliner.service';
 import { RenderSlots, renderSlotsSettings } from './render-slots';
 
 @Module({
@@ -21,7 +22,8 @@ import { RenderSlots, renderSlotsSettings } from './render-slots';
         }),
     },
     DocumentRendererService,
+    FontInlinerService,
   ],
-  exports: [DocumentRendererService],
+  exports: [DocumentRendererService, FontInlinerService],
 })
 export class DocumentRenderModule {}
