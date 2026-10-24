@@ -53,6 +53,12 @@ export const RENDER_SNIPPET_LENGTH = 32;
 export const FONT_INLINE_FETCH_TIMEOUT_MS = 5_000;
 
 /**
+ * The most one `inlineCss` call waits, cold stylesheet and files together,
+ * before the render falls back to the stylesheet `<link>` (§4.5).
+ */
+export const FONT_INLINE_BUDGET_MS = 5_000;
+
+/**
  * Google Fonts picks the format by User-Agent: a desktop Chrome gets woff2 in
  * `unicode-range` subsets, the response the inliner parses.
  */

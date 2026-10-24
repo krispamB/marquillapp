@@ -797,6 +797,7 @@ Nothing below is in `docs/api/` until then.
 | `RENDER_SLOT_WAIT_RESERVE_MS` | module constant | 20 s of the run deadline kept free of slot waiting | §7.5 |
 | Candidate retention on runs | module constant | 90 days | §11.5 |
 | `FONT_INLINE_FETCH_TIMEOUT_MS` | module constant | 5 s per font inliner fetch | §4.5 |
+| `FONT_INLINE_BUDGET_MS` | module constant | 5 s per `inlineCss` call, all its fetches together | §4.5 |
 | `FONT_INLINE_USER_AGENT` | module constant | a desktop Chrome User-Agent (woff2 subsets) | §4.5 |
 | `FONT_INLINE_ALWAYS_SUBSETS` | module constant | `latin`, `latin-ext` | §4.5 |
 

@@ -4,6 +4,7 @@ import type { DesignSystemDefinition } from '../design-system/design-system-defi
 import { fontStylesheetUrl } from '../document-source/assemble';
 import {
   FONT_INLINE_ALWAYS_SUBSETS,
+  FONT_INLINE_BUDGET_MS,
   FONT_INLINE_FETCH_TIMEOUT_MS,
   FONT_INLINE_USER_AGENT,
 } from './document-render.constants';
@@ -29,7 +30,7 @@ const UNICODE_RANGE_PATTERN = /unicode-range:\s*([^;}]+)/;
 const CSS_ESCAPE_PATTERN = /\\([0-9a-fA-F]{1,6})/g;
 
 /** The error, and its cause: undici's `fetch failed` hides the real one. */
-const reasonOf = (error: unknown): string => {
+const fetchFailureReason = (error: unknown): string => {
   if (!(error instanceof Error)) return String(error);
   const cause = error.cause as
     | { code?: unknown; message?: unknown }
@@ -73,30 +74,51 @@ export class FontInlinerService {
   ): Promise<string | null> {
     const stylesheetUrl = fontStylesheetUrl(definition);
     if (!stylesheetUrl) return null;
+    let timer: NodeJS.Timeout | undefined;
+    // A cold inline is a stylesheet then its files; the budget bounds both.
+    // Fetches that miss it carry on and fill the cache for the next render.
+    const budget = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`not done within ${FONT_INLINE_BUDGET_MS} ms`)),
+        FONT_INLINE_BUDGET_MS,
+      );
+    });
     try {
-      const faces = await cached(this.stylesheets, stylesheetUrl, () =>
-        fetchFaces(stylesheetUrl),
-      );
-      const codePoints = codePointsOf(candidate);
-      const kept = faces.filter((face) => covers(face, codePoints));
-      const inlined = await Promise.all(
-        kept.map(async (face) => {
-          const base64 = await cached(this.files, face.fileUrl, () =>
-            fetchBase64(face.fileUrl),
-          );
-          return face.css.replace(
-            `url(${face.fileUrl})`,
-            `url(data:font/woff2;base64,${base64})`,
-          );
-        }),
-      );
-      return inlined.join('\n');
+      return await Promise.race([
+        this.inline(stylesheetUrl, candidate),
+        budget,
+      ]);
     } catch (error: unknown) {
       this.logger.warn(
-        `font inlining failed for design system ${definition.id}, rendering with the stylesheet link: ${reasonOf(error)}`,
+        `font inlining failed for design system ${definition.id}, rendering with the stylesheet link: ${fetchFailureReason(error)}`,
       );
       return null;
+    } finally {
+      clearTimeout(timer);
     }
+  }
+
+  private async inline(
+    stylesheetUrl: string,
+    candidate: string,
+  ): Promise<string> {
+    const faces = await cached(this.stylesheets, stylesheetUrl, () =>
+      fetchFaces(stylesheetUrl),
+    );
+    const codePoints = codePointsOf(candidate);
+    const kept = faces.filter((face) => covers(face, codePoints));
+    const inlined = await Promise.all(
+      kept.map(async (face) => {
+        const base64 = await cached(this.files, face.fileUrl, () =>
+          fetchBase64(face.fileUrl),
+        );
+        return face.css.replace(
+          `url(${face.fileUrl})`,
+          `url(data:font/woff2;base64,${base64})`,
+        );
+      }),
+    );
+    return inlined.join('\n');
   }
 }
 

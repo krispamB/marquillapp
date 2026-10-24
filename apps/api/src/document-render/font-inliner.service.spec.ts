@@ -1,6 +1,7 @@
 import type { DesignSystemDefinition } from '../design-system/design-system-definition';
 import { fontStylesheetUrl } from '../document-source/assemble';
 import {
+  FONT_INLINE_BUDGET_MS,
   FONT_INLINE_FETCH_TIMEOUT_MS,
   FONT_INLINE_USER_AGENT,
 } from './document-render.constants';
@@ -221,6 +222,21 @@ describe('FontInlinerService', () => {
       expect(
         fetchedUrls().filter((u) => u === fixtures.stylesheetUrl),
       ).toHaveLength(2);
+    });
+
+    it('should return null and warn when the fetches outlast the budget', async () => {
+      jest.useFakeTimers();
+      try {
+        mocks.fetch.mockImplementation(() => new Promise(() => undefined));
+
+        const pending = service.inlineCss(fixtures.definition, 'Hello');
+        await jest.advanceTimersByTimeAsync(FONT_INLINE_BUDGET_MS);
+
+        await expect(pending).resolves.toBeNull();
+        expect(mocks.warn).toHaveBeenCalledTimes(1);
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('should return null without fetching when the definition has no Google fonts', async () => {
