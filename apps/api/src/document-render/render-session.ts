@@ -29,6 +29,12 @@ export interface RenderSessionOptions {
    * the PDF is still printed, because its page count can add a finding.
    */
   skipCover?: (facts: RenderFacts) => boolean;
+  /**
+   * Given the disconnect the session does not await; it never rejects. A
+   * caller that holds a Browserless slot releases it once this settles, since
+   * Browserless counts the session until the socket closes.
+   */
+  onDisconnect?: (disconnected: Promise<void>) => void;
 }
 
 /** `cover.png` of page 1, or why it could not be captured (§5.1 step 7). */
@@ -260,7 +266,10 @@ export async function renderDocumentSession(
   // Disconnecting ends the Browserless session; locally it leaves the browser
   // up. Not awaited: the caller has its result, and `durationMs` stops here
   // (the meter stops when the socket closes, a moment later).
-  browser?.disconnect().catch(() => undefined);
+  const disconnected = (browser?.disconnect() ?? Promise.resolve()).catch(
+    () => undefined,
+  );
+  options.onDisconnect?.(disconnected);
 
   const durationMs = Date.now() - startedAt;
   const usage: BrowserlessUsage = {

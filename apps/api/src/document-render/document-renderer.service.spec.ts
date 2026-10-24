@@ -9,7 +9,10 @@ jest.mock(
 
 import * as judgeModule from './judge';
 import { DocumentRendererService } from './document-renderer.service';
-import type { RenderSessionResult } from './render-session';
+import type {
+  RenderSessionOptions,
+  RenderSessionResult,
+} from './render-session';
 import { RenderSessionError } from './render-session.error';
 import { RenderSlotUnavailableError } from './render-slots';
 
@@ -132,6 +135,31 @@ describe('DocumentRendererService', () => {
       expect(order).toEqual(['acquire', 'session', 'release']);
       expect(mocks.slots.acquire).toHaveBeenCalledWith(40_000);
       expect(result.slotWaitMs).toBe(1_500);
+    });
+
+    it('should hold the slot until the session disconnects when the result returns first', async () => {
+      const { service, mocks } = makeService(env);
+      let closeSocket!: () => void;
+      mocks.renderSession.mockImplementationOnce(
+        (
+          _endpoint: string,
+          _definition: unknown,
+          _source: string,
+          options: RenderSessionOptions,
+        ) => {
+          options.onDisconnect?.(
+            new Promise<void>((resolve) => (closeSocket = resolve)),
+          );
+          return Promise.resolve({ pageCount: 3 });
+        },
+      );
+
+      await service.render({} as never, '<html></html>');
+      expect(mocks.release).not.toHaveBeenCalled();
+
+      closeSocket();
+      await new Promise(setImmediate);
+      expect(mocks.release).toHaveBeenCalledTimes(1);
     });
 
     it('should release the slot and carry the wait on the error when the session fails', async () => {

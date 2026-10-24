@@ -213,6 +213,16 @@ describe('renderDocumentSession', () => {
     expect(result.pdf).toBe(PDF);
   });
 
+  it('should hand over a disconnect that settles even when the disconnect fails', async () => {
+    mocks.browser.disconnect.mockRejectedValue(new Error('already closed'));
+    const onDisconnect = jest.fn<void, [Promise<void>]>();
+
+    await renderDocumentSession('ws://b', definition, '', { onDisconnect });
+
+    expect(onDisconnect).toHaveBeenCalledTimes(1);
+    await expect(onDisconnect.mock.calls[0][0]).resolves.toBeUndefined();
+  });
+
   it('should let font requests through and record each refused URL once', async () => {
     const font = request('https://fonts.googleapis.com/css2?family=Inter');
     const file = request('https://fonts.gstatic.com/s/inter/v1/a.woff2');
