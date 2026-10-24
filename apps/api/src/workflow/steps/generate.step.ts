@@ -135,7 +135,7 @@ async function generateDocument(
   );
 
   ctx.diagnostics.recordRepairsSpent(draft.envelopeRepairs);
-  const { candidate, repairsSpent } = await repairStatically(
+  const { candidate, repairsSpent, fallbacksSpent } = await repairStatically(
     {
       ctx,
       step: WorkflowStep.GENERATE,
@@ -149,7 +149,12 @@ async function generateDocument(
 
   return {
     ...(draft.title !== undefined ? { generatedTitle: draft.title } : {}),
-    draft: { commentary: draft.commentary, candidate, repairsSpent },
+    draft: {
+      commentary: draft.commentary,
+      candidate,
+      repairsSpent,
+      ...(fallbacksSpent !== undefined ? { fallbacksSpent } : {}),
+    },
   };
 }
 

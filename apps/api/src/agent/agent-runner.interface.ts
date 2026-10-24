@@ -1,4 +1,5 @@
 import type { ZodType } from 'zod';
+import type { CandidateEdit } from '../document-source/candidate-patch';
 import type { ArtifactType } from '../database/schemas';
 import type { ArtifactContent } from '../artifact/schemas';
 import type { BoundedViolations } from '../document-source/violation';
@@ -155,6 +156,25 @@ export interface DocumentRepairResult {
   envelopeRepairs: number;
 }
 
+/**
+ * A `patch`-mode Repair's answer: edits to the Candidate Source, or the whole
+ * of it. Neither is checked or applied here.
+ */
+export type DocumentPatchRepairResult = (
+  | { edits: CandidateEdit[] }
+  | { html: string }
+) & { envelopeRepairs: number };
+
+/**
+ * The warm follow-up to a `patch`-mode Repair whose edits did not apply: the
+ * same Repair, the edits the model answered with, and why they failed.
+ */
+export interface DocumentRepairFallbackInput extends DocumentRepairInput {
+  edits: CandidateEdit[];
+  /** From `applyEdits`; short, and safe to send to the model. */
+  problems: string[];
+}
+
 export interface ArtifactGenerationResult {
   title?: string;
   content: ArtifactContent;
@@ -171,10 +191,11 @@ export interface AgentTurnUsage extends Usage {
 }
 
 /**
- * A DOCUMENT model call: the draft, a Repair, or the one Zod repair turn
- * either may spend on an invalid envelope.
+ * A DOCUMENT model call: the draft, a Repair, a `patch`-mode Repair's `{ html }`
+ * fallback, or the one Zod repair turn any of them may spend on an invalid
+ * envelope.
  */
-export type DocumentModelCall = 'draft' | 'repair' | 'envelope';
+export type DocumentModelCall = 'draft' | 'repair' | 'fallback' | 'envelope';
 
 /**
  * `AgentRunner` must not hold the meter, so usage leaves it through hooks the
@@ -208,6 +229,22 @@ export interface AgentRunner {
   /** One Repair of a Candidate Source. Throws as `generateDocument` does. */
   repairDocument(
     input: DocumentRepairInput,
+    hooks?: AgentHooks,
+  ): Promise<DocumentRepairResult>;
+  /**
+   * One `patch`-mode Repair, answered with edits or with the whole Candidate
+   * Source. Throws as `generateDocument` does.
+   */
+  repairDocumentPatch(
+    input: DocumentRepairInput,
+    hooks?: AgentHooks,
+  ): Promise<DocumentPatchRepairResult>;
+  /**
+   * The `{ html }` follow-up to a `patch`-mode Repair whose edits did not
+   * apply, in the same conversation. Throws as `generateDocument` does.
+   */
+  repairDocumentFallback(
+    input: DocumentRepairFallbackInput,
     hooks?: AgentHooks,
   ): Promise<DocumentRepairResult>;
 }

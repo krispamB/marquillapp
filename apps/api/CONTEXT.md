@@ -45,5 +45,5 @@ A user-requested AI regeneration of the Current Version that appends a new immut
 _Avoid_: Edit, fix, patch
 
 **Repair**:
-A backend-initiated model turn, inside one Attempt, that re-emits a Candidate Source to fix the violations the app found in it. Bounded by a shared budget, never requested by the user, and never creates a version.
+A backend-initiated model turn, inside one Attempt, that produces a revised Candidate Source, as edits or in full, to fix the violations the app found in it. Bounded by a shared budget, never requested by the user, and never creates a version.
 _Avoid_: Refinement, retry, revision

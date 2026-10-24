@@ -192,6 +192,63 @@ describe('DocumentRunDiagnostics', () => {
     });
   });
 
+  describe('recordRepair', () => {
+    it('should keep one entry per Repair round, in order', () => {
+      diagnostics.recordRepair({
+        kind: 'static',
+        mode: 'patch',
+        edits: 3,
+        fallback: true,
+      });
+      diagnostics.recordRepair({
+        kind: 'render',
+        mode: 'patch',
+        edits: 0,
+        fallback: false,
+      });
+
+      expect(diagnostics.finish(READY).diagnostics.repairs).toEqual([
+        { kind: 'static', mode: 'patch', edits: 3, fallback: true },
+        { kind: 'render', mode: 'patch', edits: 0, fallback: false },
+      ]);
+    });
+
+    it('should leave repairs out when no Repair ran', () => {
+      expect(diagnostics.finish(READY).diagnostics).not.toHaveProperty(
+        'repairs',
+      );
+    });
+
+    it("should carry on an earlier job attempt's Repairs before this one's", () => {
+      diagnostics.recordRepair({
+        kind: 'static',
+        mode: 'full',
+        edits: 0,
+        fallback: false,
+      });
+      const prior = diagnostics.finish({
+        outcome: 'RETRYING',
+        failureCode: FailureCode.RENDER_UNAVAILABLE,
+        message: 'render did not settle',
+        credits: 180,
+      }).diagnostics;
+
+      const next = start({ jobAttempt: 2, prior });
+      next.recordRepair({
+        kind: 'render',
+        mode: 'full',
+        edits: 0,
+        fallback: false,
+      });
+
+      expect(next.finish(READY).diagnostics.repairs).toEqual([
+        { kind: 'static', mode: 'full', edits: 0, fallback: false },
+        { kind: 'render', mode: 'full', edits: 0, fallback: false },
+      ]);
+      expect(prior.repairs).toHaveLength(1);
+    });
+  });
+
   describe('recordAccepted', () => {
     it('should reference the checkpoint by hash with its Repairs spent', () => {
       diagnostics.recordAccepted('accepted', 1);

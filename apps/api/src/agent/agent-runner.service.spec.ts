@@ -41,10 +41,15 @@ import { AgentRunnerService } from './agent-runner.service';
 import type {
   AgentRunConfig,
   DocumentGenerateInput,
+  DocumentRepairFallbackInput,
   DocumentRepairInput,
   GenerateInput,
   Tool,
 } from './agent-runner.interface';
+import {
+  buildDocumentPatchRepairUserPrompt,
+  buildDocumentRepairFallbackUserPrompt,
+} from './prompts';
 import { StylePreset } from './style-presets.config';
 
 const GENERATION_MODEL = 'test/generation-model';
@@ -937,6 +942,245 @@ describe('AgentRunnerService', () => {
       await expect(service.repairDocument(repairInput)).rejects.toBeInstanceOf(
         DocumentTruncatedError,
       );
+    });
+  });
+
+  describe('repairDocumentPatch', () => {
+    const HTML = '<!doctype html><html><body></body></html>';
+    const CANDIDATE = '<!doctype html><html><body>13px</body></html>';
+    const EDITS = [{ find: '13px', replace: '14px' }];
+    const answer = (value: Record<string, unknown>) =>
+      completion(JSON.stringify(value));
+
+    const repairInput: DocumentRepairInput = {
+      fragment: 'DESIGN SYSTEM: Margin (margin v2)',
+      includeTitle: true,
+      candidate: CANDIDATE,
+      violations: {
+        violations: [
+          {
+            code: 'typography.rules.minPx',
+            detail: 'font-size 13px is below 14px',
+          },
+        ],
+        omitted: [],
+      },
+      maxEnvelopeRepairs: 1,
+    };
+
+    it('should return the edits the model answered with when its html is null', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        answer({ edits: EDITS, html: null }),
+      );
+
+      await expect(service.repairDocumentPatch(repairInput)).resolves.toEqual({
+        edits: EDITS,
+        envelopeRepairs: 0,
+      });
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return the html the model answered with when its edits are null', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        answer({ edits: null, html: HTML }),
+      );
+
+      await expect(service.repairDocumentPatch(repairInput)).resolves.toEqual({
+        html: HTML,
+        envelopeRepairs: 0,
+      });
+    });
+
+    it('should constrain the Repair to the patch schema and send the patch prompt', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        answer({ edits: EDITS, html: null }),
+      );
+
+      await service.repairDocumentPatch(repairInput);
+
+      const [, messages, options] = completeCalls()[0];
+      const jsonSchema = z.toJSONSchema(
+        options?.responseSchema?.schema as z.ZodType,
+        { target: 'draft-7', io: 'output' },
+      ) as { properties?: Record<string, unknown> };
+      expect(Object.keys(jsonSchema.properties ?? {})).toEqual([
+        'edits',
+        'html',
+      ]);
+      expect(messages).toHaveLength(2);
+      expect(messages[1].content).toBe(
+        buildDocumentPatchRepairUserPrompt(CANDIDATE, repairInput.violations),
+      );
+      expectGenerationOptions(options, 16384);
+    });
+
+    it('should send the same system message as the full-mode Repair', async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(answer({ html: HTML }))
+        .mockResolvedValueOnce(answer({ edits: EDITS, html: null }));
+
+      await service.repairDocument(repairInput);
+      await service.repairDocumentPatch(repairInput);
+
+      expect(messagesOfCall(2)[0]).toEqual(messagesOfCall(1)[0]);
+    });
+
+    it('should spend an envelope repair turn when the model answers with both edits and html', async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(answer({ edits: EDITS, html: HTML }))
+        .mockResolvedValueOnce(answer({ edits: EDITS, html: null }));
+      const onUsage = jest.fn();
+
+      await expect(
+        service.repairDocumentPatch(repairInput, { onUsage }),
+      ).resolves.toEqual({ edits: EDITS, envelopeRepairs: 1 });
+      expect(onUsage).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ call: 'repair' }),
+      );
+      expect(onUsage).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ call: 'envelope' }),
+      );
+    });
+
+    it('should throw DocumentTruncatedError before parsing when the patch Repair hit the cap', async () => {
+      mocks.llmService.complete.mockResolvedValue({
+        ...answer({ edits: EDITS, html: null }),
+        finishReason: 'length',
+      });
+
+      await expect(
+        service.repairDocumentPatch(repairInput),
+      ).rejects.toBeInstanceOf(DocumentTruncatedError);
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('repairDocumentFallback', () => {
+    const HTML = '<!doctype html><html><body>14px</body></html>';
+    const CANDIDATE = '<!doctype html><html><body>13px</body></html>';
+    const EDITS = [{ find: '12px', replace: '14px' }];
+    const PROBLEMS = ['Edit 1: find not found: "12px".'];
+
+    const fallbackInput: DocumentRepairFallbackInput = {
+      fragment: 'DESIGN SYSTEM: Margin (margin v2)',
+      includeTitle: false,
+      candidate: CANDIDATE,
+      violations: {
+        violations: [
+          {
+            code: 'typography.rules.minPx',
+            detail: 'font-size 13px is below 14px',
+          },
+        ],
+        omitted: [],
+      },
+      maxEnvelopeRepairs: 1,
+      edits: EDITS,
+      problems: PROBLEMS,
+    };
+
+    it('should return the Candidate Source the model wrote', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        completion(JSON.stringify({ html: HTML })),
+      );
+
+      await expect(
+        service.repairDocumentFallback(fallbackInput),
+      ).resolves.toEqual({ html: HTML, envelopeRepairs: 0 });
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+    });
+
+    it('should continue the patch Repair with its edits as the assistant turn and the problems as the user turn', async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(
+          completion(JSON.stringify({ edits: EDITS, html: null })),
+        )
+        .mockResolvedValueOnce(completion(JSON.stringify({ html: HTML })));
+
+      await service.repairDocumentPatch(fallbackInput);
+      await service.repairDocumentFallback(fallbackInput);
+
+      const [system, user, assistant, followUp] = messagesOfCall(2);
+      expect(messagesOfCall(2)).toHaveLength(4);
+      expect([system, user]).toEqual(messagesOfCall(1));
+      expect(assistant).toEqual({
+        role: MessageRole.Assistant,
+        content: JSON.stringify({ edits: EDITS, html: null }),
+      });
+      expect(followUp).toEqual({
+        role: MessageRole.User,
+        content: buildDocumentRepairFallbackUserPrompt(PROBLEMS),
+      });
+    });
+
+    it('should constrain the fallback to the html-only schema with the DOCUMENT cap', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        completion(JSON.stringify({ html: HTML })),
+      );
+
+      await service.repairDocumentFallback(fallbackInput);
+
+      const options = completeCalls()[0][2];
+      const jsonSchema = z.toJSONSchema(
+        options?.responseSchema?.schema as z.ZodType,
+        { target: 'draft-7', io: 'output' },
+      ) as { properties?: Record<string, unknown> };
+      expect(Object.keys(jsonSchema.properties ?? {})).toEqual(['html']);
+      expectGenerationOptions(options, 16384);
+    });
+
+    it('should report the fallback turn and its envelope repair turn to onUsage, tagged with the call they made', async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(completion(JSON.stringify({ html: '' }), 0.03))
+        .mockResolvedValueOnce(
+          completion(JSON.stringify({ html: HTML }), 0.04),
+        );
+      const onUsage = jest.fn();
+
+      await expect(
+        service.repairDocumentFallback(fallbackInput, { onUsage }),
+      ).resolves.toEqual({ html: HTML, envelopeRepairs: 1 });
+      expect(onUsage).toHaveBeenCalledTimes(2);
+      expect(onUsage).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ call: 'fallback', cost: 0.03 }),
+      );
+      expect(onUsage).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ call: 'envelope', cost: 0.04 }),
+      );
+    });
+
+    it('should throw ContentValidationError without a repair turn when none is left', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        completion(JSON.stringify({ html: '' })),
+      );
+
+      await expect(
+        service.repairDocumentFallback({
+          ...fallbackInput,
+          maxEnvelopeRepairs: 0,
+        }),
+      ).rejects.toBeInstanceOf(ContentValidationError);
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw DocumentTruncatedError before parsing when the fallback hit the cap', async () => {
+      mocks.llmService.complete.mockResolvedValue({
+        ...completion('{"html": "<!doctype'),
+        finishReason: 'length',
+      });
+      const onUsage = jest.fn();
+
+      await expect(
+        service.repairDocumentFallback(fallbackInput, { onUsage }),
+      ).rejects.toThrow(
+        'The DOCUMENT Repair fallback hit the output token cap',
+      );
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+      expect(onUsage).toHaveBeenCalledTimes(1);
     });
   });
 

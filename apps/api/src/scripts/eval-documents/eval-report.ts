@@ -1,11 +1,19 @@
 import type {
   DocumentMetricsBucket,
+  PatchRepairStats,
   Percentiles,
   ViolationTally,
 } from '../../diagnostics/document-metrics';
 import { EVAL_BRIEFS } from './briefs';
 import { formatDuration, type SystemVerdict } from './eval-gates';
 import type { EvalResult } from './eval-runner';
+
+/**
+ * The go/no-go for switching `DOCUMENT_REPAIR_MODE`
+ * (`src/workflow/workflow.constants.ts`) to `patch`: the fallback rate must be
+ * under this (spec §11.1, issue #232).
+ */
+const PATCH_FALLBACK_RATE_LIMIT = 0.2;
 
 const VERDICT_TEXT: Record<SystemVerdict, string> = {
   LIST: 'list it',
@@ -67,6 +75,7 @@ export function formatEvalReport(result: EvalResult): string {
     ),
   );
   lines.push('', ...bucketDetail(metrics.overall));
+  lines.push(...patchVerdict(metrics.overall.patchRepairs));
   for (const [id, bucket] of Object.entries(metrics.byDesignSystem)) {
     lines.push('', ...bucketDetail(bucket, id));
   }
@@ -134,11 +143,41 @@ function bucketDetail(
   return [
     `${prefix}Failure codes: ${failures.length === 0 ? 'none' : failures.map(([code, count]) => `${code}: ${count}`).join(', ')}`,
     `${prefix}Repair rounds (runs per rounds spent): ${JSON.stringify(bucket.repairRounds)}`,
+    ...patchLines(bucket.patchRepairs, prefix),
     `${prefix}Render timeouts by phase: ${timeouts(bucket.renderSessions.timeoutsByPhase)}`,
     `${prefix}Top static violations: ${violations(bucket.violations.static)}`,
     `${prefix}Top render violations: ${violations(bucket.violations.render)}`,
     `${prefix}First-candidate pass rate: ${percent(first.passRate)} (${first.passed} of ${first.runs}) — recorded, not gated`,
   ];
+}
+
+function patchLines(
+  patch: PatchRepairStats | undefined,
+  prefix: string,
+): string[] {
+  if (!patch) return [];
+  const mean = patch.meanEdits === null ? 'n/a' : patch.meanEdits.toFixed(1);
+  return [
+    `${prefix}Patch Repairs: ${patch.rounds} rounds; ${patch.editRounds} answered with edits, ${patch.htmlRounds} with html; ${patch.fallbacks} fell back; mean ${mean} edits per edit round`,
+  ];
+}
+
+/** The overall fallback rate and whether it clears the limit; nothing without patch rounds. */
+function patchVerdict(patch: PatchRepairStats | undefined): string[] {
+  if (!patch) return [];
+  const limit = `${PATCH_FALLBACK_RATE_LIMIT * 100}%`;
+  const lines = [
+    '',
+    `Patch fallback rate: ${percent(patch.fallbackRate)} (${patch.fallbacks} of ${patch.editRounds} edit rounds)`,
+  ];
+  if (patch.fallbackRate !== null) {
+    lines.push(
+      patch.fallbackRate < PATCH_FALLBACK_RATE_LIMIT
+        ? `PATCH GO: fallback rate is under ${limit} (DOCUMENT_REPAIR_MODE may switch to patch if no other gate is worse)`
+        : `PATCH NO-GO: fallback rate is not under ${limit} (keep DOCUMENT_REPAIR_MODE at full)`,
+    );
+  }
+  return lines;
 }
 
 function timeouts(

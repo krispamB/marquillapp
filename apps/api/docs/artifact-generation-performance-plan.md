@@ -195,7 +195,7 @@ Ship only when M3.1, M3.3 and M3.5 are in production. With Browserless Free (2 s
 - New pure `document-source/candidate-patch.ts` `applyEdits(candidate, edits)`: exact bytes (CRLF→LF only), each `find` matches **exactly once**, no overlapping ranges, applied by offset last-to-first, atomic, empty `edits` is a failure.
 - On failure: one warm follow-up in the same round listing the problems, answered with `{ html }`. Billed but not counted against `DOCUMENT_REPAIR_BUDGET`; cap one fallback per job attempt.
 - Model-authored edits are not sanitising: spec §4.4 "reject only, never sanitize" holds because the app changes nothing itself and `check()` re-runs on the result. Amend §7.2, §7.5 and the CONTEXT.md "Repair" entry ("produces a revised Candidate Source, as edits or in full").
-- Switch: module constant `DOCUMENT_REPAIR_MODE: 'full' | 'patch'` (deploy-switched, per spec §10). Record `repairs: [{ kind, mode, edits }]` in diagnostics. Go/no-go: fallback rate < 20% in the eval.
+- Switch: module constant `DOCUMENT_REPAIR_MODE: 'full' | 'patch'` (deploy-switched, per spec §10). Record `repairs: [{ kind, mode, edits, fallback }]` in diagnostics. Go/no-go: fallback rate < 20% in the eval.
 
 ### M6. Render network
 

@@ -69,6 +69,7 @@ const makeStep = () => {
     recordModelTurn: jest.fn(),
     recordCheck: jest.fn(),
     recordRepairsSpent: jest.fn(),
+    recordRepair: jest.fn(),
     recordAccepted: jest.fn(),
     recordRenderSession: jest.fn(),
     recordPageCount: jest.fn(),

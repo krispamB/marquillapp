@@ -1,4 +1,5 @@
 import { ArtifactType } from 'src/database/schemas';
+import { MAX_REPAIR_EDITS } from '../../artifact/schemas/artifact-content.schema';
 import type { BoundedViolations } from '../../document-source/violation';
 import type {
   DocumentGenerateInput,
@@ -136,6 +137,12 @@ FRAME:
   svg. An svg uses the color it inherits, and that must be an ICONS colour.
 - Use only characters the declared fonts cover. Draw check marks and bullets
   with a CSS shape: icons are capped per page.
+- Put text on a solid palette token. Never set text on color-mix(), a
+  translucent colour or a background with opacity.
+- Decorative text, such as an oversized numeral or letter, is still text.
+  Never place other text over it.
+- Markers stay inside their item. Give a bullet or number no negative offset
+  that pushes it past the wrapper.
 
 CONSTRAINTS:
 - Follow the DESIGN SYSTEM exactly. It is the only source of colours, type
@@ -266,8 +273,52 @@ Return a corrected JSON object that satisfies the schema. Output only the JSON o
  * A Repair's user message (spec §7.2): the current Candidate Source and the
  * bounded violations, nothing else. The brief, research and feedback are
  * dropped, so the model fixes what it wrote rather than writing it again.
+ * This is the `full`-mode message, answered with `{ html }`.
  */
 export function buildDocumentRepairUserPrompt(
+  candidate: string,
+  violations: BoundedViolations,
+): string {
+  return `${rejectedDocument(candidate, violations)}
+
+Fix these violations and re-emit the complete document. Change nothing else.
+Answer with JSON {"html": …} only.`;
+}
+
+/**
+ * The `patch`-mode Repair's user message (spec §7.2): the same violations and
+ * document, answered with edits, or with the complete document when a
+ * structural code means edits would not do.
+ */
+export function buildDocumentPatchRepairUserPrompt(
+  candidate: string,
+  violations: BoundedViolations,
+): string {
+  return `${rejectedDocument(candidate, violations)}
+
+Fix these violations with edits to DOCUMENT. Change nothing else.
+Each edit replaces its "find" text with its "replace" text. Copy each "find" exactly from DOCUMENT, and make it long enough to match exactly once. Finds must not overlap. Use at most ${MAX_REPAIR_EDITS} edits.
+If any violation is envelope.body, page.pages or composition.pageRoles, re-emit the complete document instead.
+Answer with JSON {"edits": [{"find": …, "replace": …}], "html": null}, or {"edits": null, "html": …} for the complete document.`;
+}
+
+/**
+ * The warm follow-up when a `patch`-mode Repair's edits do not apply (spec
+ * §7.2): the problems `applyEdits` found, answered with `{ html }`.
+ */
+export function buildDocumentRepairFallbackUserPrompt(
+  problems: readonly string[],
+): string {
+  return `Your edits could not be applied:
+
+${problems.map((problem) => `- ${problem}`).join('\n')}
+
+Re-emit the complete document with the violations fixed. Change nothing else.
+Answer with JSON {"html": …} only.`;
+}
+
+/** What every Repair's user message opens with: the violations, then the document. */
+function rejectedDocument(
   candidate: string,
   { violations, omitted }: BoundedViolations,
 ): string {
@@ -290,10 +341,7 @@ VIOLATIONS:
 ${lines.join('\n')}
 
 DOCUMENT:
-${candidate}
-
-Fix these violations and re-emit the complete document. Change nothing else.
-Answer with JSON {"html": …} only.`;
+${candidate}`;
 }
 
 /**

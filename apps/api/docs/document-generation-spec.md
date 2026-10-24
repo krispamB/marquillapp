@@ -615,8 +615,25 @@ or page-scoped repair proves necessary.
   pinned fragment, byte-identical to the draft call. The user message is the current Candidate
   Source, the bounded violations, and "fix these, re-emit the complete document, change nothing
   else". Brief, research and feedback are dropped.
-- A Repair answers with `{ html }` only (`documentRepairSchema`), and the user message's last line
-  asks for exactly that; the draft's `title` and `commentary` are kept.
+- **`DOCUMENT_REPAIR_MODE`** (`'full' | 'patch'`, default `'full'`, a module constant switched by
+  deploy) sets what a Repair answers. In `full` it answers `{ html }` only (`documentRepairSchema`),
+  and the user message's last line asks for exactly that. In `patch` it answers
+  `{ edits: {find, replace}[] | null, html: string | null }` (at most 40 edits, exactly one field
+  non-null), and the last line asks for edits, with `html` for structural codes (`envelope.body`,
+  `page.pages`, `composition.pageRoles`). The draft's `title` and `commentary` are kept either way.
+- **Applying edits.** The pure `applyEdits(candidate, edits)` (`document-source/candidate-patch.ts`)
+  matches `find` against the exact bytes of the Candidate Source (CRLF to LF is the only
+  normalisation). Each `find` must match exactly once, ranges must not overlap, and the edits apply
+  by offset, last to first, all or nothing. Empty `edits` is a failure. This does not sanitize
+  (§4.4): the app changes nothing on its own, it applies only what the model authored, and the
+  result is unchecked, so it goes back through `check()` and render like any Repair answer.
+- **Fallback.** When the edits do not apply, the same round sends one warm follow-up in the same
+  conversation, listing the problems, answered with `{ html }`. It is billed but does not count
+  against `DOCUMENT_REPAIR_BUDGET`, and a job attempt gets at most one. An envelope repair turn
+  inside the fallback still counts, as it does for any call. Empty `edits` or an empty `find` pass
+  the schema and fail in `applyEdits`, so they earn the fallback too. If that fallback is already
+  spent, failed edits end the run as `document.repair_exhausted`. A worst case per job attempt in
+  `patch` mode is therefore one more model call than above.
 
 ### 7.3 Render retries and the checkpoint (#139)
 
@@ -656,7 +673,9 @@ All of these precede any spend.
   raises `envelope.truncated` **before any parse**.
 - **Truncation is terminal** (`document.truncated`) and spends no Repair.
 - **`DOCUMENT_GENERATION_MAX_OUTPUT_TOKENS`, default 16384**, applies to DOCUMENT draft and Repair
-  calls. `GENERATION_MAX_OUTPUT_TOKENS` (8192) keeps serving POST, POLL and research.
+  calls, including the `patch` fallback. A Repair answer cut off by the cap is `envelope.truncated`
+  whether it carried edits or `html`; edits are never applied from a truncated answer.
+  `GENERATION_MAX_OUTPUT_TOKENS` (8192) keeps serving POST, POLL and research.
 - **`DOCUMENT_RUN_DEADLINE = 6 min`** per job attempt, checked before each model call and render
   session. Exceeding it is transient. On exhaustion the code follows the phase: `render.unavailable`
   in `RENDER_PDF`, `internal` elsewhere.
@@ -756,6 +775,7 @@ Nothing below is in `docs/api/` until then.
 | Candidate size cap | module constant | 256 KB | §4.4 |
 | Violations to the model | module constant | ≤3 per code, ≤40 total | §4.4 |
 | `DOCUMENT_REPAIR_BUDGET` | module constant | `2` | §7.2 |
+| `DOCUMENT_REPAIR_MODE` | module constant | `'full'`; `'patch'` once the eval's fallback rate is under 20% | §7.2 |
 | `DOCUMENT_RUN_DEADLINE` | module constant | 6 min | §7.5 |
 | `DOCUMENT_GENERATION_MAX_OUTPUT_TOKENS` | env var | `16384` | §7.5 |
 | `CHROME_PATH` | env var, test only | local Chrome for `test:render` | §11.2 |
@@ -776,8 +796,11 @@ with the per-run rule in §7.7. New dependencies: `yaml`, `parse5`, `postcss`, `
 Each DOCUMENT run records a **`documentDiagnostics`** block on `WorkflowRun`:
 
 - per candidate: every check outcome (passes included), with violation codes and counts
-- repair rounds used, `finishReason`, output tokens, page count, the pin, wall time per step and the
-  final `failureCode`
+- repair rounds used, `repairs` (one entry per Repair round: `kind` `static` or `render`, `mode`
+  `full` or `patch`, `edits` the number of edits answered, `0` for an `html` answer, and `fallback`
+  whether the edits did not apply, so the round needed the `{ html }` follow-up, sent or, with the
+  fallback already spent, ending the run; #232), `finishReason`, output tokens, page
+  count, the pin, wall time per step and the final `failureCode`
 - a reference to `renderAttempts` for session durations, units, outcome and `billed`, rather than a
   copy. Each entry also records where the session got to (#192): `phase` (the phase running when it
   ended: `pdf` for a session that finished, the phase that hung or threw otherwise) and `phaseMs`
@@ -797,8 +820,8 @@ Each DOCUMENT run records a **`documentDiagnostics`** block on `WorkflowRun`:
   spend), `model`, `promptTokens`, `completionTokens`, `reasoningTokens` and `cachedTokens` when
   the provider reports them, `latencyMs` and `finishReason`. Turns from earlier job attempts carry
   over. The list keeps the latest `MAX_MODEL_TURNS` (24); a job attempt makes at most a draft and
-  `DOCUMENT_REPAIR_BUDGET` more calls, so a run never reaches it. Diagnostics from before #207
-  carry none of these.
+  `DOCUMENT_REPAIR_BUDGET` more calls (plus one `patch` fallback), so a run never reaches it.
+  Diagnostics from before #207 carry none of these.
 
 Every run, DOCUMENT or not, also records:
 

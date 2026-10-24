@@ -62,6 +62,15 @@ describe('DocumentMetricsService', () => {
       });
     });
 
+    it('should project the Repair rounds', async () => {
+      await service.listRuns();
+
+      const [pipeline] = mocks.workflowRunModel.aggregate.mock.calls[0] as [
+        { $project: Record<string, unknown> }[],
+      ];
+      expect(pipeline[1].$project.repairs).toBe('$documentDiagnostics.repairs');
+    });
+
     it('should project the phase and timeout flag of each render attempt', async () => {
       mocks.exec.mockResolvedValue([]);
 

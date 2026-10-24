@@ -142,13 +142,41 @@ export const documentDraftSchema = z.object({
 });
 
 /**
- * What the model writes for a Repair (§7.2): the Candidate Source alone. A
- * Repair's title and commentary would be thrown away, so it is not asked for
- * them.
+ * What the model writes for a `full`-mode Repair, and for a `patch`-mode
+ * Repair's fallback (§7.2): the Candidate Source alone. A Repair's title and
+ * commentary would be thrown away, so it is not asked for them.
  */
 export const documentRepairSchema = z.object({
   html: candidateHtmlSchema,
 });
+
+/** The most edits one patch-mode Repair may answer with (§7.2). */
+export const MAX_REPAIR_EDITS = 40;
+
+// No minimum on `edits` or `find`: an empty list or find is an `applyEdits`
+// failure, which earns the `{ html }` fallback rather than an envelope repair.
+const candidateEditSchema = z.object({
+  find: z.string(),
+  replace: z.string(),
+});
+
+/**
+ * What the model writes for a `patch`-mode Repair (§7.2): edits to the
+ * Candidate Source, or the whole of it, never both. Both fields are optional
+ * here, which the provider schema turns into required-nullable and the parser
+ * strips back to absent; "exactly one" cannot be said in the strict provider
+ * schema, so it is checked here and a violation is an envelope validation
+ * failure like any other.
+ */
+export const documentPatchRepairSchema = z
+  .object({
+    edits: z.array(candidateEditSchema).max(MAX_REPAIR_EDITS).optional(),
+    html: candidateHtmlSchema.optional(),
+  })
+  .refine(
+    ({ edits, html }) => (edits === undefined) !== (html === undefined),
+    'answer with exactly one of edits and html; the other must be null',
+  );
 
 export type DocumentDraft = z.infer<typeof documentDraftSchema> & {
   title?: string;

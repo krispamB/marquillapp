@@ -18,7 +18,11 @@ import type { RenderSessionResult } from '../../document-render/render-session';
 import type { DesignSystemDefinition } from '../../design-system/design-system-definition';
 import type { DesignSystemRecord } from '../../design-system/design-systems.service';
 import type { Violation } from '../../document-source/violation';
-import { FailureCode, WorkflowStep } from '../workflow.constants';
+import {
+  type DocumentRepairMode,
+  FailureCode,
+  WorkflowStep,
+} from '../workflow.constants';
 import type { EmittedEvent } from './run-event.types';
 
 export interface WorkflowDefinition {
@@ -67,14 +71,23 @@ export interface DocumentDraftState {
   candidate: string;
   /** Turns of `DOCUMENT_REPAIR_BUDGET` already spent in this job attempt. */
   repairsSpent: number;
+  /**
+   * `patch`-mode fallbacks (`DOCUMENT_REPAIR_FALLBACKS`) already spent in
+   * this job attempt; absent means none.
+   */
+  fallbacksSpent?: number;
 }
 
 /**
  * DOCUMENT: the job's only checkpoint (spec §7.3). `RENDER_PDF` saves the
  * latest statically clean Candidate Source before it renders it, so a job
  * retry after a render outage resumes from it without calling the model.
+ * Fallbacks are not kept: a resumed job attempt has its own.
  */
-export interface AcceptedCandidate extends DocumentDraftState {
+export interface AcceptedCandidate extends Omit<
+  DocumentDraftState,
+  'fallbacksSpent'
+> {
   /** The draft's title, on an INITIAL run. */
   title?: string;
   savedAt: Date;
@@ -122,6 +135,16 @@ export interface JobAttemptFailure {
   message: string;
 }
 
+/** One Repair round, as the run's diagnostics keep it. */
+export interface RepairDiagnostic {
+  kind: 'static' | 'render';
+  mode: DocumentRepairMode;
+  /** The edits the model answered with; `0` when it answered with `html`. */
+  edits: number;
+  /** The edits did not apply and the `{ html }` fallback answered instead. */
+  fallback: boolean;
+}
+
 /** One DOCUMENT model call, as the run's diagnostics keep it. */
 export interface ModelTurn {
   model: string;
@@ -155,6 +178,11 @@ export interface DocumentDiagnostics {
   candidates: CandidateDiagnostics[];
   /** Turns of `DOCUMENT_REPAIR_BUDGET` the latest job attempt had spent. */
   repairRounds: number;
+  /**
+   * Every Repair round of every job attempt, oldest first. Absent when none
+   * ran, and from diagnostics recorded before it was kept.
+   */
+  repairs?: RepairDiagnostic[];
   /** The last model turn's. */
   finishReason?: string;
   /** Completion tokens over every model turn of every job attempt. */
@@ -210,6 +238,8 @@ export interface RunDiagnostics {
   ): void;
   /** The job attempt's running total, as it changes. */
   recordRepairsSpent(repairsSpent: number): void;
+  /** One per Repair round that produced a Candidate Source. */
+  recordRepair(repair: RepairDiagnostic): void;
   recordAccepted(candidate: string, repairsSpent: number): void;
   recordRenderSession(): void;
   recordPageCount(pageCount: number): void;
