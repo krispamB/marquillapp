@@ -429,7 +429,9 @@ export class AgentRunnerService implements AgentRunner {
 
     const options = {
       model:
-        this.textModels[input.type === ArtifactType.POLL ? 'POLL' : 'POST'],
+        input.type === ArtifactType.POLL || input.type === ArtifactType.POST
+          ? this.textModels[input.type]
+          : this.generationModel,
       ...callOptions(this.generationReasoningEffort, input.sessionId),
     };
 
