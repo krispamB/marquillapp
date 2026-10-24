@@ -115,6 +115,10 @@ export type RunCompletedEvent = {
   ts: number;
   artifactId: string;
   version: number;
+  /** POST and POLL runs only: the promoted version's content. Absent on DOCUMENT runs and snapshots. */
+  content?: ArtifactContent;
+  /** INITIAL POST and POLL runs only. */
+  title?: string;
 };
 
 /** Stable failure codes on `run.failed`; POST and POLL runs only emit `internal`. */
