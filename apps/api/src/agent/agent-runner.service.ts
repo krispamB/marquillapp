@@ -262,6 +262,14 @@ export class AgentRunnerService implements AgentRunner {
     this.documentRepairReasoningEffort = this.readEffort(
       'DOCUMENT_REPAIR_REASONING_EFFORT',
     );
+    if (
+      this.researchMode === 'snippets' &&
+      this.researchReasoningEffort === undefined
+    ) {
+      this.logger.warn(
+        'RESEARCH_MODE is snippets but RESEARCH_REASONING_EFFORT is unset; the query call runs at the model default effort, not its lowest',
+      );
+    }
     this.streamPostCommentary = readBoolEnv(
       {
         STREAM_POST_COMMENTARY: this.configService.get<string>(

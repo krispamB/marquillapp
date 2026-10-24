@@ -1891,6 +1891,23 @@ describe('AgentRunnerService', () => {
       expect(mocks.llmService.complete).not.toHaveBeenCalled();
     });
 
+    it('should warn at boot when RESEARCH_MODE is snippets and RESEARCH_REASONING_EFFORT is unset', () => {
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+
+      makeService({ env: { RESEARCH_MODE: 'snippets' } });
+      makeService({
+        env: { RESEARCH_MODE: 'snippets', RESEARCH_REASONING_EFFORT: 'none' },
+      });
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('RESEARCH_REASONING_EFFORT'),
+      );
+      warn.mockRestore();
+    });
+
     describe('in snippets mode', () => {
       const queriesJson = (...queries: string[]) =>
         completion(JSON.stringify({ queries }));
