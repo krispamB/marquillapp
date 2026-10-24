@@ -29,6 +29,7 @@
     "seed:tiers:temp": "ts-node src/scripts/temp-seed-tiers.ts",
     "seed:design-systems": "ts-node src/scripts/seed-design-systems.ts",
     "eval:documents": "ts-node -r tsconfig-paths/register src/scripts/eval-documents.ts",
+    "eval:research": "ts-node -r tsconfig-paths/register src/scripts/research-ab.ts",
     "typecheck": "tsc --noEmit -p tsconfig.build.json",
     "dev": "nest start --watch",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
