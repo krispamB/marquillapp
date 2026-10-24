@@ -349,7 +349,11 @@ export class OpenRouterStrategy implements LLMStrategy {
     if (onTextDelta) {
       return this.sendWithRetries(
         (signal) =>
-          this.streamOnce({ ...chatRequest, stream: true }, signal, onTextDelta),
+          this.streamOnce(
+            { ...chatRequest, stream: true },
+            signal,
+            onTextDelta,
+          ),
         options,
       );
     }

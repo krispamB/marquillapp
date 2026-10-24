@@ -418,7 +418,11 @@ describe('AgentRunnerService', () => {
       /** A completion that streams `text` in `pieces` through `onTextDelta` first. */
       const streamed =
         (text: string, pieces: number) =>
-        (_provider: unknown, _messages: unknown, options?: CompletionOptions) => {
+        (
+          _provider: unknown,
+          _messages: unknown,
+          options?: CompletionOptions,
+        ) => {
           const size = Math.ceil(text.length / pieces);
           let soFar = '';
           for (let at = 0; at < text.length; at += size) {
@@ -480,7 +484,9 @@ describe('AgentRunnerService', () => {
       it('should announce a rewrite before the repair turn and stream the repair', async () => {
         ({ service, mocks, fixtures } = makeService(STREAM_ON));
         mocks.llmService.complete
-          .mockImplementationOnce(streamed(generatedJson({ commentary: '' }), 2))
+          .mockImplementationOnce(
+            streamed(generatedJson({ commentary: '' }), 2),
+          )
           .mockImplementationOnce(
             streamed(generatedJson({ commentary: 'Repaired.' }), 3),
           );

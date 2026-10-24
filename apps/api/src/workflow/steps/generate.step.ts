@@ -9,6 +9,7 @@ import type {
   StepHandler,
 } from '../engine/workflow.types';
 import { WorkflowStep } from '../workflow.constants';
+import { commentaryPreview } from './commentary-preview';
 import {
   callModel,
   envelopeAllowance,
@@ -25,6 +26,9 @@ import {
  * - **terminal** — content that failed Zod even after the warm repair (R2).
  * - **retryable** — an LLM transport fault, which `src/llm` already classified
  *   and the engine's `toWorkflowError` reads straight off the `LLMError`.
+ *
+ * With `STREAM_POST_COMMENTARY` on, the agent streams the commentary as it is
+ * written, and `commentaryPreview` throttles it into `writing` progress.
  *
  * DOCUMENT drafts a Candidate Source, from the brief or by rewriting the
  * refine base, and repairs it until it is statically clean (spec §7.1).
@@ -46,7 +50,10 @@ export const generateStep: StepHandler = async (state, ctx) => {
         refine: state.refine,
         sessionId: ctx.run.runId,
       },
-      meteredHooks(ctx),
+      {
+        ...meteredHooks(ctx),
+        ...commentaryPreview((event) => ctx.emit(event)),
+      },
     );
 
     return {

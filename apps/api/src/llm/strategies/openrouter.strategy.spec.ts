@@ -1251,10 +1251,16 @@ describe('OpenRouterStrategy', () => {
         .mockResolvedValueOnce(
           streamOf(
             chunk('{"commentary":"Dra'),
-            chunk(undefined, { error: { code: 502, message: 'Upstream died' } }, 'error'),
+            chunk(
+              undefined,
+              { error: { code: 502, message: 'Upstream died' } },
+              'error',
+            ),
           ),
         )
-        .mockResolvedValueOnce(streamOf(chunk('{"commentary":"New"}', {}, 'stop')));
+        .mockResolvedValueOnce(
+          streamOf(chunk('{"commentary":"New"}', {}, 'stop')),
+        );
       const onTextDelta = jest.fn();
 
       const outcome = settle(strategy.complete(user, { onTextDelta }));
@@ -1296,16 +1302,22 @@ describe('OpenRouterStrategy', () => {
               },
             }),
         )
-        .mockResolvedValueOnce(streamOf(chunk('{"commentary":"x"}', {}, 'stop')));
+        .mockResolvedValueOnce(
+          streamOf(chunk('{"commentary":"x"}', {}, 'stop')),
+        );
 
-      const outcome = settle(strategy.complete(user, { onTextDelta: jest.fn() }));
+      const outcome = settle(
+        strategy.complete(user, { onTextDelta: jest.fn() }),
+      );
       // No short idle timer: a silent stream survives until the try's timeout.
       await jest.advanceTimersByTimeAsync(239_999);
       expect(send).toHaveBeenCalledTimes(1);
       await jest.advanceTimersByTimeAsync(1);
       await jest.advanceTimersByTimeAsync(500);
 
-      expect((await outcome).value).toMatchObject({ text: '{"commentary":"x"}' });
+      expect((await outcome).value).toMatchObject({
+        text: '{"commentary":"x"}',
+      });
       expect(send).toHaveBeenCalledTimes(2);
     });
 

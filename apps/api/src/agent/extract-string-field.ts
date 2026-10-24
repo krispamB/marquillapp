@@ -79,7 +79,13 @@ function decodeOpenString(buffer: string, from: number): string {
     }
     const unit = readUnit(buffer, i);
     if (unit === undefined) return out;
-    if (unit >= 0xd800 && unit <= 0xdbff && readUnit(buffer, i + 6) === undefined) {
+    // A low half that may still be on its way: hold the high half back.
+    if (
+      unit >= 0xd800 &&
+      unit <= 0xdbff &&
+      buffer.length < i + 12 &&
+      readUnit(buffer, i + 6) === undefined
+    ) {
       return out;
     }
     out += String.fromCharCode(unit);

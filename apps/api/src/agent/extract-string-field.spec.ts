@@ -20,10 +20,7 @@ describe('extractStringField', () => {
 
   it('should return the whole value when the string has closed', () => {
     expect(
-      extractStringField(
-        '{"commentary": "Done.", "title": "T"}',
-        'commentary',
-      ),
+      extractStringField('{"commentary": "Done.", "title": "T"}', 'commentary'),
     ).toBe('Done.');
   });
 
@@ -40,15 +37,13 @@ describe('extractStringField', () => {
     expect(extractStringField('{"commentary":"line\\', 'commentary')).toBe(
       'line',
     );
-    expect(extractStringField('{"commentary":"x\\u00', 'commentary')).toBe(
-      'x',
-    );
+    expect(extractStringField('{"commentary":"x\\u00', 'commentary')).toBe('x');
   });
 
   it('should decode a \\u escape when all four digits have arrived', () => {
-    expect(
-      extractStringField('{"commentary":"caf\\u00e9!', 'commentary'),
-    ).toBe('café!');
+    expect(extractStringField('{"commentary":"caf\\u00e9!', 'commentary')).toBe(
+      'café!',
+    );
   });
 
   it('should hold back a high surrogate when its low half has not arrived', () => {
@@ -56,6 +51,12 @@ describe('extractStringField', () => {
     expect(extractStringField(pair, 'commentary')).toBe('hi 😀');
     expect(extractStringField(pair.slice(0, -6), 'commentary')).toBe('hi ');
     expect(extractStringField(pair.slice(0, -3), 'commentary')).toBe('hi ');
+  });
+
+  it('should keep going past a lone high surrogate when more text has arrived after it', () => {
+    expect(
+      extractStringField('{"commentary":"a\\ud83d and more', 'commentary'),
+    ).toBe('a\ud83d and more');
   });
 
   it('should pass raw non-ASCII characters through unchanged', () => {
