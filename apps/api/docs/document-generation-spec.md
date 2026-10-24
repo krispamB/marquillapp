@@ -796,7 +796,8 @@ Each DOCUMENT run records a **`documentDiagnostics`** block on `WorkflowRun`:
 - per candidate: every check outcome (passes included), with violation codes and counts
 - repair rounds used, `repairs` (one entry per Repair round: `kind` `static` or `render`, `mode`
   `full` or `patch`, `edits` the number of edits answered, `0` for an `html` answer, and `fallback`
-  whether the round needed the `{ html }` follow-up, #232), `finishReason`, output tokens, page
+  whether the edits did not apply, so the round needed the `{ html }` follow-up, sent or, with the
+  fallback already spent, ending the run; #232), `finishReason`, output tokens, page
   count, the pin, wall time per step and the final `failureCode`
 - a reference to `renderAttempts` for session durations, units, outcome and `billed`, rather than a
   copy. Each entry also records where the session got to (#192): `phase` (the phase running when it

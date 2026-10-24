@@ -67,7 +67,7 @@ export const documentObjectKey = (
  * into a Document Source, render it in one CDP session, and judge what the
  * session measured. On `repair` findings it spends a render Repair from the
  * budget `GENERATE` shares, statically re-checks (and, if need be, repairs)
- * the re-emitted Candidate Source, and renders again. On a pass it uploads
+ * the repaired Candidate Source, and renders again. On a pass it uploads
  * the four objects and puts the keys, hashes and measured `pageCount` in run
  * state for `PERSIST_VERSION`.
  *
@@ -124,6 +124,9 @@ export const renderPdfStep: StepHandler = async (state, ctx) => {
   let current: RepairedCandidate = {
     candidate: draft.candidate,
     repairsSpent: draft.repairsSpent,
+    ...(draft.fallbacksSpent !== undefined
+      ? { fallbacksSpent: draft.fallbacksSpent }
+      : {}),
   };
   // Sessions that produced a verdict, all billed as one record on a pass.
   const verdicts: BrowserlessUsage[] = [];
@@ -209,8 +212,10 @@ export const renderPdfStep: StepHandler = async (state, ctx) => {
 
     // The checkpoint: a job retry after a render outage resumes from here
     // without calling the model (spec §7.3).
+    // Fallbacks are per job attempt, so the checkpoint does not keep them.
     await ctx.run.saveAcceptedCandidate({
-      ...current,
+      candidate: current.candidate,
+      repairsSpent: current.repairsSpent,
       commentary: draft.commentary,
       ...(state.generatedTitle !== undefined
         ? { title: state.generatedTitle }

@@ -37,6 +37,23 @@ export const SCHEDULED_POST_PUBLISHED_EMAIL_JOB_NAME =
  */
 export const DOCUMENT_REPAIR_BUDGET = 2;
 
+/** What a Repair answers with (spec §7.2): the whole document, or edits to it. */
+export type DocumentRepairMode = 'full' | 'patch';
+
+/**
+ * Deploy-switched, like every module constant here (spec §10): `full` asks a
+ * Repair for the complete Candidate Source, `patch` for edits, with one
+ * `{ html }` fallback per job attempt when they do not apply. Go/no-go for
+ * `patch` is an eval fallback rate under 20%.
+ */
+export const DOCUMENT_REPAIR_MODE: DocumentRepairMode = 'full';
+
+/**
+ * `patch`-mode fallbacks per job attempt: warm `{ html }` follow-ups after
+ * edits that did not apply. Billed, but not turns of `DOCUMENT_REPAIR_BUDGET`.
+ */
+export const DOCUMENT_REPAIR_FALLBACKS = 1;
+
 /**
  * The wall-clock bound on one DOCUMENT job attempt (spec §7.5), checked before
  * each model call and render session.

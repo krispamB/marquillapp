@@ -7,6 +7,7 @@ import {
   dedupePollOptions,
   DocumentDraft,
   documentDraftSchemaFor,
+  documentPatchRepairSchema,
   documentRepairSchema,
   generationSchemaFor,
 } from '../artifact/schemas';
@@ -35,6 +36,8 @@ import type {
   DocumentDraftResult,
   DocumentModelCall,
   DocumentGenerateInput,
+  DocumentPatchRepairResult,
+  DocumentRepairFallbackInput,
   DocumentRepairInput,
   DocumentRepairResult,
   GenerateInput,
@@ -46,6 +49,8 @@ import type {
 import { readReasoningEffort } from './reasoning-effort';
 import {
   buildDocumentGenerationUserPrompt,
+  buildDocumentPatchRepairUserPrompt,
+  buildDocumentRepairFallbackUserPrompt,
   buildDocumentRepairUserPrompt,
   buildGenerationUserPrompt,
   buildRepairUserPrompt,
@@ -125,6 +130,23 @@ const callOptions = (
   ...(reasoningEffort ? { reasoningEffort } : {}),
   ...(sessionId ? { sessionId } : {}),
 });
+
+/** A DOCUMENT call, as its errors and logs name it. */
+type DocumentCall = 'draft' | 'Repair' | 'Repair fallback';
+
+/** How each DOCUMENT call's first turn is tagged for usage. */
+const DOCUMENT_MODEL_CALLS: Record<DocumentCall, DocumentModelCall> = {
+  draft: 'draft',
+  Repair: 'repair',
+  'Repair fallback': 'fallback',
+};
+
+interface DocumentCallOptions<T> {
+  schema: ZodType<T>;
+  maxEnvelopeRepairs: number;
+  sessionId?: string;
+  timeLeftMs?: number;
+}
 
 const toToolDefinition = (tool: Tool): ToolDefinition => ({
   name: tool.name,
@@ -490,10 +512,10 @@ export class AgentRunnerService implements AgentRunner {
   }
 
   /**
-   * One Repair (spec §7.2): a fresh two-message call whose system message is
-   * byte-identical to the draft's, and whose user message is the Candidate
-   * Source and its bounded violations. The model answers with `{ html }`
-   * only: a Repair's title and commentary would be thrown away.
+   * One `full`-mode Repair (spec §7.2): a fresh two-message call whose system
+   * message is byte-identical to the draft's, and whose user message is the
+   * Candidate Source and its bounded violations. The model answers with
+   * `{ html }` only: a Repair's title and commentary would be thrown away.
    */
   async repairDocument(
     input: DocumentRepairInput,
@@ -502,13 +524,7 @@ export class AgentRunnerService implements AgentRunner {
     const { parsed, envelopeRepairs } = await this.completeDocument(
       'Repair',
       [
-        {
-          role: MessageRole.System,
-          content: documentGenerationSystemPrompt(
-            input.fragment,
-            input.includeTitle,
-          ),
-        },
+        this.repairSystemMessage(input),
         {
           role: MessageRole.User,
           content: buildDocumentRepairUserPrompt(
@@ -517,16 +533,99 @@ export class AgentRunnerService implements AgentRunner {
           ),
         },
       ],
-      {
-        schema: documentRepairSchema,
-        maxEnvelopeRepairs: input.maxEnvelopeRepairs,
-        sessionId: input.sessionId,
-        timeLeftMs: input.timeLeftMs,
-      },
+      this.repairOptions(input, documentRepairSchema),
       hooks,
     );
 
     return { html: parsed.html, envelopeRepairs };
+  }
+
+  /**
+   * One `patch`-mode Repair (spec §7.2): the same fresh two-message call,
+   * answered with edits, or with the whole Candidate Source for structural
+   * codes. Whether the edits apply is the caller's question.
+   */
+  async repairDocumentPatch(
+    input: DocumentRepairInput,
+    hooks?: AgentHooks,
+  ): Promise<DocumentPatchRepairResult> {
+    const { parsed, envelopeRepairs } = await this.completeDocument(
+      'Repair',
+      this.patchRepairMessages(input),
+      this.repairOptions(input, documentPatchRepairSchema),
+      hooks,
+    );
+
+    // The schema lets exactly one through.
+    return parsed.edits !== undefined
+      ? { edits: parsed.edits, envelopeRepairs }
+      : { html: parsed.html!, envelopeRepairs };
+  }
+
+  /**
+   * The warm follow-up to a `patch`-mode Repair whose edits did not apply
+   * (spec §7.2): the Repair's own messages, its edits as the assistant turn,
+   * and the problems as the user turn, answered with `{ html }`. Its own call,
+   * so it is billed and checked for truncation like any other.
+   */
+  async repairDocumentFallback(
+    input: DocumentRepairFallbackInput,
+    hooks?: AgentHooks,
+  ): Promise<DocumentRepairResult> {
+    const { parsed, envelopeRepairs } = await this.completeDocument(
+      'Repair fallback',
+      [
+        ...this.patchRepairMessages(input),
+        {
+          role: MessageRole.Assistant,
+          content: JSON.stringify({ edits: input.edits, html: null }),
+        },
+        {
+          role: MessageRole.User,
+          content: buildDocumentRepairFallbackUserPrompt(input.problems),
+        },
+      ],
+      this.repairOptions(input, documentRepairSchema),
+      hooks,
+    );
+
+    return { html: parsed.html, envelopeRepairs };
+  }
+
+  /** The draft's system message, byte for byte (spec §7.2). */
+  private repairSystemMessage(input: DocumentRepairInput): LLMMessage {
+    return {
+      role: MessageRole.System,
+      content: documentGenerationSystemPrompt(
+        input.fragment,
+        input.includeTitle,
+      ),
+    };
+  }
+
+  private patchRepairMessages(input: DocumentRepairInput): LLMMessage[] {
+    return [
+      this.repairSystemMessage(input),
+      {
+        role: MessageRole.User,
+        content: buildDocumentPatchRepairUserPrompt(
+          input.candidate,
+          input.violations,
+        ),
+      },
+    ];
+  }
+
+  private repairOptions<T>(
+    input: DocumentRepairInput,
+    schema: ZodType<T>,
+  ): DocumentCallOptions<T> {
+    return {
+      schema,
+      maxEnvelopeRepairs: input.maxEnvelopeRepairs,
+      sessionId: input.sessionId,
+      timeLeftMs: input.timeLeftMs,
+    };
   }
 
   /**
@@ -540,19 +639,14 @@ export class AgentRunnerService implements AgentRunner {
    * deadline.
    */
   private async completeDocument<T>(
-    call: 'draft' | 'Repair',
+    call: DocumentCall,
     messages: LLMMessage[],
     {
       schema,
       maxEnvelopeRepairs,
       sessionId,
       timeLeftMs,
-    }: {
-      schema: ZodType<T>;
-      maxEnvelopeRepairs: number;
-      sessionId?: string;
-      timeLeftMs?: number;
-    },
+    }: DocumentCallOptions<T>,
     hooks?: AgentHooks,
   ): Promise<{ parsed: T; envelopeRepairs: number }> {
     const options = {
@@ -576,7 +670,7 @@ export class AgentRunnerService implements AgentRunner {
 
     const first = await this.complete(messages, hooks, schema, {
       ...options,
-      call: call === 'draft' ? 'draft' : 'repair',
+      call: DOCUMENT_MODEL_CALLS[call],
     });
     this.assertNotTruncated(call, first.finishReason);
 
@@ -626,7 +720,7 @@ export class AgentRunnerService implements AgentRunner {
   }
 
   private assertNotTruncated(
-    call: 'draft' | 'Repair',
+    call: DocumentCall,
     finishReason: string | undefined,
   ): void {
     if (finishReason === 'length') {

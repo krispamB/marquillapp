@@ -70,6 +70,7 @@ const makeStep = () => {
     recordModelTurn: jest.fn(),
     recordCheck: jest.fn(),
     recordRepairsSpent: jest.fn(),
+    recordRepair: jest.fn(),
     recordAccepted: jest.fn(),
     recordRenderSession: jest.fn(),
     recordPageCount: jest.fn(),
@@ -824,6 +825,21 @@ describe('renderPdfStep', () => {
 
       expect(mocks.run.saveAcceptedCandidate).toHaveBeenLastCalledWith(
         expect.objectContaining({ candidate: REPAIRED, repairsSpent: 1 }),
+      );
+    });
+
+    it('should keep the fallbacks GENERATE spent out of the checkpoint and in run state', async () => {
+      const state = {
+        ...fixtures.state,
+        draft: { ...fixtures.state.draft!, fallbacksSpent: 1 },
+      };
+
+      await expect(renderPdfStep(state, ctx)).resolves.toMatchObject({
+        draft: { fallbacksSpent: 1 },
+      });
+      expect(mocks.run.saveAcceptedCandidate).toHaveBeenCalledWith(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- an asymmetric matcher
+        expect.not.objectContaining({ fallbacksSpent: expect.anything() }),
       );
     });
 

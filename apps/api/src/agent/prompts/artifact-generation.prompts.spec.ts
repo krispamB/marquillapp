@@ -8,7 +8,13 @@ jest.mock(
   { virtual: true },
 );
 
-import { GENERATE_DOCUMENT_SYSTEM_PROMPT } from './artifact-generation.prompts';
+import type { BoundedViolations } from '../../document-source/violation';
+import {
+  buildDocumentPatchRepairUserPrompt,
+  buildDocumentRepairFallbackUserPrompt,
+  buildDocumentRepairUserPrompt,
+  GENERATE_DOCUMENT_SYSTEM_PROMPT,
+} from './artifact-generation.prompts';
 
 describe('GENERATE_DOCUMENT_SYSTEM_PROMPT', () => {
   // The prompt is hard-wrapped; compare it as the model reads it.
@@ -81,5 +87,87 @@ describe('GENERATE_DOCUMENT_SYSTEM_PROMPT', () => {
         'Markers stay inside their item. Give a bullet or number no negative offset that pushes it past the wrapper.',
       );
     });
+  });
+});
+
+const CANDIDATE = '<!doctype html><html><body>13px</body></html>';
+const BOUNDED: BoundedViolations = {
+  violations: [
+    {
+      code: 'typography.rules.minPx',
+      detail: 'font-size 13px is below 14px',
+      page: 2,
+      line: 7,
+    },
+  ],
+  omitted: [{ code: 'page.pages', count: 1 }],
+};
+
+describe('buildDocumentRepairUserPrompt', () => {
+  it('should ask for the complete document as html when the Repair is in full mode', () => {
+    expect(buildDocumentRepairUserPrompt(CANDIDATE, BOUNDED)).toBe(
+      `Your document was rejected by the Design System checker.
+
+VIOLATIONS:
+- typography.rules.minPx (page 2, line 7): font-size 13px is below 14px
+- Not listed: 1 more page.pages.
+
+DOCUMENT:
+${CANDIDATE}
+
+Fix these violations and re-emit the complete document. Change nothing else.
+Answer with JSON {"html": …} only.`,
+    );
+  });
+});
+
+describe('buildDocumentPatchRepairUserPrompt', () => {
+  const prompt = buildDocumentPatchRepairUserPrompt(CANDIDATE, BOUNDED);
+
+  it('should lay out the violations and the document as the full-mode prompt does', () => {
+    const full = buildDocumentRepairUserPrompt(CANDIDATE, BOUNDED);
+    const layout = full.slice(0, full.indexOf(CANDIDATE) + CANDIDATE.length);
+
+    expect(prompt.startsWith(`${layout}\n\n`)).toBe(true);
+  });
+
+  it('should ask for edits whose finds are copied exactly, match once and do not overlap', () => {
+    expect(prompt).toContain('Copy each "find" exactly from DOCUMENT');
+    expect(prompt).toContain('match exactly once');
+    expect(prompt).toContain('must not overlap');
+    expect(prompt).toContain('at most 40 edits');
+  });
+
+  it('should ask for the complete document instead when a structural code is violated', () => {
+    expect(prompt).toContain(
+      'If any violation is envelope.body, page.pages or composition.pageRoles, re-emit the complete document instead.',
+    );
+  });
+
+  it('should end by asking for edits with a null html, or a null edits with the complete document', () => {
+    expect(prompt.split('\n').at(-1)).toBe(
+      'Answer with JSON {"edits": [{"find": …, "replace": …}], "html": null}, or {"edits": null, "html": …} for the complete document.',
+    );
+  });
+});
+
+describe('buildDocumentRepairFallbackUserPrompt', () => {
+  const prompt = buildDocumentRepairFallbackUserPrompt([
+    'Edit 1: find not found: "13px".',
+    'Edits 2 and 3: their find ranges overlap.',
+  ]);
+
+  it('should list each problem the edits had', () => {
+    expect(prompt).toContain('- Edit 1: find not found: "13px".');
+    expect(prompt).toContain('- Edits 2 and 3: their find ranges overlap.');
+  });
+
+  it('should end by asking for the complete document as html only', () => {
+    expect(prompt).toContain(
+      'Re-emit the complete document with the violations fixed. Change nothing else.',
+    );
+    expect(prompt.split('\n').at(-1)).toBe(
+      'Answer with JSON {"html": …} only.',
+    );
   });
 });

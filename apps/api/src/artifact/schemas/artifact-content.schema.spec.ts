@@ -10,6 +10,7 @@ import { z, ZodError } from 'zod';
 import { ArtifactType } from 'src/database/schemas';
 import {
   documentDraftSchemaFor,
+  documentPatchRepairSchema,
   documentRepairSchema,
   generationSchemaFor,
   parseArtifactContent,
@@ -118,6 +119,88 @@ describe('documentRepairSchema', () => {
 
   it('should reject an empty html', () => {
     expect(() => documentRepairSchema.parse({ html: '' })).toThrow(ZodError);
+  });
+});
+
+describe('documentPatchRepairSchema', () => {
+  const HTML = '<!doctype html><html><body></body></html>';
+  const edit = { find: '13px', replace: '14px' };
+
+  it('should accept edits alone', () => {
+    expect(documentPatchRepairSchema.parse({ edits: [edit] })).toEqual({
+      edits: [edit],
+    });
+  });
+
+  it('should accept html alone', () => {
+    expect(documentPatchRepairSchema.parse({ html: HTML })).toEqual({
+      html: HTML,
+    });
+  });
+
+  it('should reject an answer with both edits and html', () => {
+    expect(() =>
+      documentPatchRepairSchema.parse({ edits: [edit], html: HTML }),
+    ).toThrow(ZodError);
+  });
+
+  it('should reject an answer with neither edits nor html', () => {
+    expect(() => documentPatchRepairSchema.parse({})).toThrow(ZodError);
+  });
+
+  it('should reject an empty edits list', () => {
+    expect(() => documentPatchRepairSchema.parse({ edits: [] })).toThrow(
+      ZodError,
+    );
+  });
+
+  it('should accept 40 edits and reject 41', () => {
+    const edits = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({ find: `f${i}`, replace: '' }));
+
+    expect(() =>
+      documentPatchRepairSchema.parse({ edits: edits(40) }),
+    ).not.toThrow();
+    expect(() => documentPatchRepairSchema.parse({ edits: edits(41) })).toThrow(
+      ZodError,
+    );
+  });
+
+  it('should reject an edit with an empty find, and accept an empty replace', () => {
+    expect(() =>
+      documentPatchRepairSchema.parse({ edits: [{ find: '', replace: 'x' }] }),
+    ).toThrow(ZodError);
+    expect(() =>
+      documentPatchRepairSchema.parse({ edits: [{ find: 'x', replace: '' }] }),
+    ).not.toThrow();
+  });
+
+  it('should reject an empty html', () => {
+    expect(() => documentPatchRepairSchema.parse({ html: '' })).toThrow(
+      ZodError,
+    );
+  });
+
+  it('should expose edits and html to the provider as two optional fields', () => {
+    const jsonSchema = z.toJSONSchema(documentPatchRepairSchema, {
+      target: 'draft-7',
+      io: 'output',
+    });
+
+    expect(Object.keys(jsonSchema.properties ?? {})).toEqual(['edits', 'html']);
+    expect(jsonSchema.required ?? []).toEqual([]);
+    expect(jsonSchema.properties?.edits).toMatchObject({
+      type: 'array',
+      minItems: 1,
+      maxItems: 40,
+      items: {
+        properties: {
+          find: { type: 'string', minLength: 1 },
+          replace: { type: 'string' },
+        },
+        required: ['find', 'replace'],
+      },
+    });
   });
 });
 

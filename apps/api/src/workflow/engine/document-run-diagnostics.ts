@@ -8,14 +8,15 @@ import type {
   DocumentDiagnostics,
   JobAttemptFailure,
   ModelTurn,
+  RepairDiagnostic,
   RunDiagnostics,
   ViolationCode,
 } from './workflow.types';
 
 /**
  * The most model calls a run's diagnostics keep, the latest first to stay. A
- * job attempt makes at most a draft and `DOCUMENT_REPAIR_BUDGET` more turns,
- * so a run within its job attempts never reaches it.
+ * job attempt makes at most a draft, `DOCUMENT_REPAIR_BUDGET` more turns and
+ * a `patch`-mode fallback, so a run within its job attempts never reaches it.
  */
 export const MAX_MODEL_TURNS = 24;
 
@@ -71,6 +72,7 @@ export class DocumentRunDiagnostics implements RunDiagnostics {
   /** The latest Candidate Source checked or checkpointed in this job attempt. */
   private latestCandidate?: string;
   private repairRounds = 0;
+  private readonly repairs: RepairDiagnostic[];
   private outputTokens: number;
   private promptTokens: number;
   private reasoningTokens: number;
@@ -103,6 +105,7 @@ export class DocumentRunDiagnostics implements RunDiagnostics {
     this.reasoningTokens = prior?.reasoningTokens ?? 0;
     this.cachedPromptTokens = prior?.cachedPromptTokens ?? 0;
     this.modelTurns = [...(prior?.modelTurns ?? [])];
+    this.repairs = [...(prior?.repairs ?? [])];
     this.finishReason = prior?.finishReason;
     this.sessions = prior?.renderAttempts.sessions ?? 0;
     this.pages = prior?.pageCount;
@@ -157,6 +160,10 @@ export class DocumentRunDiagnostics implements RunDiagnostics {
     this.repairRounds = repairsSpent;
   }
 
+  recordRepair({ kind, mode, edits, fallback }: RepairDiagnostic): void {
+    this.repairs.push({ kind, mode, edits, fallback });
+  }
+
   recordAccepted(candidate: string, repairsSpent: number): void {
     this.acceptedCandidate = {
       candidateSha256: sha256Hex(candidate),
@@ -198,6 +205,7 @@ export class DocumentRunDiagnostics implements RunDiagnostics {
       jobAttemptFailures: failures,
       candidates: this.candidates,
       repairRounds: this.repairRounds,
+      ...(this.repairs.length > 0 ? { repairs: [...this.repairs] } : {}),
       ...(this.finishReason !== undefined
         ? { finishReason: this.finishReason }
         : {}),
