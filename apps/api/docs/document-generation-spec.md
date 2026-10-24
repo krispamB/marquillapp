@@ -354,9 +354,14 @@ type Violation = { code: string; detail: string; page?: number; line?: number };
 Assembly turns a statically clean Candidate Source into a Document Source by adding exactly three
 derived things:
 
-1. **The frame stylesheet** (§4.3), as a second `<style>` block.
-2. **The Google Fonts `<link>`**, built from `typography.fonts` ∩ `DESIGN_SYSTEM_FONT_ALLOWLIST`,
-   `display=block`.
+1. **The frame stylesheet** (§4.3), as the last `<style>` block.
+2. **The fonts**, from `typography.fonts` ∩ `DESIGN_SYSTEM_FONT_ALLOWLIST`, `display=block` (#235).
+   The worker's `FontInlinerService` fetches the css2 stylesheet with a Chrome User-Agent, keeps the
+   `@font-face` subsets whose `unicode-range` meets the Candidate Source's text (always `latin` and
+   `latin-ext`), and inlines each woff2 as a `data:font/woff2;base64` URL. Assembly puts that CSS in
+   a `<style>` before the frame. Every fetch is cached per process by URL, and a failed one is
+   evicted; any failure falls back to the Google Fonts `<link>`, never to a failed render.
+   `assemble()` stays pure: the CSS is an argument, and without it the `<link>` is added.
 3. **Icons.** Each `<svg data-icon data-size>` placeholder is filled from the pinned Lucide catalog
    (`lucide-static`, catalog id `app-inline-v1`): `viewBox`, paths, `stroke="currentColor"`,
    `width`/`height` from `data-size`, `aria-hidden="true"`, `focusable="false"`.
@@ -378,8 +383,10 @@ One CDP session per render replaces the REST `/pdf` call. It uses `puppeteer.con
 (`puppeteer-core`, a runtime dependency) and is one metered render:
 
 1. `setJavaScriptEnabled(false)`. CDP evaluation still runs the probe.
-2. Request interception allowlists `fonts.googleapis.com/css2` and `fonts.gstatic.com` only. A
-   refused request is recorded.
+2. Request interception allowlists `fonts.googleapis.com/css2`, `fonts.gstatic.com` and inlined
+   `data:font/` URLs only. A refused request is recorded. Chrome emits a request for each inlined
+   font and aborting one is a no-op, so the filter passes `data:font/` before its refusal branch;
+   otherwise every inlined render would end as `render.egress`.
 3. `emulateMediaType('print')`; viewport at the definition's page size.
 4. `setContent(…, { waitUntil: 'load' })`. Not `networkidle0`, which never settles on Browserless.
 5. Probe: force layout, `await document.fonts.ready`, collect page boxes, line boxes, colours,
@@ -496,9 +503,10 @@ version: {
 - **Retention.** Per-version objects are never deleted while the artifact is live. A future
   soft-delete sweep must skip versions referenced by a `SCHEDULED` or `PUBLISHED` Post. Objects from
   an Attempt that never reached `READY` stay under their own prefix for that sweep.
-- A frozen Document Source references Google-hosted fonts that may one day stop being served. This
-  never affects a stored PDF, because nothing re-renders a stored version (§6.6). Self-hosting fonts
-  is the eventual fix and is out of scope.
+- A frozen Document Source carries its fonts inline (§4.5), so `source.html` is larger (about
+  0.3–1.1 MB on the launch systems). One assembled after an inlining failure references
+  Google-hosted fonts that may one day stop being served. This never affects a stored PDF, because
+  nothing re-renders a stored version (§6.6).
 
 ### 6.4 Manual edit (#138)
 
@@ -784,6 +792,9 @@ Nothing below is in `docs/api/` until then.
 | `BROWSERLESS_SLOT_WAIT_MAX_MS` | env var, worker | `120000` | §11.1 |
 | `RENDER_SLOT_WAIT_RESERVE_MS` | module constant | 20 s of the run deadline kept free of slot waiting | §7.5 |
 | Candidate retention on runs | module constant | 90 days | §11.5 |
+| `FONT_INLINE_FETCH_TIMEOUT_MS` | module constant | 5 s per font inliner fetch | §4.5 |
+| `FONT_INLINE_USER_AGENT` | module constant | a desktop Chrome User-Agent (woff2 subsets) | §4.5 |
+| `FONT_INLINE_ALWAYS_SUBSETS` | module constant | `latin`, `latin-ext` | §4.5 |
 
 Module constants change by deploy, never by environment, so a document never renders differently per
 environment. Existing `CREDIT_SURCHARGE_PDF_RENDER` and `CREDIT_MINIMUM_PDF_RENDER` keep their values
