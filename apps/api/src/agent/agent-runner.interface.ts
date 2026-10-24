@@ -206,6 +206,17 @@ export interface AgentHooks {
   onUsage?: (usage: AgentTurnUsage) => void;
   // Fired by the research tool loop (#112); `generate` calls no tools.
   onToolCall?: (tool: { name: string }) => void;
+  /**
+   * `generate` with `STREAM_POST_COMMENTARY` on: the commentary written so
+   * far, on each piece of text the model sends. Repeats a value when a piece
+   * did not change it.
+   */
+  onCommentary?: (commentary: string) => void;
+  /**
+   * `generate` while streaming: the draft failed validation and the repair
+   * turn will write the commentary again, so what was seen so far is void.
+   */
+  onRewrite?: () => void;
 }
 
 // Narrow role interface consumed by the workflow engine's StepContext. Steps

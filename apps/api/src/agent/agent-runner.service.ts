@@ -46,6 +46,8 @@ import type {
   ResearchSource,
   Tool,
 } from './agent-runner.interface';
+import { readBoolEnv } from '../common/env';
+import { extractStringField } from './extract-string-field';
 import { readReasoningEffort } from './reasoning-effort';
 import {
   buildDocumentGenerationUserPrompt,
@@ -176,6 +178,8 @@ export class AgentRunnerService implements AgentRunner {
   private readonly generationReasoningEffort?: ReasoningEffort;
   private readonly documentDraftReasoningEffort?: ReasoningEffort;
   private readonly documentRepairReasoningEffort?: ReasoningEffort;
+  /** `STREAM_POST_COMMENTARY`: stream POST and POLL commentary as it is written. */
+  private readonly streamPostCommentary: boolean;
   private readonly searchWebTool: Tool;
 
   constructor(
@@ -217,6 +221,15 @@ export class AgentRunnerService implements AgentRunner {
     );
     this.documentRepairReasoningEffort = this.readEffort(
       'DOCUMENT_REPAIR_REASONING_EFFORT',
+    );
+    this.streamPostCommentary = readBoolEnv(
+      {
+        STREAM_POST_COMMENTARY: this.configService.get<string>(
+          'STREAM_POST_COMMENTARY',
+        ),
+      },
+      'STREAM_POST_COMMENTARY',
+      false,
     );
     this.searchWebTool = createSearchWebTool(
       this.configService.getOrThrow<string>('TAVILY_API_KEY'),
@@ -394,6 +407,11 @@ export class AgentRunnerService implements AgentRunner {
    *
    * The repair re-prompts with the exact validation error. A failure that
    * survives it is a `ContentValidationError` — terminal, per R2.
+   *
+   * With `STREAM_POST_COMMENTARY` on and an `onCommentary` hook, both calls
+   * stream, and the hook gets the commentary written so far as it grows
+   * (`commentary` is the schema's first key, so it arrives first). The repair
+   * rewrites it, so `onRewrite` fires before the repair call.
    */
   async generate(
     input: GenerateInput,
@@ -418,9 +436,20 @@ export class AgentRunnerService implements AgentRunner {
         : {}),
     };
 
+    const onCommentary = this.streamPostCommentary
+      ? hooks?.onCommentary
+      : undefined;
     const options = {
       model: this.generationModel,
       ...callOptions(this.generationReasoningEffort, input.sessionId),
+      ...(onCommentary
+        ? {
+            onTextDelta: (_delta: string, text: string) => {
+              const commentary = extractStringField(text, 'commentary');
+              if (commentary !== undefined) onCommentary(commentary);
+            },
+          }
+        : {}),
     };
 
     const { text: draft } = await this.complete(
@@ -443,6 +472,7 @@ export class AgentRunnerService implements AgentRunner {
     this.logger.warn(
       `Generated ${input.type} first draft failed validation; attempting one repair: ${describeError(validationError)}`,
     );
+    if (onCommentary) hooks?.onRewrite?.();
 
     const { text: repaired } = await this.complete(
       [
@@ -830,7 +860,10 @@ export class AgentRunnerService implements AgentRunner {
       model: string;
       maxTokens?: number;
       call?: DocumentModelCall;
-    } & Pick<CompletionOptions, 'reasoningEffort' | 'sessionId' | 'deadlineAt'>,
+    } & Pick<
+      CompletionOptions,
+      'reasoningEffort' | 'sessionId' | 'deadlineAt' | 'onTextDelta'
+    >,
   ): Promise<{ text: string; finishReason?: string }> {
     const {
       text,
@@ -844,6 +877,7 @@ export class AgentRunnerService implements AgentRunner {
       ...(options.deadlineAt !== undefined
         ? { deadlineAt: options.deadlineAt }
         : {}),
+      ...(options.onTextDelta ? { onTextDelta: options.onTextDelta } : {}),
       ...(responseSchema
         ? {
             responseSchema: {

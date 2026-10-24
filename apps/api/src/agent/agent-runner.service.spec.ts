@@ -412,6 +412,124 @@ describe('AgentRunnerService', () => {
       });
     });
 
+    describe('streamed commentary', () => {
+      const STREAM_ON = { env: { STREAM_POST_COMMENTARY: 'true' } };
+
+      /** A completion that streams `text` in `pieces` through `onTextDelta` first. */
+      const streamed =
+        (text: string, pieces: number) =>
+        (_provider: unknown, _messages: unknown, options?: CompletionOptions) => {
+          const size = Math.ceil(text.length / pieces);
+          let soFar = '';
+          for (let at = 0; at < text.length; at += size) {
+            const delta = text.slice(at, at + size);
+            soFar += delta;
+            options?.onTextDelta?.(delta, soFar);
+          }
+          return Promise.resolve(completion(text));
+        };
+
+      it('should not stream when STREAM_POST_COMMENTARY is off', async () => {
+        mocks.llmService.complete.mockResolvedValue(
+          completion(generatedJson({ commentary: 'Write more.' })),
+        );
+
+        await service.generate(fixtures.input, { onCommentary: jest.fn() });
+
+        expect(completeCalls()[0][2]?.onTextDelta).toBeUndefined();
+      });
+
+      it('should not stream when the caller takes no commentary', async () => {
+        ({ service, mocks, fixtures } = makeService(STREAM_ON));
+        mocks.llmService.complete.mockResolvedValue(
+          completion(generatedJson({ commentary: 'Write more.' })),
+        );
+
+        await service.generate(fixtures.input, { onUsage: jest.fn() });
+
+        expect(completeCalls()[0][2]?.onTextDelta).toBeUndefined();
+      });
+
+      it('should fail boot when STREAM_POST_COMMENTARY is not a boolean', () => {
+        expect(() =>
+          makeService({ env: { STREAM_POST_COMMENTARY: 'yes' } }),
+        ).toThrow('STREAM_POST_COMMENTARY');
+      });
+
+      it('should hand the commentary written so far to onCommentary as the text streams', async () => {
+        ({ service, mocks, fixtures } = makeService(STREAM_ON));
+        mocks.llmService.complete.mockImplementation(
+          streamed('{"commentary":"Write more, ship more.","title":"T"}', 6),
+        );
+        const onCommentary = jest.fn();
+
+        await expect(
+          service.generate(fixtures.input, { onCommentary }),
+        ).resolves.toMatchObject({
+          content: { commentary: 'Write more, ship more.' },
+        });
+
+        const seen = onCommentary.mock.calls.map(([text]) => text as string);
+        expect(seen.length).toBeGreaterThan(1);
+        expect(seen.at(-1)).toBe('Write more, ship more.');
+        seen.forEach((text) =>
+          expect('Write more, ship more.'.startsWith(text)).toBe(true),
+        );
+      });
+
+      it('should announce a rewrite before the repair turn and stream the repair', async () => {
+        ({ service, mocks, fixtures } = makeService(STREAM_ON));
+        mocks.llmService.complete
+          .mockImplementationOnce(streamed(generatedJson({ commentary: '' }), 2))
+          .mockImplementationOnce(
+            streamed(generatedJson({ commentary: 'Repaired.' }), 3),
+          );
+        const order: string[] = [];
+        const onCommentary = jest.fn((text: string) =>
+          order.push(`text:${text}`),
+        );
+        const onRewrite = jest.fn(() => order.push('rewrite'));
+
+        await service.generate(fixtures.input, { onCommentary, onRewrite });
+
+        expect(onRewrite).toHaveBeenCalledTimes(1);
+        const rewriteAt = order.indexOf('rewrite');
+        expect(completeCalls()[1][2]?.onTextDelta).toBeDefined();
+        expect(order.slice(rewriteAt + 1)).toContain('text:Repaired.');
+      });
+
+      it('should announce no rewrite when the first draft is valid', async () => {
+        ({ service, mocks, fixtures } = makeService(STREAM_ON));
+        mocks.llmService.complete.mockImplementation(
+          streamed(generatedJson({ commentary: 'Fine.' }), 2),
+        );
+        const onRewrite = jest.fn();
+
+        await service.generate(fixtures.input, {
+          onCommentary: jest.fn(),
+          onRewrite,
+        });
+
+        expect(onRewrite).not.toHaveBeenCalled();
+      });
+
+      it('should announce no rewrite when it is not streaming', async () => {
+        mocks.llmService.complete
+          .mockResolvedValueOnce(completion(generatedJson({ commentary: '' })))
+          .mockResolvedValueOnce(
+            completion(generatedJson({ commentary: 'Repaired.' })),
+          );
+        const onRewrite = jest.fn();
+
+        await service.generate(fixtures.input, {
+          onCommentary: jest.fn(),
+          onRewrite,
+        });
+
+        expect(onRewrite).not.toHaveBeenCalled();
+      });
+    });
+
     describe('the inline repair retry', () => {
       it('should re-prompt with the validation error and return the repaired content', async () => {
         mocks.llmService.complete
