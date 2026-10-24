@@ -1,5 +1,72 @@
-import type { ResearchResult, ResearchSource } from './agent-runner.interface';
+import { z } from 'zod';
+import type {
+  ResearchMode,
+  ResearchResult,
+  ResearchSource,
+} from './agent-runner.interface';
 import type { WebSearchResult } from './tools';
+
+/** Most searches one snippet research runs. */
+export const MAX_SNIPPET_QUERIES = 4;
+/** Tavily rejects a longer query. */
+const MAX_QUERY_CHARS = 400;
+
+export const DEFAULT_RESEARCH_MAX_SNIPPETS = 10;
+export const DEFAULT_RESEARCH_SNIPPET_CHARS = 600;
+
+/** What the query call is asked for, as structured output. */
+export const snippetQueriesSchema = z.object({
+  queries: z.array(z.string().min(1)).min(1).max(MAX_SNIPPET_QUERIES),
+});
+
+/**
+ * What its answer is read with: looser than what was asked for, so a fifth
+ * query or a blank one is dropped by `cleanSnippetQueries` rather than
+ * failing the whole answer.
+ */
+export const snippetQueriesAnswerSchema = z.object({
+  queries: z.array(z.string()),
+});
+
+/**
+ * The queries to search: trimmed, blank and case-insensitive repeats
+ * dropped, each cut to Tavily's length limit, at most four. When none are
+ * left, the brief itself is the one query.
+ */
+export const cleanSnippetQueries = (
+  queries: readonly string[],
+  brief: string,
+): string[] => {
+  const seen = new Set<string>();
+  const kept: string[] = [];
+  for (const raw of queries) {
+    const query = raw.replace(/\s+/g, ' ').trim().slice(0, MAX_QUERY_CHARS);
+    const key = query.toLowerCase();
+    if (query === '' || seen.has(key)) continue;
+    seen.add(key);
+    kept.push(query);
+    if (kept.length === MAX_SNIPPET_QUERIES) break;
+  }
+  if (kept.length > 0) return kept;
+  return [brief.replace(/\s+/g, ' ').trim().slice(0, MAX_QUERY_CHARS)];
+};
+
+/**
+ * Reads `RESEARCH_MODE`. Unset or blank is `agent`; anything but `agent` or
+ * `snippets` throws, so a typo fails worker boot instead of silently
+ * falling back.
+ */
+export const readResearchMode = (
+  raw: string | number | null | undefined,
+): ResearchMode => {
+  const value =
+    raw === undefined || raw === null ? '' : String(raw).trim().toLowerCase();
+  if (value === '' || value === 'agent') return 'agent';
+  if (value === 'snippets') return 'snippets';
+  throw new Error(
+    `RESEARCH_MODE must be agent or snippets, or unset; got "${String(raw)}"`,
+  );
+};
 
 /** One successful search: its query and Tavily's results, best first. */
 export interface SnippetSearch {

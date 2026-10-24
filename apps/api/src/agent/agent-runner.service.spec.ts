@@ -1653,6 +1653,253 @@ describe('AgentRunnerService', () => {
       expect(mocks.llmService.completeWithTools).toHaveBeenCalledTimes(2);
       expect(result.findings).toBe('forced synthesis');
     });
+
+    it('should leave mode unset on agent research when RESEARCH_MODE is agent', async () => {
+      ({ service, mocks, fixtures } = makeService({
+        env: { RESEARCH_MODE: 'agent' },
+      }));
+      mocks.llmService.completeWithTools.mockResolvedValueOnce(
+        toolTurn([], 0.01, 'findings'),
+      );
+
+      const result = await service.research({
+        prompt: 'topic',
+        type: ArtifactType.POST,
+      });
+
+      expect(result).toEqual({ findings: 'findings', sources: [] });
+      expect(mocks.llmService.complete).not.toHaveBeenCalled();
+    });
+
+    describe('in snippets mode', () => {
+      const queriesJson = (...queries: string[]) =>
+        completion(JSON.stringify({ queries }));
+
+      const searchedQueries = (): string[] =>
+        (tavilySearch.mock.calls as Array<[string]>).map(([query]) => query);
+
+      const withContent = (
+        sources: Array<{ title: string; url: string; content: string }>,
+      ) => ({ results: sources.map((s) => ({ ...s, score: 1 })) });
+
+      beforeEach(() => {
+        ({ service, mocks, fixtures } = makeService({
+          env: { RESEARCH_MODE: 'snippets' },
+        }));
+      });
+
+      it('should make one research-model call for the queries and no tool turns', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(queriesJson('q1'));
+        tavilySearch.mockResolvedValue(withContent([]));
+
+        await service.research({
+          prompt: 'topic',
+          type: ArtifactType.POST,
+          sessionId: 'run-1',
+        });
+
+        expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+        expect(mocks.llmService.completeWithTools).not.toHaveBeenCalled();
+        const [provider, messages, options] = completeCalls()[0];
+        expect(provider).toBe(LLMProvider.OPENROUTER);
+        expect(messages.map((m) => m.role)).toEqual([
+          MessageRole.System,
+          MessageRole.User,
+        ]);
+        expect(messages[1].content).toContain('topic');
+        const { responseSchema, ...rest } = options!;
+        expect(rest).toEqual({
+          model: RESEARCH_MODEL,
+          max_tokens: DEFAULT_MAX_OUTPUT_TOKENS,
+          sessionId: 'run-1',
+          timeoutMs: RESEARCH_TURN_TIMEOUT_MS,
+        });
+        expect(responseSchema?.name).toBe('research_queries');
+        expect(responseSchema?.schema).toBeInstanceOf(z.ZodType);
+      });
+
+      it('should send RESEARCH_REASONING_EFFORT on the query call when it is set', async () => {
+        ({ service, mocks, fixtures } = makeService({
+          env: { RESEARCH_MODE: 'snippets', RESEARCH_REASONING_EFFORT: 'none' },
+        }));
+        mocks.llmService.complete.mockResolvedValueOnce(queriesJson('q1'));
+        tavilySearch.mockResolvedValue(withContent([]));
+
+        await service.research({ prompt: 'topic', type: ArtifactType.POST });
+
+        expect(completeCalls()[0][2]?.reasoningEffort).toBe('none');
+      });
+
+      it('should run every query in parallel before any search returns', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(
+          queriesJson('q1', 'q2', 'q3'),
+        );
+        const pending: Array<() => void> = [];
+        tavilySearch.mockImplementation(
+          () =>
+            new Promise((resolve) =>
+              pending.push(() => resolve(withContent([]))),
+            ),
+        );
+
+        const research = service.research({
+          prompt: 'topic',
+          type: ArtifactType.POST,
+        });
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(searchedQueries()).toEqual(['q1', 'q2', 'q3']);
+        pending.forEach((resolve) => resolve());
+        await research;
+      });
+
+      it('should charge each successful search and not a failed one', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(
+          queriesJson('q1', 'q2', 'q3'),
+        );
+        tavilySearch
+          .mockResolvedValueOnce(withContent([]))
+          .mockRejectedValueOnce(new Error('Tavily unavailable'))
+          .mockResolvedValueOnce(withContent([]));
+        const onToolCall = jest.fn();
+        const onUsage = jest.fn();
+
+        await service.research(
+          { prompt: 'topic', type: ArtifactType.POST },
+          { onToolCall, onUsage },
+        );
+
+        expect(onToolCall).toHaveBeenCalledTimes(2);
+        expect(onToolCall).toHaveBeenCalledWith({ name: 'searchWeb' });
+        expect(onUsage).toHaveBeenCalledTimes(1);
+        expect(onUsage).toHaveBeenCalledWith(
+          expect.objectContaining({ cost: 0.02, model: RESEARCH_MODEL }),
+        );
+      });
+
+      it('should return deduped, interleaved, numbered snippets with mode snippets', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(
+          queriesJson('q1', 'q2'),
+        );
+        tavilySearch
+          .mockResolvedValueOnce(
+            withContent([
+              { title: 'A1', url: 'https://a.com/1', content: 'a one' },
+              { title: 'A2', url: 'https://a.com/2', content: 'a two' },
+            ]),
+          )
+          .mockResolvedValueOnce(
+            withContent([
+              { title: 'Dup', url: 'https://www.a.com/1/', content: 'again' },
+              { title: 'B2', url: 'https://b.com/2', content: 'b two' },
+            ]),
+          );
+
+        const result = await service.research({
+          prompt: 'topic',
+          type: ArtifactType.POST,
+        });
+
+        expect(result).toEqual({
+          findings: [
+            '[1] A1 (https://a.com/1)\na one',
+            '[2] A2 (https://a.com/2)\na two',
+            '[3] B2 (https://b.com/2)\nb two',
+          ].join('\n\n'),
+          sources: [
+            { title: 'A1', url: 'https://a.com/1' },
+            { title: 'A2', url: 'https://a.com/2' },
+            { title: 'B2', url: 'https://b.com/2' },
+          ],
+          mode: 'snippets',
+        });
+      });
+
+      it('should cap snippets at RESEARCH_MAX_SNIPPETS and cut each to RESEARCH_SNIPPET_CHARS', async () => {
+        ({ service, mocks, fixtures } = makeService({
+          env: {
+            RESEARCH_MODE: 'snippets',
+            RESEARCH_MAX_SNIPPETS: '2',
+            RESEARCH_SNIPPET_CHARS: '10',
+          },
+        }));
+        mocks.llmService.complete.mockResolvedValueOnce(queriesJson('q1'));
+        tavilySearch.mockResolvedValueOnce(
+          withContent(
+            ['1', '2', '3'].map((n) => ({
+              title: n,
+              url: `https://a.com/${n}`,
+              content: 'x'.repeat(40),
+            })),
+          ),
+        );
+
+        const result = await service.research({
+          prompt: 'topic',
+          type: ArtifactType.POST,
+        });
+
+        expect(result.sources).toHaveLength(2);
+        expect(result.findings).toBe(
+          `[1] 1 (https://a.com/1)\n${'x'.repeat(9)}…\n\n[2] 2 (https://a.com/2)\n${'x'.repeat(9)}…`,
+        );
+      });
+
+      it('should search at most four distinct queries', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(
+          queriesJson('q1', ' Q1 ', '', 'q2', 'q3', 'q4', 'q5'),
+        );
+        tavilySearch.mockResolvedValue(withContent([]));
+
+        await service.research({ prompt: 'topic', type: ArtifactType.POST });
+
+        expect(searchedQueries()).toEqual(['q1', 'q2', 'q3', 'q4']);
+      });
+
+      it('should search the brief itself when the query call answers with invalid JSON', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(completion('not json'));
+        tavilySearch.mockResolvedValue(withContent([]));
+
+        await service.research({
+          prompt: 'the brief',
+          type: ArtifactType.POST,
+        });
+
+        expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+        expect(searchedQueries()).toEqual(['the brief']);
+      });
+
+      it('should return empty findings when every search fails', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(
+          queriesJson('q1', 'q2'),
+        );
+        tavilySearch.mockRejectedValue(new Error('Tavily unavailable'));
+
+        await expect(
+          service.research({ prompt: 'topic', type: ArtifactType.POST }),
+        ).resolves.toEqual({ findings: '', sources: [], mode: 'snippets' });
+      });
+
+      it('should let a transport error from the query call fail the research', async () => {
+        const error = new LLMError('upstream down', { retryable: true });
+        mocks.llmService.complete.mockRejectedValueOnce(error);
+
+        await expect(
+          service.research({ prompt: 'topic', type: ArtifactType.POST }),
+        ).rejects.toBe(error);
+        expect(tavilySearch).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('research configuration', () => {
+      it.each([
+        [{ RESEARCH_MODE: 'snippet' }, 'RESEARCH_MODE'],
+        [{ RESEARCH_MAX_SNIPPETS: '0' }, 'RESEARCH_MAX_SNIPPETS'],
+        [{ RESEARCH_SNIPPET_CHARS: 'lots' }, 'RESEARCH_SNIPPET_CHARS'],
+      ])('should fail construction when %p is invalid', (env, key) => {
+        expect(() => makeService({ env })).toThrow(key);
+      });
+    });
   });
 
   describe('output-token configuration', () => {

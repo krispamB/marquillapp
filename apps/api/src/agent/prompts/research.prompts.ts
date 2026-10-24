@@ -48,3 +48,27 @@ function audienceHint(type: ArtifactType): string {
 export function researchUserPrompt(input: ResearchInput): string {
   return `BRIEF:\n${input.prompt}\n\nThe writer will turn your findings into ${audienceHint(input.type)}. Research the topic and report what you find.`;
 }
+
+// Snippet research (RESEARCH_MODE=snippets, plan M7.2): the model only plans
+// the searches. Their raw excerpts go straight to GENERATE, unread.
+export const SNIPPET_QUERIES_SYSTEM_PROMPT = `ROLE:
+You plan web searches for a LinkedIn content writer. You do not search or
+write anything yourself.
+
+TASK:
+Read the brief and write 1 to 4 web search queries whose results would give
+the writer current, concrete facts, figures and examples for it.
+- Each query covers a different angle; do not repeat one in other words.
+- Write queries the way a person types them into a search engine: specific
+  keywords, no full sentences, no instructions.
+- Use fewer queries for a narrow brief.
+
+Answer with JSON {"queries": [...]} only.`;
+
+export function snippetQueriesSystemPrompt(): string {
+  return SNIPPET_QUERIES_SYSTEM_PROMPT;
+}
+
+export function snippetQueriesUserPrompt(input: ResearchInput): string {
+  return `BRIEF:\n${input.prompt}\n\nThe writer will turn the search results into ${audienceHint(input.type)}. Write the search queries.`;
+}

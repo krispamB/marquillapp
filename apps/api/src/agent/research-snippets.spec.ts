@@ -1,6 +1,8 @@
 import {
   buildSnippetResearch,
+  cleanSnippetQueries,
   normaliseSnippetUrl,
+  readResearchMode,
   type SnippetSearch,
 } from './research-snippets';
 
@@ -155,7 +157,9 @@ describe('research snippets', () => {
 
       expect(buildSnippetResearch(searches, LIMITS)).toEqual({
         findings: '[1] https://untitled.com/p (https://untitled.com/p)\nBody',
-        sources: [{ title: 'https://untitled.com/p', url: 'https://untitled.com/p' }],
+        sources: [
+          { title: 'https://untitled.com/p', url: 'https://untitled.com/p' },
+        ],
         mode: 'snippets',
       });
     });
@@ -182,6 +186,41 @@ describe('research snippets', () => {
         sources: [],
         mode: 'snippets',
       });
+    });
+  });
+
+  describe('cleanSnippetQueries', () => {
+    it('should trim, drop blanks and case-insensitive repeats, and keep at most four', () => {
+      expect(
+        cleanSnippetQueries([' a  b ', 'A B', '', 'c', 'd', 'e', 'f'], 'brief'),
+      ).toEqual(['a b', 'c', 'd', 'e']);
+    });
+
+    it('should cut each query to 400 characters', () => {
+      expect(cleanSnippetQueries(['q'.repeat(500)], 'brief')[0]).toHaveLength(
+        400,
+      );
+    });
+
+    it('should fall back to the brief when no query is left', () => {
+      expect(cleanSnippetQueries(['  '], ' the\n brief ')).toEqual([
+        'the brief',
+      ]);
+    });
+  });
+
+  describe('readResearchMode', () => {
+    it.each([
+      [undefined, 'agent'],
+      ['', 'agent'],
+      [' agent ', 'agent'],
+      ['Snippets', 'snippets'],
+    ])('should read %p as %s', (raw, mode) => {
+      expect(readResearchMode(raw)).toBe(mode);
+    });
+
+    it('should throw naming RESEARCH_MODE when the value is unknown', () => {
+      expect(() => readResearchMode('snippet')).toThrow('RESEARCH_MODE');
     });
   });
 });
