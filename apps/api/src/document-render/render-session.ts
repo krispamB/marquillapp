@@ -84,12 +84,14 @@ const reasonOf = (error: unknown): string =>
 
 /**
  * One render of a Document Source (§5.1): one `puppeteer.connect` session, one
- * metered render. In order: JavaScript off; requests allowlisted to the Google
- * Fonts stylesheet and font files, with every refusal recorded; print media
- * and a viewport at the page size; `setContent` until `load`; the probe; the
- * font pass; a best-effort `cover.png` of page 1 (skipped when `skipCover` says the
- * session is going to Repair); `page.pdf` and its page
- * count. One deadline covers all of it, connect included.
+ * metered render. In order: the request listener, then JavaScript off, request
+ * interception, print media, a viewport at the page size and the CDP session
+ * in parallel (requests allowlisted to the Google Fonts stylesheet and font
+ * files, with every refusal recorded); `setContent` until `load`; the probe;
+ * the font pass; a best-effort `cover.png` of page 1 (skipped when `skipCover`
+ * says the session is going to Repair); `page.pdf` and its page count. One
+ * deadline covers all of it, connect included. The CDP detach and the browser
+ * disconnect are not awaited.
  *
  * It times each of those phases (`RenderPhase`), so a session that hits the
  * deadline or fails says where: `result.trace`, or `RenderSessionError.trace`.
@@ -128,12 +130,9 @@ export async function renderDocumentSession(
     clock.enter('setup');
     const page = await connected.newPage();
 
-    // 1. Untrusted content never executes. CDP evaluation still runs the probe.
-    await page.setJavaScriptEnabled(false);
-
-    // 2. The second wall behind the static `url(` rule: only the font
-    // stylesheet and the font files it references may load.
-    await page.setRequestInterception(true);
+    // 1. The second wall behind the static `url(` rule: only the font
+    // stylesheet and the font files it references may load. The listener is
+    // attached first, so no request is ever seen without it.
     page.on('request', (request: HTTPRequest) => {
       if (request.isInterceptResolutionHandled()) return;
       const url = request.url();
@@ -147,17 +146,25 @@ export async function renderDocumentSession(
       }
     });
 
-    // 3. Measure the layout the PDF gets, not the screen one.
-    await page.emulateMediaType('print');
-    await page.setViewport({ width, height });
+    // 2. One round trip for all of setup, not five. Untrusted content never
+    // executes (CDP evaluation still runs the probe), requests are
+    // intercepted, and the layout measured is the PDF's, not the screen's. The
+    // CDP session is for the font pass.
+    const [, , , , cdp] = await Promise.all([
+      page.setJavaScriptEnabled(false),
+      page.setRequestInterception(true),
+      page.emulateMediaType('print'),
+      page.setViewport({ width, height }),
+      page.createCDPSession(),
+    ]);
 
-    // 4. `load`, not `networkidle0`, which never settles on Browserless. Font
+    // 3. `load`, not `networkidle0`, which never settles on Browserless. Font
     // readiness is proven by the probe and the font pass instead. The session
     // deadline bounds this, so the per-call timeout is off.
     clock.enter('load');
     await page.setContent(documentSource, { waitUntil: 'load', timeout: 0 });
 
-    // 5. The probe.
+    // 4. The probe.
     clock.enter('probe');
     const probed = await page.evaluate(
       probeInPage,
@@ -168,13 +175,16 @@ export async function renderDocumentSession(
     facts.elements = probed.elements;
     facts.faces = probed.faces;
 
-    // 6. The font pass: which font actually painted each element's glyphs.
+    // 5. The font pass: which font actually painted each element's glyphs.
     // `document.fonts.check()` cannot tell: it is true for a missing family.
     clock.enter('fontPass');
-    const cdp = await page.createCDPSession();
-    await cdp.send('DOM.enable');
-    await cdp.send('CSS.enable');
-    const { root } = await cdp.send('DOM.getDocument');
+    // CDP runs commands in the order sent, so the enables are pipelined
+    // with `DOM.getDocument` and cost no round trip of their own.
+    const [, , { root }] = await Promise.all([
+      cdp.send('DOM.enable'),
+      cdp.send('CSS.enable'),
+      cdp.send('DOM.getDocument'),
+    ]);
     const { nodeIds } = await cdp.send('DOM.querySelectorAll', {
       nodeId: root.nodeId,
       selector: PROBE_ELEMENT_SELECTOR,
@@ -188,9 +198,10 @@ export async function renderDocumentSession(
     withText.forEach((e, i) => {
       facts.platformFonts[e.idx] = fonts[i].fonts as PlatformFont[];
     });
-    await cdp.detach();
+    // Nothing waits on the detach; the disconnect closes it anyway.
+    cdp.detach().catch(() => undefined);
 
-    // 7. Best effort: a cover that fails to capture never blocks READY.
+    // 6. Best effort: a cover that fails to capture never blocks READY.
     clock.enter('cover');
     if (options.skipCover?.(facts)) {
       cover = {
@@ -209,13 +220,15 @@ export async function renderDocumentSession(
       }
     }
 
-    // 8. Print, then count what printed.
+    // 7. Print, then count what printed.
     clock.enter('pdf');
     pdf = await page.pdf({
       width: `${width}px`,
       height: `${height}px`,
       printBackground: true,
       margin: { top: '0', right: '0', bottom: '0', left: '0' },
+      // The probe already awaited `document.fonts.ready`; skip a second wait.
+      waitForFonts: false,
       timeout: 0,
     });
     facts.pdfPageCount = countPdfPages(pdf);
@@ -242,8 +255,10 @@ export async function renderDocumentSession(
   }
   // Before the disconnect, which no phase of the session owns.
   const trace = clock.finish();
-  // Disconnecting ends the Browserless session; locally it leaves the browser up.
-  await browser?.disconnect().catch(() => undefined);
+  // Disconnecting ends the Browserless session; locally it leaves the browser
+  // up. Not awaited: the caller has its result, and `durationMs` stops here
+  // (the meter stops when the socket closes, a moment later).
+  browser?.disconnect().catch(() => undefined);
 
   const durationMs = Date.now() - startedAt;
   const usage: BrowserlessUsage = {

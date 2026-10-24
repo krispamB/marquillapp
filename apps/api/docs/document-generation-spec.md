@@ -379,16 +379,19 @@ One CDP session per render replaces the REST `/pdf` call. It uses `puppeteer.con
 
 1. `setJavaScriptEnabled(false)`. CDP evaluation still runs the probe.
 2. Request interception allowlists `fonts.googleapis.com/css2` and `fonts.gstatic.com` only. A
-   refused request is recorded.
-3. `emulateMediaType('print')`; viewport at the definition's page size.
+   refused request is recorded. The request listener is attached first.
+3. `emulateMediaType('print')`; viewport at the definition's page size. Steps 1–3 and the CDP
+   session for step 6 are sent in parallel (one round trip).
 4. `setContent(…, { waitUntil: 'load' })`. Not `networkidle0`, which never settles on Browserless.
 5. Probe: force layout, `await document.fonts.ready`, collect page boxes, line boxes, colours,
    effective backgrounds, clipping ancestors and FontFace status.
 6. Font pass: `CSS.getPlatformFontsForNode` per text element (`document.fonts.check()` cannot detect
-   fallback).
+   fallback). `DOM.enable`, `CSS.enable` and `DOM.getDocument` are pipelined; the detach is not
+   awaited.
 7. Capture `cover.png` from page 1. This is best effort: a failure is recorded and never blocks
    `READY` (#138).
-8. `page.pdf`, then count the PDF's pages.
+8. `page.pdf` (`waitForFonts: false`; the probe already awaited the fonts), then count the PDF's
+   pages. The final `browser.disconnect()` is not awaited.
 
 One deadline covers the whole session, not only `setContent`.
 

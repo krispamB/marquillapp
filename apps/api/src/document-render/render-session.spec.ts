@@ -133,7 +133,11 @@ describe('renderDocumentSession', () => {
       clip: { x: 0, y: 0, width: 1080, height: 1350 },
     });
     expect(mocks.page.pdf).toHaveBeenCalledWith(
-      expect.objectContaining({ width: '1080px', height: '1350px' }),
+      expect.objectContaining({
+        width: '1080px',
+        height: '1350px',
+        waitForFonts: false,
+      }),
     );
     expect(mocks.browser.disconnect).toHaveBeenCalledTimes(1);
 
@@ -147,6 +151,66 @@ describe('renderDocumentSession', () => {
     expect(result.cover).toEqual({ ok: true, png: PNG });
     expect(result.usage.units).toBe(1);
     expect(result.usage.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('should attach the request listener before interception is enabled', async () => {
+    await renderDocumentSession('ws://b', definition, '');
+
+    const listenerAt = mocks.page.on.mock.invocationCallOrder[0];
+    expect(listenerAt).toBeLessThan(
+      mocks.page.setRequestInterception.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('should start every setup call before any of them resolves', async () => {
+    const settle: (() => void)[] = [];
+    const pending = () =>
+      jest.fn(() => new Promise<void>((resolve) => settle.push(resolve)));
+    mocks.page.setJavaScriptEnabled = pending();
+    mocks.page.setRequestInterception = pending();
+    mocks.page.emulateMediaType = pending();
+    mocks.page.setViewport = pending();
+
+    const run = renderDocumentSession('ws://b', definition, '');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(settle).toHaveLength(4);
+    expect(mocks.page.createCDPSession).toHaveBeenCalledTimes(1);
+    settle.forEach((resolve) => resolve());
+    await run;
+  });
+
+  it('should send the font pass setup calls in order without waiting on each', async () => {
+    await renderDocumentSession('ws://b', definition, '');
+
+    const methods = mocks.cdp.send.mock.calls.map(([method]) => method);
+    expect(methods.slice(0, 4)).toEqual([
+      'DOM.enable',
+      'CSS.enable',
+      'DOM.getDocument',
+      'DOM.querySelectorAll',
+    ]);
+  });
+
+  it('should not wait on the CDP detach or the browser disconnect', async () => {
+    mocks.cdp.detach.mockReturnValue(new Promise(() => undefined));
+    mocks.browser.disconnect.mockReturnValue(new Promise(() => undefined));
+
+    const result = await renderDocumentSession('ws://b', definition, '');
+
+    expect(mocks.cdp.detach).toHaveBeenCalledTimes(1);
+    expect(mocks.browser.disconnect).toHaveBeenCalledTimes(1);
+    expect(result.pdf).toBe(PDF);
+  });
+
+  it('should swallow a failed detach or disconnect', async () => {
+    mocks.cdp.detach.mockRejectedValue(new Error('already closed'));
+    mocks.browser.disconnect.mockRejectedValue(new Error('already closed'));
+
+    const result = await renderDocumentSession('ws://b', definition, '');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(result.pdf).toBe(PDF);
   });
 
   it('should let font requests through and record each refused URL once', async () => {
