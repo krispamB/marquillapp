@@ -44,3 +44,30 @@ export const RENDER_OVERLAP_SHARE = 0.25;
 
 /** Characters of an element's text quoted in a finding's locator. */
 export const RENDER_SNIPPET_LENGTH = 32;
+
+/**
+ * Each fetch the font inliner makes (the css2 stylesheet, then each font
+ * file) gives up after this long, and the render falls back to the
+ * stylesheet `<link>` (§4.5).
+ */
+export const FONT_INLINE_FETCH_TIMEOUT_MS = 5_000;
+
+/**
+ * The most one `inlineCss` call waits, cold stylesheet and files together,
+ * before the render falls back to the stylesheet `<link>` (§4.5).
+ */
+export const FONT_INLINE_BUDGET_MS = 5_000;
+
+/**
+ * Google Fonts picks the format by User-Agent: a desktop Chrome gets woff2 in
+ * `unicode-range` subsets, the response the inliner parses.
+ */
+export const FONT_INLINE_USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
+  '(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
+
+/** Subsets the inliner always keeps, whatever the text holds. */
+export const FONT_INLINE_ALWAYS_SUBSETS: readonly string[] = [
+  'latin',
+  'latin-ext',
+];

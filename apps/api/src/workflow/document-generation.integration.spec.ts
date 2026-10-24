@@ -250,6 +250,7 @@ const makeRun = () => {
     artifacts: artifacts as never,
     designSystems: designSystems as never,
     renderer: renderer as never,
+    fonts: { inlineCss: jest.fn().mockResolvedValue(null) },
     objects,
     creditMeter: creditMeter as never,
     featureGating: {

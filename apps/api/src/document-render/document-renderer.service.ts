@@ -50,6 +50,7 @@ export class DocumentRendererService implements DocumentRenderer {
     // Taken before `connect` and the session clock, so waiting for a slot
     // never counts against the session deadline.
     const slot = await this.slots.acquire(maxSlotWaitMs);
+    let disconnected: Promise<void> = Promise.resolve();
     try {
       const result = await this.renderSession(
         endpoint,
@@ -58,6 +59,9 @@ export class DocumentRendererService implements DocumentRenderer {
         {
           // A session with findings goes to Repair, so its cover would be thrown away.
           skipCover: (facts) => judge(definition, facts).length > 0,
+          onDisconnect: (closing) => {
+            disconnected = closing;
+          },
         },
       );
       return { ...result, slotWaitMs: slot.waitedMs };
@@ -65,7 +69,9 @@ export class DocumentRendererService implements DocumentRenderer {
       if (error instanceof RenderSessionError) error.slotWaitMs = slot.waitedMs;
       throw error;
     } finally {
-      await slot.release();
+      // The result does not wait for the disconnect, but the slot does:
+      // Browserless counts the session until its socket closes.
+      void disconnected.then(() => slot.release());
     }
   }
 

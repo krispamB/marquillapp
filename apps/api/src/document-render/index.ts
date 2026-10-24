@@ -7,4 +7,5 @@ export * from './render-session';
 export * from './render-slots';
 export * from './render-usage.types';
 export * from './document-renderer.service';
+export * from './font-inliner.service';
 export * from './document-render.module';

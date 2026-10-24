@@ -88,6 +88,16 @@ export function isFontRequest(url: string): boolean {
   );
 }
 
+/**
+ * A font assembly inlined as a data URL (§4.5). Chrome still emits a request
+ * for it, and aborting one is a no-op, so the request filter must let it
+ * through rather than record it as refused. Only assembly writes `url(` into a
+ * Document Source, so a data URL font is always the app's own.
+ */
+export function isInlinedFont(url: string): boolean {
+  return url.startsWith('data:font/');
+}
+
 const elementsOf = (node: ParentNode): Element[] =>
   node.childNodes.flatMap((child) =>
     'tagName' in child ? [child, ...elementsOf(child)] : [],
@@ -159,19 +169,25 @@ export function assertIconsFilled(documentSource: string): void {
 
 /**
  * Turns a statically clean Candidate Source into a Document Source (§4.5) by
- * adding exactly three derived things: the frame stylesheet, the Google Fonts
- * link, and the inlined icons. Pure and deterministic.
+ * adding exactly three derived things: the frame stylesheet, the fonts, and
+ * the inlined icons. The fonts are `fontCss` in a `<style>` when the worker
+ * inlined them, and the Google Fonts link otherwise. Pure and deterministic.
  */
 export function assemble(
   definition: DesignSystemDefinition,
   candidate: string,
+  fontCss?: string,
 ): string {
   const document = parse(candidate);
   const all = elementsOf(document);
   const head = all.find((element) => element.tagName === 'head')!;
 
   const href = fontStylesheetUrl(definition);
-  if (href) {
+  if (fontCss !== undefined) {
+    const fonts = defaultTreeAdapter.createElement('style', html.NS.HTML, []);
+    defaultTreeAdapter.insertText(fonts, fontCss);
+    defaultTreeAdapter.appendChild(head, fonts);
+  } else if (href) {
     defaultTreeAdapter.appendChild(
       head,
       defaultTreeAdapter.createElement('link', html.NS.HTML, [
