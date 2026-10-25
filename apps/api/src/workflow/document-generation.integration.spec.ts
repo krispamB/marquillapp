@@ -134,6 +134,8 @@ const makeJob = (overrides: Partial<Job<BuildInput>> = {}): Job<BuildInput> =>
     // BullMQ counts the attempts that already failed: a first attempt has 0.
     attemptsMade: 0,
     opts: { attempts: 3 },
+    // BullMQ stamps every job; the prompts take the run's date from it.
+    timestamp: Date.parse('2026-10-25T12:00:00Z'),
     ...overrides,
   }) as unknown as Job<BuildInput>;
 

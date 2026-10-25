@@ -10,9 +10,11 @@ jest.mock(
 
 import type { BoundedViolations } from '../../document-source/violation';
 import {
+  buildDocumentGenerationUserPrompt,
   buildDocumentPatchRepairUserPrompt,
   buildDocumentRepairFallbackUserPrompt,
   buildDocumentRepairUserPrompt,
+  buildGenerationUserPrompt,
   GENERATE_DOCUMENT_SYSTEM_PROMPT,
 } from './artifact-generation.prompts';
 
@@ -103,6 +105,85 @@ describe('artifact-generation prompts', () => {
     ],
     omitted: [{ code: 'page.pages', count: 1 }],
   };
+
+  const TODAY_LINE =
+    'TODAY: 2026-10-25 (Sunday). Treat this date as the present: "this year" means 2026. Prefer the most recent figures, and do not present an earlier year as current.';
+
+  describe('buildGenerationUserPrompt', () => {
+    it('should open with the date it is given when it writes a POST brief', () => {
+      const prompt = buildGenerationUserPrompt({
+        type: 'POST' as never,
+        prompt: 'Hiring trends',
+        today: '2026-10-25',
+      });
+
+      expect(prompt.split('\n\n')[0]).toBe(TODAY_LINE);
+      expect(prompt).toContain('BRIEF:\nHiring trends');
+    });
+
+    it('should state the date when it writes a POLL brief', () => {
+      const prompt = buildGenerationUserPrompt({
+        type: 'POLL' as never,
+        prompt: 'Remote work',
+        today: '2026-10-25',
+      });
+
+      expect(prompt).toContain(TODAY_LINE);
+    });
+
+    it('should state the date when it writes a refine brief', () => {
+      const prompt = buildGenerationUserPrompt({
+        type: 'POST' as never,
+        prompt: 'Hiring trends',
+        today: '2026-10-25',
+        refine: {
+          priorContent: { commentary: 'Old post' } as never,
+          feedback: 'Shorter',
+        },
+      });
+
+      expect(prompt).toContain(TODAY_LINE);
+      expect(prompt).toContain('REVISION FEEDBACK:\nShorter');
+    });
+
+    it('should name the weekday when given a run date', () => {
+      const prompt = buildGenerationUserPrompt({
+        type: 'POST' as never,
+        prompt: 'Hiring trends',
+        today: '2027-01-01',
+      });
+
+      expect(prompt).toContain('TODAY: 2027-01-01 (Friday).');
+      expect(prompt).toContain('"this year" means 2027');
+    });
+  });
+
+  describe('buildDocumentGenerationUserPrompt', () => {
+    const base = {
+      prompt: 'Five lessons from shipping',
+      today: '2026-10-25',
+      fragment: 'FRAGMENT',
+      includeTitle: true,
+      maxEnvelopeRepairs: 1,
+    };
+
+    it('should open with the date it is given when it writes a draft brief', () => {
+      const prompt = buildDocumentGenerationUserPrompt(base);
+
+      expect(prompt.split('\n\n')[0]).toBe(TODAY_LINE);
+    });
+
+    it('should state the date when it writes a refine brief', () => {
+      const prompt = buildDocumentGenerationUserPrompt({
+        ...base,
+        includeTitle: false,
+        refine: { candidate: '<html></html>', feedback: 'Fewer pages' },
+      });
+
+      expect(prompt.split('\n\n')[0]).toBe(TODAY_LINE);
+      expect(prompt).toContain('PREVIOUS DOCUMENT:\n<html></html>');
+    });
+  });
 
   describe('buildDocumentRepairUserPrompt', () => {
     it('should ask for the complete document as html when the Repair is in full mode', () => {

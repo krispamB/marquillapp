@@ -74,6 +74,8 @@ const makeStep = () => {
     recordRenderSession: jest.fn(),
     recordPageCount: jest.fn(),
   };
+  // Late on the 25th in UTC, so a local-time date would read the 26th east of UTC.
+  const runCreatedAt = new Date('2026-10-25T23:30:00Z');
   const ctx = {
     agent,
     meter,
@@ -82,6 +84,7 @@ const makeStep = () => {
     deadline,
     diagnostics,
     logger,
+    runCreatedAt,
   } as unknown as StepContext;
 
   const state = {
@@ -154,8 +157,25 @@ describe('generateStep', () => {
         stylePreset: 'contrarian',
         research,
         refine,
+        today: '2026-10-25',
         sessionId: 'run-1',
       },
+      expect.anything(),
+    );
+  });
+
+  it("should date the brief from the run's creation time when the wall clock has moved on", async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2027-03-01T12:00:00Z'));
+    mocks.agent.generate.mockResolvedValue({ content: { commentary: 'ok' } });
+
+    try {
+      await generateStep(fixtures.state, ctx);
+    } finally {
+      jest.useRealTimers();
+    }
+
+    expect(mocks.agent.generate).toHaveBeenCalledWith(
+      expect.objectContaining({ today: '2026-10-25' }),
       expect.anything(),
     );
   });
@@ -269,6 +289,7 @@ describe('generateStep', () => {
           fragment: 'FRAGMENT',
           includeTitle: true,
           maxEnvelopeRepairs: 1,
+          today: '2026-10-25',
           sessionId: 'run-1',
           timeLeftMs: 120_000,
         },

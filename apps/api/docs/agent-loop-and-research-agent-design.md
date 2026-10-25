@@ -150,11 +150,18 @@ interface AgentRunner {
 interface GenerateInput {
   type: ArtifactType;                     // #97 — POST | POLL | DOCUMENT
   prompt: string;
+  today: string;                          // the run's UTC date, YYYY-MM-DD
   stylePreset?: StylePreset;
   research?: ResearchResult;              // cached findings (#98 research slot)
   refine?: { priorContent: ArtifactContent; feedback: string };
 }
 ```
+
+- **Every research and generation user message opens with a `TODAY:` line**
+  (`todaySection` in `agent/prompts/today.prompt.ts`), so the model does not take its
+  training-era year as the present. The steps pass `today` from `ctx.runCreatedAt`, the
+  BullMQ job's `timestamp`, so every job attempt of a run sees the same date. The system
+  prompts stay static and cacheable.
 
 - The concrete instance is resolved once in the worker bootstrap and passed as
   `ctx.agent` (the existing `app.get(...)` pattern in `workflow.worker.ts`).
@@ -194,7 +201,7 @@ on a valid render. Parked as future work.
   result even at the cap.
 
 ```ts
-interface ResearchInput { prompt: string; type: ArtifactType; stylePreset?: StylePreset }
+interface ResearchInput { prompt: string; type: ArtifactType; today: string; stylePreset?: StylePreset }
 ```
 
 **Rejected — port YouTube + Reddit + web as three tools now.** Triples the tool

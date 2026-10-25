@@ -37,7 +37,15 @@ const makeStep = () => {
     recordModelCall: jest.fn(),
   };
   const emit = jest.fn();
-  const ctx = { agent, meter, run, emit } as unknown as StepContext;
+  // Late on the 25th in UTC, so a local-time date would read the 26th east of UTC.
+  const runCreatedAt = new Date('2026-10-25T23:30:00Z');
+  const ctx = {
+    agent,
+    meter,
+    run,
+    emit,
+    runCreatedAt,
+  } as unknown as StepContext;
 
   const state = {
     input: {
@@ -80,8 +88,25 @@ describe('researchStep', () => {
         prompt: 'Why staff engineers should write more',
         type: 'POST',
         stylePreset: 'contrarian',
+        today: '2026-10-25',
         sessionId: 'run-1',
       },
+      expect.anything(),
+    );
+  });
+
+  it("should date the research from the run's creation time when the wall clock has moved on", async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2027-03-01T12:00:00Z'));
+    mocks.agent.research.mockResolvedValue(research);
+
+    try {
+      await researchStep(fixtures.state, ctx);
+    } finally {
+      jest.useRealTimers();
+    }
+
+    expect(mocks.agent.research).toHaveBeenCalledWith(
+      expect.objectContaining({ today: '2026-10-25' }),
       expect.anything(),
     );
   });

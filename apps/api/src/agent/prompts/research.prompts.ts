@@ -1,5 +1,6 @@
 import { ArtifactType } from 'src/database/schemas';
 import type { ResearchInput } from '../agent-runner.interface';
+import { todaySection } from './today.prompt';
 
 // The research agent is fully autonomous: there is nowhere to deliver a
 // clarifying question in the fire-and-forget run model, so the system prompt
@@ -18,6 +19,9 @@ METHOD:
 - If a search returns an { error } or unhelpful results, adapt the query and try
   again rather than giving up.
 - You cannot ask the user anything — decide what to research yourself.
+- The brief states TODAY's date. Search for the most recent information as of
+  that date, and put its year in queries where recency matters. Your training
+  data ends earlier; do not treat its year as the present.
 
 WHEN YOU HAVE ENOUGH:
 Stop calling the tool and reply with prose only — no tool call. Your final reply
@@ -46,5 +50,5 @@ function audienceHint(type: ArtifactType): string {
 }
 
 export function researchUserPrompt(input: ResearchInput): string {
-  return `BRIEF:\n${input.prompt}\n\nThe writer will turn your findings into ${audienceHint(input.type)}. Research the topic and report what you find.`;
+  return `${todaySection(input.today)}\n\nBRIEF:\n${input.prompt}\n\nThe writer will turn your findings into ${audienceHint(input.type)}. Search for the most recent information as of ${input.today}, research the topic, and report what you find.`;
 }

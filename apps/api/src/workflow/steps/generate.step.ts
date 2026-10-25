@@ -1,6 +1,7 @@
 import { ContentValidationError } from '../../agent/agent-runner.error';
 import type { DocumentRefineInput } from '../../agent/agent-runner.interface';
 import { ArtifactType, RunKind } from '../../database/schemas';
+import { runDate } from '../engine/run-date';
 import { RunEventType } from '../engine/run-event.types';
 import { terminal } from '../engine/workflow.error';
 import type {
@@ -44,6 +45,7 @@ export const generateStep: StepHandler = async (state, ctx) => {
         stylePreset,
         research: state.research,
         refine: state.refine,
+        today: runDate(ctx),
         sessionId: ctx.run.runId,
       },
       meteredHooks(ctx),
@@ -127,6 +129,7 @@ async function generateDocument(
         includeTitle,
         maxEnvelopeRepairs: draftAllowance,
         ...(refine ? { refine } : {}),
+        today: runDate(ctx),
         sessionId: ctx.run.runId,
         timeLeftMs: ctx.deadline.remainingMs(),
       },
