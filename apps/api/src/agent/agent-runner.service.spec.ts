@@ -141,6 +141,7 @@ const makeService = ({
   const input: GenerateInput = {
     type: ArtifactType.POST,
     prompt: 'Why staff engineers should write more',
+    today: '2026-10-25',
   };
 
   return { service, mocks: { llmService, configService }, fixtures: { input } };
@@ -755,6 +756,7 @@ describe('AgentRunnerService', () => {
 
     const documentInput: DocumentGenerateInput = {
       prompt: 'Three fixes for documents',
+      today: '2026-10-25',
       fragment: 'DESIGN SYSTEM: Margin (margin v2)',
       includeTitle: true,
       maxEnvelopeRepairs: 1,
@@ -1046,6 +1048,7 @@ describe('AgentRunnerService', () => {
 
       await service.generateDocument({
         prompt: 'Three fixes for documents',
+        today: '2026-10-25',
         stylePreset: StylePreset.CONTRARIAN,
         research: { findings: 'RESEARCH FINDINGS TEXT', sources: [] },
         fragment: repairInput.fragment,
@@ -1666,6 +1669,7 @@ describe('AgentRunnerService', () => {
 
       const result = await service.research({
         prompt: 'topic',
+        today: '2026-10-25',
         type: ArtifactType.POST,
       });
 
@@ -1698,6 +1702,7 @@ describe('AgentRunnerService', () => {
 
       const result = await service.research({
         prompt: 'topic',
+        today: '2026-10-25',
         type: ArtifactType.POST,
       });
 
@@ -1717,6 +1722,7 @@ describe('AgentRunnerService', () => {
 
       const result = await service.research({
         prompt: 'topic',
+        today: '2026-10-25',
         type: ArtifactType.POST,
       });
 
@@ -1739,7 +1745,7 @@ describe('AgentRunnerService', () => {
       const onToolCall = jest.fn();
 
       await service.research(
-        { prompt: 'topic', type: ArtifactType.POST },
+        { prompt: 'topic', today: '2026-10-25', type: ArtifactType.POST },
         { onToolCall },
       );
 
@@ -1761,7 +1767,11 @@ describe('AgentRunnerService', () => {
         .mockResolvedValueOnce(toolTurn(calls))
         .mockResolvedValueOnce(toolTurn([], 0.01, 'findings'));
 
-      await service.research({ prompt: 'topic', type: ArtifactType.POST });
+      await service.research({
+        prompt: 'topic',
+        today: '2026-10-25',
+        type: ArtifactType.POST,
+      });
 
       expect(tavilySearch).toHaveBeenCalledTimes(5);
     });
@@ -1781,7 +1791,7 @@ describe('AgentRunnerService', () => {
       const onToolCall = jest.fn();
 
       await service.research(
-        { prompt: 'topic', type: ArtifactType.POST },
+        { prompt: 'topic', today: '2026-10-25', type: ArtifactType.POST },
         { onToolCall },
       );
 
@@ -1802,7 +1812,11 @@ describe('AgentRunnerService', () => {
         .mockResolvedValueOnce(toolTurn(calls('b')))
         .mockResolvedValueOnce(toolTurn([], 0.01, 'findings'));
 
-      await service.research({ prompt: 'topic', type: ArtifactType.POST });
+      await service.research({
+        prompt: 'topic',
+        today: '2026-10-25',
+        type: ArtifactType.POST,
+      });
 
       expect(tavilySearch).toHaveBeenCalledTimes(5);
     });
@@ -1812,7 +1826,11 @@ describe('AgentRunnerService', () => {
         toolTurn([], 0.01, 'no search needed'),
       );
 
-      await service.research({ prompt: 'topic', type: ArtifactType.POST });
+      await service.research({
+        prompt: 'topic',
+        today: '2026-10-25',
+        type: ArtifactType.POST,
+      });
 
       const [, , tools, options] = completeWithToolsCalls()[0];
       expect(options).toEqual({
@@ -1838,6 +1856,7 @@ describe('AgentRunnerService', () => {
 
       await service.research({
         prompt: 'topic',
+        today: '2026-10-25',
         type: ArtifactType.POST,
       });
 
@@ -1867,6 +1886,7 @@ describe('AgentRunnerService', () => {
 
       const result = await service.research({
         prompt: 'topic',
+        today: '2026-10-25',
         type: ArtifactType.POST,
       });
 
@@ -2157,6 +2177,7 @@ describe('AgentRunnerService', () => {
         await service.generate(fixtures.input);
         await service.research({
           prompt: 'topic',
+          today: '2026-10-25',
           type: ArtifactType.POST,
         });
 
@@ -2191,6 +2212,7 @@ describe('AgentRunnerService', () => {
     const HTML = '<!doctype html><html><body></body></html>';
     const draftInput: DocumentGenerateInput = {
       prompt: 'Three fixes for documents',
+      today: '2026-10-25',
       fragment: 'FRAGMENT',
       includeTitle: true,
       maxEnvelopeRepairs: 1,
@@ -2223,6 +2245,7 @@ describe('AgentRunnerService', () => {
       mocks.llmService.complete.mockResolvedValue(completion('synthesis'));
       await service.research({
         prompt: 'topic',
+        today: '2026-10-25',
         type: ArtifactType.POST,
         ...session,
       });
@@ -2499,7 +2522,7 @@ describe('AgentRunnerService', () => {
       const onUsage = jest.fn();
 
       await service.research(
-        { prompt: 'topic', type: ArtifactType.POST },
+        { prompt: 'topic', today: '2026-10-25', type: ArtifactType.POST },
         { onUsage },
       );
 
@@ -2518,7 +2541,7 @@ describe('AgentRunnerService', () => {
       const onUsage = jest.fn();
 
       await service.research(
-        { prompt: 'topic', type: ArtifactType.POST },
+        { prompt: 'topic', today: '2026-10-25', type: ArtifactType.POST },
         { onUsage },
       );
 

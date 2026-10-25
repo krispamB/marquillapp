@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
@@ -23,11 +24,14 @@ type RendererProps = Omit<PdfPreviewProps, "ariaLabel" | "className">;
 // LinkedIn carousels are usually 4:5; the first page replaces this once it loads.
 const DEFAULT_PAGE_ASPECT = 4 / 5;
 const MIN_FITTED_PAGE_HEIGHT = 240;
+// A mouse that travels further than this between press and release was dragging the rail, not clicking a page.
+const DRAG_CLICK_TOLERANCE = 4;
 
 type DragState = {
   pointerId: number;
   startX: number;
   scrollLeft: number;
+  moved: boolean;
 };
 
 export default function PdfPreviewRenderer({
@@ -39,11 +43,13 @@ export default function PdfPreviewRenderer({
   fitViewportOffset,
   maxPageWidth = 560,
   onPageChange,
+  onExpand,
 }: RendererProps) {
   const railRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<Array<HTMLDivElement | null>>([]);
   const dragRef = useRef<DragState | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
+  const suppressClickRef = useRef(false);
   const [attempt, setAttempt] = useState(0);
   const [numPages, setNumPages] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -145,6 +151,7 @@ export default function PdfPreviewRenderer({
   }
 
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    suppressClickRef.current = false;
     if (event.pointerType !== "mouse" || event.button !== 0) return;
     const rail = railRef.current;
     if (!rail) return;
@@ -152,6 +159,7 @@ export default function PdfPreviewRenderer({
       pointerId: event.pointerId,
       startX: event.clientX,
       scrollLeft: rail.scrollLeft,
+      moved: false,
     };
     rail.setPointerCapture(event.pointerId);
     setIsDragging(true);
@@ -161,6 +169,7 @@ export default function PdfPreviewRenderer({
     const rail = railRef.current;
     const drag = dragRef.current;
     if (!rail || !drag || drag.pointerId !== event.pointerId) return;
+    if (Math.abs(event.clientX - drag.startX) > DRAG_CLICK_TOLERANCE) drag.moved = true;
     rail.scrollLeft = drag.scrollLeft - (event.clientX - drag.startX);
   }
 
@@ -169,9 +178,26 @@ export default function PdfPreviewRenderer({
     const drag = dragRef.current;
     if (!rail || !drag || drag.pointerId !== event.pointerId) return;
     dragRef.current = null;
+    suppressClickRef.current = drag.moved || Math.abs(event.clientX - drag.startX) > DRAG_CLICK_TOLERANCE;
     setIsDragging(false);
     if (rail.hasPointerCapture(event.pointerId)) rail.releasePointerCapture(event.pointerId);
     scrollToPage(closestPage());
+  }
+
+  // The rail captures the mouse while it is pressed, so the click lands on the
+  // rail rather than the page; handling it here covers both.
+  function handleRailClick() {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    onExpand?.();
+  }
+
+  function handlePageKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onExpand?.();
   }
 
   function retry() {
@@ -227,8 +253,9 @@ export default function PdfPreviewRenderer({
         {numPages ? (
           <div
             ref={railRef}
-            className={`mq-pdf-preview-rail${isDragging ? " is-dragging" : ""}`}
+            className={`mq-pdf-preview-rail${isDragging ? " is-dragging" : ""}${onExpand ? " is-expandable" : ""}`}
             onScroll={handleScroll}
+            onClick={onExpand ? handleRailClick : undefined}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={finishDragging}
@@ -239,7 +266,13 @@ export default function PdfPreviewRenderer({
                 key={index + 1}
                 ref={(node) => { pageRefs.current[index] = node; }}
                 className="mq-pdf-preview-page"
-                aria-label={`Page ${index + 1} of ${numPages}`}
+                aria-label={onExpand ? `Expand document, page ${index + 1} of ${numPages}` : `Page ${index + 1} of ${numPages}`}
+                {...(onExpand ? {
+                  role: "button",
+                  // One tab stop for the rail: the page the controls have brought into view.
+                  tabIndex: index + 1 === currentPage ? 0 : -1,
+                  onKeyDown: handlePageKeyDown,
+                } : {})}
               >
                 <Page
                   pageNumber={index + 1}

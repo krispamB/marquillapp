@@ -3,6 +3,7 @@ import {
   type UsageRecord,
 } from '../../feature-gating/credit-meter.constants';
 import { WorkflowStep } from '../workflow.constants';
+import { runDate } from '../engine/run-date';
 import { RunEventType } from '../engine/run-event.types';
 import type { ResearchResult } from '../../agent/agent-runner.interface';
 import type { StepContext, StepHandler } from '../engine/workflow.types';
@@ -48,7 +49,13 @@ export const researchStep: StepHandler = async (state, ctx) => {
 
   const research = await ctx.agent.research(
     // The run id groups the run's calls for provider cache affinity.
-    { prompt, type, stylePreset, sessionId: ctx.run.runId },
+    {
+      prompt,
+      type,
+      stylePreset,
+      today: runDate(ctx),
+      sessionId: ctx.run.runId,
+    },
     {
       onUsage: (turn) => {
         record({

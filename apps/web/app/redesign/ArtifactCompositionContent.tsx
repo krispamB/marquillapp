@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { FileText } from "lucide-react";
 import PdfPreview from "../../components/pdf/PdfPreview";
 import PdfThumbnail from "../../components/pdf/PdfThumbnail";
+import usePdfLightbox from "../../components/pdf/usePdfLightbox";
 import type { ArtifactDetailData } from "./artifactTypes";
 import { artifactTypeIcons, artifactTypeLabels } from "./artifactPresentation";
 import { truncatePostPreview } from "./postPreviewCutoff";
@@ -45,6 +46,13 @@ export function ArtifactContentView({ artifact }: { artifact: ArtifactDetailData
   const commentary = artifact.content.commentary?.trim();
   const poll = artifact.type === "POLL" ? artifact.content.poll : undefined;
   const document = artifact.type === "DOCUMENT" ? artifact.content.document : undefined;
+  const documentTitle = artifact.title?.trim() || "LinkedIn document";
+  const { open: openLightbox, lightbox } = usePdfLightbox({
+    source: document?.pdfUrl,
+    title: documentTitle,
+    pageCountHint: document?.pageCount,
+    openHref: document?.pdfUrl,
+  });
 
   return (
     <>
@@ -62,24 +70,26 @@ export function ArtifactContentView({ artifact }: { artifact: ArtifactDetailData
         document.pdfUrl ? (
           <PdfPreview
             source={document.pdfUrl}
-            title={artifact.title?.trim() || "LinkedIn document"}
+            title={documentTitle}
             pageCountHint={document.pageCount}
             openHref={document.pdfUrl}
-            ariaLabel={`${artifact.title?.trim() || "LinkedIn document"} carousel preview`}
+            ariaLabel={`${documentTitle} carousel preview`}
             className="mq-pdf-preview-composition"
             fitViewportOffset={PREVIEW_SLIDE_VIEWPORT_OFFSET}
+            onExpand={openLightbox}
           />
         ) : (
           <div className="mq-preview-document">
             <FileText size={28} />
             <span>
-              <strong>{artifact.title?.trim() || "LinkedIn document"}</strong>
+              <strong>{documentTitle}</strong>
               <small>{document.pageCount} pages · PDF</small>
             </span>
             <small>PDF preview unavailable</small>
           </div>
         )
       ) : null}
+      {lightbox}
     </>
   );
 }
@@ -100,6 +110,12 @@ export default function AttachedArtifactComposition({
   const ArtifactIcon = artifactTypeIcons[artifact.type];
   const title = artifact.title?.trim() || "Untitled artifact";
   const document = artifact.type === "DOCUMENT" ? artifact.content.document : undefined;
+  const { open: openLightbox, lightbox } = usePdfLightbox({
+    source: document?.pdfUrl,
+    title,
+    pageCountHint: document?.pageCount,
+    openHref: document?.pdfUrl,
+  });
 
   return (
     <>
@@ -107,7 +123,9 @@ export default function AttachedArtifactComposition({
         <header><span className="mq-mono">_ attached artifact</span>{canSwap ? <button type="button" onClick={onSwap} disabled={busy}>Swap</button> : null}</header>
         <div>
           {document?.pdfUrl ? (
-            <PdfThumbnail source={document.pdfUrl} label={`${title} first page`} />
+            <button type="button" className="mq-pdf-thumbnail-button" onClick={openLightbox} aria-label="Expand document" title="Expand">
+              <PdfThumbnail source={document.pdfUrl} label={`${title} first page`} />
+            </button>
           ) : (
             <span className={`mq-artifact-pick-icon is-${artifact.type.toLowerCase()}`}><ArtifactIcon size={18} /></span>
           )}
@@ -119,6 +137,7 @@ export default function AttachedArtifactComposition({
         </div>
       </article>
       {mediaControls ? <article className="mq-card mq-post-media-card">{mediaControls}</article> : null}
+      {lightbox}
     </>
   );
 }

@@ -448,4 +448,9 @@ export interface StepContext {
   /** `step.progress` only. Lifecycle events are the core's job. */
   emit: (event: EmittedEvent) => void;
   run: RunRecordHandle;
+  /**
+   * When the run was enqueued: its BullMQ job's `timestamp`, the same for
+   * every job attempt. Prompts date themselves from it (`runDate`).
+   */
+  runCreatedAt: Date;
 }

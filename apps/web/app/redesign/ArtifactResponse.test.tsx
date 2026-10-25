@@ -1,10 +1,23 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { cleanup, fireEvent, render } from "@testing-library/react";
-import { afterAll, afterEach, describe, expect, test } from "bun:test";
-import ArtifactResponse, { isAttachableArtifact } from "./ArtifactResponse";
+import { afterAll, afterEach, describe, expect, mock, test } from "bun:test";
 import { documentArtifactFixture } from "./artifactTestFixtures";
 
 GlobalRegistrator.register();
+
+// The real preview loads its pages through next/dynamic and pdf.js, which a test
+// cannot drive reliably; PdfPreviewRenderer.test covers clicking and keyboard
+// on the pages. This stand-in keeps the preview's label and its expand surface.
+mock.module("../../components/pdf/PdfPreview", () => ({
+  default: ({ title, ariaLabel, onExpand }: { title?: string; ariaLabel?: string; onExpand?: () => void }) => (
+    <div aria-label={ariaLabel ?? (title ? `${title} PDF preview` : "PDF preview")}>
+      {onExpand ? <button type="button" onClick={onExpand}>Expand document, page 1 of 2</button> : null}
+    </div>
+  ),
+}));
+
+const { default: ArtifactResponse, isAttachableArtifact } = await import("./ArtifactResponse");
+
 afterEach(cleanup);
 afterAll(() => GlobalRegistrator.unregister());
 
@@ -25,6 +38,30 @@ describe("ArtifactResponse document preview", () => {
 
     expect(view.getByText("PDF link unavailable")).toBeTruthy();
     expect(view.queryByLabelText("Marketing playbook PDF preview")).toBeNull();
+  });
+});
+
+describe("ArtifactResponse expanded document", () => {
+  const expandedView = (view: ReturnType<typeof render>) =>
+    view.queryByRole("dialog", { name: "Marketing playbook full-screen preview" });
+
+  test("clicking the document opens the full-screen preview", () => {
+    const view = render(<ArtifactResponse artifact={documentArtifactFixture({ pdfUrl: "https://files.example/document.pdf" })} />);
+
+    expect(expandedView(view)).toBeNull();
+    fireEvent.click(view.getByRole("button", { name: "Expand document, page 1 of 2" }));
+
+    expect(expandedView(view)).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Close full-screen preview" }));
+    expect(expandedView(view)).toBeNull();
+  });
+
+  test("the expand button still opens the full-screen preview", () => {
+    const view = render(<ArtifactResponse artifact={documentArtifactFixture({ pdfUrl: "https://files.example/document.pdf" })} />);
+
+    fireEvent.click(view.getByRole("button", { name: "Expand carousel preview" }));
+
+    expect(expandedView(view)).toBeTruthy();
   });
 });
 

@@ -6,6 +6,7 @@ import type {
   GenerateInput,
 } from '../agent-runner.interface';
 import { resolveStylePresetInstruction } from '../style-presets.config';
+import { todaySection } from './today.prompt';
 
 // `generate` is a single structured completion, so the system prompt carries the
 // whole output contract: the model gets one shot plus one repair, and both are
@@ -204,7 +205,7 @@ TITLE:
  * unstyled initial run sends the model nothing but the topic.
  */
 export function buildGenerationUserPrompt(input: GenerateInput): string {
-  const sections = [`BRIEF:\n${input.prompt}`];
+  const sections = [todaySection(input.today), `BRIEF:\n${input.prompt}`];
 
   const voice = resolveStylePresetInstruction(input.stylePreset);
   if (voice) sections.push(`VOICE:\n${voice}`);
@@ -248,6 +249,7 @@ export function buildDocumentGenerationUserPrompt(
   const brief = buildGenerationUserPrompt({
     type: ArtifactType.DOCUMENT,
     prompt: input.prompt,
+    today: input.today,
     stylePreset: input.stylePreset,
     research: input.research,
   });

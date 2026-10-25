@@ -89,13 +89,23 @@ export interface ResearchResult {
   mode?: ResearchMode;
 }
 
-export interface ResearchInput extends SessionAffinity {
+/**
+ * The run's date as UTC `YYYY-MM-DD`, stated in every research and generation
+ * prompt so the model does not take its training-era year as the present.
+ * Steps derive it from the run's creation time, so every job attempt of a run
+ * sees the same date.
+ */
+export interface RunDate {
+  today: string;
+}
+
+export interface ResearchInput extends SessionAffinity, RunDate {
   prompt: string;
   type: ArtifactType;
   stylePreset?: StylePreset;
 }
 
-export interface GenerateInput extends SessionAffinity {
+export interface GenerateInput extends SessionAffinity, RunDate {
   type: ArtifactType;
   prompt: string;
   stylePreset?: StylePreset;
@@ -114,7 +124,8 @@ export interface DocumentRefineInput {
 }
 
 /** A DOCUMENT draft (spec §7.5), INITIAL or REFINE. */
-export interface DocumentGenerateInput extends SessionAffinity, RunTimeLeft {
+export interface DocumentGenerateInput
+  extends SessionAffinity, RunTimeLeft, RunDate {
   prompt: string;
   stylePreset?: StylePreset;
   research?: ResearchResult;

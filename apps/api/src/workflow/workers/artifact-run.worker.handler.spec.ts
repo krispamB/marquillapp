@@ -64,6 +64,7 @@ const makeJob = (overrides: Partial<Job<BuildInput>> = {}): Job<BuildInput> =>
     data: buildInput(),
     attemptsMade: 1,
     opts: { attempts: 3 },
+    timestamp: Date.parse('2026-10-25T23:30:00Z'),
     ...overrides,
   }) as unknown as Job<BuildInput>;
 
@@ -357,6 +358,22 @@ describe('ArtifactRunProcessor', () => {
       );
       expect(mocks.runHandle.complete).toHaveBeenCalledTimes(1);
       expect(mocks.artifacts.failVersion).not.toHaveBeenCalled();
+    });
+
+    it("should date the prompts from the job's creation time when a retry runs on a later day", async () => {
+      jest.useFakeTimers({ advanceTimers: true });
+      jest.setSystemTime(new Date('2027-03-01T12:00:00Z'));
+
+      try {
+        await processor.process(makeJob({ attemptsMade: 2 }));
+      } finally {
+        jest.useRealTimers();
+      }
+
+      expect(mocks.agent.generate).toHaveBeenCalledWith(
+        expect.objectContaining({ today: '2026-10-25' }),
+        expect.anything(),
+      );
     });
 
     it("should refresh the run's in-flight lease at the start of each attempt", async () => {

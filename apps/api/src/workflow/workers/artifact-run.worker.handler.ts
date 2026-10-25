@@ -169,6 +169,9 @@ export class ArtifactRunProcessor {
       diagnostics,
       emit,
       run,
+      // Enqueued right after the run was created, and the same for every job
+      // attempt and stall restart, so a retry past midnight keeps the date.
+      runCreatedAt: new Date(job.timestamp),
     };
 
     await runWorkflow(job.data, {

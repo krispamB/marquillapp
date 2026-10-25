@@ -529,8 +529,9 @@ document.
 - **The prompt sees the base's Candidate Source** (`candidate.html`, verified against
   `candidateSha256`), never the assembled Document Source. Reverse-assembly is rejected.
 - The prompt also carries the base's commentary, the user's `feedback`, the original `prompt` and
-  `stylePreset`, the prompt fragment of the new Attempt's pin, and the prior run's research. There is
-  no new research pass.
+  `stylePreset`, the prompt fragment of the new Attempt's pin, the prior run's research, and the
+  refine run's own date (the `TODAY:` line every draft brief opens with). There is no new research
+  pass.
 - The model re-emits the whole document, which goes through check → Repair → assemble → render.
 - **Design System on refine:**
   1. By default the new Attempt carries the base's exact pin, whatever its status: `SUPERSEDED` and
