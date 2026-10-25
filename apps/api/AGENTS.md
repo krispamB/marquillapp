@@ -22,6 +22,8 @@ bun run start:worker     # the worker process (node dist/workflow/workers/workfl
 
 bun run seed:design-systems  # seed Design Systems from assets/design-systems; the API and worker refuse to boot without it
 bun run typecheck        # tsc against tsconfig.build.json, i.e. exactly what ships
+bun run eval:text         # POST/POLL model comparison: latency and tokens per model (spends OpenRouter budget; docs/text-eval-runbook.md)
+bun run eval:research     # agent vs snippet research A/B on fixed briefs (spends OpenRouter and Tavily credit; RESEARCH_MODE below)
 bun run test             # Jest: all *.spec.ts under src/
 bunx jest src/auth/auth.service.spec.ts   # a single file
 bun run test:e2e         # end-to-end (test/jest-e2e.json)
@@ -124,9 +126,12 @@ Copy `.env.example` and fill in real values. Required keys not in the example:
 - `GENERATION_MODEL`, `RESEARCH_MODEL` — OpenRouter model identifiers used by `AgentRunnerService`
 
 Optional keys in the example (worker):
+- `POST_GENERATION_MODEL`, `POLL_GENERATION_MODEL` (default `GENERATION_MODEL`; unset or blank falls back) — the OpenRouter model for POST or POLL generation and its Zod repair turn (`resolveTextGenerationModels`, `src/agent/generation-model.ts`). DOCUMENT always uses `GENERATION_MODEL`. Pick them with `bun run eval:text` (`docs/text-eval-runbook.md`).
+- `STREAM_POST_COMMENTARY` (default `false`; `true`/`1` or `false`/`0`, anything else fails boot) — POST and POLL `generate` streams the model's answer (`CompletionOptions.onTextDelta`, same per-try timeout and retry loop), `extractStringField` reads the partial `commentary` out of the JSON so far, and `GENERATE` emits it as `step.progress { phase: 'writing', partial: { commentary } }` at most every 250 ms (`commentaryPreview`, `src/workflow/steps/commentary-preview.ts`), with `phase: 'rewrite'` before a Zod repair. Off changes nothing.
 - `TAVILY_TIMEOUT_S` (default `10`) — per-search Tavily timeout in seconds
 - `TAVILY_SEARCH_DEPTH` (default `advanced`, or `basic`) — Tavily search depth
 - `RESEARCH_REASONING_EFFORT`, `GENERATION_REASONING_EFFORT`, `DOCUMENT_DRAFT_REASONING_EFFORT`, `DOCUMENT_REPAIR_REASONING_EFFORT` (default unset: no effort sent) — reasoning effort for each call site of `AgentRunnerService`; an unknown value fails worker boot. Which efforts a model accepts differs per model, so check the model before setting one (see `.env.example`).
+- `RESEARCH_MODE` (default `agent`, or `snippets`; anything else fails worker boot) — how `AgentRunnerService.research()` works. `agent` is the autonomous tool loop. `snippets` (`src/agent/research-snippets.ts`) is one `RESEARCH_MODEL` call at `RESEARCH_REASONING_EFFORT` (set it to the model's lowest, `none` on Luna) that returns 1–4 queries as structured output; the searches run in parallel, each that returns charges `web_search` as in the loop, and the excerpts are deduped by normalised URL, interleaved by query and capped at `RESEARCH_MAX_SNIPPETS` (default `10`) × `RESEARCH_SNIPPET_CHARS` (default `600`, both `readIntEnv`, min 1), as numbered `[n] Title (url)` findings with `mode: 'snippets'`. GENERATE labels them as raw web excerpts. `bun run eval:research` (`src/scripts/research-ab.ts`) researches fixed POST and DOCUMENT briefs in both modes and reports latency, calls, searches and findings size; it needs only `.env`, not Mongo, Redis or the worker, and spends real OpenRouter and Tavily credit.
 
 Optional integer settings are read with `readIntEnv` (`src/common/env.ts`): unset or blank gives the default, and anything that is not a base-10 integer within bounds fails boot, naming the key.
 - `MONGO_MAX_POOL_SIZE` (default `10`, min 1), `MONGO_MIN_POOL_SIZE` (default `2`, must not exceed max) — Mongo connection pool, per process (`mongoOptionsFrom` in `src/database/mongo-options.ts`). **Sizing rule:** the worker's pool must be at least its total worker concurrency + 10.

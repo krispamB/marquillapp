@@ -75,6 +75,18 @@ export const features: Feature[] = [
     ],
   },
   {
+    id: 'streamed-commentary',
+    name: 'Streamed post and poll text',
+    area: 'creation',
+    status: 'building',
+    summary: 'While Mark writes a POST or POLL Artifact, its commentary appears in the conversation as it is written, in a preview that the finished artifact replaces. A Zod repair or a retry clears the preview and it starts again.',
+    issues: [238],
+    docs: ['apps/api/docs/artifact-generation-performance-plan.md', 'apps/api/docs/api/runs.md'],
+    notes: [
+      'Built but shipped off: STREAM_POST_COMMENTARY defaults to false on the worker. Before switching it on, verify the POST and POLL models stream with json_schema and requireParameters on OpenRouter. Set live (with since and a changelog entry) only once it is on in production.',
+    ],
+  },
+  {
     id: 'artifact-refine',
     name: 'Refine an artifact',
     area: 'creation',

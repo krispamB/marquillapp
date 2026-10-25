@@ -225,6 +225,60 @@ describe('generateStep', () => {
     );
   });
 
+  describe('streamed commentary', () => {
+    it('should emit the commentary the agent streams as the writing phase', async () => {
+      mocks.agent.generate.mockImplementation(
+        (_input: unknown, hooks: AgentHooks) => {
+          hooks.onCommentary?.('Write');
+          return Promise.resolve({ content: { commentary: 'Write more.' } });
+        },
+      );
+
+      await generateStep(fixtures.state, ctx);
+
+      expect(mocks.emit).toHaveBeenCalledWith({
+        type: 'step.progress',
+        data: {
+          step: 'GENERATE',
+          phase: 'writing',
+          partial: { commentary: 'Write' },
+        },
+      });
+    });
+
+    it('should emit the rewrite phase when the agent announces a repair', async () => {
+      mocks.agent.generate.mockImplementation(
+        (_input: unknown, hooks: AgentHooks) => {
+          hooks.onCommentary?.('Bad draft');
+          hooks.onRewrite?.();
+          hooks.onCommentary?.('Good');
+          return Promise.resolve({ content: { commentary: 'Good draft.' } });
+        },
+      );
+
+      await generateStep(fixtures.state, ctx);
+
+      expect(
+        mocks.emit.mock.calls.map(
+          ([event]) => (event as { data: { phase: string } }).data.phase,
+        ),
+      ).toEqual(['writing', 'rewrite', 'writing']);
+    });
+
+    it('should still meter usage when it takes the commentary', async () => {
+      mocks.agent.generate.mockImplementation(
+        (_input: unknown, hooks: AgentHooks) => {
+          hooks.onUsage?.(turnUsage());
+          return Promise.resolve({ content: { commentary: 'ok' } });
+        },
+      );
+
+      await generateStep(fixtures.state, ctx);
+
+      expect(mocks.meter.record).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('for a DOCUMENT run', () => {
     const draft = {
       title: 'Three fixes',

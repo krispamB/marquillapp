@@ -56,7 +56,7 @@ import RefineDesignControl from "./RefineDesignControl";
 import { isDesignSystemUnavailable } from "./designSystems";
 import useDesignSystems from "./useDesignSystems";
 import RedesignShell from "./Shell";
-import { useArtifactRun } from "./useArtifactRun";
+import { useArtifactRun, type InlineArtifactResult } from "./useArtifactRun";
 import useArtifactPostDraft from "./useArtifactPostDraft";
 
 type ConversationEntry =
@@ -122,6 +122,8 @@ export default function ArtifactConversationClient({
   const [entries, setEntries] = useState<ConversationEntry[]>([]);
   const [artifactType, setArtifactType] = useState<ArtifactType>();
   const [artifactTitle, setArtifactTitle] = useState<string>();
+  const artifactTitleRef = useRef(artifactTitle);
+  useEffect(() => { artifactTitleRef.current = artifactTitle; }, [artifactTitle]);
   const [activeRunId, setActiveRunId] = useState(initialRunId);
   const [isHydrated, setIsHydrated] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -201,9 +203,23 @@ export default function ArtifactConversationClient({
     return response.data;
   }, [artifactId]);
 
-  const handleArtifactReady = useCallback(async (version: number, credits: number) => {
+  const handleArtifactReady = useCallback(async (
+    version: number,
+    credits: number,
+    inline?: InlineArtifactResult,
+  ) => {
     try {
-      const artifact = await readArtifact(version);
+      // A live POST/POLL completion carries the version itself; otherwise read it.
+      const artifact: ArtifactDetailData = inline ? {
+        id: inline.artifactId,
+        type: inline.type,
+        title: inline.title ?? artifactTitleRef.current,
+        currentVersion: version,
+        version,
+        status: "READY",
+        content: inline.content,
+        updatedAt: new Date().toISOString(),
+      } : await readArtifact(version);
       appendArtifact(artifact, credits);
       setLoadError(null);
     } finally {
@@ -224,6 +240,7 @@ export default function ArtifactConversationClient({
     retryCompletedVersion,
     showDurableFailure,
   } = useArtifactRun({
+    artifactId,
     runId: activeRunId,
     // Follow a ?run= from the first render; the hook does nothing without a run id.
     enabled: true,
@@ -580,6 +597,9 @@ export default function ArtifactConversationClient({
                   artifactId={artifactId}
                   onRetryLoad={retryCompletedVersion}
                 />
+                {run.draftCommentary ? (
+                  <p className="mq-studio-post-copy mq-studio-draft-preview">{run.draftCommentary}</p>
+                ) : null}
               </div>
             </div>
           ) : null}

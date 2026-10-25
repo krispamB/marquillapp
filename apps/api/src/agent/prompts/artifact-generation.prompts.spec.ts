@@ -13,8 +13,10 @@ import {
   buildDocumentPatchRepairUserPrompt,
   buildDocumentRepairFallbackUserPrompt,
   buildDocumentRepairUserPrompt,
+  buildGenerationUserPrompt,
   GENERATE_DOCUMENT_SYSTEM_PROMPT,
 } from './artifact-generation.prompts';
+import { ArtifactType } from 'src/database/schemas';
 
 describe('artifact-generation prompts', () => {
   describe('GENERATE_DOCUMENT_SYSTEM_PROMPT', () => {
@@ -170,6 +172,44 @@ Answer with JSON {"html": …} only.`,
       expect(prompt.split('\n').at(-1)).toBe(
         'Answer with JSON {"html": …} only.',
       );
+    });
+  });
+
+  describe('buildGenerationUserPrompt', () => {
+    const brief = { type: ArtifactType.POST, prompt: 'The brief' };
+    const sources = [{ title: 'A', url: 'https://a.com/' }];
+
+    it('should label agent research as RESEARCH FINDINGS with its sources', () => {
+      const prompt = buildGenerationUserPrompt({
+        ...brief,
+        research: { findings: 'A synthesis.', sources },
+      });
+
+      expect(prompt).toBe(
+        'BRIEF:\nThe brief\n\nRESEARCH FINDINGS:\nA synthesis.\n\nSOURCES:\n- A (https://a.com/)',
+      );
+    });
+
+    it('should label snippet research as raw web excerpts when mode is snippets', () => {
+      const findings = '[1] A (https://a.com/)\nAn excerpt.';
+      const prompt = buildGenerationUserPrompt({
+        ...brief,
+        research: { findings, sources, mode: 'snippets' },
+      });
+
+      expect(prompt).toContain(
+        `RESEARCH SNIPPETS (raw web excerpts; use only facts they state):\n${findings}`,
+      );
+      expect(prompt).not.toContain('RESEARCH FINDINGS');
+    });
+
+    it('should skip the research section when snippet research found nothing', () => {
+      const prompt = buildGenerationUserPrompt({
+        ...brief,
+        research: { findings: '', sources: [], mode: 'snippets' },
+      });
+
+      expect(prompt).toBe('BRIEF:\nThe brief');
     });
   });
 });

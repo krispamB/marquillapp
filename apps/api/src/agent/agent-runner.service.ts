@@ -11,6 +11,7 @@ import {
   documentRepairSchema,
   generationSchemaFor,
 } from '../artifact/schemas';
+import { type IntEnvOptions, readIntEnv } from '../common/env';
 import { LLMProvider, MessageRole } from '../llm/interfaces';
 import type {
   CompletionOptions,
@@ -42,11 +43,29 @@ import type {
   DocumentRepairResult,
   GenerateInput,
   ResearchInput,
+  ResearchMode,
   ResearchResult,
   ResearchSource,
   Tool,
 } from './agent-runner.interface';
+import { readBoolEnv } from '../common/env';
+import { extractStringField } from './extract-string-field';
+import {
+  resolveTextGenerationModels,
+  type TextGenerationModels,
+} from './generation-model';
 import { readReasoningEffort } from './reasoning-effort';
+import {
+  buildSnippetResearch,
+  cleanSnippetQueries,
+  DEFAULT_RESEARCH_MAX_SNIPPETS,
+  DEFAULT_RESEARCH_SNIPPET_CHARS,
+  readResearchMode,
+  type SnippetLimits,
+  type SnippetSearch,
+  snippetQueriesAnswerSchema,
+  snippetQueriesSchema,
+} from './research-snippets';
 import {
   buildDocumentGenerationUserPrompt,
   buildDocumentPatchRepairUserPrompt,
@@ -58,6 +77,8 @@ import {
   generationSystemPrompt,
   researchSystemPrompt,
   researchUserPrompt,
+  snippetQueriesSystemPrompt,
+  snippetQueriesUserPrompt,
 } from './prompts';
 import {
   createSearchWebTool,
@@ -165,10 +186,14 @@ const toToolDefinition = (tool: Tool): ToolDefinition => ({
 export class AgentRunnerService implements AgentRunner {
   private readonly logger = new Logger(AgentRunnerService.name);
   private readonly generationModel: string;
+  // POST and POLL generation (and its Zod repair); DOCUMENT keeps generationModel.
+  private readonly textModels: TextGenerationModels;
   private readonly researchModel: string;
   private readonly researchMaxSteps: number;
   private readonly researchMaxSuccessfulSearches: number;
   private readonly researchMaxOutputTokens: number;
+  private readonly researchMode: ResearchMode;
+  private readonly snippetLimits: SnippetLimits;
   private readonly generationMaxOutputTokens: number;
   private readonly documentMaxOutputTokens: number;
   // Each effort applies to its own call sites only; unset sends none.
@@ -176,6 +201,8 @@ export class AgentRunnerService implements AgentRunner {
   private readonly generationReasoningEffort?: ReasoningEffort;
   private readonly documentDraftReasoningEffort?: ReasoningEffort;
   private readonly documentRepairReasoningEffort?: ReasoningEffort;
+  /** `STREAM_POST_COMMENTARY`: stream POST and POLL commentary as it is written. */
+  private readonly streamPostCommentary: boolean;
   private readonly searchWebTool: Tool;
 
   constructor(
@@ -185,6 +212,9 @@ export class AgentRunnerService implements AgentRunner {
   ) {
     this.generationModel =
       this.configService.getOrThrow<string>('GENERATION_MODEL');
+    this.textModels = resolveTextGenerationModels(this.generationModel, (key) =>
+      this.configService.get<string | number>(key),
+    );
     this.researchModel =
       this.configService.getOrThrow<string>('RESEARCH_MODEL');
     this.researchMaxSteps = this.readMaxSteps();
@@ -199,6 +229,20 @@ export class AgentRunnerService implements AgentRunner {
       'RESEARCH_MAX_OUTPUT_TOKENS',
       DEFAULT_MAX_OUTPUT_TOKENS,
     );
+    // A bad value throws here, failing worker boot like an unknown effort.
+    this.researchMode = readResearchMode(
+      this.configService.get<string>('RESEARCH_MODE'),
+    );
+    this.snippetLimits = {
+      maxSnippets: this.readInt('RESEARCH_MAX_SNIPPETS', {
+        default: DEFAULT_RESEARCH_MAX_SNIPPETS,
+        min: 1,
+      }),
+      snippetChars: this.readInt('RESEARCH_SNIPPET_CHARS', {
+        default: DEFAULT_RESEARCH_SNIPPET_CHARS,
+        min: 1,
+      }),
+    };
     this.generationMaxOutputTokens = this.readPositiveInteger(
       'GENERATION_MAX_OUTPUT_TOKENS',
       DEFAULT_MAX_OUTPUT_TOKENS,
@@ -218,6 +262,23 @@ export class AgentRunnerService implements AgentRunner {
     this.documentRepairReasoningEffort = this.readEffort(
       'DOCUMENT_REPAIR_REASONING_EFFORT',
     );
+    if (
+      this.researchMode === 'snippets' &&
+      this.researchReasoningEffort === undefined
+    ) {
+      this.logger.warn(
+        'RESEARCH_MODE is snippets but RESEARCH_REASONING_EFFORT is unset; the query call runs at the model default effort, not its lowest',
+      );
+    }
+    this.streamPostCommentary = readBoolEnv(
+      {
+        STREAM_POST_COMMENTARY: this.configService.get<string>(
+          'STREAM_POST_COMMENTARY',
+        ),
+      },
+      'STREAM_POST_COMMENTARY',
+      false,
+    );
     this.searchWebTool = createSearchWebTool(
       this.configService.getOrThrow<string>('TAVILY_API_KEY'),
       resolveSearchWebOptions(
@@ -228,18 +289,27 @@ export class AgentRunnerService implements AgentRunner {
   }
 
   /**
-   * The agentic half. One tool (`searchWeb`), fully autonomous: the model
-   * self-directs its queries across turns and, when done, answers in prose.
+   * Research in the configured `RESEARCH_MODE`. Both modes return the same
+   * shape, so the run record, refine reuse and GENERATE take either; the
+   * whole result is persisted on the run record so a later refine reuses it
+   * with zero re-search.
    *
-   * `findings` is that final synthesis — not a dump of raw search bodies —
-   * keeping the generation prompt tight. `sources` is deduped across every
-   * search the loop made. The whole result is persisted on the run record so a
-   * later refine reuses it with zero re-search.
+   * `agent` (the default): one tool (`searchWeb`), fully autonomous. The
+   * model self-directs its queries across turns and, when done, answers in
+   * prose. `findings` is that final synthesis, not a dump of raw search
+   * bodies, keeping the generation prompt tight. `sources` is deduped across
+   * every search the loop made.
+   *
+   * `snippets`: see `researchSnippets`.
    */
   async research(
     input: ResearchInput,
     hooks?: AgentHooks,
   ): Promise<ResearchResult> {
+    if (this.researchMode === 'snippets') {
+      return this.researchSnippets(input, hooks);
+    }
+
     const result = await this.run(
       {
         system: researchSystemPrompt(),
@@ -261,6 +331,75 @@ export class AgentRunnerService implements AgentRunner {
       findings: result.text,
       sources: this.collectSources(result.steps),
     };
+  }
+
+  /**
+   * Snippet research (plan M7.2): one research-model call plans 1–4 queries,
+   * they are searched in parallel, and the raw excerpts are returned as
+   * numbered `[n] Title (url)` blocks, with no synthesis turn.
+   *
+   * The query call runs at `RESEARCH_REASONING_EFFORT`, which a deployment
+   * using this mode sets to the model's lowest (`none` on Luna). Each search
+   * that returns charges `web_search` through `onToolCall`, exactly as in
+   * the agent loop; a failed search charges nothing. An answer that is not
+   * the asked-for JSON is not repaired: the brief itself is searched.
+   */
+  private async researchSnippets(
+    input: ResearchInput,
+    hooks?: AgentHooks,
+  ): Promise<ResearchResult> {
+    const queries = await this.planSnippetQueries(input, hooks);
+    const outputs = await Promise.all(
+      queries.map((query, i) =>
+        this.executeTool(
+          [this.searchWebTool],
+          {
+            id: `snippet-${i + 1}`,
+            name: this.searchWebTool.name,
+            input: { query },
+          },
+          hooks,
+        ),
+      ),
+    );
+    const searches = outputs.filter((output): output is SnippetSearch =>
+      hasResults(output),
+    );
+    return buildSnippetResearch(searches, this.snippetLimits);
+  }
+
+  private async planSnippetQueries(
+    input: ResearchInput,
+    hooks?: AgentHooks,
+  ): Promise<string[]> {
+    const { text } = await this.complete(
+      [
+        { role: MessageRole.System, content: snippetQueriesSystemPrompt() },
+        { role: MessageRole.User, content: snippetQueriesUserPrompt(input) },
+      ],
+      hooks,
+      snippetQueriesSchema,
+      {
+        model: this.researchModel,
+        maxTokens: this.researchMaxOutputTokens,
+        reasoningEffort: this.researchReasoningEffort,
+        sessionId: input.sessionId,
+        timeoutMs: RESEARCH_TURN_TIMEOUT_MS,
+        schemaName: 'research_queries',
+      },
+    );
+
+    let planned: string[] = [];
+    try {
+      planned = this.parser.parseWithSchema(text, snippetQueriesAnswerSchema, {
+        stripNullObjectValues: true,
+      }).queries;
+    } catch (error: unknown) {
+      this.logger.warn(
+        `Snippet research query plan failed validation; searching the brief: ${describeError(error)}`,
+      );
+    }
+    return cleanSnippetQueries(planned, input.prompt);
   }
 
   /**
@@ -394,6 +533,11 @@ export class AgentRunnerService implements AgentRunner {
    *
    * The repair re-prompts with the exact validation error. A failure that
    * survives it is a `ContentValidationError` — terminal, per R2.
+   *
+   * With `STREAM_POST_COMMENTARY` on and an `onCommentary` hook, both calls
+   * stream, and the hook gets the commentary written so far as it grows
+   * (`commentary` is the schema's first key, so it arrives first). The repair
+   * rewrites it, so `onRewrite` fires before the repair call.
    */
   async generate(
     input: GenerateInput,
@@ -418,9 +562,23 @@ export class AgentRunnerService implements AgentRunner {
         : {}),
     };
 
+    const onCommentary = this.streamPostCommentary
+      ? hooks?.onCommentary
+      : undefined;
     const options = {
-      model: this.generationModel,
+      model:
+        input.type === ArtifactType.POLL || input.type === ArtifactType.POST
+          ? this.textModels[input.type]
+          : this.generationModel,
       ...callOptions(this.generationReasoningEffort, input.sessionId),
+      ...(onCommentary
+        ? {
+            onTextDelta: (_delta: string, text: string) => {
+              const commentary = extractStringField(text, 'commentary');
+              if (commentary !== undefined) onCommentary(commentary);
+            },
+          }
+        : {}),
     };
 
     const { text: draft } = await this.complete(
@@ -443,6 +601,7 @@ export class AgentRunnerService implements AgentRunner {
     this.logger.warn(
       `Generated ${input.type} first draft failed validation; attempting one repair: ${describeError(validationError)}`,
     );
+    if (onCommentary) hooks?.onRewrite?.();
 
     const { text: repaired } = await this.complete(
       [
@@ -830,7 +989,16 @@ export class AgentRunnerService implements AgentRunner {
       model: string;
       maxTokens?: number;
       call?: DocumentModelCall;
-    } & Pick<CompletionOptions, 'reasoningEffort' | 'sessionId' | 'deadlineAt'>,
+      /** The structured-output name; artifact generation unless set. */
+      schemaName?: string;
+    } & Pick<
+      CompletionOptions,
+      | 'reasoningEffort'
+      | 'sessionId'
+      | 'deadlineAt'
+      | 'timeoutMs'
+      | 'onTextDelta'
+    >,
   ): Promise<{ text: string; finishReason?: string }> {
     const {
       text,
@@ -841,13 +1009,17 @@ export class AgentRunnerService implements AgentRunner {
       model: options.model,
       max_tokens: options.maxTokens ?? this.generationMaxOutputTokens,
       ...callOptions(options.reasoningEffort, options.sessionId),
+      ...(options.timeoutMs !== undefined
+        ? { timeoutMs: options.timeoutMs }
+        : {}),
       ...(options.deadlineAt !== undefined
         ? { deadlineAt: options.deadlineAt }
         : {}),
+      ...(options.onTextDelta ? { onTextDelta: options.onTextDelta } : {}),
       ...(responseSchema
         ? {
             responseSchema: {
-              name: 'artifact_generation',
+              name: options.schemaName ?? 'artifact_generation',
               schema: responseSchema,
             },
           }
@@ -868,6 +1040,15 @@ export class AgentRunnerService implements AgentRunner {
     return readReasoningEffort(
       this.configService.get<string | number>(key),
       key,
+    );
+  }
+
+  private readInt(key: string, options: IntEnvOptions): number {
+    const raw = this.configService.get<string | number>(key);
+    return readIntEnv(
+      { [key]: raw === undefined || raw === null ? undefined : String(raw) },
+      key,
+      options,
     );
   }
 

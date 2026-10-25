@@ -197,6 +197,29 @@ on a valid render. Parked as future work.
 interface ResearchInput { prompt: string; type: ArtifactType; stylePreset?: StylePreset }
 ```
 
+**Amended (performance plan M7.2, #237) — snippet mode.** `RESEARCH_MODE` picks
+the path inside `research()`; `agent` (the default) is everything above, unchanged.
+`snippets` trades the synthesis for speed (est. 20–45 s → 3–5 s):
+
+1. One `RESEARCH_MODEL` call at `RESEARCH_REASONING_EFFORT` (deployments set the
+   model's lowest, `none` on Luna) returns `{ queries: string[1..4] }` as structured
+   output. A malformed answer is not repaired; the brief itself is searched.
+2. The queries (trimmed, deduped case-insensitively, at most 4) run through the same
+   `searchWeb` tool in parallel. Each search that returns fires `onToolCall`, so the
+   `web_search` charge is the agent loop's; a failed search charges nothing.
+3. `buildSnippetResearch` (`src/agent/research-snippets.ts`) interleaves results by
+   query (each query's best first), dedupes by normalised URL (lowercase host without
+   `www.`, no fragment, tracking parameters or trailing slash; the first URL is kept
+   as returned, since normalising can break a link), and keeps at most
+   `RESEARCH_MAX_SNIPPETS` (10) excerpts of at most `RESEARCH_SNIPPET_CHARS` (600)
+   characters, whitespace collapsed.
+
+`findings` is then the numbered `[n] Title (url)` blocks, each followed by its excerpt,
+and the result carries `mode: 'snippets'` (§6). This brings back a query-planning
+stage this section once rejected, but as one bounded call instead of the old
+pre-steps, and only behind the flag. Compare the modes with `bun run eval:research`
+(fixed POST and DOCUMENT briefs).
+
 **Rejected — port YouTube + Reddit + web as three tools now.** Triples the tool
 surface, cost, and prompt-tuning for launch; the heavy legacy YouTube pipeline
 (search→transcript→compress) dies with the old engine (#95 resolution).
@@ -214,8 +237,13 @@ interface ResearchSource { title: string; url: string }
 interface ResearchResult {
   findings: string;                       // the loop's final synthesized brief (= AgentRunResult.text)
   sources: ResearchSource[];              // deduped from every searchWeb result across steps
+  mode?: 'agent' | 'snippets';            // set only by snippet mode (§5); absent means agent
 }
 ```
+
+In snippet mode `findings` is raw web excerpts, not a synthesis; GENERATE labels the
+section "RESEARCH SNIPPETS (raw web excerpts; use only facts they state)" instead of
+"RESEARCH FINDINGS", and leaves it out when no search returned anything.
 
 - Derivation inside `research()`: `findings = result.text` (the agent's own synthesis
   after searching); `sources = dedupeByUrl(steps.flatMap(searchWeb results →

@@ -42,3 +42,28 @@ export function readIntEnv(
   }
   return value;
 }
+
+const TRUE_VALUES = new Set(['true', '1']);
+const FALSE_VALUES = new Set(['false', '0']);
+
+/**
+ * Reads an on/off setting. Unset or blank gives `defaultValue`; `true`/`1`
+ * and `false`/`0` (any case) are read as such, and anything else throws an
+ * Error naming the key and the value, so a bad setting fails the boot.
+ */
+export function readBoolEnv(
+  source: EnvSource,
+  key: string,
+  defaultValue: boolean,
+): boolean {
+  const raw =
+    source instanceof ConfigService
+      ? source.get<string | boolean>(key)
+      : source[key];
+  const text =
+    raw === undefined || raw === null ? '' : String(raw).trim().toLowerCase();
+  if (text === '') return defaultValue;
+  if (TRUE_VALUES.has(text)) return true;
+  if (FALSE_VALUES.has(text)) return false;
+  throw new Error(`${key} is "${String(raw)}"; it must be true or false`);
+}

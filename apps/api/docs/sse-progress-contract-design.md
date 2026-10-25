@@ -143,7 +143,7 @@ the client contract:
 | `step.progress` | Fine-grained within a step (optional) | `{ step, ...signal }` e.g. `{ sourcesFound }` (#99 §7) |
 | `usage.tick` | Credits consumed | `{ kind, credits, detail? }` (#100 `UsageKind`) |
 | `step.failed` | Step failed **but will retry** (non-terminal) | `{ step, retryable: true, message }` |
-| `run.completed` | Terminal ✔ — version is now `READY` | `{ artifactId, version }` |
+| `run.completed` | Terminal ✔ — version is now `READY` | `{ artifactId, version, content?, title? }` — POST and POLL only: `content` is the promoted version's content, `title` is added on INITIAL runs. Both are absent for DOCUMENT runs and for the snapshot written when the stream has expired. |
 | `run.failed` | Terminal ✘ | `{ failureReason }` |
 
 - **"Artifact ready" = `run.completed`.** The issue lists "artifact ready" in the
@@ -156,6 +156,15 @@ the client contract:
   a step emits it via `ctx.emit` only when it has a meaningful sub-signal
   (research `sourcesFound`, PDF `pageRendered`). Clients must treat it as
   best-effort UI polish, never as a required checkpoint.
+- **Streamed commentary (`STREAM_POST_COMMENTARY`, #238).** With the switch
+  on, POST and POLL `GENERATE` stream the model's answer and emit
+  `{ step: 'GENERATE', phase: 'writing', partial: { commentary } }` at most
+  every 250 ms while the commentary grows. `partial.commentary` is the whole
+  commentary written so far, not a delta, so a client replaces its preview
+  with it and loses nothing when an event is skipped. `{ phase: 'rewrite' }`
+  comes before a Zod repair turn, which writes the commentary again: the
+  client drops its preview. A retrying `step.failed` drops it too. The preview
+  is never the result; `run.completed` is. With the switch off nothing changes.
 - **Progress-bar math** is `index/total` from `step.started/completed`, where
   `total = steps.length` from `run.started`. Because #98 §2's builder emits an
   **honest** step list (only steps that actually run), `total` is exact — no
@@ -179,7 +188,7 @@ type ProgressEvent =
   | { event: 'step.progress'; data: { seq: number; ts: number; step: WorkflowStep; [k: string]: unknown } }
   | { event: 'usage.tick';    data: { seq: number; ts: number; kind: string; credits: number; detail?: unknown } }
   | { event: 'step.failed';   data: { seq: number; ts: number; step: WorkflowStep; retryable: true; message: string } }
-  | { event: 'run.completed'; data: { seq: number; ts: number; artifactId: string; version: number } }
+  | { event: 'run.completed'; data: { seq: number; ts: number; artifactId: string; version: number; content?: ArtifactContent; title?: string } }
   | { event: 'run.failed';    data: { seq: number; ts: number; failureReason: string } };
 ```
 
@@ -365,8 +374,9 @@ es.addEventListener('usage.tick',     (e) => bumpCredits(JSON.parse(e.data)));
 es.addEventListener('step.failed',    (e) => showRetrying(JSON.parse(e.data)));
 
 es.addEventListener('run.completed', (e) => {
-  const { artifactId, version } = JSON.parse(e.data);
-  refetchArtifact(artifactId, version);   // now READY
+  const { artifactId, version, content } = JSON.parse(e.data);
+  if (content) renderVersion(JSON.parse(e.data));  // live POST/POLL: no refetch
+  else refetchArtifact(artifactId, version);       // now READY
   es.close();                             // deliberate close — no reconnect
 });
 es.addEventListener('run.failed', (e) => {

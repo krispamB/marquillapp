@@ -209,10 +209,18 @@ export function buildGenerationUserPrompt(input: GenerateInput): string {
   const voice = resolveStylePresetInstruction(input.stylePreset);
   if (voice) sections.push(`VOICE:\n${voice}`);
 
-  if (input.research) {
-    sections.push(`RESEARCH FINDINGS:\n${input.research.findings}`);
-    if (input.research.sources.length > 0) {
-      const sources = input.research.sources
+  const research = input.research;
+  // Snippet research is raw web text, not a synthesis, and can come back
+  // empty when every search failed; it is labelled as such, or left out.
+  const snippets = research?.mode === 'snippets';
+  if (research && !(snippets && research.findings.trim() === '')) {
+    sections.push(
+      snippets
+        ? `RESEARCH SNIPPETS (raw web excerpts; use only facts they state):\n${research.findings}`
+        : `RESEARCH FINDINGS:\n${research.findings}`,
+    );
+    if (research.sources.length > 0) {
+      const sources = research.sources
         .map((source) => `- ${source.title} (${source.url})`)
         .join('\n');
       sections.push(`SOURCES:\n${sources}`);
