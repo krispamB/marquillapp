@@ -15,9 +15,9 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useCallback, useState } from "react";
-import PdfLightbox from "../../components/pdf/PdfLightbox";
+import { useState, type ComponentType } from "react";
 import PdfPreview from "../../components/pdf/PdfPreview";
+import usePdfLightbox from "../../components/pdf/usePdfLightbox";
 import type {
   ArtifactDetailData,
   ArtifactType,
@@ -76,7 +76,9 @@ function PollResponse({ artifact }: { artifact: ArtifactDetailData }) {
 // slide, plus the refine box below; the rest is left for the slide itself.
 const STUDIO_SLIDE_VIEWPORT_OFFSET = 330;
 
-function DocumentResponse({ artifact }: { artifact: ArtifactDetailData }) {
+type ResponseBodyProps = { artifact: ArtifactDetailData; onExpand?: () => void };
+
+function DocumentResponse({ artifact, onExpand }: ResponseBodyProps) {
   const commentary = artifact.content.commentary?.trim();
   const document = artifact.content.document;
 
@@ -98,13 +100,14 @@ function DocumentResponse({ artifact }: { artifact: ArtifactDetailData }) {
           className="mq-pdf-preview-studio"
           showHeader={false}
           fitViewportOffset={STUDIO_SLIDE_VIEWPORT_OFFSET}
+          onExpand={onExpand}
         />
       ) : null}
     </div>
   );
 }
 
-const responseBodies: Record<ArtifactType, typeof PostResponse> = {
+const responseBodies: Record<ArtifactType, ComponentType<ResponseBodyProps>> = {
   POST: PostResponse,
   POLL: PollResponse,
   DOCUMENT: DocumentResponse,
@@ -340,13 +343,17 @@ export default function ArtifactResponse({
   onSave?: (request: UpdateArtifactRequest) => Promise<void>;
 }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
-  const closeLightbox = useCallback(() => setIsLightboxOpen(false), []);
   const TypeIcon = artifactTypeIcons[artifact.type];
   const ResponseBody = responseBodies[artifact.type];
   const document = artifact.type === "DOCUMENT" ? artifact.content.document : undefined;
   const pdfUrl = document?.pdfUrl;
   const title = artifact.title?.trim() || artifactTypeLabels[artifact.type];
+  const { open: openLightbox, lightbox } = usePdfLightbox({
+    source: pdfUrl,
+    title,
+    pageCountHint: document?.pageCount,
+    openHref: pdfUrl,
+  });
 
   function setEditing(next: boolean) {
     setIsEditing(next);
@@ -368,7 +375,7 @@ export default function ArtifactResponse({
               <button
                 type="button"
                 className="mq-studio-icon-action"
-                onClick={() => setIsLightboxOpen(true)}
+                onClick={openLightbox}
                 aria-label="Expand carousel preview"
                 title="Expand"
               >
@@ -421,7 +428,7 @@ export default function ArtifactResponse({
           />
         ) : (
           <>
-            <ResponseBody artifact={artifact} />
+            <ResponseBody artifact={artifact} onExpand={pdfUrl ? openLightbox : undefined} />
             {editError ? <p className="mq-artifact-editor-error" role="alert">{editError}</p> : null}
           </>
         )}
@@ -433,15 +440,7 @@ export default function ArtifactResponse({
         </footer>
       ) : null}
 
-      {isLightboxOpen && pdfUrl ? (
-        <PdfLightbox
-          source={pdfUrl}
-          title={title}
-          pageCountHint={document?.pageCount}
-          openHref={pdfUrl}
-          onClose={closeLightbox}
-        />
-      ) : null}
+      {lightbox}
     </article>
   );
 }
