@@ -52,7 +52,11 @@ describe('research A/B', () => {
       ]);
       expect(research).toHaveBeenCalledWith(
         'snippets',
-        { prompt: 'brief two', type: ArtifactType.DOCUMENT },
+        {
+          prompt: 'brief two',
+          type: ArtifactType.DOCUMENT,
+          today: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) as string,
+        },
         expect.any(Object),
       );
     });

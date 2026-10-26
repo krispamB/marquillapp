@@ -69,6 +69,7 @@ async function runOne(
   deps: TextEvalDeps,
   model: string,
   brief: TextEvalBrief,
+  today: string,
   effort?: ReasoningEffort,
 ): Promise<TextEvalRecord> {
   const now = deps.now ?? Date.now;
@@ -76,6 +77,7 @@ async function runOne(
   const input: GenerateInput = {
     type: brief.type,
     prompt: brief.prompt,
+    today,
     ...(brief.stylePreset ? { stylePreset: brief.stylePreset } : {}),
   };
   const started = now();
@@ -125,6 +127,8 @@ export async function runTextEval(
   >,
 ): Promise<TextEvalResult> {
   const startedAt = new Date().toISOString();
+  // One date for the whole run, as a workflow run dates every attempt alike.
+  const today = startedAt.slice(0, 10);
   const briefs = selectBriefs(options.types, options.briefsPerType);
   const jobs = options.models.flatMap((model) =>
     briefs.map((brief) => ({ model, brief })),
@@ -135,7 +139,7 @@ export async function runTextEval(
     while (next < jobs.length) {
       const index = next++;
       const { model, brief } = jobs[index];
-      records[index] = await runOne(deps, model, brief, options.effort);
+      records[index] = await runOne(deps, model, brief, today, options.effort);
     }
   };
   await Promise.all(

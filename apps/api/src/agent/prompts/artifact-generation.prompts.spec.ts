@@ -18,6 +18,7 @@ import {
   GENERATE_DOCUMENT_SYSTEM_PROMPT,
 } from './artifact-generation.prompts';
 import { ArtifactType } from 'src/database/schemas';
+import { todaySection } from './today.prompt';
 
 describe('artifact-generation prompts', () => {
   describe('GENERATE_DOCUMENT_SYSTEM_PROMPT', () => {
@@ -256,7 +257,11 @@ Answer with JSON {"html": …} only.`,
   });
 
   describe('buildGenerationUserPrompt', () => {
-    const brief = { type: ArtifactType.POST, prompt: 'The brief' };
+    const brief = {
+      type: ArtifactType.POST,
+      prompt: 'The brief',
+      today: '2026-10-25',
+    };
     const sources = [{ title: 'A', url: 'https://a.com/' }];
 
     it('should label agent research as RESEARCH FINDINGS with its sources', () => {
@@ -266,7 +271,7 @@ Answer with JSON {"html": …} only.`,
       });
 
       expect(prompt).toBe(
-        'BRIEF:\nThe brief\n\nRESEARCH FINDINGS:\nA synthesis.\n\nSOURCES:\n- A (https://a.com/)',
+        `${todaySection(brief.today)}\n\nBRIEF:\nThe brief\n\nRESEARCH FINDINGS:\nA synthesis.\n\nSOURCES:\n- A (https://a.com/)`,
       );
     });
 
@@ -289,7 +294,7 @@ Answer with JSON {"html": …} only.`,
         research: { findings: '', sources: [], mode: 'snippets' },
       });
 
-      expect(prompt).toBe('BRIEF:\nThe brief');
+      expect(prompt).toBe(`${todaySection(brief.today)}\n\nBRIEF:\nThe brief`);
     });
   });
 });

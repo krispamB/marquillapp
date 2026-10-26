@@ -227,7 +227,7 @@ describe('createTextEvalDeps', () => {
 
     await deps.generate(
       'cand/model',
-      { type: ArtifactType.POST, prompt: 'x' },
+      { type: ArtifactType.POST, prompt: 'x', today: '2026-03-01' },
       {},
       'low',
     );

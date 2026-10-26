@@ -100,6 +100,8 @@ export async function runResearchAb(
   now: () => number = () => performance.now(),
 ): Promise<ResearchAbRecord[]> {
   const records: ResearchAbRecord[] = [];
+  // One date for the whole run, so every mode and repeat sees the same prompt.
+  const today = new Date().toISOString().slice(0, 10);
   for (let round = 1; round <= repeat; round++) {
     for (const brief of briefs) {
       for (const mode of modes) {
@@ -121,7 +123,7 @@ export async function runResearchAb(
         try {
           result = await research(
             mode,
-            { prompt: brief.prompt, type: brief.type },
+            { prompt: brief.prompt, type: brief.type, today },
             hooks,
           );
         } catch (caught: unknown) {
