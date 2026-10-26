@@ -551,6 +551,7 @@ describe('AgentRunnerService', () => {
       const pollInput: GenerateInput = {
         type: ArtifactType.POLL,
         prompt: 'Tabs or spaces?',
+        today: '2026-10-25',
       };
 
       it('should use GENERATION_MODEL for POST and POLL when neither key is set', async () => {
@@ -625,6 +626,7 @@ describe('AgentRunnerService', () => {
         );
         await service.generateDocument({
           prompt: 'Three fixes',
+          today: '2026-10-25',
           fragment: 'FRAGMENT',
           includeTitle: true,
           maxEnvelopeRepairs: 1,
@@ -1905,6 +1907,7 @@ describe('AgentRunnerService', () => {
       const result = await service.research({
         prompt: 'topic',
         type: ArtifactType.POST,
+        today: '2026-10-25',
       });
 
       expect(result).toEqual({ findings: 'findings', sources: [] });
