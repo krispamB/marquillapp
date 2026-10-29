@@ -1444,6 +1444,15 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
 .mq-studio-document-response > .mq-pdf-preview-studio:first-child { margin-top: 0; }
 .mq-pdf-lightbox { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: rgba(8,8,7,.72); backdrop-filter: blur(4px); }
 .mq-pdf-lightbox-panel { position: relative; width: min(100%, 1240px); max-height: 100%; }
+.mq-pdf-lightbox { animation: mq-pdf-lightbox-fade-in 240ms cubic-bezier(.2,.8,.2,1) both; }
+.mq-pdf-lightbox-panel { animation: mq-pdf-lightbox-panel-in 320ms cubic-bezier(.16,1,.3,1) both; will-change: transform, opacity; }
+.mq-pdf-lightbox.is-closing { pointer-events: none; animation: mq-pdf-lightbox-fade-out 200ms cubic-bezier(.4,0,1,1) both; }
+.mq-pdf-lightbox.is-closing .mq-pdf-lightbox-panel { animation: mq-pdf-lightbox-panel-out 200ms cubic-bezier(.4,0,1,1) both; }
+@keyframes mq-pdf-lightbox-fade-in { from { opacity: 0; } }
+@keyframes mq-pdf-lightbox-fade-out { to { opacity: 0; } }
+@keyframes mq-pdf-lightbox-panel-in { from { opacity: 0; transform: translateY(14px) scale(.96); } }
+@keyframes mq-pdf-lightbox-panel-out { to { opacity: 0; transform: translateY(8px) scale(.98); } }
+@media (prefers-reduced-motion: reduce) { .mq-pdf-lightbox, .mq-pdf-lightbox-panel, .mq-pdf-lightbox.is-closing, .mq-pdf-lightbox.is-closing .mq-pdf-lightbox-panel { animation: none; } }
 .mq-pdf-lightbox-close { position: absolute; top: 9px; right: 9px; z-index: 2; display: inline-grid; width: 34px; height: 34px; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--ink-700); cursor: pointer; }
 .mq-pdf-lightbox-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .mq-pdf-preview-lightbox { box-shadow: var(--sh-lg); }
