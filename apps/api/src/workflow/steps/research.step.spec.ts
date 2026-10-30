@@ -163,6 +163,28 @@ describe('researchStep', () => {
     });
   });
 
+  it('should record a native search call as llm usage with its search count and no web_search surcharge', async () => {
+    mocks.agent.research.mockImplementation(
+      (_input: unknown, hooks: AgentHooks) => {
+        hooks.onUsage?.(turnUsage({ cost: 0.031, webSearchRequests: 3 }));
+        return Promise.resolve(research);
+      },
+    );
+
+    await researchStep(fixtures.state, ctx);
+
+    expect(mocks.meter.record).toHaveBeenCalledTimes(1);
+    expect(mocks.meter.record).toHaveBeenCalledWith({
+      kind: 'llm',
+      amount: 0.031,
+      detail: {
+        model: 'test/research-model',
+        totalTokens: 150,
+        webSearchRequests: 3,
+      },
+    });
+  });
+
   it("should tally each LLM turn's usage on the run record", async () => {
     const first = turnUsage({ cost: 0.03, latencyMs: 2000 });
     const second = turnUsage({ cost: 0.01, reasoningTokens: 40 });

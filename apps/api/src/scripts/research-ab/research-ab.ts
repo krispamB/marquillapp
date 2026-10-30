@@ -57,7 +57,21 @@ export const RESEARCH_AB_BRIEFS: readonly ResearchAbBrief[] = [
   },
 ];
 
-export const RESEARCH_MODES: readonly ResearchMode[] = ['agent', 'snippets'];
+/** Every mode `--modes` accepts. */
+export const RESEARCH_MODES: readonly ResearchMode[] = [
+  'agent',
+  'snippets',
+  'native',
+];
+
+/**
+ * The modes compared when `--modes` is not given. `native` is opt-in: it
+ * needs `ANTHROPIC_API_KEY` and spends Anthropic credit.
+ */
+export const DEFAULT_RESEARCH_AB_MODES: readonly ResearchMode[] = [
+  'agent',
+  'snippets',
+];
 
 /** Researches one brief in one mode; the real one is an `AgentRunnerService`. */
 export type ResearchFn = (
@@ -74,7 +88,10 @@ export interface ResearchAbRecord {
   ms: number;
   llmCalls: number;
   costUsd: number;
-  /** Searches that returned, i.e. the `web_search` charges. */
+  /**
+   * Searches that returned, i.e. the `web_search` charges, plus the model's
+   * own server-side searches in `native` mode.
+   */
   searches: number;
   sources: number;
   findingsChars: number;
@@ -112,6 +129,7 @@ export async function runResearchAb(
           onUsage: (usage) => {
             llmCalls += 1;
             costUsd += usage.cost;
+            searches += usage.webSearchRequests ?? 0;
           },
           onToolCall: () => {
             searches += 1;
@@ -259,7 +277,8 @@ export interface ResearchAbCliOptions extends ResearchAbOptions {
 export const RESEARCH_AB_USAGE = [
   'Usage: bun run eval:research [options]',
   '',
-  '  --modes <list>   comma-separated research modes (default agent,snippets)',
+  '  --modes <list>   comma-separated research modes: agent, snippets, native',
+  '                   (default agent,snippets; native needs ANTHROPIC_API_KEY)',
   '  --repeat <n>     rounds over every brief (default 1)',
   '  --json <path>    also write every record, findings included, as JSON',
 ].join('\n');
@@ -282,7 +301,7 @@ export function parseResearchAbArgs(
     values.set(flag, value);
   }
 
-  const modes = (values.get('--modes') ?? RESEARCH_MODES.join(','))
+  const modes = (values.get('--modes') ?? DEFAULT_RESEARCH_AB_MODES.join(','))
     .split(',')
     .map((mode) => mode.trim());
   for (const mode of modes) {

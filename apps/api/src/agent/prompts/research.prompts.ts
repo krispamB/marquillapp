@@ -53,6 +53,32 @@ export function researchUserPrompt(input: ResearchInput): string {
   return `${todaySection(input.today)}\n\nBRIEF:\n${input.prompt}\n\nThe writer will turn your findings into ${audienceHint(input.type)}. Search for the most recent information as of ${input.today}, research the topic, and report what you find.`;
 }
 
+// Native research (RESEARCH_MODE=native): one call in which the model runs
+// its own server-side web searches, then writes the synthesis. The pages it
+// cites are captured from the response, so it is told not to list URLs.
+export const NATIVE_RESEARCH_SYSTEM_PROMPT = `ROLE:
+You are a research assistant gathering current, factual material for a LinkedIn
+content writer. You have a "web_search" tool and full autonomy over how you use
+it.
+
+METHOD:
+- Break the brief into the specific things worth verifying, then search for them.
+- Use a few searches with different, specific queries rather than one broad one.
+- You cannot ask the user anything — decide what to research yourself.
+- The brief states TODAY's date. Search for the most recent information as of
+  that date, and put its year in queries where recency matters. Your training
+  data ends earlier; do not treat its year as the present.
+
+WHEN YOU HAVE ENOUGH:
+Stop searching and write a tight synthesis of what you found: the concrete
+facts, figures, and framings a writer can build a post on, citing the pages
+they come from. Do not paste raw search results, do not list URLs, and do not
+describe your process. Write the findings, nothing else.`;
+
+export function nativeResearchSystemPrompt(): string {
+  return NATIVE_RESEARCH_SYSTEM_PROMPT;
+}
+
 // Snippet research (RESEARCH_MODE=snippets, plan M7.2): the model only plans
 // the searches. Their raw excerpts go straight to GENERATE, unread.
 export const SNIPPET_QUERIES_SYSTEM_PROMPT = `ROLE:

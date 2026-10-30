@@ -75,13 +75,16 @@ export interface ResearchSource {
 
 /**
  * How research was done (`RESEARCH_MODE`). Absent means `agent`, which is what
- * every research result stored before snippet mode existed was.
+ * every research result stored before snippet mode existed was. `native` is
+ * the model's own server-side web search (Anthropic only).
  */
-export type ResearchMode = 'agent' | 'snippets';
+export type ResearchMode = 'agent' | 'snippets' | 'native';
 
 // In `agent` mode `findings` is the agent's own synthesis after searching, not
 // a dump of raw search bodies. In `snippets` mode it is the numbered raw web
-// excerpts ("[n] Title (url)" blocks), and `mode` says so. Stored verbatim on
+// excerpts ("[n] Title (url)" blocks), and `mode` says so. In `native` mode
+// it is the model's synthesis after its own web searches, with the pages it
+// cited as `sources`. Stored verbatim on
 // WorkflowRun.researchContext so a refine reuses it with zero re-search.
 export interface ResearchResult {
   findings: string;

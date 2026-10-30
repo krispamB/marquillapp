@@ -111,7 +111,7 @@ const makeService = ({
 }: ServiceConfig = {}) => {
   const llmService = { complete: jest.fn(), completeWithTools: jest.fn() };
   const configService = {
-    getOrThrow: jest.fn((key: string) => CONFIG[key]),
+    getOrThrow: jest.fn((key: string) => env[key] ?? CONFIG[key]),
     get: jest.fn((key: string) => {
       if (key === 'RESEARCH_MAX_STEPS') return maxSteps;
       if (key === 'RESEARCH_MAX_SUCCESSFUL_SEARCHES') {
@@ -2158,6 +2158,216 @@ describe('AgentRunnerService', () => {
         [{ RESEARCH_SNIPPET_CHARS: 'lots' }, 'RESEARCH_SNIPPET_CHARS'],
       ])('should fail construction when %p is invalid', (env, key) => {
         expect(() => makeService({ env })).toThrow(key);
+      });
+    });
+  });
+
+  describe('LLM_PROVIDER', () => {
+    const ANTHROPIC_ENV = {
+      LLM_PROVIDER: 'anthropic',
+      ANTHROPIC_API_KEY: 'test-anthropic-key',
+      GENERATION_MODEL: 'anthropic/claude-haiku-5.5',
+      RESEARCH_MODEL: 'claude-haiku-5-5',
+    };
+
+    it('should send generation to OpenRouter when LLM_PROVIDER is unset', async () => {
+      mocks.llmService.complete.mockResolvedValueOnce(
+        completion(generatedJson({ commentary: 'Body' })),
+      );
+
+      await service.generate(fixtures.input);
+
+      expect(completeCalls()[0][0]).toBe(LLMProvider.OPENROUTER);
+    });
+
+    it('should send generation, research turns and the cap completion to Anthropic when LLM_PROVIDER is anthropic', async () => {
+      ({ service, mocks, fixtures } = makeService({
+        maxSteps: 1,
+        env: ANTHROPIC_ENV,
+      }));
+      mocks.llmService.complete
+        .mockResolvedValueOnce(
+          completion(generatedJson({ commentary: 'Body' })),
+        )
+        .mockResolvedValueOnce(completion('Final findings.'));
+      mocks.llmService.completeWithTools.mockResolvedValueOnce(
+        toolTurn([{ id: 'c1', name: 'nope', input: {} }]),
+      );
+
+      await service.generate(fixtures.input);
+      await service.research({
+        prompt: 'topic',
+        type: ArtifactType.POST,
+        today: '2026-10-25',
+      });
+
+      expect(completeCalls().map(([provider]) => provider)).toEqual([
+        LLMProvider.ANTHROPIC,
+        LLMProvider.ANTHROPIC,
+      ]);
+      expect(completeWithToolsCalls()[0][0]).toBe(LLMProvider.ANTHROPIC);
+    });
+
+    it('should fail construction when LLM_PROVIDER is not a known provider', () => {
+      expect(() => makeService({ env: { LLM_PROVIDER: 'claude' } })).toThrow(
+        'LLM_PROVIDER',
+      );
+    });
+
+    it('should fail construction when LLM_PROVIDER is anthropic and ANTHROPIC_API_KEY is unset', () => {
+      const env = { ...ANTHROPIC_ENV, ANTHROPIC_API_KEY: '' };
+
+      expect(() => makeService({ env })).toThrow('ANTHROPIC_API_KEY');
+    });
+
+    it('should fail construction naming the model when LLM_PROVIDER is anthropic and a model is not a Claude model', () => {
+      expect(() =>
+        makeService({
+          env: { ...ANTHROPIC_ENV, POST_GENERATION_MODEL: 'openai/gpt-5-mini' },
+        }),
+      ).toThrow('openai/gpt-5-mini');
+    });
+
+    it("should carry a tool turn's provider content onto the assistant message when the strategy returns some", async () => {
+      const providerContent = [{ type: 'thinking', signature: 's' }];
+      mocks.llmService.completeWithTools
+        .mockResolvedValueOnce({
+          ...toolTurn([{ id: 'c1', name: 'nope', input: {} }]),
+          providerContent,
+        })
+        .mockResolvedValueOnce(toolTurn([], 0.01, 'Done.'));
+
+      await service.research({
+        prompt: 'topic',
+        type: ArtifactType.POST,
+        today: '2026-10-25',
+      });
+
+      const assistant = completeWithToolsCalls()[1][1].find(
+        (m) => m.role === MessageRole.Assistant,
+      );
+      expect(assistant).toMatchObject({ providerContent });
+    });
+
+    it('should add no provider content key when the strategy returns none', async () => {
+      mocks.llmService.completeWithTools
+        .mockResolvedValueOnce(
+          toolTurn([{ id: 'c1', name: 'nope', input: {} }]),
+        )
+        .mockResolvedValueOnce(toolTurn([], 0.01, 'Done.'));
+
+      await service.research({
+        prompt: 'topic',
+        type: ArtifactType.POST,
+        today: '2026-10-25',
+      });
+
+      const assistant = completeWithToolsCalls()[1][1].find(
+        (m) => m.role === MessageRole.Assistant,
+      );
+      expect(assistant).not.toHaveProperty('providerContent');
+    });
+
+    describe('research in native mode', () => {
+      const NATIVE_ENV = { ...ANTHROPIC_ENV, RESEARCH_MODE: 'native' };
+      const nativeAnswer = (): CompletionResult => ({
+        text: '  Heat pump sales rose 12% in 2026.  ',
+        usage: { ...usage(0.031), webSearchRequests: 3 },
+        model: 'claude-haiku-5-5',
+        citations: [
+          { url: 'https://www.a.com/x/', title: 'A' },
+          { url: 'https://a.com/x', title: 'A again' },
+          { url: 'https://b.com', title: 'B' },
+        ],
+      });
+
+      beforeEach(() => {
+        ({ service, mocks, fixtures } = makeService({ env: NATIVE_ENV }));
+      });
+
+      it('should fail construction when LLM_PROVIDER is not anthropic', () => {
+        expect(() => makeService({ env: { RESEARCH_MODE: 'native' } })).toThrow(
+          'RESEARCH_MODE=native needs LLM_PROVIDER=anthropic',
+        );
+      });
+
+      it('should make one Anthropic call with the web search tool and no Tavily search', async () => {
+        ({ service, mocks, fixtures } = makeService({
+          maxSuccessfulSearches: 2,
+          env: { ...NATIVE_ENV, RESEARCH_REASONING_EFFORT: 'low' },
+        }));
+        mocks.llmService.complete.mockResolvedValueOnce(nativeAnswer());
+
+        await service.research({
+          prompt: 'heat pumps',
+          type: ArtifactType.DOCUMENT,
+          today: '2026-10-25',
+          sessionId: 'run-1',
+        });
+
+        expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+        expect(mocks.llmService.completeWithTools).not.toHaveBeenCalled();
+        expect(tavilySearch).not.toHaveBeenCalled();
+        const [provider, messages, options] = completeCalls()[0];
+        expect(provider).toBe(LLMProvider.ANTHROPIC);
+        expect(messages.map((m) => m.role)).toEqual([
+          MessageRole.System,
+          MessageRole.User,
+        ]);
+        expect(messages[0].content).toContain('web_search');
+        expect(messages[1].content).toContain('heat pumps');
+        expect(options).toEqual({
+          model: 'claude-haiku-5-5',
+          max_tokens: DEFAULT_MAX_OUTPUT_TOKENS,
+          reasoningEffort: 'low',
+          sessionId: 'run-1',
+          timeoutMs: 120_000,
+          webSearch: { maxUses: 2 },
+        });
+      });
+
+      it('should return the synthesis and the cited pages deduped, as native research', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(nativeAnswer());
+
+        await expect(
+          service.research({
+            prompt: 'heat pumps',
+            type: ArtifactType.POST,
+            today: '2026-10-25',
+          }),
+        ).resolves.toEqual({
+          findings: 'Heat pump sales rose 12% in 2026.',
+          sources: [
+            { title: 'A', url: 'https://www.a.com/x/' },
+            { title: 'B', url: 'https://b.com' },
+          ],
+          mode: 'native',
+        });
+      });
+
+      it('should report the call with its search count and never fire onToolCall', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(nativeAnswer());
+        const onUsage = jest.fn();
+        const onToolCall = jest.fn();
+
+        await service.research(
+          {
+            prompt: 'heat pumps',
+            type: ArtifactType.POST,
+            today: '2026-10-25',
+          },
+          { onUsage, onToolCall },
+        );
+
+        expect(onUsage).toHaveBeenCalledTimes(1);
+        expect(onUsage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            cost: 0.031,
+            webSearchRequests: 3,
+            model: 'claude-haiku-5-5',
+          }),
+        );
+        expect(onToolCall).not.toHaveBeenCalled();
       });
     });
   });
