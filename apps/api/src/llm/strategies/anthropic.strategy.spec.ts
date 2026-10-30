@@ -830,6 +830,39 @@ describe('AnthropicStrategy', () => {
       expect(result.finishReason).toBe('stop');
     });
 
+    const pausedAfter = (searches: number) =>
+      message({
+        content: [{ type: 'text', text: 'partial' }],
+        stop_reason: 'pause_turn',
+        usage: {
+          input_tokens: 1_000,
+          output_tokens: 100,
+          server_tool_use: { web_search_requests: searches },
+        },
+      });
+
+    it('should send only the unspent searches when it re-sends a paused turn', async () => {
+      fetchFn
+        .mockResolvedValueOnce(jsonResponse(pausedAfter(2)))
+        .mockResolvedValueOnce(jsonResponse(searched()));
+
+      await strategy.complete(user, { webSearch: { maxUses: 5 } });
+
+      expect(requestAt(0).body.tools![0]).toMatchObject({ max_uses: 5 });
+      expect(requestAt(1).body.tools![0]).toMatchObject({ max_uses: 3 });
+    });
+
+    it('should return the paused turn instead of re-sending when the paused turn spent every search', async () => {
+      fetchFn.mockResolvedValue(jsonResponse(pausedAfter(3)));
+
+      const result = await strategy.complete(user, {
+        webSearch: { maxUses: 3 },
+      });
+
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(result.finishReason).toBe('pause_turn');
+    });
+
     it('should stop re-sending after five continuations when the model keeps pausing', async () => {
       fetchFn.mockImplementation(() =>
         Promise.resolve(

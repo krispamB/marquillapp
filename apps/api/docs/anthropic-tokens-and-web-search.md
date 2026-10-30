@@ -14,7 +14,8 @@ Source tags used below: [models] = `shared/models.md`, [caching] = `shared/promp
 [platform] = `shared/platform-availability.md`, [mac] = `shared/managed-agents-core.md`,
 [mat] = `shared/managed-agents-tools.md`, [errors] = `shared/error-codes.md`,
 [migr] = `shared/model-migration.md`, [curl] = `curl/examples.md`, [tavily] = Tavily API credits page,
-[meter] = `src/feature-gating/credit-meter.*`, [data] = the owner's measured runs.
+[meter] = `src/feature-gating/credit-meter.*`, [data] = the owner's measured runs,
+[web-search-docs] = the live Claude web search tool page.
 
 ## 1. TL;DR
 
@@ -273,10 +274,9 @@ What this says:
 
 ## 5. Web search corner
 
-This section is the practical part. Facts are marked with their source; where the bundled API
-reference is silent, the line says **unconfirmed** and names what to check on the live docs
-(`platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool`, listed in `live-sources.md`
-as a page to fetch before building).
+This section is the practical part. Facts are marked with their source. The web-search facts were
+checked against the live tool page [web-search-docs] on 2026-10-30; anything still open says
+**unconfirmed**.
 
 ### 5.1 How the server-side `web_search` tool works
 
@@ -285,70 +285,84 @@ as a page to fetch before building).
   `maxSteps`, no result round trip. The API runs its own sampling loop.
 - **The model decides.** The model chooses when to search and what to ask. You do not give it queries
   (unlike `snippets`, where our first call writes the queries).
-- **Tool definition.**
+- **Tool definition** [web-search-docs]:
 
   ```json
-  { "type": "web_search_20260209", "name": "web_search" }
+  {
+    "type": "web_search_20250305",
+    "name": "web_search",
+    "max_uses": 5,
+    "allowed_domains": ["example.com"],
+    "user_location": { "type": "approximate", "city": "Lagos", "country": "NG", "timezone": "Africa/Lagos" }
+  }
   ```
 
-  [tools]. The older version is `web_search_20250305`.
-- **Two versions.** `web_search_20260209` has dynamic filtering: Claude writes and runs code to filter
-  results before they enter the context window, built in with no extra tool or beta header [tools].
-  Models that get it: Opus 5.5, Opus 5, Fable 5, Opus 4.8, Opus 4.7, Opus 4.6, Sonnet 5.5, Sonnet 5,
-  Sonnet 4.6 [tools]. **Haiku 5.5 is not on that list**, so use `web_search_20250305` there. The code
-  execution used for filtering is free when used with web search/fetch [tools].
-  Do not also declare a standalone `code_execution` tool alongside the `_20260209` versions; it creates
-  a second execution environment that can confuse the model [tools].
+- **Three versions** [web-search-docs][tools]:
+  - `web_search_20250305` is the basic tool. Every supported model has it, Haiku 5.5 included.
+  - `web_search_20260209` adds dynamic filtering: Claude writes and runs code to filter results
+    before they enter the context window. Its `allowed_callers` defaults to code execution, which the
+    API provisions for you at no extra charge when used with web search. A model without programmatic
+    tool calling needs `allowed_callers: ["direct"]`. Models that get it: Opus 5.5, Opus 5, Fable 5,
+    Opus 4.8, Opus 4.7, Opus 4.6, Sonnet 5.5, Sonnet 5, Sonnet 4.6 [tools]. **Haiku 5.5 is not on
+    that list**, so the provider sends `web_search_20250305` there. Whether Haiku will get dynamic
+    filtering later is **unconfirmed**.
+  - `web_search_20260318` adds a `response_inclusion` setting. The provider does not use it yet.
+  - Do not also declare a standalone `code_execution` tool alongside the `_20260209` version; it
+    creates a second execution environment that can confuse the model [tools].
 - **Platform availability.** Web search is on the Claude API, and not on every cloud. On Vertex and
   Foundry (Azure) only the basic `web_search_20250305` exists [platform]. Direct Claude API is the
   full-featured route.
-- **`max_uses`.** Caps searches per request. I could not confirm the field's exact semantics for the
-  Messages API in the bundled sources (it appears there only for the advisor tool, with a different
-  meaning). **Unconfirmed**; the task brief names it, so verify on the live page. It is the control
-  that matches `RESEARCH_MAX_SUCCESSFUL_SEARCHES=5`.
-- **Domain allow and block lists, `user_location`.** The bundled reference documents these for
-  Managed Agents [mat], and the Messages tool is expected to take the same shapes (**unconfirmed**
-  for the Messages API):
-  - `allowed_domains` and `blocked_domains` are mutually exclusive on one entry; 1-64 hostnames each;
-    plain hostnames only (no scheme, port or wildcard); a listed domain covers its subdomains.
-  - A search silently omits results outside the list; `web_fetch` returns an error result.
+- **`max_uses`.** Caps the searches in one request. Past it, the next search comes back as a
+  `max_uses_exceeded` error result [web-search-docs]. It is per request, so a `pause_turn`
+  continuation would get a fresh allowance; the provider sends each continuation only the searches
+  still unspent, and stops continuing once none are left. The app sets it from
+  `RESEARCH_MAX_SUCCESSFUL_SEARCHES` (5).
+- **Domain allow and block lists, `user_location`** [web-search-docs]:
+  - `allowed_domains` and `blocked_domains` cannot both be set on one request (a 400). Plain hostnames,
+    no scheme; a listed domain covers its subdomains. The provider rejects both-set before sending.
   - `user_location`: `{ "type": "approximate", city?, region?, country? (ISO 3166-1 alpha-2),
-    timezone? (IANA) }`, at least one optional field. Some countries are rejected by the search
-    provider [mat].
+    timezone? (IANA) }`. The provider does not send it yet.
   Useful for us: `allowed_domains` could pin research to trusted outlets for a fixed client brief;
   `user_location` could localise results for non-US users.
-- **Results and citations.** Search results arrive as blocks in the response content, and the model's
-  text carries `citations` with URLs. The exact block names and fields (`server_tool_use`,
-  `web_search_tool_result`, `web_search_result_location`) are **unconfirmed** in the bundled sources.
-  Plan to store the cited URLs from the response itself, not to ask the model to write them.
-  Do not replay a `text` block with non-empty `citations` back inside a user message on
-  `2026-10-21`; it errors [migr].
-- **Errors.** Per the task brief, a failed search arrives as HTTP 200 with an error object in the
-  result block, not as an HTTP error. This is **unconfirmed** in the bundled sources (the closest
-  documented pattern is the advisor tool, where errors are `*_result_error` objects inside a 200
-  response [tools]). The provider code must therefore inspect result blocks, not only HTTP status.
-- **`pause_turn`.** The server-side loop has a default limit of 10 iterations. At the limit the
-  response has `stop_reason: "pause_turn"`. To continue, send the user message and the assistant
-  content back unchanged, with no extra "Continue" message; the server resumes where it left off
-  [tools]. Set a continuation cap (the source suggests about 5) so a loop cannot run forever
-  [tools]. Each resume is another request billed for its tokens.
+- **Results and citations** [web-search-docs]. The response content holds:
+  - a `server_tool_use` block with the query the model ran (`input.query`);
+  - a `web_search_tool_result` block whose `content` is a list of `web_search_result` entries:
+    `url`, `title`, `encrypted_content`, `page_age`;
+  - `text` blocks whose `citations` are `web_search_result_location` entries: `url`, `title`,
+    `encrypted_index`, and `cited_text` (up to 150 characters).
+  The provider collects the cited URLs into `citations` on the result, so the app stores them from the
+  response, not from the model's prose. Citations must be shown to end users when the answer is shown
+  to them [web-search-docs]. Do not replay a `text` block with non-empty `citations` back inside a user
+  message on `2026-10-21`; it errors [migr].
+- **Errors** [web-search-docs]. A failed search is HTTP 200 with a `web_search_tool_result` whose
+  `content` is a `web_search_tool_result_error` with an `error_code`: `too_many_requests`,
+  `invalid_tool_input`, `max_uses_exceeded`, `query_too_long`, `request_too_large`, or `unavailable`.
+  The model sees the error and carries on. The provider logs a warning for each one; it does not fail
+  the call.
+- **`pause_turn`** [web-search-docs][tools]. The server-side loop has a default limit of 10
+  iterations. At the limit the response has `stop_reason: "pause_turn"`. To continue, send the user
+  message and the paused assistant content back unchanged, with no extra "Continue" message; the
+  server resumes where it left off. `encrypted_content` and `encrypted_index` must go back
+  byte-for-byte. The provider caps continuations at 5 and returns what it has after that. Each resume
+  is another request billed for its tokens.
 - **Refusal.** A response can also stop with `refusal` (section 2.6).
 
 ### 5.2 Billing
 
-- **$10 per 1,000 searches**, so $0.01 per search [mac]. Plus the search results counted as input
-  tokens on the request (the brief says so; the sources I read state the per-search fee only, so the
-  "results billed as input" part is **unconfirmed** in the bundled reference).
+- **$10 per 1,000 searches**, so $0.01 per search [mac][web-search-docs]. On top, the search results
+  count as input tokens on the request, and on every later turn that carries them [web-search-docs].
+- **Errored searches are not billed** [web-search-docs].
+- **The count is in `usage.server_tool_use.web_search_requests`** on the Messages response
+  [web-search-docs]. The provider adds it to `Usage.webSearchRequests` and prices it into `Usage.cost`.
 - With Haiku 5.5 input at $0.10/MTok, 25,000 tokens of results cost $0.0025, so the per-search fee
   dominates on Haiku (five searches = $0.05). On Sonnet 5.5, the same 25,000 tokens cost $0.05, which
   matches the search fee.
 - Server tools add a 5-minute cache write after tool results when caching is on [caching].
-- The meter today sees web search only as a 32-credit surcharge per Tavily call. For native search, the
-  engineer needs a rule for how many credits to charge per native search. To keep the same 2x markup
-  on vendor cost, the arithmetic is $0.01 x 1000 x 2 = **20 credits per search**, against 32 for Tavily
-  basic. This is arithmetic, not a recommendation. How native searches are counted in `usage` on the
-  Messages API is **unconfirmed** (the Managed Agents `usage.server_tool_use` field shows request
-  counts [mac]; I did not find the Messages equivalent).
+- **Batch API.** Web search works in batches, but batched searches are throttled [web-search-docs].
+- The meter today sees web search only as a 32-credit surcharge per Tavily call. Native searches are
+  instead priced inside the LLM usage's cost, so they go through the normal 2x markup:
+  $0.01 x 1000 x 2 = **20 credits per search**, against 32 for Tavily basic. No `web_search`
+  surcharge is charged for them.
 
 ### 5.3 Side by side: Tavily `agent`, Tavily `snippets`, native
 
@@ -362,12 +376,12 @@ Current `.env`: `RESEARCH_MODEL=anthropic/claude-haiku-5.5`, `TAVILY_SEARCH_DEPT
 | Search round trips | Sequential across steps (a step can issue several) | Parallel, one wave | Server-side, invisible to the app |
 | Latency | Not measured here; **unconfirmed**. Loop adds one LLM latency per step. | Expected lowest of the Tavily modes; **unconfirmed** | Expected fewer app round trips; total latency **unconfirmed** and must be measured |
 | Search cost per run (5 searches) | 5 x $0.008 = **$0.040** PAYG, $0.025 Growth [tavily] | up to 4 x $0.008 = $0.032 PAYG, $0.020 Growth (max 4 queries) | 5 x $0.010 = **$0.050** [mac] |
-| Model-token cost, Haiku 5.5 | Measured research turns: 26-36k tokens [data]; $0.003 to $0.018 (see 5.4) | One short call (small); then the excerpts add input tokens to GENERATE | Result tokens as input; likely similar range to measured; **unconfirmed** |
+| Model-token cost, Haiku 5.5 | Measured research turns: 26-36k tokens [data]; $0.003 to $0.018 (see 5.4) | One short call (small); then the excerpts add input tokens to GENERATE | Result tokens billed as input [web-search-docs]; size on our briefs **unconfirmed** (measure) |
 | Total per research run (Haiku) | about $0.043 to $0.058 PAYG | about $0.035 to $0.04 (my estimate; query call not measured) | about $0.053 to $0.068 |
 | Accuracy and freshness | Tavily relevance score and snippet text; depth `basic` is shallow | Raw excerpts only, capped at 600 chars each | Quality is the provider's; no head-to-head data. **Unconfirmed**; this is what the eval must show. |
-| Citations | We build `[n] Title (url)` findings ourselves from Tavily results | Same, numbered findings | Model text with `citations` and URLs from the API (exact shape **unconfirmed**) |
+| Citations | We build `[n] Title (url)` findings ourselves from Tavily results | Same, numbered findings | Model text with `web_search_result_location` citations (url, title, cited text) from the API |
 | Control over sources | Full: query text, depth, results count, our own filtering | Full on queries; none after | `allowed_domains` / `blocked_domains` / `user_location` / `max_uses`; no control over ranking |
-| Failure modes | Tavily timeout (10 s) comes back as `{ error }` and the model adapts [`search-web.tool.ts`]; search fault never fails the run | A failed search simply contributes no excerpts | Errors in a 200 body; `pause_turn`; `refusal`; unknown behaviour on search outage. Whole research fails or degrades as one unit. |
+| Failure modes | Tavily timeout (10 s) comes back as `{ error }` and the model adapts [`search-web.tool.ts`]; search fault never fails the run | A failed search simply contributes no excerpts | Error results in a 200 body (`unavailable` on outage), which the model works around; `pause_turn`; `refusal`. Whole research fails or degrades as one unit. |
 | Vendor lock-in | Tavily plus any LLM | Tavily plus any LLM | Anthropic only; direct API only (Vertex and Foundry have basic search only [platform]) |
 
 Per-run cost arithmetic (Haiku 5.5, search fee only, 5 searches):
@@ -411,8 +425,7 @@ Perks (what native would give us):
   excerpts into the brief.
 - Dynamic filtering on Sonnet 5.5 and Opus 5.5 trims results before they enter context, which can cut
   input tokens (token savings **unconfirmed**; measure).
-- Domain allow and block lists and `user_location` are first-class settings (shape **unconfirmed** for
-  Messages).
+- Domain allow and block lists and `user_location` are first-class settings [web-search-docs].
 - One vendor to bill, one invoice, one set of failure modes to monitor.
 
 Trade-offs:
@@ -420,9 +433,9 @@ Trade-offs:
 - It costs more per search than Tavily at every Tavily tier except advanced on Growth.
 - It is not available on Haiku 5.5 with dynamic filtering; the filtered, token-efficient path needs a
   model 20x more expensive per token.
-- The model decides how much to search. `max_uses` bounds it, but you lose the exact "successful
-  search" accounting that makes the credit meter predictable. `pause_turn` continuations can add
-  requests.
+- The model decides how much to search. `max_uses` bounds it, and the API reports the exact count,
+  but errored searches are free while the model may retry them, so the count per run varies.
+  `pause_turn` continuations add requests.
 - Less visibility into what was searched and why unless the response blocks are logged.
 - No equivalent of the `snippets` mode's cheap, parallel, bounded design.
 - All-in on Anthropic for research as well as generation. With OpenRouter, a different model can still
@@ -433,11 +446,11 @@ Trade-offs:
 
 ### 5.6 How to try it
 
-This is what the engineer is adding; names are from the task brief and `apps/api/AGENTS.md`.
+Names are from `apps/api/AGENTS.md` and `apps/api/.env.example`.
 
-1. In `apps/api/.env`, set `LLM_PROVIDER=anthropic`, the Anthropic API key (variable name is whatever
-   the engineer defines), and model names in Anthropic form (for example `claude-haiku-5-5`, not
-   `anthropic/claude-haiku-5.5`). Model ID format is from [models].
+1. In `apps/api/.env`, set `LLM_PROVIDER=anthropic` and `ANTHROPIC_API_KEY`. Model names can stay as
+   OpenRouter slugs (`anthropic/claude-haiku-5.5` becomes `claude-haiku-5-5`) or be API ids [models].
+   Every model setting must be a Claude model, or the worker fails boot.
 2. Set `RESEARCH_MODE=native`. Existing values stay valid: `agent` and `snippets` (anything else fails
    worker boot).
 3. Run `bun run eval:research` from `apps/api`. It researches fixed POST and DOCUMENT briefs in each
@@ -448,8 +461,8 @@ This is what the engineer is adding; names are from the task brief and `apps/api
    and dollars on Sonnet.
 4. Keep Tavily for one more reason: run both on the same briefs so differences are the search, not the
    week's news.
-5. To stay inside a budget, set `max_uses` to the same value as `RESEARCH_MAX_SUCCESSFUL_SEARCHES`
-   (5), and cap `pause_turn` continuations (the source suggests about 5 [tools]).
+5. The budget is already wired: `max_uses` is `RESEARCH_MAX_SUCCESSFUL_SEARCHES` (5) across the whole
+   call, continuations included, and `pause_turn` continuations are capped at 5.
 6. Log, for every native run: searches used, result tokens, cited URLs, `stop_reason`, and any error
    object in result blocks.
 
@@ -502,9 +515,9 @@ Open questions (each is either **unconfirmed** or needs a decision):
   in the sources.
 - Does Haiku 5.5 reject forced `tool_choice` like Sonnet 5.5 and Opus 5.5? The error table does not
   list it.
-- What are the exact Messages API shapes for `web_search`: `max_uses`, result and citation blocks, error
-  object, usage counters for searches? Fetch the live web-search page before building.
-- Are search result tokens billed as input, and how large are they on our briefs? Needs a logged run.
+- How large are search result tokens on our briefs? They are billed as input [web-search-docs]; the
+  size needs a logged run.
+- Will Haiku 5.5 get the dynamic-filtering tool version? Not on the list today.
 - How long does a native research run take against the current `agent` loop? Not measured.
 - What is the split of the 15,408-token DOCUMENT prompt between the fixed system prompt, design-system
   context and the brief? Needed to size the caching estimate.
@@ -540,6 +553,11 @@ was no `SKILL.md` at that root; the files read were:
 - `curl/examples.md` (headers, endpoint, caching and thinking request shapes)
 
 External:
+
+- [web-search-docs] Claude web search tool:
+  https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool (fetched 2026-10-30:
+  versions, tool fields, result, citation and error shapes, `pause_turn`, billing, batch, display
+  requirement, supported models)
 
 - Tavily API credits: https://docs.tavily.com/documentation/api-credits.md (basic search = 1 credit,
   advanced = 2 credits, pay-as-you-go $0.008 per credit, $0.005 on Growth, as given in the task brief;

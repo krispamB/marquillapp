@@ -562,6 +562,23 @@ export class AnthropicStrategy implements LLMStrategy {
         );
         break;
       }
+      // max_uses is per request, so a re-sent turn gets only what is left.
+      const searchesLeft = options?.webSearch
+        ? options.webSearch.maxUses - (usage.webSearchRequests ?? 0)
+        : undefined;
+      if (searchesLeft !== undefined && searchesLeft <= 0) {
+        this.logger.warn(
+          'Anthropic paused a web-search turn with no searches left; returning what it has',
+        );
+        break;
+      }
+      if (searchesLeft !== undefined) {
+        request.tools = request.tools?.map((tool) =>
+          tool.name === 'web_search'
+            ? { ...tool, max_uses: searchesLeft }
+            : tool,
+        );
+      }
       // The API resumes from the trailing server-tool block; no "continue" message.
       request.messages = [
         ...request.messages,
