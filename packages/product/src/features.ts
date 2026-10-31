@@ -20,7 +20,7 @@ export const features: Feature[] = [
     public: { title: 'Posts', body: 'LinkedIn text posts, drafted from your prompt.' },
     board: true,
     since: '2026-01-27',
-    docs: ['apps/api/docs/artifact-workflow-prd.md', 'apps/api/docs/api/artifacts.md'],
+    docs: ['apps/api/docs/artifact-workflow-prd.md', 'apps/api/docs/api/artifacts.md', 'apps/api/docs/linkedin-dwell-time-and-ai-content-research.md'],
   },
   {
     id: 'style-presets',
@@ -41,7 +41,7 @@ export const features: Feature[] = [
     board: true,
     since: '2026-08-06',
     issues: [114, 121],
-    docs: ['apps/api/docs/linkedin-poll-document-api-research.md'],
+    docs: ['apps/api/docs/linkedin-poll-document-api-research.md', 'apps/api/docs/linkedin-dwell-time-and-ai-content-research.md'],
   },
   {
     id: 'artifact-studio',
@@ -117,7 +117,7 @@ export const features: Feature[] = [
     board: true,
     since: '2026-08-06',
     issues: [115, 121],
-    docs: ['apps/api/docs/document-generation-spec.md', 'apps/api/docs/carousel-template-system-design.md'],
+    docs: ['apps/api/docs/document-generation-spec.md', 'apps/api/docs/carousel-template-system-design.md', 'apps/api/docs/linkedin-dwell-time-and-ai-content-research.md'],
     notes: ['Documents are now made from a Design System; the template carousels were retired in the #177 cutover.'],
   },
   {

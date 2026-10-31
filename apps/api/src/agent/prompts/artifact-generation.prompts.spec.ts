@@ -16,11 +16,31 @@ import {
   buildDocumentRepairUserPrompt,
   buildGenerationUserPrompt,
   GENERATE_DOCUMENT_SYSTEM_PROMPT,
+  GENERATE_POLL_SYSTEM_PROMPT,
+  GENERATE_POST_SYSTEM_PROMPT,
 } from './artifact-generation.prompts';
 import { ArtifactType } from 'src/database/schemas';
 import { todaySection } from './today.prompt';
 
 describe('artifact-generation prompts', () => {
+  describe('FEED RULES', () => {
+    it.each([
+      ['POST', GENERATE_POST_SYSTEM_PROMPT],
+      ['POLL', GENERATE_POLL_SYSTEM_PROMPT],
+      ['DOCUMENT', GENERATE_DOCUMENT_SYSTEM_PROMPT],
+    ])(
+      'should carry the anti-slop and save-worthiness rules when the type is %s',
+      (_type, raw) => {
+        const prompt = raw.replace(/\s+/g, ' ');
+        expect(prompt).toContain('FEED RULES:');
+        expect(prompt).toContain('Make it worth saving.');
+        expect(prompt).toContain('Never use engagement bait');
+        expect(prompt).toContain('Avoid these AI tells: em dashes;');
+        expect(prompt).toContain('Never invent experience');
+      },
+    );
+  });
+
   describe('GENERATE_DOCUMENT_SYSTEM_PROMPT', () => {
     // The prompt is hard-wrapped; compare it as the model reads it.
     const prompt = GENERATE_DOCUMENT_SYSTEM_PROMPT.replace(/\s+/g, ' ');
