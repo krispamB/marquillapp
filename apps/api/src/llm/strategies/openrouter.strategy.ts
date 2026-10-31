@@ -24,13 +24,12 @@ import {
   ToolTurnResult,
   Usage,
 } from '../interfaces';
-import { LLMError, fromStreamError, toLLMError } from '../errors';
+import { LLMError, fromStreamError } from '../errors';
 import {
-  jitterMs,
   readRetryPolicy,
-  sleep,
+  sendWithRetries,
   type RetryPolicy,
-} from './openrouter-retry';
+} from './llm-retry';
 
 const DEFAULT_MODEL = 'openai/gpt-5-mini';
 
@@ -41,6 +40,19 @@ const emptyUsage = (): Usage => ({
   totalTokens: 0,
   cost: 0,
 });
+
+/**
+ * The call's USD cost. A BYOK call (the provider billed on our own key)
+ * reports `cost: 0`, with the provider's real price only in
+ * `costDetails.upstreamInferenceCost`; that is used whenever `cost` is zero
+ * or missing, so the meter never falls back to token pricing for it.
+ */
+const reportedCost = (usage: ChatUsage): number => {
+  if (usage.cost != null && usage.cost > 0) return usage.cost;
+  const upstream = usage.costDetails?.upstreamInferenceCost;
+  if (upstream != null && upstream > 0) return upstream;
+  return usage.cost ?? 0;
+};
 
 /**
  * OpenRouter reports cost, and the reasoning and cache token details, only
@@ -56,7 +68,7 @@ const toUsage = (usage: ChatUsage | undefined, latencyMs: number): Usage => {
     promptTokens: usage.promptTokens,
     completionTokens: usage.completionTokens,
     totalTokens: usage.totalTokens,
-    cost: usage.cost ?? 0,
+    cost: reportedCost(usage),
     ...(reasoningTokens != null ? { reasoningTokens } : {}),
     ...(cachedTokens != null ? { cachedTokens } : {}),
     ...(cacheWriteTokens != null ? { cacheWriteTokens } : {}),
@@ -306,6 +318,13 @@ export class OpenRouterStrategy implements LLMStrategy {
     options?: CompletionOptions,
     tools?: Array<ToolDefinition>,
   ): Promise<{ result: ChatResult; latencyMs: number }> {
+    if (options?.webSearch) {
+      throw new LLMError(
+        'OpenRouter does not run model web search; set LLM_PROVIDER=anthropic to use CompletionOptions.webSearch',
+        { retryable: false },
+      );
+    }
+
     const responseJsonSchema = options?.responseSchema
       ? (toProviderJsonSchema(
           z.toJSONSchema(options.responseSchema.schema, {
@@ -345,9 +364,15 @@ export class OpenRouterStrategy implements LLMStrategy {
       stream: false as const,
     };
 
+    const retry = {
+      label: 'OpenRouter',
+      policy: this.retry,
+      logger: this.logger,
+    };
     const onTextDelta = tools ? undefined : options?.onTextDelta;
     if (onTextDelta) {
-      return this.sendWithRetries(
+      return sendWithRetries(
+        retry,
         (signal) =>
           this.streamOnce(
             { ...chatRequest, stream: true },
@@ -358,7 +383,8 @@ export class OpenRouterStrategy implements LLMStrategy {
       );
     }
 
-    return this.sendWithRetries(
+    return sendWithRetries(
+      retry,
       (signal) => this.client.chat.send({ chatRequest }, { signal }),
       options,
     );
@@ -419,112 +445,4 @@ export class OpenRouterStrategy implements LLMStrategy {
       ...(usage ? { usage } : {}),
     };
   }
-
-  /**
-   * The app-owned retry loop. Each try gets a signal that aborts at the
-   * per-try timeout, `min(OPENROUTER_TIMEOUT_MS, options.timeoutMs, time left
-   * before options.deadlineAt)`, or when the caller's signal does. A retryable
-   * failure sleeps `Retry-After` when the provider sent one, else full jitter,
-   * and the loop stops when tries run out, when the sleeps would pass
-   * `OPENROUTER_RETRY_BUDGET_MS`, or when the next try would start past the
-   * deadline. Then the last error is thrown, still classified, so the job's
-   * own retry decides. A caller's abort is never retried.
-   *
-   * `latencyMs` is the answering try's, not the whole loop's.
-   */
-  private async sendWithRetries(
-    sendOnce: (signal: AbortSignal) => Promise<ChatResult>,
-    options?: CompletionOptions,
-  ): Promise<{ result: ChatResult; latencyMs: number }> {
-    const callerSignal = options?.signal;
-    const deadlineAt = options?.deadlineAt;
-    const capMs = Math.min(
-      this.retry.timeoutMs,
-      options?.timeoutMs ?? Number.POSITIVE_INFINITY,
-    );
-    let sleptMs = 0;
-
-    for (let attempt = 1; ; attempt++) {
-      const tryMs =
-        deadlineAt === undefined
-          ? capMs
-          : Math.min(capMs, deadlineAt - Date.now());
-      if (tryMs <= 0) {
-        // Transient like the run deadline itself: the job's retry gets a fresh one.
-        throw new LLMError('The call passed its deadline before it was sent', {
-          retryable: true,
-        });
-      }
-
-      // A timer rather than `AbortSignal.timeout`, so fake timers drive it in specs.
-      const timeout = new AbortController();
-      const timer = setTimeout(
-        () =>
-          timeout.abort(
-            new DOMException(
-              `OpenRouter try timed out after ${tryMs}ms`,
-              'TimeoutError',
-            ),
-          ),
-        tryMs,
-      );
-      const signal = callerSignal
-        ? AbortSignal.any([timeout.signal, callerSignal])
-        : timeout.signal;
-
-      let error: LLMError;
-      const startedAt = Date.now();
-      try {
-        const result = await sendOnce(signal);
-        return { result, latencyMs: Date.now() - startedAt };
-      } catch (raw: unknown) {
-        error = this.classify(raw, callerSignal, timeout.signal, tryMs);
-      } finally {
-        clearTimeout(timer);
-      }
-
-      if (!error.retryable || attempt >= this.retry.maxAttempts) throw error;
-      const delayMs = error.retryAfterMs ?? jitterMs(this.retry, attempt - 1);
-      if (sleptMs + delayMs > this.retry.budgetMs) throw error;
-      if (deadlineAt !== undefined && Date.now() + delayMs >= deadlineAt) {
-        throw error;
-      }
-
-      this.logger.warn(
-        `OpenRouter try ${attempt}/${this.retry.maxAttempts} failed (${error.statusCode ?? 'no status'}: ${error.message}); retrying in ${delayMs}ms`,
-      );
-      try {
-        await sleep(delayMs, callerSignal);
-      } catch (reason: unknown) {
-        throw abortedByCaller(reason);
-      }
-      sleptMs += delayMs;
-    }
-  }
-
-  /**
-   * The caller's abort wins over everything, our own per-try timeout
-   * included; a timeout that fired is retryable whatever the SDK made of it.
-   */
-  private classify(
-    raw: unknown,
-    callerSignal: AbortSignal | undefined,
-    timeoutSignal: AbortSignal,
-    tryMs: number,
-  ): LLMError {
-    if (callerSignal?.aborted) return abortedByCaller(raw);
-    if (timeoutSignal.aborted) {
-      return new LLMError(`OpenRouter try timed out after ${tryMs}ms`, {
-        retryable: true,
-        cause: raw,
-      });
-    }
-    return toLLMError(raw);
-  }
 }
-
-const abortedByCaller = (cause: unknown): LLMError =>
-  new LLMError('The OpenRouter call was aborted by its caller', {
-    retryable: false,
-    cause,
-  });

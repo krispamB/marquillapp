@@ -644,6 +644,42 @@ describe('WorkflowRunService', () => {
       });
     });
 
+    it('should sum model web searches into llmUsage when a call reports some', async () => {
+      const run = service.handleFor(fixtures.runId);
+      run.recordModelCall({
+        promptTokens: 100,
+        completionTokens: 10,
+        totalTokens: 110,
+        cost: 0.03,
+        webSearchRequests: 3,
+      });
+      run.recordModelCall({
+        promptTokens: 100,
+        completionTokens: 10,
+        totalTokens: 110,
+        cost: 0.001,
+      });
+
+      await run.complete(10);
+
+      expect(mocks.workflowRunModel.updateOne).toHaveBeenCalledWith(byRunId, {
+        $set: {
+          status: RunStatus.COMPLETED,
+          creditsUsed: 10,
+          llmUsage: {
+            calls: 2,
+            promptTokens: 200,
+            completionTokens: 20,
+            reasoningTokens: 0,
+            cachedTokens: 0,
+            cacheWriteTokens: 0,
+            llmMs: 0,
+            webSearchRequests: 3,
+          },
+        },
+      });
+    });
+
     it("should write the job attempt's summed LLM usage with its failure, in one update", async () => {
       const run = service.handleFor(fixtures.runId);
       run.recordModelCall({

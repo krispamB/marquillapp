@@ -52,9 +52,9 @@ export const cleanSnippetQueries = (
 };
 
 /**
- * Reads `RESEARCH_MODE`. Unset or blank is `agent`; anything but `agent` or
- * `snippets` throws, so a typo fails worker boot instead of silently
- * falling back.
+ * Reads `RESEARCH_MODE`. Unset or blank is `agent`; anything but `agent`,
+ * `snippets` or `native` throws, so a typo fails worker boot instead of
+ * silently falling back.
  */
 export const readResearchMode = (
   raw: string | number | null | undefined,
@@ -63,8 +63,9 @@ export const readResearchMode = (
     raw === undefined || raw === null ? '' : String(raw).trim().toLowerCase();
   if (value === '' || value === 'agent') return 'agent';
   if (value === 'snippets') return 'snippets';
+  if (value === 'native') return 'native';
   throw new Error(
-    `RESEARCH_MODE must be agent or snippets, or unset; got "${String(raw)}"`,
+    `RESEARCH_MODE must be agent, snippets or native, or unset; got "${String(raw)}"`,
   );
 };
 

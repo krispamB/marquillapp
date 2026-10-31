@@ -172,6 +172,105 @@ describe('OpenRouterStrategy', () => {
       expect(result.usage.cost).toBe(0);
     });
 
+    it('should throw a terminal LLMError without calling the provider when web search is asked for', async () => {
+      const error = await strategy
+        .complete([{ role: MessageRole.User, content: 'hi' }], {
+          webSearch: { maxUses: 3 },
+        })
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(LLMError);
+      expect(error).toMatchObject({ retryable: false });
+      expect((error as Error).message).toContain('LLM_PROVIDER=anthropic');
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it('should report the upstream inference cost when a BYOK call reports a zero cost', async () => {
+      send.mockResolvedValue({
+        choices: [{ message: { content: 'x' } }],
+        usage: {
+          promptTokens: 1000,
+          completionTokens: 200,
+          totalTokens: 1200,
+          cost: 0,
+          costDetails: {
+            upstreamInferenceCost: 0.0002,
+            upstreamInferencePromptCost: 0.0001,
+            upstreamInferenceCompletionsCost: 0.0001,
+          },
+        },
+      });
+
+      const result = await strategy.complete([
+        { role: MessageRole.User, content: 'hi' },
+      ]);
+
+      expect(result.usage.cost).toBe(0.0002);
+    });
+
+    it('should report the upstream inference cost when the cost is missing', async () => {
+      send.mockResolvedValue({
+        choices: [{ message: { content: 'x' } }],
+        usage: {
+          promptTokens: 1000,
+          completionTokens: 200,
+          totalTokens: 1200,
+          costDetails: {
+            upstreamInferenceCost: 0.0003,
+            upstreamInferencePromptCost: 0.0001,
+            upstreamInferenceCompletionsCost: 0.0002,
+          },
+        },
+      });
+
+      const result = await strategy.complete([
+        { role: MessageRole.User, content: 'hi' },
+      ]);
+
+      expect(result.usage.cost).toBe(0.0003);
+    });
+
+    it('should keep the reported cost when it is not zero', async () => {
+      send.mockResolvedValue({
+        choices: [{ message: { content: 'x' } }],
+        usage: {
+          ...usage,
+          costDetails: {
+            upstreamInferenceCost: 0.9,
+            upstreamInferencePromptCost: 0.5,
+            upstreamInferenceCompletionsCost: 0.4,
+          },
+        },
+      });
+
+      const result = await strategy.complete([
+        { role: MessageRole.User, content: 'hi' },
+      ]);
+
+      expect(result.usage.cost).toBe(0.00042);
+    });
+
+    it('should report a zero cost when the cost is zero and the upstream cost is null', async () => {
+      send.mockResolvedValue({
+        choices: [{ message: { content: 'x' } }],
+        usage: {
+          ...usage,
+          cost: 0,
+          costDetails: {
+            upstreamInferenceCost: null,
+            upstreamInferencePromptCost: 0,
+            upstreamInferenceCompletionsCost: 0,
+          },
+        },
+      });
+
+      const result = await strategy.complete([
+        { role: MessageRole.User, content: 'hi' },
+      ]);
+
+      expect(result.usage.cost).toBe(0);
+    });
+
     it('should map reasoning, cached and cache-write tokens when the provider reports them', async () => {
       send.mockResolvedValue({
         choices: [{ message: { content: 'x' } }],

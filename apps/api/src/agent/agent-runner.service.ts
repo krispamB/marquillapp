@@ -21,6 +21,8 @@ import type {
   ToolDefinition,
   Usage,
 } from '../llm/interfaces';
+import { toAnthropicModelId } from '../llm/anthropic-model';
+import { readLlmProvider } from '../llm/llm-provider';
 import { LLMService } from '../llm/llm.service';
 import { ResponseParserService } from '../llm/parsers/responseParser.service';
 import {
@@ -55,6 +57,7 @@ import {
   type TextGenerationModels,
 } from './generation-model';
 import { readReasoningEffort } from './reasoning-effort';
+import { buildNativeResearch } from './research-native';
 import {
   buildSnippetResearch,
   cleanSnippetQueries,
@@ -75,6 +78,7 @@ import {
   buildRepairUserPrompt,
   documentGenerationSystemPrompt,
   generationSystemPrompt,
+  nativeResearchSystemPrompt,
   researchSystemPrompt,
   researchUserPrompt,
   snippetQueriesSystemPrompt,
@@ -96,6 +100,11 @@ const DEFAULT_DOCUMENT_MAX_OUTPUT_TOKENS = 16384;
  * ends long before the provider's per-try timeout would end it.
  */
 const RESEARCH_TURN_TIMEOUT_MS = 45_000;
+/**
+ * A native research call runs several server-side searches before it
+ * answers, so its per-try timeout is longer than a research turn's.
+ */
+const NATIVE_RESEARCH_TIMEOUT_MS = 120_000;
 
 const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -185,6 +194,8 @@ const toToolDefinition = (tool: Tool): ToolDefinition => ({
 @Injectable()
 export class AgentRunnerService implements AgentRunner {
   private readonly logger = new Logger(AgentRunnerService.name);
+  /** `LLM_PROVIDER`: where every model call goes. */
+  private readonly provider: LLMProvider;
   private readonly generationModel: string;
   // POST and POLL generation (and its Zod repair); DOCUMENT keeps generationModel.
   private readonly textModels: TextGenerationModels;
@@ -217,6 +228,11 @@ export class AgentRunnerService implements AgentRunner {
     );
     this.researchModel =
       this.configService.getOrThrow<string>('RESEARCH_MODEL');
+    // A bad value throws here, failing worker boot.
+    this.provider = readLlmProvider(
+      this.configService.get<string>('LLM_PROVIDER'),
+    );
+    if (this.provider === LLMProvider.ANTHROPIC) this.assertAnthropicReady();
     this.researchMaxSteps = this.readMaxSteps();
     this.researchMaxSuccessfulSearches = Math.min(
       this.readPositiveInteger(
@@ -233,6 +249,14 @@ export class AgentRunnerService implements AgentRunner {
     this.researchMode = readResearchMode(
       this.configService.get<string>('RESEARCH_MODE'),
     );
+    if (
+      this.researchMode === 'native' &&
+      this.provider !== LLMProvider.ANTHROPIC
+    ) {
+      throw new Error(
+        'RESEARCH_MODE=native needs LLM_PROVIDER=anthropic: only the Anthropic provider runs the model web search',
+      );
+    }
     this.snippetLimits = {
       maxSnippets: this.readInt('RESEARCH_MAX_SNIPPETS', {
         default: DEFAULT_RESEARCH_MAX_SNIPPETS,
@@ -309,6 +333,9 @@ export class AgentRunnerService implements AgentRunner {
     if (this.researchMode === 'snippets') {
       return this.researchSnippets(input, hooks);
     }
+    if (this.researchMode === 'native') {
+      return this.researchNative(input, hooks);
+    }
 
     const result = await this.run(
       {
@@ -366,6 +393,36 @@ export class AgentRunnerService implements AgentRunner {
       hasResults(output),
     );
     return buildSnippetResearch(searches, this.snippetLimits);
+  }
+
+  /**
+   * Native research: one `RESEARCH_MODEL` call in which the model runs up to
+   * `RESEARCH_MAX_SUCCESSFUL_SEARCHES` web searches server-side and writes
+   * the synthesis; the pages it cites become `sources`. Its usage carries
+   * the searches' price in `cost` and their count in `webSearchRequests`,
+   * and `onToolCall` never fires, so no `web_search` surcharge is charged on
+   * top of what the provider billed.
+   */
+  private async researchNative(
+    input: ResearchInput,
+    hooks?: AgentHooks,
+  ): Promise<ResearchResult> {
+    const { text, usage, citations, model } = await this.llmService.complete(
+      this.provider,
+      [
+        { role: MessageRole.System, content: nativeResearchSystemPrompt() },
+        { role: MessageRole.User, content: researchUserPrompt(input) },
+      ],
+      {
+        model: this.researchModel,
+        max_tokens: this.researchMaxOutputTokens,
+        ...callOptions(this.researchReasoningEffort, input.sessionId),
+        timeoutMs: NATIVE_RESEARCH_TIMEOUT_MS,
+        webSearch: { maxUses: this.researchMaxSuccessfulSearches },
+      },
+    );
+    hooks?.onUsage?.({ ...usage, model: model ?? this.researchModel });
+    return buildNativeResearch(text, citations ?? []);
   }
 
   private async planSnippetQueries(
@@ -452,7 +509,7 @@ export class AgentRunnerService implements AgentRunner {
 
     for (let step = 0; step < maxSteps; step++) {
       const turn = await this.llmService.completeWithTools(
-        LLMProvider.OPENROUTER,
+        this.provider,
         conversation,
         toolDefinitions,
         options,
@@ -468,6 +525,10 @@ export class AgentRunnerService implements AgentRunner {
         role: MessageRole.Assistant,
         content: turn.text,
         toolCalls: turn.toolCalls,
+        // Anthropic needs the turn's own blocks (thinking included) back verbatim.
+        ...(turn.providerContent
+          ? { providerContent: turn.providerContent }
+          : {}),
       });
 
       const toolResults: unknown[] = [];
@@ -517,7 +578,7 @@ export class AgentRunnerService implements AgentRunner {
     // Budget spent, model still reaching for tools: one tools-free completion so
     // the run yields usable text rather than a stranded tool call.
     const final = await this.llmService.complete(
-      LLMProvider.OPENROUTER,
+      this.provider,
       conversation,
       options,
     );
@@ -1005,7 +1066,7 @@ export class AgentRunnerService implements AgentRunner {
       usage,
       finishReason,
       model: answeredBy,
-    } = await this.llmService.complete(LLMProvider.OPENROUTER, messages, {
+    } = await this.llmService.complete(this.provider, messages, {
       model: options.model,
       max_tokens: options.maxTokens ?? this.generationMaxOutputTokens,
       ...callOptions(options.reasoningEffort, options.sessionId),
@@ -1034,6 +1095,26 @@ export class AgentRunnerService implements AgentRunner {
     });
 
     return { text, ...(finishReason ? { finishReason } : {}) };
+  }
+
+  /**
+   * `LLM_PROVIDER=anthropic` fails worker boot without a key, or with a
+   * configured model that is not a Claude model, instead of failing each run.
+   */
+  private assertAnthropicReady(): void {
+    if (!this.configService.get<string>('ANTHROPIC_API_KEY')) {
+      throw new Error(
+        'LLM_PROVIDER is anthropic but ANTHROPIC_API_KEY is unset',
+      );
+    }
+    for (const model of new Set([
+      this.generationModel,
+      this.textModels.POST,
+      this.textModels.POLL,
+      this.researchModel,
+    ])) {
+      toAnthropicModelId(model);
+    }
   }
 
   private readEffort(key: string): ReasoningEffort | undefined {

@@ -1,12 +1,15 @@
 /**
  * Research A/B (performance plan M7.2). Run from `apps/api`:
  *
- *   bun run eval:research [--modes agent,snippets] [--repeat 1] [--json out.json]
+ *   bun run eval:research [--modes agent,snippets,native] [--repeat 1] [--json out.json]
  *
  * Researches each fixed brief (POST and DOCUMENT, research on) in every mode,
  * one at a time, through a real `AgentRunnerService` per mode: the same
  * OpenRouter and Tavily calls a run's RESEARCH step makes, at the efforts and
- * limits in `.env`, with only `RESEARCH_MODE` overridden. It needs no MongoDB,
+ * limits in `.env`, with only `RESEARCH_MODE` overridden. `native` (opt-in,
+ * not in the default) also sets `LLM_PROVIDER=anthropic`, so it needs
+ * `ANTHROPIC_API_KEY` and Claude `RESEARCH_MODEL`/`GENERATION_MODEL` ids
+ * (OpenRouter's `anthropic/...` ids work), and spends Anthropic credit. It needs no MongoDB,
  * Redis or worker, and writes nothing to them; it spends real OpenRouter and
  * Tavily credit. It prints latency, LLM calls, searches, sources and findings
  * size per run and per mode; `--json` keeps every findings text so the two
@@ -20,7 +23,7 @@ import type { ResearchMode } from '../agent/agent-runner.interface';
 import { LLMService } from '../llm/llm.service';
 import { LLMFactoryService } from '../llm/llmFactory.service';
 import { ResponseParserService } from '../llm/parsers/responseParser.service';
-import { OpenRouterStrategy } from '../llm/strategies';
+import { AnthropicStrategy, OpenRouterStrategy } from '../llm/strategies';
 import {
   formatResearchAbReport,
   parseResearchAbArgs,
@@ -28,16 +31,25 @@ import {
 } from './research-ab/research-ab';
 
 /**
- * `.env` as the worker reads it, with `RESEARCH_MODE` set to `mode`: a
- * ConfigService's own values win over process.env.
+ * `.env` as the worker reads it, with `RESEARCH_MODE` set to `mode` (and
+ * `LLM_PROVIDER=anthropic` for `native`): a ConfigService's own values win
+ * over process.env.
  */
 const configFor = (mode: ResearchMode): ConfigService =>
-  new ConfigService({ ...process.env, RESEARCH_MODE: mode });
+  new ConfigService({
+    ...process.env,
+    RESEARCH_MODE: mode,
+    ...(mode === 'native' ? { LLM_PROVIDER: 'anthropic' } : {}),
+  });
 
 async function run(): Promise<void> {
   const options = parseResearchAbArgs(process.argv.slice(2));
+  const config = new ConfigService();
   const llm = new LLMService(
-    new LLMFactoryService(new OpenRouterStrategy(new ConfigService())),
+    new LLMFactoryService(
+      new OpenRouterStrategy(config),
+      new AnthropicStrategy(config),
+    ),
   );
   const parser = new ResponseParserService();
   const runners = new Map(

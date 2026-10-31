@@ -16,6 +16,9 @@ import type { StepContext, StepHandler } from '../engine/workflow.types';
  * - each LLM turn → `{ kind: 'llm', amount: usage.cost }`, so the SSE credit
  *   count climbs while the run is still searching;
  * - each search → `{ kind: 'web_search', amount: 1 }`, the fixed surcharge.
+ *   Native research (`RESEARCH_MODE=native`) fires no search hook: the
+ *   model's own searches are already priced in its `llm` cost, and their
+ *   count rides along in the usage detail.
  *
  * Each LLM turn's tokens and time are tallied on the run record as well.
  *
@@ -61,7 +64,14 @@ export const researchStep: StepHandler = async (state, ctx) => {
         record({
           kind: USAGE_KINDS.LLM,
           amount: turn.cost,
-          detail: { model: turn.model, totalTokens: turn.totalTokens },
+          detail: {
+            model: turn.model,
+            totalTokens: turn.totalTokens,
+            // Native research: the searches are priced in `amount`, never surcharged.
+            ...(turn.webSearchRequests
+              ? { webSearchRequests: turn.webSearchRequests }
+              : {}),
+          },
         });
         ctx.run.recordModelCall(turn);
       },

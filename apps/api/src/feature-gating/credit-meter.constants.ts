@@ -24,6 +24,12 @@ export interface UsageDetail {
   // provider reports no cost.
   totalTokens?: number;
   model?: string;
+  /**
+   * Native research: the model's own web searches in this call. Diagnostic
+   * only; their price is already in the `llm` amount, so no `web_search`
+   * surcharge is charged for them.
+   */
+  webSearchRequests?: number;
   browserless?: BrowserlessUsage;
 }
 

@@ -361,6 +361,19 @@ export class WorkflowRunService {
 const addModelCall = (
   total: RunLlmUsage | undefined,
   usage: Usage,
+): RunLlmUsage => {
+  // Only once a call searched, so runs without model web search are unchanged.
+  const webSearchRequests =
+    (total?.webSearchRequests ?? 0) + (usage.webSearchRequests ?? 0);
+  return {
+    ...sumModelCall(total, usage),
+    ...(webSearchRequests > 0 ? { webSearchRequests } : {}),
+  };
+};
+
+const sumModelCall = (
+  total: RunLlmUsage | undefined,
+  usage: Usage,
 ): RunLlmUsage => ({
   calls: (total?.calls ?? 0) + 1,
   promptTokens: (total?.promptTokens ?? 0) + usage.promptTokens,

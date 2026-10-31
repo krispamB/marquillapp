@@ -100,6 +100,32 @@ describe('research A/B', () => {
       });
     });
 
+    it("should count a native call's own web searches as searches when it reports them", async () => {
+      const research: ResearchFn = (_mode, _input, hooks) => {
+        hooks.onUsage?.({
+          promptTokens: 1,
+          completionTokens: 1,
+          totalTokens: 2,
+          cost: 0.03,
+          model: 'claude-haiku-5-5',
+          webSearchRequests: 3,
+        });
+        return Promise.resolve({ findings: 'x', sources: [], mode: 'native' });
+      };
+
+      const [record] = await runResearchAb(
+        research,
+        { modes: ['native'], repeat: 1, briefs: [BRIEFS[0]] },
+        clock(),
+      );
+
+      expect(record).toMatchObject({
+        mode: 'native',
+        llmCalls: 1,
+        searches: 3,
+      });
+    });
+
     it('should record a failed research and carry on', async () => {
       const research: ResearchFn = jest
         .fn()
@@ -205,6 +231,12 @@ describe('research A/B', () => {
           'out.json',
         ]),
       ).toEqual({ modes: ['snippets'], repeat: 3, jsonPath: 'out.json' });
+    });
+
+    it('should accept native in --modes without adding it to the default', () => {
+      expect(parseResearchAbArgs(['--modes', 'agent,snippets,native'])).toEqual(
+        { modes: ['agent', 'snippets', 'native'], repeat: 1 },
+      );
     });
 
     it.each([

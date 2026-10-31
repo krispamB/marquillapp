@@ -2,8 +2,11 @@ import type { ZodType } from 'zod';
 
 export enum LLMProvider {
   OPENAI = 'openai',
+  /** Unused placeholder, kept as it was. Anthropic is `ANTHROPIC`. */
   CLAUDE = 'claude',
   OPENROUTER = 'openrouter',
+  /** The Anthropic Messages API, called directly (`AnthropicStrategy`). */
+  ANTHROPIC = 'anthropic',
 }
 
 export enum MessageRole {
@@ -28,6 +31,14 @@ export interface AssistantMessage {
   role: MessageRole.Assistant;
   content?: string;
   toolCalls?: ToolCall[];
+  /**
+   * The provider's own content blocks for this turn, exactly as it returned
+   * them (`ToolTurnResult.providerContent`). A strategy that understands
+   * them re-sends them unchanged instead of rebuilding the turn from
+   * `content` and `toolCalls`, which keeps reasoning blocks valid across a
+   * tool loop. Other strategies ignore it.
+   */
+  providerContent?: unknown[];
 }
 
 /** The result of executing one tool call, fed back into the next turn. */
@@ -69,6 +80,17 @@ export interface Usage {
   cacheWriteTokens?: number;
   /** Wall time of the call, request to response. Summed across a run's calls. */
   latencyMs?: number;
+  /**
+   * Server-side web searches the model ran during the call
+   * (`CompletionOptions.webSearch`). Their price is already in `cost`.
+   */
+  webSearchRequests?: number;
+}
+
+/** A web page the model cited in its answer. */
+export interface WebCitation {
+  url: string;
+  title: string;
 }
 
 export interface CompletionResult {
@@ -81,6 +103,8 @@ export interface CompletionResult {
    * means the output hit `max_tokens` and is truncated.
    */
   finishReason?: string;
+  /** Pages the model cited, deduped by URL, when it searched the web. */
+  citations?: WebCitation[];
 }
 
 export interface ToolTurnResult {
@@ -89,6 +113,26 @@ export interface ToolTurnResult {
   usage: Usage;
   /** The model the provider says answered, when it says. */
   model?: string;
+  /** Pages the model cited, deduped by URL, when it searched the web. */
+  citations?: WebCitation[];
+  /**
+   * The turn's raw provider content blocks, when the strategy needs them
+   * back verbatim on the next turn. Copy it onto the `AssistantMessage`
+   * that records this turn.
+   */
+  providerContent?: unknown[];
+}
+
+/**
+ * Lets the model search the web itself, server-side, within one call. Only
+ * `AnthropicStrategy` supports it; any other strategy throws a terminal
+ * `LLMError`. Give either `allowedDomains` or `blockedDomains`, not both.
+ */
+export interface WebSearchOptions {
+  /** Most searches the model may run in the call. */
+  maxUses: number;
+  allowedDomains?: string[];
+  blockedDomains?: string[];
 }
 
 /**
@@ -137,6 +181,8 @@ export type CompletionOptions = {
     name: string;
     schema: ZodType;
   };
+  /** Unset sends no search tool. See `WebSearchOptions`. */
+  webSearch?: WebSearchOptions;
 };
 
 export interface LLMStrategy {

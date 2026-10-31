@@ -353,6 +353,11 @@ export interface RunLlmUsage {
   cacheWriteTokens: number;
   /** Wall time spent waiting on the model, summed over the calls. */
   llmMs: number;
+  /**
+   * Server-side web searches the model ran (`RESEARCH_MODE=native`). Present
+   * only when a call ran some; their price is already in the LLM cost.
+   */
+  webSearchRequests?: number;
 }
 
 /** Research a run finished, and the usage it recorded while doing so. */
