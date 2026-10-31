@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
+import { readBoolEnv } from '../../common/env';
 import { toAnthropicModelId, webSearchToolType } from '../anthropic-model';
 import { anthropicCostUsd } from '../anthropic-pricing';
 import { LLMError, fromStreamError } from '../errors';
@@ -80,13 +81,24 @@ interface RequestMessage {
   content: unknown[];
 }
 
+/** A 5-minute prompt-cache breakpoint, the API's default TTL. */
+const EPHEMERAL = { type: 'ephemeral' } as const;
+
+interface SystemBlock {
+  type: 'text';
+  text: string;
+  cache_control?: typeof EPHEMERAL;
+}
+
 interface MessagesRequest {
   model: string;
   max_tokens: number;
-  system?: string;
+  system?: string | SystemBlock[];
   messages: RequestMessage[];
   tools?: Array<Record<string, unknown>>;
   output_config?: Record<string, unknown>;
+  /** Automatic caching: the API puts the breakpoint on the last cacheable block. */
+  cache_control?: typeof EPHEMERAL;
 }
 
 /** Everything a call produced, every paused-and-resumed response joined. */
@@ -413,6 +425,8 @@ export class AnthropicStrategy implements LLMStrategy {
   private readonly apiVersion: string;
   private readonly retry: RetryPolicy;
   private readonly fetchFn: FetchFn;
+  /** `ANTHROPIC_PROMPT_CACHE`: mark every request's prefix for prompt caching. */
+  private readonly promptCache: boolean;
   private readonly unpricedModels = new Set<string>();
 
   constructor(
@@ -428,6 +442,11 @@ export class AnthropicStrategy implements LLMStrategy {
       DEFAULT_API_VERSION;
     // A bad ANTHROPIC_* retry key throws here, which fails boot.
     this.retry = readRetryPolicy(this.config, 'ANTHROPIC');
+    this.promptCache = readBoolEnv(
+      this.config,
+      'ANTHROPIC_PROMPT_CACHE',
+      false,
+    );
     this.fetchFn = fetchFn ?? ((url, init) => fetch(url, init));
   }
 
@@ -634,16 +653,34 @@ export class AnthropicStrategy implements LLMStrategy {
       };
     }
 
+    const { system, messages: requestMessages } = toAnthropicMessages(messages);
+
     // No `temperature`: API version 2026-10-21 rejects every sampling parameter.
     return {
       model,
       max_tokens: options?.max_tokens ?? DEFAULT_MAX_TOKENS,
-      ...toAnthropicMessages(messages),
+      ...(system !== undefined ? { system: this.withSystemCache(system) } : {}),
+      messages: requestMessages,
       ...(allTools.length ? { tools: allTools } : {}),
       ...(Object.keys(outputConfig).length
         ? { output_config: outputConfig }
         : {}),
+      ...(this.promptCache ? { cache_control: EPHEMERAL } : {}),
     };
+  }
+
+  /**
+   * With `ANTHROPIC_PROMPT_CACHE` on, a breakpoint closes the system prompt.
+   * Tools render before it, so that one entry holds the tools and the system
+   * prompt, and runs with different briefs still share it. The top-level
+   * `cache_control` caches the rest, which a repair, a Repair fallback, a
+   * research tool turn or a paused web-search turn re-sends. A prefix under
+   * the model's minimum (512 tokens on Haiku 5.5) silently is not cached.
+   */
+  private withSystemCache(system: string): string | SystemBlock[] {
+    return this.promptCache
+      ? [{ type: 'text', text: system, cache_control: EPHEMERAL }]
+      : system;
   }
 
   private post(

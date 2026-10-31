@@ -18,7 +18,9 @@ const makeStrategy = (env: Record<string, string> = {}) => {
 type AnthropicBody = {
   model: string;
   max_tokens: number;
-  system?: string;
+  system?:
+    | string
+    | Array<{ type: string; text: string; cache_control?: unknown }>;
   messages: Array<{ role: string; content: unknown[] }>;
   tools?: Array<Record<string, unknown>>;
   output_config?: {
@@ -27,6 +29,7 @@ type AnthropicBody = {
   };
   stream?: boolean;
   temperature?: number;
+  cache_control?: unknown;
 };
 
 const message = (overrides: Record<string, unknown> = {}) => ({
@@ -105,6 +108,7 @@ describe('AnthropicStrategy', () => {
       ['ANTHROPIC_RETRY_BASE_MS', '-1'],
       ['ANTHROPIC_RETRY_MAX_DELAY_MS', '1.5'],
       ['ANTHROPIC_RETRY_BUDGET_MS', 'soon'],
+      ['ANTHROPIC_PROMPT_CACHE', 'yes'],
     ])('should throw naming %s when it is %p', (key, value) => {
       expect(() => makeStrategy({ [key]: value })).toThrow(key);
     });
@@ -881,6 +885,87 @@ describe('AnthropicStrategy', () => {
 
       expect(fetchFn).toHaveBeenCalledTimes(6);
       expect(result.finishReason).toBe('pause_turn');
+    });
+  });
+
+  describe('prompt caching', () => {
+    const withSystem: LLMMessage[] = [
+      { role: MessageRole.System, content: 'You write posts.' },
+      ...user,
+    ];
+
+    it('should send a plain system string and no cache_control when ANTHROPIC_PROMPT_CACHE is unset', async () => {
+      fetchFn.mockResolvedValue(jsonResponse(message()));
+
+      await strategy.complete(withSystem);
+
+      expect(lastRequest().body.system).toBe('You write posts.');
+      expect(lastRequest().body).not.toHaveProperty('cache_control');
+    });
+
+    it('should mark the system prompt and the request for caching when ANTHROPIC_PROMPT_CACHE is true', async () => {
+      ({ strategy } = makeStrategy({ ANTHROPIC_PROMPT_CACHE: 'true' }));
+      fetchFn.mockResolvedValue(jsonResponse(message()));
+
+      await strategy.complete(withSystem);
+
+      expect(lastRequest().body.system).toEqual([
+        {
+          type: 'text',
+          text: 'You write posts.',
+          cache_control: { type: 'ephemeral' },
+        },
+      ]);
+      expect(lastRequest().body.cache_control).toEqual({ type: 'ephemeral' });
+    });
+
+    it('should mark only the request when caching is on and there is no system prompt', async () => {
+      ({ strategy } = makeStrategy({ ANTHROPIC_PROMPT_CACHE: '1' }));
+      fetchFn.mockResolvedValue(jsonResponse(message()));
+
+      await strategy.complete(user);
+
+      expect(lastRequest().body).not.toHaveProperty('system');
+      expect(lastRequest().body.cache_control).toEqual({ type: 'ephemeral' });
+    });
+
+    it('should keep the cache markers on a tool turn when caching is on', async () => {
+      ({ strategy } = makeStrategy({ ANTHROPIC_PROMPT_CACHE: 'true' }));
+      fetchFn.mockResolvedValue(jsonResponse(message()));
+
+      await strategy.completeWithTools(withSystem, [
+        {
+          name: 'searchWeb',
+          description: 'Search the web',
+          parameters: z.object({ query: z.string() }),
+        },
+      ]);
+
+      const { body } = lastRequest();
+      expect(body.tools).toHaveLength(1);
+      expect(body.system).toEqual([
+        expect.objectContaining({ cache_control: { type: 'ephemeral' } }),
+      ]);
+      expect(body.cache_control).toEqual({ type: 'ephemeral' });
+    });
+
+    it('should keep the cache markers on a re-sent paused turn when caching is on', async () => {
+      ({ strategy } = makeStrategy({ ANTHROPIC_PROMPT_CACHE: 'true' }));
+      fetchFn
+        .mockResolvedValueOnce(
+          jsonResponse(message({ stop_reason: 'pause_turn' })),
+        )
+        .mockResolvedValueOnce(jsonResponse(message()));
+
+      await strategy.complete(withSystem);
+
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+      for (const i of [0, 1]) {
+        expect(requestAt(i).body.cache_control).toEqual({ type: 'ephemeral' });
+        expect(requestAt(i).body.system).toEqual([
+          expect.objectContaining({ cache_control: { type: 'ephemeral' } }),
+        ]);
+      }
     });
   });
 

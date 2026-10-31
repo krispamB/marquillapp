@@ -51,6 +51,21 @@ A 1-hour cache write costs twice the input rate. Server-side web search costs $0
 
 **Updating it.** Edit `ANTHROPIC_PRICES` and its spec from the pricing page when a price changes or a model is added. A model missing from the table reports cost `0` and the strategy logs a warning once per model; the meter then bills its flat token fallback, which overcharges, so add the model before switching to it.
 
+## Prompt caching: `ANTHROPIC_PROMPT_CACHE`
+
+Off by default. With it on, every request the strategy sends carries two 5-minute cache markers:
+
+- **The system prompt** goes out as one text block with `cache_control: { type: 'ephemeral' }`. Tools and the structured-output schema render before the system prompt, so this entry holds all three, and it does not depend on the brief. Any run with the same model, effort, schema and system prompt that starts within 5 minutes of the last one reads it. A DOCUMENT system prompt varies only by Design System and by whether a title is asked for.
+- **Top-level `cache_control`** (automatic caching) puts a second breakpoint on the last block of the request. A later call that re-sends that whole request as its prefix reads it: a POST or POLL Zod repair, a DOCUMENT Repair fallback (it extends the patch Repair's messages), each `agent` research tool turn, and a paused web-search turn.
+
+A DOCUMENT Repair re-sends the draft's system message byte for byte, so it reads the draft's system entry, but not its user message, which differs. The draft and its Repairs share an entry only while `DOCUMENT_DRAFT_REASONING_EFFORT` and `DOCUMENT_REPAIR_REASONING_EFFORT` are equal: an effort change can invalidate the cache.
+
+**Costs.** On Haiku 5.5, a cache write costs 1.25x the input price and a read 0.1x. Every request writes its tail, so a call that nothing reuses within 5 minutes pays 25% more for its input. A prefix under the model's minimum (512 tokens on Haiku 5.5) is silently not cached; the snippet query plan (about 400 tokens) is one. Usage reports reads as `cachedTokens` and writes as `cacheWriteTokens`, both priced by `anthropic-pricing.ts`, so the meter charges users the cached price.
+
+**Measured on 2026-10-31.** Two DOCUMENT drafts on the margin Design System, with different briefs, `claude-haiku-5-5`, effort `low`, `max_tokens` 64: the first wrote 3,234 tokens and cost $0.000437; the second read 3,214 (system prompt, schema), wrote 23 (its brief) and cost $0.000067. Prompt sizes per artifact type are in `docs/artifact-prompt-token-budget.md`.
+
+**Checking it in production.** A run's `llmUsage.cachedTokens` sums its cache reads, and a DOCUMENT run's `documentDiagnostics` also records them. If it stays 0 across runs that should share a prefix, something in the prefix changes per request.
+
 ## Native research and its billing rule
 
 `RESEARCH_MODE=native` is one `RESEARCH_MODEL` call with the web search server tool (`max_uses` = `RESEARCH_MAX_SUCCESSFUL_SEARCHES`, 120 s per try). It needs `LLM_PROVIDER=anthropic`; any other combination fails worker boot. `OpenRouterStrategy` throws a terminal `LLMError` if asked for `webSearch`.
