@@ -33,6 +33,7 @@
     "eval:research": "ts-node -r tsconfig-paths/register src/scripts/research-ab.ts",
     "typecheck": "tsc --noEmit -p tsconfig.build.json",
     "dev": "nest start --watch",
+    "dev:ready": "bun scripts/wait-for-api.mjs",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
   },
   "dependencies": {

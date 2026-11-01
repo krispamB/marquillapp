@@ -1,0 +1,10 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "dev": {
+      "with": ["@marquill/api#dev"],
+      "dependsOn": ["@marquill/api#dev:ready"]
+    }
+  }
+}
