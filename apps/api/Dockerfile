@@ -20,6 +20,7 @@ COPY package.json bun.lock bunfig.toml ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY apps/landing/package.json apps/landing/
+COPY packages/product/package.json packages/product/
 
 FROM manifests AS build
 RUN bun install --frozen-lockfile --filter @marquill/api
