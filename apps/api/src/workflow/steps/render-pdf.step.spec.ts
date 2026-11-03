@@ -20,6 +20,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { judge } from '../../document-render/judge';
 import { check } from '../../document-source/candidate-check';
 import { RenderSessionError } from '../../document-render/render-session.error';
+import { RenderSlotUnavailableError } from '../../document-render/render-slots';
 import { assemble } from '../../document-source/assemble';
 import { IconInliningError } from '../../document-source/icon-inlining.error';
 import type { RenderAttemptUsage } from '../../document-render/render-usage.types';
@@ -48,14 +49,19 @@ const PNG = new Uint8Array([137, 80, 78, 71]);
 
 const makeStep = () => {
   const renderer = { render: jest.fn() };
+  const fonts = { inlineCss: jest.fn().mockResolvedValue(null) };
   const objects = { put: jest.fn().mockResolvedValue(undefined) };
   const run = {
     runId: 'run-1',
     recordRenderAttempt: jest.fn().mockResolvedValue(undefined),
     recordDocumentCheck: jest.fn().mockResolvedValue(undefined),
     saveAcceptedCandidate: jest.fn().mockResolvedValue(undefined),
+    recordModelCall: jest.fn(),
   };
-  const deadline = { assertTimeLeft: jest.fn() };
+  const deadline = {
+    assertTimeLeft: jest.fn(),
+    remainingMs: jest.fn((reserveMs: number = 0) => 120_000 - reserveMs),
+  };
   const meter = { record: jest.fn() };
   const emit = jest.fn();
   const logger = { error: jest.fn(), warn: jest.fn() };
@@ -65,6 +71,7 @@ const makeStep = () => {
     recordModelTurn: jest.fn(),
     recordCheck: jest.fn(),
     recordRepairsSpent: jest.fn(),
+    recordRepair: jest.fn(),
     recordAccepted: jest.fn(),
     recordRenderSession: jest.fn(),
     recordPageCount: jest.fn(),
@@ -79,6 +86,7 @@ const makeStep = () => {
     deadline,
     diagnostics,
     renderer,
+    fonts,
     objects,
     run,
     meter,
@@ -121,6 +129,7 @@ const makeStep = () => {
       deadline,
       diagnostics,
       renderer,
+      fonts,
       objects,
       run,
       meter,
@@ -165,14 +174,44 @@ describe('renderPdfStep', () => {
       expect(mockedAssemble).toHaveBeenCalledWith(
         fixtures.definition,
         CANDIDATE,
+        undefined,
       );
       expect(mocks.renderer.render).toHaveBeenCalledWith(
         fixtures.definition,
         SOURCE,
+        expect.any(Object),
       );
       expect(mockedJudge).toHaveBeenCalledWith(fixtures.definition, {
         measured: true,
       });
+    });
+
+    it('should assemble with the inlined font CSS when the inliner returns it', async () => {
+      mocks.fonts.inlineCss.mockResolvedValue(
+        '@font-face { src: url(data:font/woff2;base64,AA); }',
+      );
+
+      await renderPdfStep(fixtures.state, ctx);
+
+      expect(mocks.fonts.inlineCss).toHaveBeenCalledWith(
+        fixtures.definition,
+        CANDIDATE,
+      );
+      expect(mockedAssemble).toHaveBeenCalledWith(
+        fixtures.definition,
+        CANDIDATE,
+        '@font-face { src: url(data:font/woff2;base64,AA); }',
+      );
+    });
+
+    it('should assemble with the stylesheet link when the inliner returns null', async () => {
+      await renderPdfStep(fixtures.state, ctx);
+
+      expect(mockedAssemble).toHaveBeenCalledWith(
+        fixtures.definition,
+        CANDIDATE,
+        undefined,
+      );
     });
 
     it('should upload the four objects under the version prefix', async () => {
@@ -287,6 +326,61 @@ describe('renderPdfStep', () => {
     });
   });
 
+  describe('uploads', () => {
+    it('should start the PDF and cover uploads together', async () => {
+      let releasePdf: () => void = () => undefined;
+      mocks.objects.put.mockImplementation((key: string) =>
+        key.endsWith('document.pdf')
+          ? new Promise<void>((resolve) => {
+              releasePdf = resolve;
+            })
+          : Promise.resolve(),
+      );
+
+      const done = renderPdfStep(fixtures.state, ctx);
+      await new Promise((resolve) => setImmediate(resolve));
+
+      const keys = mocks.objects.put.mock.calls.map(([key]) => key as string);
+      expect(keys).toContain('artifacts/artifact-1/3/document.pdf');
+      expect(keys).toContain('artifacts/artifact-1/3/cover.png');
+      releasePdf();
+      const patch = await done;
+      expect(patch.document?.coverKey).toBe('artifacts/artifact-1/3/cover.png');
+    });
+
+    it('should report a cover failure and still land the PDF when the cover fails while the PDF upload is pending', async () => {
+      let releasePdf: () => void = () => undefined;
+      let pdfLanded = false;
+      mocks.objects.put.mockImplementation((key: string) =>
+        key.endsWith('cover.png')
+          ? Promise.reject(new Error('R2 503'))
+          : key.endsWith('document.pdf')
+            ? new Promise<void>((resolve) => {
+                releasePdf = () => {
+                  pdfLanded = true;
+                  resolve();
+                };
+              })
+            : Promise.resolve(),
+      );
+
+      const done = renderPdfStep(fixtures.state, ctx);
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(pdfLanded).toBe(false);
+      releasePdf();
+      const patch = await done;
+
+      expect(pdfLanded).toBe(true);
+      expect(patch.document?.pdfKey).toBe(
+        'artifacts/artifact-1/3/document.pdf',
+      );
+      expect(patch.document?.coverKey).toBeUndefined();
+      expect(mocks.run.recordRenderAttempt).toHaveBeenCalledWith(
+        expect.objectContaining({ coverFailure: 'upload failed: R2 503' }),
+      );
+    });
+  });
+
   describe('on repair findings', () => {
     beforeEach(() => {
       mockedJudge.mockReturnValueOnce([SAFE_AREA]);
@@ -305,6 +399,8 @@ describe('renderPdfStep', () => {
         candidate: CANDIDATE,
         violations: { violations: [SAFE_AREA], omitted: [] },
         maxEnvelopeRepairs: 1,
+        sessionId: 'run-1',
+        timeLeftMs: 120_000,
       });
       expect(hooks.onUsage).toBeInstanceOf(Function);
     });
@@ -315,6 +411,11 @@ describe('renderPdfStep', () => {
       expect(mockedCheck).toHaveBeenCalledWith(fixtures.definition, REPAIRED);
       expect(mockedAssemble).toHaveBeenNthCalledWith(
         2,
+        fixtures.definition,
+        REPAIRED,
+        undefined,
+      );
+      expect(mocks.fonts.inlineCss).toHaveBeenLastCalledWith(
         fixtures.definition,
         REPAIRED,
       );
@@ -412,10 +513,12 @@ describe('renderPdfStep', () => {
       expect(mocks.renderer.render).toHaveBeenLastCalledWith(
         fixtures.definition,
         SOURCE,
+        expect.any(Object),
       );
       expect(mockedAssemble).toHaveBeenLastCalledWith(
         fixtures.definition,
         FIXED,
+        undefined,
       );
       expect(patch.draft?.repairsSpent).toBe(2);
     });
@@ -667,6 +770,7 @@ describe('renderPdfStep', () => {
         2,
         fixtures.definition,
         SOURCE,
+        expect.any(Object),
       );
       expect(sleep).toHaveBeenCalledWith(2000);
       expect(mocks.agent.repairDocument).not.toHaveBeenCalled();
@@ -762,6 +866,21 @@ describe('renderPdfStep', () => {
       );
     });
 
+    it('should keep the fallbacks GENERATE spent out of the checkpoint and in run state', async () => {
+      const state = {
+        ...fixtures.state,
+        draft: { ...fixtures.state.draft!, fallbacksSpent: 1 },
+      };
+
+      await expect(renderPdfStep(state, ctx)).resolves.toMatchObject({
+        draft: { fallbacksSpent: 1 },
+      });
+      expect(mocks.run.saveAcceptedCandidate).toHaveBeenCalledWith(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- an asymmetric matcher
+        expect.not.objectContaining({ fallbacksSpent: expect.anything() }),
+      );
+    });
+
     it('should not save it again for an in-step retry of the same source', async () => {
       mockedJudge.mockReturnValueOnce([
         { code: 'render.timeout', detail: 'did not finish' },
@@ -800,6 +919,86 @@ describe('renderPdfStep', () => {
 
       await expect(renderPdfStep(fixtures.state, ctx)).rejects.toBe(passed);
       expect(mocks.renderer.render).not.toHaveBeenCalled();
+    });
+
+    it('should let a render wait for a slot only while 20 s of the attempt would be left', async () => {
+      await renderPdfStep(fixtures.state, ctx);
+
+      expect(mocks.deadline.remainingMs).toHaveBeenCalledWith(20_000);
+      expect(mocks.renderer.render).toHaveBeenCalledWith(
+        fixtures.definition,
+        SOURCE,
+        { maxSlotWaitMs: 100_000 },
+      );
+    });
+  });
+
+  describe('when no Browserless slot comes free', () => {
+    beforeEach(() => {
+      mocks.renderer.render.mockRejectedValue(
+        new RenderSlotUnavailableError(2, 100_000),
+      );
+    });
+
+    it('should fail transiently as render.unavailable', async () => {
+      await expect(renderPdfStep(fixtures.state, ctx)).rejects.toMatchObject({
+        retryable: true,
+        code: 'render.unavailable',
+      });
+    });
+
+    it('should record no render attempt and bill nothing', async () => {
+      await expect(renderPdfStep(fixtures.state, ctx)).rejects.toBeInstanceOf(
+        WorkflowError,
+      );
+
+      expect(mocks.run.recordRenderAttempt).not.toHaveBeenCalled();
+      expect(mocks.diagnostics.recordRenderSession).not.toHaveBeenCalled();
+      expect(mocks.meter.record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('slot wait', () => {
+    it('should record how long a passing session waited for its slot', async () => {
+      mocks.renderer.render.mockResolvedValue(
+        fixtures.session({ slotWaitMs: 1_500 }),
+      );
+
+      await renderPdfStep(fixtures.state, ctx);
+
+      expect(attemptsOf(mocks)).toEqual([
+        expect.objectContaining({ outcome: 'PASSED', slotWaitMs: 1_500 }),
+      ]);
+    });
+
+    it('should record how long a session with findings waited for its slot', async () => {
+      mockedJudge.mockReturnValueOnce([SAFE_AREA]);
+      mocks.renderer.render
+        .mockResolvedValueOnce(fixtures.session({ slotWaitMs: 4_000 }))
+        .mockResolvedValueOnce(fixtures.session({ slotWaitMs: 0 }));
+
+      await renderPdfStep(fixtures.state, ctx);
+
+      expect(attemptsOf(mocks)).toEqual([
+        expect.objectContaining({ outcome: 'FINDINGS', slotWaitMs: 4_000 }),
+        expect.objectContaining({ outcome: 'PASSED', slotWaitMs: 0 }),
+      ]);
+    });
+
+    it('should record how long a failed session waited for its slot', async () => {
+      const failure = new RenderSessionError('socket hang up', {
+        durationMs: 2_000,
+        units: 1,
+      });
+      failure.slotWaitMs = 700;
+      mocks.renderer.render.mockRejectedValue(failure);
+
+      await expect(renderPdfStep(fixtures.state, ctx)).rejects.toMatchObject({
+        code: 'render.unavailable',
+      });
+      expect(attemptsOf(mocks)).toEqual([
+        expect.objectContaining({ outcome: 'ERROR', slotWaitMs: 700 }),
+      ]);
     });
   });
 

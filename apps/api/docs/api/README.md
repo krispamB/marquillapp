@@ -51,6 +51,17 @@ Authenticated routes are rate-limited per user and per route. The default is 120
 
 Over the limit, the server returns `429 Too Many Requests` with a `Retry-After` header in seconds. Responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.
 
+Separately from the request rate, `POST /artifacts` and `POST /artifacts/:id/refine` can be refused when the user already has the configured number of runs in progress (`MAX_INFLIGHT_RUNS_PER_USER`; unset or `0` means no cap). That `429` has no `Retry-After` header and a coded body; retry once a run finishes. Nothing is created or charged.
+
+```json
+{
+  "statusCode": 429,
+  "code": "run.too_many_in_flight",
+  "limit": 3,
+  "message": "You can have 3 runs in progress at once. Wait for one to finish, then try again."
+}
+```
+
 ### IDs and dates
 
 - Mongo IDs are 24-character hexadecimal strings.
@@ -93,7 +104,7 @@ Feature limits return HTTP `403` with a structured message payload:
 
 ### Artifact lifecycle
 
-An artifact is account-agnostic until it is posted. A generation or refine request creates a `GENERATING` version and returns a `runId`; the client watches that run and refetches the artifact after `run.completed`.
+An artifact is account-agnostic until it is posted. A generation or refine request creates a `GENERATING` version and returns a `runId`; the client watches that run and refetches the artifact after `run.completed`. For a live POST or POLL run, `run.completed` carries the promoted `content` (and `title` on an INITIAL run), so the refetch is optional; see [runs.md](./runs.md).
 
 ```text
 POST /artifacts or POST /artifacts/:id/refine

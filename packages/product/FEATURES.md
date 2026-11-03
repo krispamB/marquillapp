@@ -10,9 +10,9 @@ Every feature Marquill has, is building, or has discussed. `live` means deployed
 
 | Id | Feature | Status | Date | What it does | Landing; plans | Links |
 | --- | --- | --- | --- | --- | --- | --- |
-| `text-posts` | Text posts | live | 2026-01-27 | Mark drafts a LinkedIn text post (a POST Artifact) from a prompt, in an optional style preset. | board | [artifact-workflow-prd.md](../../apps/api/docs/artifact-workflow-prd.md), [artifacts.md](../../apps/api/docs/api/artifacts.md) |
+| `text-posts` | Text posts | live | 2026-01-27 | Mark drafts a LinkedIn text post (a POST Artifact) from a prompt, in an optional style preset. | board | [artifact-workflow-prd.md](../../apps/api/docs/artifact-workflow-prd.md), [artifacts.md](../../apps/api/docs/api/artifacts.md), [linkedin-dwell-time-and-ai-content-research.md](../../apps/api/docs/linkedin-dwell-time-and-ai-content-research.md) |
 | `style-presets` | Style presets | live | 2026-04-08 | Six writing styles for a draft: professional, storytelling, educational, bold, contrarian, founder.<br>_Defined in apps/api/src/agent/style-presets.config.ts._ |  |  |
-| `polls` | Polls | live | 2026-08-06 | Mark drafts a POLL Artifact: a question, two to four options, and a 3, 7, or 14 day duration, published as a native LinkedIn poll. | board | #114, #121, [linkedin-poll-document-api-research.md](../../apps/api/docs/linkedin-poll-document-api-research.md) |
+| `polls` | Polls | live | 2026-08-06 | Mark drafts a POLL Artifact: a question, two to four options, and a 3, 7, or 14 day duration, published as a native LinkedIn poll. | board | #114, #121, [linkedin-poll-document-api-research.md](../../apps/api/docs/linkedin-poll-document-api-research.md), [linkedin-dwell-time-and-ai-content-research.md](../../apps/api/docs/linkedin-dwell-time-and-ai-content-research.md) |
 | `artifact-studio` | Artifact Studio | live | 2026-08-06 | The /artifacts/new screen: pick a type (post, poll, document), write a prompt, toggle research, and watch the run. |  | #112 |
 | `run-progress` | Live run progress | live | 2026-07-18 | Each workflow step (research, generate, render, persist) and the credit count stream to the browser over SSE while a run works. |  | #112, [sse-progress-contract-design.md](../../apps/api/docs/sse-progress-contract-design.md), [runs.md](../../apps/api/docs/api/runs.md) |
 | `artifact-refine` | Refine an artifact | live | 2026-08-06 | Ask Mark for changes to an existing artifact from its conversation page. Each refine is a new Document Version; research is reused, not re-run. |  | #118 |
@@ -22,7 +22,7 @@ Every feature Marquill has, is building, or has discussed. `live` means deployed
 
 | Id | Feature | Status | Date | What it does | Landing; plans | Links |
 | --- | --- | --- | --- | --- | --- | --- |
-| `documents` | Documents | live | 2026-08-06 | Mark makes a DOCUMENT Artifact (a one-pager or a multi-slide carousel), rendered to PDF and published as a LinkedIn document post.<br>_Documents are now made from a Design System; the template carousels were retired in the #177 cutover._ | board | #115, #121, [document-generation-spec.md](../../apps/api/docs/document-generation-spec.md), [carousel-template-system-design.md](../../apps/api/docs/carousel-template-system-design.md) |
+| `documents` | Documents | live | 2026-08-06 | Mark makes a DOCUMENT Artifact (a one-pager or a multi-slide carousel), rendered to PDF and published as a LinkedIn document post.<br>_Documents are now made from a Design System; the template carousels were retired in the #177 cutover._ | board | #115, #121, [document-generation-spec.md](../../apps/api/docs/document-generation-spec.md), [carousel-template-system-design.md](../../apps/api/docs/carousel-template-system-design.md), [linkedin-dwell-time-and-ai-content-research.md](../../apps/api/docs/linkedin-dwell-time-and-ai-content-research.md) |
 | `design-systems` | Design Systems for documents | live | 2026-10-15 | Six app-owned Design Systems (Afterglow, Broadside, Colophon, Margin, Overprint, Schematic). Mark writes a Candidate Source against the chosen system, it is checked, rendered, and repaired.<br>_Systems that fail the eval ship in UNLISTED_DESIGN_SYSTEMS, so the live set can be smaller than six._<br>_The go-live date is the merge date; #177 has no recorded cutover date._ | board | #177, #191, #193, #198, [document-generation-spec.md](../../apps/api/docs/document-generation-spec.md), [design-systems.md](../../apps/api/docs/api/design-systems.md) |
 | `document-refine-from-source` | Refine a document from its Candidate Source | live | 2026-10-14 | A document refine edits the previous Candidate Source instead of starting over, so unchanged pages stay put. |  | #171, #172, #177 |
 | `design-system-picker` | Design System swatch menu | live | 2026-10-15 | A swatch menu in Artifact Studio and refine. Each system shows a three-way colour wheel of its background, text, and accent; hovering it previews the sample pages before you pick. |  | #198, #177 |
@@ -82,6 +82,13 @@ Every feature Marquill has, is building, or has discussed. `live` means deployed
 | `welcome-email` | Welcome email | live | 2026-04-07 | A branded welcome email on sign-up. |  |  |
 
 ## Planned and building
+
+### Creation
+
+| Id | Feature | Status | Date | What it does | Landing; plans | Links |
+| --- | --- | --- | --- | --- | --- | --- |
+| `run-in-flight-cap` | Per-user cap on runs in flight | building |  | A user can have at most MAX_INFLIGHT_RUNS_PER_USER artifact runs going at once, so one batch cannot fill the queue for everyone. A launch over the cap gets a 429 run.too_many_in_flight whose message the app shows; nothing is created or charged.<br>_Built but shipped off: MAX_INFLIGHT_RUNS_PER_USER defaults to 0 (no cap). The plan is to turn it on at 3 if queueWaitMs shows users waiting behind another user's batch. Set live (with since and a changelog entry) only once it is switched on in production._ |  | #230, [artifact-generation-performance-plan.md](../../apps/api/docs/artifact-generation-performance-plan.md) |
+| `streamed-commentary` | Streamed post and poll text | building |  | While Mark writes a POST or POLL Artifact, its commentary appears in the conversation as it is written, in a preview that the finished artifact replaces. A Zod repair or a retry clears the preview and it starts again.<br>_Built but shipped off: STREAM_POST_COMMENTARY defaults to false on the worker. Before switching it on, verify the POST and POLL models stream with json_schema and requireParameters on OpenRouter. Set live (with since and a changelog entry) only once it is on in production._ |  | #238, [artifact-generation-performance-plan.md](../../apps/api/docs/artifact-generation-performance-plan.md), [runs.md](../../apps/api/docs/api/runs.md) |
 
 ### Documents
 

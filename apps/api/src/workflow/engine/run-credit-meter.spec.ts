@@ -1,4 +1,5 @@
 import { FeatureGateForbiddenException } from '../../feature-gating/feature-gating.exception';
+import type { Entitlement } from '../../feature-gating/feature-gating.service';
 import { RunCreditMeter } from './run-credit-meter';
 import { RunEventType } from './run-event.types';
 import { WorkflowError } from './workflow.error';
@@ -6,7 +7,17 @@ import { WorkflowError } from './workflow.error';
 describe('RunCreditMeter', () => {
   const userId = '665f1b2c3d4e5f6a7b8c9d0e';
 
-  const makeMeter = () => {
+  const makeEntitlement = (): Entitlement => ({
+    tier: null,
+    source: 'default',
+    subscriptionStatus: null,
+    period: {
+      periodStart: new Date('2026-03-01T00:00:00.000Z'),
+      periodEnd: new Date('2026-04-01T00:00:00.000Z'),
+    },
+  });
+
+  const makeMeter = (entitlement?: Entitlement) => {
     const creditMeterService = {
       toCredits: jest.fn().mockReturnValue(0),
       assertBalance: jest.fn().mockResolvedValue(undefined),
@@ -21,6 +32,7 @@ describe('RunCreditMeter', () => {
       { runId: 'run-1', artifactId: 'artifact-1', version: 1 },
       emit,
       logger as any,
+      entitlement,
     );
 
     return { meter, mocks: { creditMeterService, emit, logger } };
@@ -111,7 +123,11 @@ describe('RunCreditMeter', () => {
       meter.record({ kind: 'llm', amount: 0.03 }); // winning attempt
       await meter.commit();
 
-      expect(mocks.creditMeterService.debit).toHaveBeenCalledWith(userId, 30);
+      expect(mocks.creditMeterService.debit).toHaveBeenCalledWith(
+        userId,
+        30,
+        undefined,
+      );
     });
   });
 
@@ -121,6 +137,19 @@ describe('RunCreditMeter', () => {
 
       expect(mocks.creditMeterService.assertBalance).toHaveBeenCalledWith(
         userId,
+        undefined,
+      );
+    });
+
+    it('should read only usage when the meter was built with an entitlement', async () => {
+      const entitlement = makeEntitlement();
+      ({ meter, mocks } = makeMeter(entitlement));
+
+      await meter.assertBalance();
+
+      expect(mocks.creditMeterService.assertBalance).toHaveBeenCalledWith(
+        userId,
+        entitlement,
       );
     });
 
@@ -178,7 +207,26 @@ describe('RunCreditMeter', () => {
 
       await meter.commit();
 
-      expect(mocks.creditMeterService.debit).toHaveBeenCalledWith(userId, 12);
+      expect(mocks.creditMeterService.debit).toHaveBeenCalledWith(
+        userId,
+        12,
+        undefined,
+      );
+    });
+
+    it("should debit into the entitlement's period when built with one", async () => {
+      const entitlement = makeEntitlement();
+      ({ meter, mocks } = makeMeter(entitlement));
+      mocks.creditMeterService.toCredits.mockReturnValue(12);
+      meter.record({ kind: 'llm', amount: 0.012 });
+
+      await meter.commit();
+
+      expect(mocks.creditMeterService.debit).toHaveBeenCalledWith(
+        userId,
+        12,
+        entitlement.period,
+      );
     });
 
     it('should not debit when nothing was recorded', async () => {

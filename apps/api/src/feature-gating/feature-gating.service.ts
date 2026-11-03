@@ -3,6 +3,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -14,6 +15,7 @@ import {
   Usage,
 } from '../database/schemas';
 
+import { readIntEnv } from '../common/env';
 import {
   FEATURE_GATE_ERROR_CODE,
   FEATURE_KEYS,
@@ -27,8 +29,38 @@ const isDuplicateKeyError = (error: unknown): boolean =>
   'code' in error &&
   error.code === 11000;
 
+const DEFAULT_TIER_CACHE_TTL_MS = 60_000;
+const DEFAULT_TIER_CACHE_KEY = 'default';
+
+/** The usage period credits and scheduled posts are counted in. */
+export interface UsagePeriod {
+  periodStart: Date;
+  periodEnd: Date;
+}
+
+/**
+ * Who the user is to the gates, from one subscription read. The tier and the
+ * period always come from the same decision: a subscription whose tier
+ * document is missing falls back to the default tier *and* the default period.
+ */
+export interface Entitlement {
+  /** Null only when no default tier is configured. */
+  tier: Tier | null;
+  source: 'subscription' | 'default';
+  subscriptionStatus: SubscriptionStatus | null;
+  period: UsagePeriod;
+}
+
 @Injectable()
 export class FeatureGatingService {
+  // Tiers are written only by the seed script, so a short in-process cache is
+  // safe. The subscription is never cached: a Paddle webhook must apply at once.
+  private readonly tierCacheTtlMs: number;
+  private readonly tierCache = new Map<
+    string,
+    { tier: Tier; expiresAt: number }
+  >();
+
   constructor(
     @InjectModel(Subscription.name)
     private readonly subscriptionModel: Model<Subscription>,
@@ -38,21 +70,20 @@ export class FeatureGatingService {
     private readonly connectedAccountModel: Model<any>,
     @InjectModel(Artifact.name)
     private readonly artifactModel: Model<Artifact>,
-  ) {}
-
-  async resolveEntitlementTier(userId: string): Promise<Tier> {
-    const entitlement = await this.resolveEntitlement(userId);
-    if (!entitlement.tier) {
-      throw new NotFoundException('Default tier not configured');
-    }
-    return entitlement.tier;
+    configService: ConfigService,
+  ) {
+    this.tierCacheTtlMs = readIntEnv(
+      configService,
+      'FEATURE_TIER_CACHE_TTL_MS',
+      { default: DEFAULT_TIER_CACHE_TTL_MS },
+    );
   }
 
-  async resolveEntitlement(userId: string): Promise<{
-    tier: Tier | null;
-    source: 'subscription' | 'default';
-    subscriptionStatus: SubscriptionStatus | null;
-  }> {
+  async resolveEntitlementTier(userId: string): Promise<Tier> {
+    return this.tierOf(await this.resolveEntitlement(userId));
+  }
+
+  async resolveEntitlement(userId: string): Promise<Entitlement> {
     const subscription = await this.subscriptionModel
       .findOne({ userId: new Types.ObjectId(userId) })
       .sort({ updatedAt: -1 })
@@ -64,27 +95,54 @@ export class FeatureGatingService {
         subscription.status === SubscriptionStatus.PAST_DUE) &&
       subscription.currentPeriodEnd > new Date()
     ) {
-      const paidTier = await this.tierModel
-        .findById(subscription.tierId)
-        .lean();
+      // Never populated here, so the reference is the id.
+      const tierId = subscription.tierId as Types.ObjectId;
+      const paidTier = await this.cachedTier(tierId.toString(), () =>
+        this.tierModel.findById(tierId).lean(),
+      );
       if (paidTier) {
         return {
-          tier: paidTier as Tier,
+          tier: paidTier,
           source: 'subscription',
           subscriptionStatus: subscription.status,
+          period: {
+            periodStart: new Date(subscription.currentPeriodStart),
+            periodEnd: new Date(subscription.currentPeriodEnd),
+          },
         };
       }
     }
 
-    const defaultTier = await this.tierModel
-      .findOne({ isDefault: true, isActive: true })
-      .lean();
+    const defaultTier = await this.cachedTier(DEFAULT_TIER_CACHE_KEY, () =>
+      this.tierModel.findOne({ isDefault: true, isActive: true }).lean(),
+    );
+    const periodStart = this.getCurrentUtcMonthStart();
 
     return {
-      tier: (defaultTier as Tier | null) ?? null,
+      tier: defaultTier,
       source: 'default',
       subscriptionStatus: subscription?.status ?? null,
+      period: {
+        periodStart,
+        periodEnd: this.getNextUtcMonthStart(periodStart),
+      },
     };
+  }
+
+  /**
+   * The launch gate: one entitlement for the research and balance checks, so
+   * a launch reads the subscription once. Returns what it checked.
+   */
+  async assertLaunch(
+    userId: string,
+    options: { withResearch: boolean },
+  ): Promise<Entitlement> {
+    const entitlement = await this.resolveEntitlement(userId);
+    if (options.withResearch) {
+      await this.assertResearchAccess(userId, entitlement);
+    }
+    await this.assertBalance(userId, entitlement);
+    return entitlement;
   }
 
   getLimitFromTier(tier: Tier, feature: FeatureKey): number {
@@ -127,8 +185,13 @@ export class FeatureGatingService {
     }
   }
 
-  async assertResearchAccess(userId: string): Promise<void> {
-    const tier = await this.resolveEntitlementTier(userId);
+  async assertResearchAccess(
+    userId: string,
+    entitlement?: Entitlement,
+  ): Promise<void> {
+    const tier = this.tierOf(
+      entitlement ?? (await this.resolveEntitlement(userId)),
+    );
     const configuredLimit = tier?.limits?.[FEATURE_KEYS.RESEARCH];
     // Deployment-safe bridge for tier documents created before the explicit
     // capability existed. Paid access is inferred from plan price, never from
@@ -208,17 +271,21 @@ export class FeatureGatingService {
   // Headroom check, not a fit check: commit-on-success has no pre-run estimate to
   // fit against, so a run may start with 5 credits left and settle at 60. The next
   // run's guard catches the overshoot, which the agent's step cap bounds.
-  async assertBalance(userId: string): Promise<void> {
-    const tier = await this.resolveEntitlementTier(userId);
+  // A passed entitlement is reused, so the check costs only the usage read.
+  async assertBalance(
+    userId: string,
+    entitlement?: Entitlement,
+  ): Promise<void> {
+    const resolved = entitlement ?? (await this.resolveEntitlement(userId));
+    const tier = this.tierOf(resolved);
     const limit = this.getLimitFromTier(tier, FEATURE_KEYS.CREDITS);
 
     if (limit === -1) return; // unlimited
 
-    const periodStart = await this.resolveUsagePeriodStart(userId);
     const currentUsage = await this.getUsageCount(
       userId,
       FEATURE_KEYS.CREDITS,
-      periodStart,
+      resolved.period.periodStart,
     );
 
     if (currentUsage < limit) return;
@@ -241,10 +308,16 @@ export class FeatureGatingService {
 
   // Settle a finished run against the period aggregate. The increment is variable,
   // unlike the single-unit capacity counters, so callers pass the resolved total.
-  async debit(userId: string, credits: number): Promise<void> {
+  // A caller that already resolved the entitlement passes its period.
+  async debit(
+    userId: string,
+    credits: number,
+    period?: UsagePeriod,
+  ): Promise<void> {
     if (credits <= 0) return;
 
-    const periodStart = await this.resolveUsagePeriodStart(userId);
+    const periodStart =
+      period?.periodStart ?? (await this.resolveUsagePeriodStart(userId));
     const userObjectId = new Types.ObjectId(userId);
 
     const query = {
@@ -483,35 +556,36 @@ export class FeatureGatingService {
     return usagePeriod.periodStart;
   }
 
-  private async resolveUsagePeriod(userId: string): Promise<{
-    periodStart: Date;
-    periodEnd: Date;
-    source: 'subscription' | 'default';
-  }> {
-    const subscription = await this.subscriptionModel
-      .findOne({ userId: new Types.ObjectId(userId) })
-      .sort({ updatedAt: -1 })
-      .lean();
+  private async resolveUsagePeriod(
+    userId: string,
+  ): Promise<UsagePeriod & { source: 'subscription' | 'default' }> {
+    const { period, source } = await this.resolveEntitlement(userId);
+    return { ...period, source };
+  }
 
-    if (
-      subscription &&
-      (subscription.status === SubscriptionStatus.ACTIVE ||
-        subscription.status === SubscriptionStatus.PAST_DUE) &&
-      subscription.currentPeriodEnd > new Date()
-    ) {
-      return {
-        periodStart: new Date(subscription.currentPeriodStart),
-        periodEnd: new Date(subscription.currentPeriodEnd),
-        source: 'subscription',
-      };
+  private tierOf(entitlement: Entitlement): Tier {
+    if (!entitlement.tier) {
+      throw new NotFoundException('Default tier not configured');
     }
+    return entitlement.tier;
+  }
 
-    const periodStart = this.getCurrentUtcMonthStart();
-    return {
-      periodStart,
-      periodEnd: this.getNextUtcMonthStart(periodStart),
-      source: 'default',
-    };
+  /** A missing tier is never cached, so a seed run is picked up at once. */
+  private async cachedTier(
+    key: string,
+    read: () => Promise<unknown>,
+  ): Promise<Tier | null> {
+    const now = Date.now();
+    const hit = this.tierCache.get(key);
+    if (hit && hit.expiresAt > now) return hit.tier;
+
+    const tier = ((await read()) as Tier | null) ?? null;
+    if (tier && this.tierCacheTtlMs > 0) {
+      this.tierCache.set(key, { tier, expiresAt: now + this.tierCacheTtlMs });
+    } else {
+      this.tierCache.delete(key);
+    }
+    return tier;
   }
 
   private getCurrentUtcMonthStart(): Date {

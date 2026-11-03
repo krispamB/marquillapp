@@ -22,6 +22,8 @@ export type PdfPreviewProps = {
   fitViewportOffset?: number;
   maxPageWidth?: number;
   onPageChange?: (page: number, totalPages: number) => void;
+  /** Makes the pages a button that opens the full-screen viewer. */
+  onExpand?: () => void;
 };
 
 const PdfPreviewRenderer = dynamic(() => import("./PdfPreviewRenderer"), {
@@ -40,6 +42,7 @@ export default function PdfPreview({
   fitViewportOffset,
   maxPageWidth,
   onPageChange,
+  onExpand,
 }: PdfPreviewProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -84,6 +87,7 @@ export default function PdfPreview({
           fitViewportOffset={fitViewportOffset}
           maxPageWidth={maxPageWidth}
           onPageChange={onPageChange}
+          onExpand={onExpand}
         />
       ) : (
         <PdfPreviewLoading pageCountHint={pageCountHint} />

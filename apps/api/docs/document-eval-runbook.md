@@ -165,6 +165,22 @@ The user and its runs stay in the database. Re-running the eval reuses the user 
 7. **Cover review** — one row per `READY` run with its system, page count and a presigned cover URL (valid
    24 hours).
 
+## Running in patch mode
+
+`DOCUMENT_REPAIR_MODE` (`src/workflow/workflow.constants.ts`) picks what a Repair answers with: the whole
+document (`full`, the default) or edits to it (`patch`). It is a deploy-switched module constant, not an env
+var, so the eval only runs in `patch` mode if the worker was built with it.
+
+1. Locally, edit `DOCUMENT_REPAIR_MODE` to `'patch'` and restart the worker. Do not commit the change.
+2. Run the eval as above.
+3. Read the **Patch fallback rate** line under the aggregates: fallbacks divided by Repair rounds the model
+   answered with edits, plus a `PATCH GO` or `PATCH NO-GO` line. The per-group `Patch Repairs` lines show the
+   round counts and mean edits per edit round. These lines appear only when a round ran in `patch` mode,
+   and runs recorded before patch mode carry no Repair rounds.
+4. Revert the constant.
+5. Switch production to `patch` (in a PR that changes the constant) only if the rate is under 20% and no other
+   gate is worse than the `full` run. At 20% or more, keep `full`.
+
 ## What a person does
 
 1. Run the eval as above.

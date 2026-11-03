@@ -34,18 +34,15 @@ import {
   DesignSystem,
   DesignSystemSchema,
 } from './schemas';
+import { mongoOptionsFrom } from './mongo-options';
 
 @Global()
 @Module({
   imports: [
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        uri: configService.get<string>('MONGO_URI'),
-        maxPoolSize: 10,
-        minPoolSize: 2,
-        serverSelectionTimeoutMS: 5000,
-      }),
+      useFactory: (configService: ConfigService) =>
+        mongoOptionsFrom(configService),
       inject: [ConfigService],
     }),
     MongooseModule.forFeature([

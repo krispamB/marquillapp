@@ -6,7 +6,7 @@ import { renderPromptFragment } from '../../design-system/prompt-fragment';
 import { sha256Hex } from '../../document-source/sha256';
 import { FailureCode } from '../workflow.constants';
 import { alert, alertSubject } from '../engine/alert';
-import { terminal, transient } from '../engine/workflow.error';
+import { describeError, terminal, transient } from '../engine/workflow.error';
 import type {
   ResolvedDesignSystem,
   RunState,
@@ -70,16 +70,12 @@ export const resolveInputStep: StepHandler = async (state, ctx) => {
     throw error;
   }
 
-  const baseCandidate =
+  const [baseCandidate, research] = await Promise.all([
     state.input.type === ArtifactType.DOCUMENT
-      ? await readBaseCandidate(
-          state,
-          ctx,
-          refine.priorContent as DocumentContent,
-        )
-      : undefined;
-
-  const research = await ctx.run.getLatestCompletedResearch(artifactId);
+      ? readBaseCandidate(state, ctx, refine.priorContent as DocumentContent)
+      : undefined,
+    ctx.run.getLatestCompletedResearch(artifactId),
+  ]);
 
   return {
     ...resolved,
@@ -93,6 +89,9 @@ export const resolveInputStep: StepHandler = async (state, ctx) => {
  * The base's Candidate Source, which the refine prompt sees in place of the
  * assembled Document Source (spec §6.5, §7.4):
  *
+ * - Mongo's kept copy (`run_candidate_sources`, by hash) is tried first and
+ *   trusted only when it matches the frozen hash; a miss, mismatch or error
+ *   falls back to R2;
  * - an R2 read that fails is **transient**: the object may well be there;
  * - an object that is missing, or whose bytes no longer match the hash the
  *   version froze, is **terminal** and alerts: no replay restores it.
@@ -104,6 +103,9 @@ async function readBaseCandidate(
 ): Promise<string> {
   const { artifactId, version } = state.input;
   const { candidateKey, candidateSha256 } = document;
+
+  const kept = await readKeptCandidate(ctx, candidateSha256);
+  if (kept !== undefined) return kept;
 
   let body: Buffer | null;
   try {
@@ -128,6 +130,25 @@ async function readBaseCandidate(
     throw terminal(reason, undefined, FailureCode.ARTIFACT_SOURCE_MISSING);
   }
   return body.toString('utf8');
+}
+
+/** The kept copy when it exists and matches `candidateSha256`; else `undefined`. */
+async function readKeptCandidate(
+  ctx: StepContext,
+  candidateSha256: string,
+): Promise<string | undefined> {
+  try {
+    const text = await ctx.run.readAcceptedCandidateText(candidateSha256);
+    if (text !== undefined && sha256Hex(text) === candidateSha256) {
+      return text;
+    }
+  } catch (error: unknown) {
+    // Best-effort: R2 is the source of truth.
+    ctx.logger.warn(
+      `Reading the kept Candidate Source ${candidateSha256} failed; falling back to R2: ${describeError(error)}`,
+    );
+  }
+  return undefined;
 }
 
 /**

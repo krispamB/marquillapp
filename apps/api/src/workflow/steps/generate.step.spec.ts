@@ -52,11 +52,16 @@ const makeStep = () => {
   };
   const meter = { record: jest.fn() };
   const run = {
+    runId: 'run-1',
     recordDocumentCheck: jest.fn().mockResolvedValue(undefined),
     readAcceptedCandidate: jest.fn().mockResolvedValue(undefined),
+    recordModelCall: jest.fn(),
   };
   const emit = jest.fn();
-  const deadline = { assertTimeLeft: jest.fn() };
+  const deadline = {
+    assertTimeLeft: jest.fn(),
+    remainingMs: jest.fn(() => 120_000),
+  };
   const logger = { log: jest.fn() };
   const diagnostics = {
     stepStarted: jest.fn(),
@@ -64,10 +69,13 @@ const makeStep = () => {
     recordModelTurn: jest.fn(),
     recordCheck: jest.fn(),
     recordRepairsSpent: jest.fn(),
+    recordRepair: jest.fn(),
     recordAccepted: jest.fn(),
     recordRenderSession: jest.fn(),
     recordPageCount: jest.fn(),
   };
+  // Late on the 25th in UTC, so a local-time date would read the 26th east of UTC.
+  const runCreatedAt = new Date('2026-10-25T23:30:00Z');
   const ctx = {
     agent,
     meter,
@@ -76,6 +84,7 @@ const makeStep = () => {
     deadline,
     diagnostics,
     logger,
+    runCreatedAt,
   } as unknown as StepContext;
 
   const state = {
@@ -129,7 +138,7 @@ describe('generateStep', () => {
     });
   });
 
-  it('should pass the research and refine slots through to the agent', async () => {
+  it('should pass the research and refine slots, and the run id as the session, to the agent', async () => {
     mocks.agent.generate.mockResolvedValue({
       content: { commentary: 'ok' },
     });
@@ -148,7 +157,25 @@ describe('generateStep', () => {
         stylePreset: 'contrarian',
         research,
         refine,
+        today: '2026-10-25',
+        sessionId: 'run-1',
       },
+      expect.anything(),
+    );
+  });
+
+  it("should date the brief from the run's creation time when the wall clock has moved on", async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2027-03-01T12:00:00Z'));
+    mocks.agent.generate.mockResolvedValue({ content: { commentary: 'ok' } });
+
+    try {
+      await generateStep(fixtures.state, ctx);
+    } finally {
+      jest.useRealTimers();
+    }
+
+    expect(mocks.agent.generate).toHaveBeenCalledWith(
+      expect.objectContaining({ today: '2026-10-25' }),
       expect.anything(),
     );
   });
@@ -174,6 +201,20 @@ describe('generateStep', () => {
       2,
       expect.objectContaining({ amount: 0.02 }),
     );
+  });
+
+  it("should tally each LLM turn's usage on the run record", async () => {
+    const usage = turnUsage({ cost: 0.01, latencyMs: 4000 });
+    mocks.agent.generate.mockImplementation(
+      (_input: unknown, hooks: AgentHooks) => {
+        hooks.onUsage?.(usage);
+        return Promise.resolve({ content: { commentary: 'ok' } });
+      },
+    );
+
+    await generateStep(fixtures.state, ctx);
+
+    expect(mocks.run.recordModelCall).toHaveBeenCalledWith(usage);
   });
 
   it('should fail terminally when the content is invalid after the repair retry', async () => {
@@ -202,6 +243,60 @@ describe('generateStep', () => {
     await expect(generateStep(fixtures.state, ctx)).rejects.toBe(
       transportError,
     );
+  });
+
+  describe('streamed commentary', () => {
+    it('should emit the commentary the agent streams as the writing phase', async () => {
+      mocks.agent.generate.mockImplementation(
+        (_input: unknown, hooks: AgentHooks) => {
+          hooks.onCommentary?.('Write');
+          return Promise.resolve({ content: { commentary: 'Write more.' } });
+        },
+      );
+
+      await generateStep(fixtures.state, ctx);
+
+      expect(mocks.emit).toHaveBeenCalledWith({
+        type: 'step.progress',
+        data: {
+          step: 'GENERATE',
+          phase: 'writing',
+          partial: { commentary: 'Write' },
+        },
+      });
+    });
+
+    it('should emit the rewrite phase when the agent announces a repair', async () => {
+      mocks.agent.generate.mockImplementation(
+        (_input: unknown, hooks: AgentHooks) => {
+          hooks.onCommentary?.('Bad draft');
+          hooks.onRewrite?.();
+          hooks.onCommentary?.('Good');
+          return Promise.resolve({ content: { commentary: 'Good draft.' } });
+        },
+      );
+
+      await generateStep(fixtures.state, ctx);
+
+      expect(
+        mocks.emit.mock.calls.map(
+          ([event]) => (event as { data: { phase: string } }).data.phase,
+        ),
+      ).toEqual(['writing', 'rewrite', 'writing']);
+    });
+
+    it('should still meter usage when it takes the commentary', async () => {
+      mocks.agent.generate.mockImplementation(
+        (_input: unknown, hooks: AgentHooks) => {
+          hooks.onUsage?.(turnUsage());
+          return Promise.resolve({ content: { commentary: 'ok' } });
+        },
+      );
+
+      await generateStep(fixtures.state, ctx);
+
+      expect(mocks.meter.record).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('for a DOCUMENT run', () => {
@@ -248,6 +343,9 @@ describe('generateStep', () => {
           fragment: 'FRAGMENT',
           includeTitle: true,
           maxEnvelopeRepairs: 1,
+          today: '2026-10-25',
+          sessionId: 'run-1',
+          timeLeftMs: 120_000,
         },
         expect.anything(),
       );
@@ -396,6 +494,24 @@ describe('generateStep', () => {
         ]);
       });
 
+      it('should bound the draft and each Repair by the time left when each starts', async () => {
+        mockedCheck.mockReturnValueOnce([finding]);
+        mocks.deadline.remainingMs
+          .mockReturnValueOnce(90_000)
+          .mockReturnValueOnce(40_000);
+
+        await generateStep(fixtures.documentState, ctx);
+
+        expect(mocks.agent.generateDocument).toHaveBeenCalledWith(
+          expect.objectContaining({ timeLeftMs: 90_000 }),
+          expect.anything(),
+        );
+        expect(mocks.agent.repairDocument).toHaveBeenCalledWith(
+          expect.objectContaining({ timeLeftMs: 40_000 }),
+          expect.anything(),
+        );
+      });
+
       it('should call no model once it has passed', async () => {
         const passed = new WorkflowError('past the deadline', {
           retryable: true,
@@ -432,6 +548,8 @@ describe('generateStep', () => {
             candidate: draft.html,
             violations: { violations: [finding], omitted: [] },
             maxEnvelopeRepairs: 1,
+            sessionId: 'run-1',
+            timeLeftMs: 120_000,
           },
           expect.anything(),
         );

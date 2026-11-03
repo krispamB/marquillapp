@@ -49,8 +49,8 @@ describe('runWorkflow', () => {
     };
     const run = {
       runId: '665f1b2c3d4e5f6a7b8c9d03',
-      setCurrentStep: jest.fn().mockResolvedValue(undefined),
       saveResearchContext: jest.fn().mockResolvedValue(undefined),
+      readResearchContext: jest.fn().mockResolvedValue(undefined),
       complete: jest.fn().mockResolvedValue(undefined),
       fail: jest.fn().mockResolvedValue(undefined),
     };
@@ -66,6 +66,7 @@ describe('runWorkflow', () => {
       recordModelTurn: jest.fn(),
       recordCheck: jest.fn(),
       recordRepairsSpent: jest.fn(),
+      recordRepair: jest.fn(),
       recordAccepted: jest.fn(),
       recordRenderSession: jest.fn(),
       recordPageCount: jest.fn(),
@@ -196,16 +197,6 @@ describe('runWorkflow', () => {
       expect(ctx).toBe(deps.ctx);
     });
 
-    it('should record the current step on the run at each boundary', async () => {
-      await runWorkflow(makeInput(), deps);
-
-      expect(mocks.run.setCurrentStep.mock.calls.map(([s]) => s)).toEqual([
-        RESOLVE_INPUT,
-        GENERATE,
-        PERSIST_VERSION,
-      ]);
-    });
-
     it('should time each step in the diagnostics, leaving a failed step open', async () => {
       (deps.handlers[GENERATE] as jest.Mock).mockRejectedValue(
         new Error('boom'),
@@ -308,6 +299,36 @@ describe('runWorkflow', () => {
       expect(mocks.meter.commit).toHaveBeenCalledTimes(1);
     });
 
+    it('should emit run.completed before the debit commits', async () => {
+      await runWorkflow(makeInput(), deps);
+
+      const completedCall = mocks.emitter.emit.mock.calls.findIndex(
+        ([event]) => event.type === RunEventType.RUN_COMPLETED,
+      );
+      expect(
+        mocks.emitter.emit.mock.invocationCallOrder[completedCall],
+      ).toBeLessThan(mocks.meter.commit.mock.invocationCallOrder[0]);
+      expect(mocks.meter.commit.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.emitter.flush.mock.invocationCallOrder.at(-1)!,
+      );
+    });
+
+    it('should still emit run.completed when the debit commit rejects', async () => {
+      mocks.meter.commit.mockRejectedValue(transient('db down'));
+
+      await runWorkflow(makeInput(), deps).catch(() => undefined);
+
+      expect(emittedTypes()).toContain(RunEventType.RUN_COMPLETED);
+    });
+
+    it('should flush the emitter when the debit commit rejects', async () => {
+      mocks.meter.commit.mockRejectedValue(transient('db down'));
+
+      await expect(runWorkflow(makeInput(), deps)).rejects.toThrow('db down');
+
+      expect(mocks.emitter.flush).toHaveBeenCalledTimes(1);
+    });
+
     it('should not commit when a step fails', async () => {
       (mocks.handlers[GENERATE] as jest.Mock).mockRejectedValue(
         transient('rate limited'),
@@ -358,6 +379,50 @@ describe('runWorkflow', () => {
     it('should identify the artifact version on run.completed', async () => {
       const input = makeInput();
 
+      await runWorkflow(input, deps);
+
+      expect(emittedOf(RunEventType.RUN_COMPLETED)[0]).toMatchObject({
+        artifactId: input.artifactId,
+        version: input.version,
+      });
+    });
+
+    it('should carry the promoted content on run.completed for a POST', async () => {
+      await runWorkflow(makeInput({ kind: RunKind.REFINE }), deps);
+
+      expect(emittedOf(RunEventType.RUN_COMPLETED)[0]).toMatchObject({
+        content: { commentary: 'hello' },
+      });
+      expect(emittedOf(RunEventType.RUN_COMPLETED)[0]).not.toHaveProperty(
+        'title',
+      );
+    });
+
+    it('should carry the content and title on an INITIAL POLL', async () => {
+      const content = {
+        poll: { question: 'q?', options: ['a', 'b'], durationDays: 3 },
+      };
+      (mocks.handlers[GENERATE] as jest.Mock).mockResolvedValue({
+        content,
+        generatedTitle: 'A title',
+      });
+
+      await runWorkflow(makeInput({ type: ArtifactType.POLL }), deps);
+
+      expect(emittedOf(RunEventType.RUN_COMPLETED)[0]).toMatchObject({
+        content,
+        title: 'A title',
+      });
+    });
+
+    it('should not carry content on run.completed for a DOCUMENT', async () => {
+      (mocks.handlers[GENERATE] as jest.Mock).mockResolvedValue({
+        content: { commentary: 'hello' },
+        generatedTitle: 'A title',
+      });
+      mocks.handlers[WorkflowStep.RENDER_PDF] = jest.fn().mockResolvedValue({});
+
+      const input = makeInput({ type: ArtifactType.DOCUMENT });
       await runWorkflow(input, deps);
 
       expect(emittedOf(RunEventType.RUN_COMPLETED)[0]).toEqual({
@@ -636,6 +701,16 @@ describe('handleTerminalFailure', () => {
 
     expect(mocks.run.fail).toHaveBeenCalled();
     expect(mocks.logger.error).toHaveBeenCalled();
+  });
+
+  it('should not emit run.failed again when the run had already ended', async () => {
+    // A replayed failure: the worker's failed event and the stalled-job
+    // listener can both report the same job.
+    mocks.run.fail.mockResolvedValue('ALREADY_ENDED');
+
+    await expect(handleTerminalFailure(deps, failure)).resolves.toBeNull();
+
+    expect(mocks.emitter.emit).not.toHaveBeenCalled();
   });
 
   it('should still emit run.failed when marking the run fails', async () => {

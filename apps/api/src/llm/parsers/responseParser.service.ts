@@ -23,19 +23,25 @@ const stripNullObjectValues = (value: unknown): unknown => {
 @Injectable()
 export class ResponseParserService {
   /**
-   * Parse JSON response with Zod schema validation
+   * Parse JSON response with Zod schema validation. `prepare` sees the parsed
+   * value just before the schema does, for fixes that must not live in the
+   * schema itself.
    */
   parseWithSchema<T>(
     response: string,
     schema: z.ZodSchema<T>,
-    options?: { stripNullObjectValues?: boolean },
+    options?: {
+      stripNullObjectValues?: boolean;
+      prepare?: (value: unknown) => unknown;
+    },
   ): T {
     try {
       const cleaned = this.cleanJsonResponse(response);
       const raw = JSON.parse(cleaned) as unknown;
-      const parsed = options?.stripNullObjectValues
+      const stripped = options?.stripNullObjectValues
         ? stripNullObjectValues(raw)
         : raw;
+      const parsed = options?.prepare ? options.prepare(stripped) : stripped;
       return schema.parse(parsed);
     } catch (error: unknown) {
       throw new Error(`Failed to parse response: ${describeError(error)}`);

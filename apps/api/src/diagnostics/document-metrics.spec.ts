@@ -236,6 +236,60 @@ describe('computeDocumentMetrics', () => {
     });
   });
 
+  describe('patch repairs', () => {
+    const round = (
+      edits: number,
+      fallback = false,
+      mode: 'full' | 'patch' = 'patch',
+    ) => ({ kind: 'static' as const, mode, edits, fallback });
+
+    it('should leave patchRepairs out when no round ran in patch mode', () => {
+      const metrics = computeDocumentMetrics([
+        run({ repairs: [round(0, false, 'full')] }),
+        run(),
+      ]);
+
+      expect(metrics.overall.patchRepairs).toBeUndefined();
+    });
+
+    it('should count edit rounds, html rounds and fallbacks, and rate fallbacks per edit round', () => {
+      const metrics = computeDocumentMetrics([
+        run({ repairs: [round(3), round(1, true)] }),
+        run({ repairs: [round(0), round(2), round(4)] }),
+      ]);
+
+      expect(metrics.overall.patchRepairs).toEqual({
+        rounds: 5,
+        editRounds: 4,
+        htmlRounds: 1,
+        fallbacks: 1,
+        fallbackRate: 0.25,
+        meanEdits: 2.5,
+      });
+    });
+
+    it('should give a null rate and mean when every round answered with html', () => {
+      const metrics = computeDocumentMetrics([run({ repairs: [round(0)] })]);
+
+      expect(metrics.overall.patchRepairs).toMatchObject({
+        rounds: 1,
+        editRounds: 0,
+        fallbackRate: null,
+        meanEdits: null,
+      });
+    });
+
+    it('should bucket per Design System', () => {
+      const metrics = computeDocumentMetrics([
+        run({ designSystemId: 'a', repairs: [round(2, true)] }),
+        run({ designSystemId: 'b' }),
+      ]);
+
+      expect(metrics.byDesignSystem.a.patchRepairs?.fallbackRate).toBe(1);
+      expect(metrics.byDesignSystem.b.patchRepairs).toBeUndefined();
+    });
+  });
+
   describe('truncations', () => {
     it('should count runs where any job attempt was truncated, including one a retry absorbed', () => {
       const metrics = computeDocumentMetrics([

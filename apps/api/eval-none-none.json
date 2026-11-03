@@ -1,0 +1,2367 @@
+{
+  "startedAt": "2026-10-23T09:53:59.180Z",
+  "finishedAt": "2026-10-23T10:18:02.830Z",
+  "options": {
+    "concurrency": 2,
+    "timeoutMs": 7200000,
+    "pollMs": 10000,
+    "jsonPath": "eval-none-none.json",
+    "cleanup": false
+  },
+  "designSystemIds": [
+    "margin",
+    "afterglow",
+    "broadside",
+    "colophon",
+    "overprint",
+    "schematic"
+  ],
+  "defaultDesignSystemId": "margin",
+  "records": [
+    {
+      "key": "margin/4p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "margin",
+      "requestedPages": 4,
+      "state": "COMPLETED",
+      "artifactId": "6adb2eb74550a0c8516d039c",
+      "runId": "6adb2eb74550a0c8516d039f",
+      "version": 1
+    },
+    {
+      "key": "margin/8p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "margin",
+      "requestedPages": 8,
+      "state": "COMPLETED",
+      "artifactId": "6adb2eb74550a0c8516d039d",
+      "runId": "6adb2eb74550a0c8516d039e",
+      "version": 1
+    },
+    {
+      "key": "margin/15p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "margin",
+      "requestedPages": 15,
+      "state": "COMPLETED",
+      "artifactId": "6adb2ecb4550a0c8516d03a0",
+      "runId": "6adb2ecb4550a0c8516d03a1",
+      "version": 1
+    },
+    {
+      "key": "afterglow/4p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "afterglow",
+      "requestedPages": 4,
+      "state": "COMPLETED",
+      "artifactId": "6adb2edf4550a0c8516d03a2",
+      "runId": "6adb2edf4550a0c8516d03a3",
+      "version": 1
+    },
+    {
+      "key": "afterglow/8p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "afterglow",
+      "requestedPages": 8,
+      "state": "COMPLETED",
+      "artifactId": "6adb2f074550a0c8516d03a4",
+      "runId": "6adb2f074550a0c8516d03a5",
+      "version": 1
+    },
+    {
+      "key": "afterglow/12p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "afterglow",
+      "requestedPages": 12,
+      "state": "COMPLETED",
+      "artifactId": "6adb2f434550a0c8516d03a6",
+      "runId": "6adb2f434550a0c8516d03a7",
+      "version": 1
+    },
+    {
+      "key": "broadside/4p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "broadside",
+      "requestedPages": 4,
+      "state": "FAILED",
+      "artifactId": "6adb2f894550a0c8516d03a8",
+      "runId": "6adb2f894550a0c8516d03a9",
+      "version": 1
+    },
+    {
+      "key": "broadside/8p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "broadside",
+      "requestedPages": 8,
+      "state": "COMPLETED",
+      "artifactId": "6adb2fe44550a0c8516d03aa",
+      "runId": "6adb2fe44550a0c8516d03ab",
+      "version": 1
+    },
+    {
+      "key": "broadside/12p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "broadside",
+      "requestedPages": 12,
+      "state": "COMPLETED",
+      "artifactId": "6adb30344550a0c8516d03ac",
+      "runId": "6adb30344550a0c8516d03ad",
+      "version": 1
+    },
+    {
+      "key": "colophon/4p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "colophon",
+      "requestedPages": 4,
+      "state": "COMPLETED",
+      "artifactId": "6adb308e4550a0c8516d03ae",
+      "runId": "6adb308e4550a0c8516d03af",
+      "version": 1
+    },
+    {
+      "key": "colophon/8p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "colophon",
+      "requestedPages": 8,
+      "state": "FAILED",
+      "artifactId": "6adb30f24550a0c8516d03b0",
+      "runId": "6adb30f24550a0c8516d03b1",
+      "version": 1
+    },
+    {
+      "key": "colophon/12p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "colophon",
+      "requestedPages": 12,
+      "state": "FAILED",
+      "artifactId": "6adb311a4550a0c8516d03b2",
+      "runId": "6adb311a4550a0c8516d03b3",
+      "version": 1
+    },
+    {
+      "key": "overprint/4p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "overprint",
+      "requestedPages": 4,
+      "state": "FAILED",
+      "artifactId": "6adb316a4550a0c8516d03b4",
+      "runId": "6adb316a4550a0c8516d03b5",
+      "version": 1
+    },
+    {
+      "key": "overprint/8p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "overprint",
+      "requestedPages": 8,
+      "state": "FAILED",
+      "artifactId": "6adb31ce4550a0c8516d03b6",
+      "runId": "6adb31ce4550a0c8516d03b7",
+      "version": 1
+    },
+    {
+      "key": "overprint/12p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "overprint",
+      "requestedPages": 12,
+      "state": "COMPLETED",
+      "artifactId": "6adb32294550a0c8516d03b8",
+      "runId": "6adb32294550a0c8516d03b9",
+      "version": 1
+    },
+    {
+      "key": "schematic/4p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "schematic",
+      "requestedPages": 4,
+      "state": "COMPLETED",
+      "artifactId": "6adb32794550a0c8516d03ba",
+      "runId": "6adb32794550a0c8516d03bb",
+      "version": 1
+    },
+    {
+      "key": "schematic/8p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "schematic",
+      "requestedPages": 8,
+      "state": "FAILED",
+      "artifactId": "6adb32d34550a0c8516d03bc",
+      "runId": "6adb32d34550a0c8516d03bd",
+      "version": 1
+    },
+    {
+      "key": "schematic/15p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "schematic",
+      "requestedPages": 15,
+      "state": "FAILED",
+      "artifactId": "6adb33234550a0c8516d03be",
+      "runId": "6adb33234550a0c8516d03bf",
+      "version": 1
+    },
+    {
+      "key": "refine/carry-pin",
+      "kind": "REFINE",
+      "requestedPages": 4,
+      "sourceKey": "margin/4p",
+      "state": "COMPLETED",
+      "artifactId": "6adb2eb74550a0c8516d039c",
+      "runId": "6adb33ec4550a0c8516d03c0",
+      "version": 2
+    },
+    {
+      "key": "refine/switch-system",
+      "kind": "REFINE",
+      "requestedDesignSystemId": "afterglow",
+      "requestedPages": 8,
+      "sourceKey": "margin/8p",
+      "state": "COMPLETED",
+      "artifactId": "6adb2eb74550a0c8516d039d",
+      "runId": "6adb33ec4550a0c8516d03c1",
+      "version": 2
+    }
+  ],
+  "rows": [
+    {
+      "runId": "6adb2eb74550a0c8516d039e",
+      "designSystemId": "margin",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "cfe52b52021ab9ad738db463337a6474773a1b4cd365fe412bc627e6f309e88a",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 0,
+      "wallTimeMs": 18547,
+      "credits": 14,
+      "pageCount": 8,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb2eb74550a0c8516d039f",
+      "designSystemId": "margin",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "0ca96d3bf47c2c61f61cf788ecc72d5de4ae92daeb3f60fa3483653e340e2148",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 0,
+      "wallTimeMs": 16028,
+      "credits": 14,
+      "pageCount": 4,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb2ecb4550a0c8516d03a1",
+      "designSystemId": "margin",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "dcc89d84366e1188a56ebd4d5e6bde2f37cb364d30292be74f9bc5165228806d",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "envelope.css.pageSelector",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "2158b05aafe117be4da5ef5fbb89db994674fedaa097a069e14d6763a55b26f9",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 1,
+      "wallTimeMs": 44747,
+      "credits": 26,
+      "pageCount": 15,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb2edf4550a0c8516d03a3",
+      "designSystemId": "afterglow",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "9de0863ab732939a6f58d882f9f5b03ef1bf206fbe84e878db141f05b76941b6",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "envelope.css.import",
+                  "count": 1
+                },
+                {
+                  "code": "envelope.css.pageSelector",
+                  "count": 1
+                },
+                {
+                  "code": "palette.rules.externalColors",
+                  "count": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "862143f3e1577591de1da2f2896e6971164e626aa35a88a02adad3b9b51f8cbf",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "icons.colors",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "516f54f1e1b1a32ef59de104e519510087a4be5a89aa90b9579f240df60ed583",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 2,
+      "wallTimeMs": 58463,
+      "credits": 30,
+      "pageCount": 4,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb2f074550a0c8516d03a5",
+      "designSystemId": "afterglow",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "77cf2ed0f560a5ccef6ac0337d2f183aa930298c6b5aea6494c7a86d92ac6283",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "envelope.css.import",
+                  "count": 1
+                },
+                {
+                  "code": "envelope.css.pageSelector",
+                  "count": 1
+                },
+                {
+                  "code": "palette.rules.externalColors",
+                  "count": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "95ea00ad19b53de67d0561ec79d970ee48b190f7e327a0254500a2018dd67bbe",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "icons.colors",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "37e8f43d1c3fc02d4945dd2294710fda921f65df585a138cbd03af7a13306070",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 2,
+      "wallTimeMs": 67156,
+      "credits": 34,
+      "pageCount": 8,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb2f434550a0c8516d03a7",
+      "designSystemId": "afterglow",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "53bf89f7b6d7e676da690df3ed60632e18b6190f6b2f7f49886a8f89a01e8a43",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "envelope.css.import",
+                  "count": 1
+                },
+                {
+                  "code": "envelope.css.pageSelector",
+                  "count": 1
+                },
+                {
+                  "code": "palette.rules.externalColors",
+                  "count": 5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "1bf9006cb759ec4f616600443606efa39afb54896a4362f116e6484051097dab",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "icons.colors",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "583d3c74e8764a66d53a8f66cb3d0c1d17207e7c14e7a676d6f9186ac20d0124",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 2,
+      "wallTimeMs": 95296,
+      "credits": 43,
+      "pageCount": 12,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb2f894550a0c8516d03a9",
+      "designSystemId": "broadside",
+      "outcome": "FAILED",
+      "failureCode": "document.repair_exhausted",
+      "jobAttemptFailureCodes": [
+        "document.repair_exhausted"
+      ],
+      "candidates": [
+        {
+          "candidateSha256": "22f9a8647c5a97809b1da65a934aeef2223a4d54b3430267d892c358514e9922",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "envelope.css.pageSelector",
+                  "count": 1
+                },
+                {
+                  "code": "typography.fonts",
+                  "count": 7
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "425d55fb0b21f4aecf0f584e76d107e993f992d4c5819fbcb800e41e514f68de",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "page.safeArea",
+                  "count": 3
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "repairRounds": 2,
+      "wallTimeMs": 78011,
+      "credits": 26,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb2fe44550a0c8516d03ab",
+      "designSystemId": "broadside",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "8c8ef07e96be8cd41cbc470eaac6a418e1f86d5f3447de2b944113ccbc9d5da8",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "envelope.css.import",
+                  "count": 1
+                },
+                {
+                  "code": "envelope.css.pageSelector",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "cc52df89eff65724dd3a6d8af2e6da85d7bb83fabfe237f3d01b46f5ce79a27f",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 2,
+      "wallTimeMs": 87550,
+      "credits": 38,
+      "pageCount": 8,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb30344550a0c8516d03ad",
+      "designSystemId": "broadside",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "1ac969bd35b3f72bd82980555fccb10358f923c2432a28177a94d3f0fb3f07de",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "envelope.css.import",
+                  "count": 1
+                },
+                {
+                  "code": "envelope.css.pageSelector",
+                  "count": 1
+                },
+                {
+                  "code": "spacing.scale",
+                  "count": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "eab5e911bdff04b6e3c7a2df8c41dc24a58ae09558438f79b63081d571a96d69",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "page.safeArea",
+                  "count": 7
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "2bf91bb0a23aec243900176da6d639d08d72f9a79d4f013843f03e68e2eb6665",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 2,
+      "wallTimeMs": 100815,
+      "credits": 43,
+      "pageCount": 12,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb308e4550a0c8516d03af",
+      "designSystemId": "colophon",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "fe7a2c022423bad226b5d831bffc06af633a413a074e3c1f21b2f01fcf8fce68",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "envelope.css.import",
+                  "count": 1
+                },
+                {
+                  "code": "typography.rules.transforms",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "a8075b4c8e6c1bd5fca4be47c13b5ed3e771ae7c01bcc1ae72f8c73b0c9c404d",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 1,
+      "wallTimeMs": 41792,
+      "credits": 22,
+      "pageCount": 4,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb30f24550a0c8516d03b1",
+      "designSystemId": "colophon",
+      "outcome": "FAILED",
+      "failureCode": "document.repair_exhausted",
+      "jobAttemptFailureCodes": [
+        "document.repair_exhausted"
+      ],
+      "candidates": [
+        {
+          "candidateSha256": "d1179c67520ffd7df14483cbacf9894be60a584447fd90e0e478f78df5cf3692",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "envelope.css.import",
+                  "count": 1
+                },
+                {
+                  "code": "spacing.scale",
+                  "count": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "5073beec83db634c906e0990edc5718e5d7aac5a2535025b9954bea233b7778d",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "render.overlap",
+                  "count": 4
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "36dad44af4e771cbc15b633c9526be0aabdbd842bf0fb0e99bb804ad5b146f7a",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "page.safeArea",
+                  "count": 1
+                },
+                {
+                  "code": "render.overlap",
+                  "count": 3
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "repairRounds": 2,
+      "wallTimeMs": 82184,
+      "credits": 26,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb311a4550a0c8516d03b3",
+      "designSystemId": "colophon",
+      "outcome": "FAILED",
+      "failureCode": "document.repair_exhausted",
+      "jobAttemptFailureCodes": [
+        "document.repair_exhausted"
+      ],
+      "candidates": [
+        {
+          "candidateSha256": "d8f4795cd172c7769b070c692f3d74a7cfe236dc58e8c71c6258282d1f56b705",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "envelope.css.import",
+                  "count": 1
+                },
+                {
+                  "code": "envelope.css.pageSelector",
+                  "count": 1
+                },
+                {
+                  "code": "typography.rules.transforms",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "34093f85dc000ae8c579cf14bab7e502ba9543cfa11956fdd78363bb895574ab",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "page.safeArea",
+                  "count": 7
+                },
+                {
+                  "code": "render.overlap",
+                  "count": 1
+                },
+                {
+                  "code": "icons.colors",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "76bc8f37d16b91f76c319e8389dbfdaddf92c2e24d29197021f02f8d3e9afbfc",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "render.overlap",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "repairRounds": 2,
+      "wallTimeMs": 99102,
+      "credits": 31,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb316a4550a0c8516d03b5",
+      "designSystemId": "overprint",
+      "outcome": "FAILED",
+      "failureCode": "document.repair_exhausted",
+      "jobAttemptFailureCodes": [
+        "document.repair_exhausted"
+      ],
+      "candidates": [
+        {
+          "candidateSha256": "95289444280b25f4ea5bd7b64bd9a8a1577211c669589d0c305e951a6dcb457c",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "envelope.css.import",
+                  "count": 1
+                },
+                {
+                  "code": "envelope.css.pageSelector",
+                  "count": 2
+                },
+                {
+                  "code": "spacing.scale",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "0896771b5d1774f31508a3ccc8dc7344b107400bd9366362f2f9ffc49601c66d",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "page.safeArea",
+                  "count": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "217a73fbd824e0a412b5fa2983695cbcb355e656643062b1b59d7694417aeb43",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "page.safeArea",
+                  "count": 3
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "repairRounds": 2,
+      "wallTimeMs": 87117,
+      "credits": 26,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb31ce4550a0c8516d03b7",
+      "designSystemId": "overprint",
+      "outcome": "FAILED",
+      "failureCode": "document.repair_exhausted",
+      "jobAttemptFailureCodes": [
+        "document.repair_exhausted"
+      ],
+      "candidates": [
+        {
+          "candidateSha256": "10d8ccf31dbd0901c8d670d7c383b33a0cd9e87bfa610222efe707b77952b2fa",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "envelope.body",
+                  "count": 1
+                },
+                {
+                  "code": "composition.pageRoles",
+                  "count": 1
+                },
+                {
+                  "code": "envelope.css.import",
+                  "count": 1
+                },
+                {
+                  "code": "envelope.css.pageSelector",
+                  "count": 1
+                },
+                {
+                  "code": "spacing.scale",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "c781bf6883c4ff58ce4b67a7e2429d3c85618f5cbcdf260737af41c99e4a6cea",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "page.safeArea",
+                  "count": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "0617170b25a5801961b0b5db013be4b00d273347b476371d63ceebbf287d8682",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "page.safeArea",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "repairRounds": 2,
+      "wallTimeMs": 78804,
+      "credits": 26,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb32294550a0c8516d03b9",
+      "designSystemId": "overprint",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "7d2677129e008ed096ae9e3796da7e64ab5e968b0562443da9fb7356c10d941f",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "envelope.css.import",
+                  "count": 1
+                },
+                {
+                  "code": "envelope.css.pageSelector",
+                  "count": 1
+                },
+                {
+                  "code": "spacing.scale",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "5caf6738ee2e5eeff602546716111583480b21dfa8bffceb3efb71e4700b9c0e",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "page.safeArea",
+                  "count": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "3ee918978cd48a7ce0eb7f1422f2a06c5e08dd44e1d7d93ab0cfe2cc27303815",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 2,
+      "wallTimeMs": 94574,
+      "credits": 42,
+      "pageCount": 12,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb32794550a0c8516d03bb",
+      "designSystemId": "schematic",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "05305f24290bcd024d45cbe31eecc682b5c1160d4ed5078c23c058ce6cee3d52",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "envelope.attribute",
+                  "count": 1
+                },
+                {
+                  "code": "envelope.css.atRule",
+                  "count": 1
+                },
+                {
+                  "code": "envelope.css.pageSelector",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "e2bb7687eb14d5ab2a69e0c22e03c52a8dd54526dcb2ff0d5bab1be66928204b",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "render.fonts.fallback",
+                  "count": 36
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "9f6aa35bd6e996a622142196d71cc32bb324114cd0e53e7392ea319a9b2d3349",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 2,
+      "wallTimeMs": 78047,
+      "credits": 34,
+      "pageCount": 4,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb32d34550a0c8516d03bd",
+      "designSystemId": "schematic",
+      "outcome": "FAILED",
+      "failureCode": "document.repair_exhausted",
+      "jobAttemptFailureCodes": [
+        "document.repair_exhausted"
+      ],
+      "candidates": [
+        {
+          "candidateSha256": "6223cdf4c6fa85e983561edc75712df4f67553828bc5fc665ceae5f749820fbf",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "envelope.css.import",
+                  "count": 1
+                },
+                {
+                  "code": "envelope.css.pageSelector",
+                  "count": 1
+                },
+                {
+                  "code": "spacing.scale",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "2005a754567f5d98e5f1ae56bcc8bca2d680e5dbce92c55cc8ab5eb5e9b9dcc5",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "page.safeArea",
+                  "count": 1
+                }
+              ]
+            },
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "page.safeArea",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "repairRounds": 2,
+      "wallTimeMs": 78561,
+      "credits": 31,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb33234550a0c8516d03bf",
+      "designSystemId": "schematic",
+      "outcome": "FAILED",
+      "failureCode": "document.repair_exhausted",
+      "jobAttemptFailureCodes": [
+        "document.repair_exhausted"
+      ],
+      "candidates": [
+        {
+          "candidateSha256": "775979e62cc2b03991acd33130b956a05bdeb757690323246543d4b9a62dc76b",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "envelope.css.import",
+                  "count": 1
+                },
+                {
+                  "code": "envelope.css.pageSelector",
+                  "count": 1
+                },
+                {
+                  "code": "envelope.css.important",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "35c4601dc479cf55e7c1be0c185d8daaf7ef5e7a0964ee97d1a1393c3dd925c5",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "page.safeArea",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "c0294442ea3e8dd2bdb8ca1a1e2cc0ce53fba3ef929c4613d974bb2e0ec77c89",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "page.safeArea",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "repairRounds": 2,
+      "wallTimeMs": 119480,
+      "credits": 39,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb33ec4550a0c8516d03c0",
+      "designSystemId": "margin",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "c3cad36f67d431a5545c173de024f68ee1f0f1732393b4f93be825777ec843b8",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 0,
+      "wallTimeMs": 29520,
+      "credits": 14,
+      "pageCount": 4,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6adb33ec4550a0c8516d03c1",
+      "designSystemId": "afterglow",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "d660dcae42713dbf3f1eb4c39f573113c9b38c5cdc130ea335678fdc9eb2d850",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "icons.colors",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "21f96de358dc35a6608a29a2ca98b58da5df4f8debd953c3a4b18949ec622d1d",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 1,
+      "wallTimeMs": 73670,
+      "credits": 26,
+      "pageCount": 8,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    }
+  ],
+  "metrics": {
+    "since": null,
+    "overall": {
+      "runs": 20,
+      "ready": 13,
+      "readyRate": 0.65,
+      "failures": {
+        "document.repair_exhausted": 7
+      },
+      "firstCandidate": {
+        "runs": 20,
+        "passed": 3,
+        "passRate": 0.15
+      },
+      "repairRounds": {
+        "0": 3,
+        "1": 3,
+        "2": 14
+      },
+      "violations": {
+        "static": [
+          {
+            "code": "envelope.css.pageSelector",
+            "checks": 14,
+            "count": 15
+          },
+          {
+            "code": "envelope.css.import",
+            "checks": 13,
+            "count": 13
+          },
+          {
+            "code": "spacing.scale",
+            "checks": 6,
+            "count": 8
+          },
+          {
+            "code": "palette.rules.externalColors",
+            "checks": 3,
+            "count": 10
+          },
+          {
+            "code": "typography.rules.transforms",
+            "checks": 2,
+            "count": 2
+          },
+          {
+            "code": "typography.fonts",
+            "checks": 1,
+            "count": 7
+          },
+          {
+            "code": "composition.pageRoles",
+            "checks": 1,
+            "count": 1
+          },
+          {
+            "code": "envelope.attribute",
+            "checks": 1,
+            "count": 1
+          },
+          {
+            "code": "envelope.body",
+            "checks": 1,
+            "count": 1
+          },
+          {
+            "code": "envelope.css.atRule",
+            "checks": 1,
+            "count": 1
+          }
+        ],
+        "render": [
+          {
+            "code": "page.safeArea",
+            "checks": 13,
+            "count": 33
+          },
+          {
+            "code": "icons.colors",
+            "checks": 5,
+            "count": 5
+          },
+          {
+            "code": "render.overlap",
+            "checks": 4,
+            "count": 9
+          },
+          {
+            "code": "render.fonts.fallback",
+            "checks": 1,
+            "count": 36
+          }
+        ]
+      },
+      "truncations": 0,
+      "truncationRate": 0,
+      "renderSessions": {
+        "total": 33,
+        "perRun": 1.65,
+        "retries": 0,
+        "billedUnits": 33,
+        "absorbedUnits": 0,
+        "timeoutsByPhase": {}
+      },
+      "wallTimeMs": {
+        "p50": 78047,
+        "p95": 100815,
+        "max": 119480
+      },
+      "credits": {
+        "p50": 30,
+        "p95": 43,
+        "max": 43
+      }
+    },
+    "byDesignSystem": {
+      "afterglow": {
+        "runs": 4,
+        "ready": 4,
+        "readyRate": 1,
+        "failures": {},
+        "firstCandidate": {
+          "runs": 4,
+          "passed": 0,
+          "passRate": 0
+        },
+        "repairRounds": {
+          "1": 1,
+          "2": 3
+        },
+        "violations": {
+          "static": [
+            {
+              "code": "palette.rules.externalColors",
+              "checks": 3,
+              "count": 10
+            },
+            {
+              "code": "envelope.css.import",
+              "checks": 3,
+              "count": 3
+            },
+            {
+              "code": "envelope.css.pageSelector",
+              "checks": 3,
+              "count": 3
+            }
+          ],
+          "render": [
+            {
+              "code": "icons.colors",
+              "checks": 4,
+              "count": 4
+            }
+          ]
+        },
+        "truncations": 0,
+        "truncationRate": 0,
+        "renderSessions": {
+          "total": 8,
+          "perRun": 2,
+          "retries": 0,
+          "billedUnits": 8,
+          "absorbedUnits": 0,
+          "timeoutsByPhase": {}
+        },
+        "wallTimeMs": {
+          "p50": 67156,
+          "p95": 95296,
+          "max": 95296
+        },
+        "credits": {
+          "p50": 30,
+          "p95": 43,
+          "max": 43
+        }
+      },
+      "broadside": {
+        "runs": 3,
+        "ready": 2,
+        "readyRate": 0.6666666666666666,
+        "failures": {
+          "document.repair_exhausted": 1
+        },
+        "firstCandidate": {
+          "runs": 3,
+          "passed": 0,
+          "passRate": 0
+        },
+        "repairRounds": {
+          "2": 3
+        },
+        "violations": {
+          "static": [
+            {
+              "code": "envelope.css.pageSelector",
+              "checks": 3,
+              "count": 3
+            },
+            {
+              "code": "envelope.css.import",
+              "checks": 2,
+              "count": 2
+            },
+            {
+              "code": "typography.fonts",
+              "checks": 1,
+              "count": 7
+            },
+            {
+              "code": "spacing.scale",
+              "checks": 1,
+              "count": 2
+            }
+          ],
+          "render": [
+            {
+              "code": "page.safeArea",
+              "checks": 2,
+              "count": 10
+            }
+          ]
+        },
+        "truncations": 0,
+        "truncationRate": 0,
+        "renderSessions": {
+          "total": 4,
+          "perRun": 1.3333333333333333,
+          "retries": 0,
+          "billedUnits": 4,
+          "absorbedUnits": 0,
+          "timeoutsByPhase": {}
+        },
+        "wallTimeMs": {
+          "p50": 87550,
+          "p95": 100815,
+          "max": 100815
+        },
+        "credits": {
+          "p50": 38,
+          "p95": 43,
+          "max": 43
+        }
+      },
+      "colophon": {
+        "runs": 3,
+        "ready": 1,
+        "readyRate": 0.3333333333333333,
+        "failures": {
+          "document.repair_exhausted": 2
+        },
+        "firstCandidate": {
+          "runs": 3,
+          "passed": 0,
+          "passRate": 0
+        },
+        "repairRounds": {
+          "1": 1,
+          "2": 2
+        },
+        "violations": {
+          "static": [
+            {
+              "code": "envelope.css.import",
+              "checks": 3,
+              "count": 3
+            },
+            {
+              "code": "typography.rules.transforms",
+              "checks": 2,
+              "count": 2
+            },
+            {
+              "code": "spacing.scale",
+              "checks": 1,
+              "count": 2
+            },
+            {
+              "code": "envelope.css.pageSelector",
+              "checks": 1,
+              "count": 1
+            }
+          ],
+          "render": [
+            {
+              "code": "render.overlap",
+              "checks": 4,
+              "count": 9
+            },
+            {
+              "code": "page.safeArea",
+              "checks": 2,
+              "count": 8
+            },
+            {
+              "code": "icons.colors",
+              "checks": 1,
+              "count": 1
+            }
+          ]
+        },
+        "truncations": 0,
+        "truncationRate": 0,
+        "renderSessions": {
+          "total": 5,
+          "perRun": 1.6666666666666667,
+          "retries": 0,
+          "billedUnits": 5,
+          "absorbedUnits": 0,
+          "timeoutsByPhase": {}
+        },
+        "wallTimeMs": {
+          "p50": 82184,
+          "p95": 99102,
+          "max": 99102
+        },
+        "credits": {
+          "p50": 22,
+          "p95": 22,
+          "max": 22
+        }
+      },
+      "margin": {
+        "runs": 4,
+        "ready": 4,
+        "readyRate": 1,
+        "failures": {},
+        "firstCandidate": {
+          "runs": 4,
+          "passed": 3,
+          "passRate": 0.75
+        },
+        "repairRounds": {
+          "0": 3,
+          "1": 1
+        },
+        "violations": {
+          "static": [
+            {
+              "code": "envelope.css.pageSelector",
+              "checks": 1,
+              "count": 1
+            }
+          ],
+          "render": []
+        },
+        "truncations": 0,
+        "truncationRate": 0,
+        "renderSessions": {
+          "total": 4,
+          "perRun": 1,
+          "retries": 0,
+          "billedUnits": 4,
+          "absorbedUnits": 0,
+          "timeoutsByPhase": {}
+        },
+        "wallTimeMs": {
+          "p50": 18547,
+          "p95": 44747,
+          "max": 44747
+        },
+        "credits": {
+          "p50": 14,
+          "p95": 26,
+          "max": 26
+        }
+      },
+      "overprint": {
+        "runs": 3,
+        "ready": 1,
+        "readyRate": 0.3333333333333333,
+        "failures": {
+          "document.repair_exhausted": 2
+        },
+        "firstCandidate": {
+          "runs": 3,
+          "passed": 0,
+          "passRate": 0
+        },
+        "repairRounds": {
+          "2": 3
+        },
+        "violations": {
+          "static": [
+            {
+              "code": "envelope.css.pageSelector",
+              "checks": 3,
+              "count": 4
+            },
+            {
+              "code": "envelope.css.import",
+              "checks": 3,
+              "count": 3
+            },
+            {
+              "code": "spacing.scale",
+              "checks": 3,
+              "count": 3
+            },
+            {
+              "code": "composition.pageRoles",
+              "checks": 1,
+              "count": 1
+            },
+            {
+              "code": "envelope.body",
+              "checks": 1,
+              "count": 1
+            }
+          ],
+          "render": [
+            {
+              "code": "page.safeArea",
+              "checks": 5,
+              "count": 11
+            }
+          ]
+        },
+        "truncations": 0,
+        "truncationRate": 0,
+        "renderSessions": {
+          "total": 6,
+          "perRun": 2,
+          "retries": 0,
+          "billedUnits": 6,
+          "absorbedUnits": 0,
+          "timeoutsByPhase": {}
+        },
+        "wallTimeMs": {
+          "p50": 87117,
+          "p95": 94574,
+          "max": 94574
+        },
+        "credits": {
+          "p50": 42,
+          "p95": 42,
+          "max": 42
+        }
+      },
+      "schematic": {
+        "runs": 3,
+        "ready": 1,
+        "readyRate": 0.3333333333333333,
+        "failures": {
+          "document.repair_exhausted": 2
+        },
+        "firstCandidate": {
+          "runs": 3,
+          "passed": 0,
+          "passRate": 0
+        },
+        "repairRounds": {
+          "2": 3
+        },
+        "violations": {
+          "static": [
+            {
+              "code": "envelope.css.pageSelector",
+              "checks": 3,
+              "count": 3
+            },
+            {
+              "code": "envelope.css.import",
+              "checks": 2,
+              "count": 2
+            },
+            {
+              "code": "envelope.attribute",
+              "checks": 1,
+              "count": 1
+            },
+            {
+              "code": "envelope.css.atRule",
+              "checks": 1,
+              "count": 1
+            },
+            {
+              "code": "envelope.css.important",
+              "checks": 1,
+              "count": 1
+            },
+            {
+              "code": "spacing.scale",
+              "checks": 1,
+              "count": 1
+            }
+          ],
+          "render": [
+            {
+              "code": "page.safeArea",
+              "checks": 4,
+              "count": 4
+            },
+            {
+              "code": "render.fonts.fallback",
+              "checks": 1,
+              "count": 36
+            }
+          ]
+        },
+        "truncations": 0,
+        "truncationRate": 0,
+        "renderSessions": {
+          "total": 6,
+          "perRun": 2,
+          "retries": 0,
+          "billedUnits": 6,
+          "absorbedUnits": 0,
+          "timeoutsByPhase": {}
+        },
+        "wallTimeMs": {
+          "p50": 78561,
+          "p95": 119480,
+          "max": 119480
+        },
+        "credits": {
+          "p50": 34,
+          "p95": 34,
+          "max": 34
+        }
+      }
+    }
+  },
+  "evaluation": {
+    "gates": [
+      {
+        "id": "failing-runs",
+        "label": "Runs failing ≤ 1",
+        "pass": false,
+        "detail": "7 failing of 20: broadside/4p (document.repair_exhausted), colophon/8p (document.repair_exhausted), colophon/12p (document.repair_exhausted), overprint/4p (document.repair_exhausted), overprint/8p (document.repair_exhausted), schematic/8p (document.repair_exhausted), schematic/15p (document.repair_exhausted)"
+      },
+      {
+        "id": "truncated",
+        "label": "document.truncated = 0",
+        "pass": true,
+        "detail": "0 run(s) truncated"
+      },
+      {
+        "id": "egress",
+        "label": "render.egress = 0",
+        "pass": true,
+        "detail": "0 run(s) hit render.egress"
+      },
+      {
+        "id": "slowest",
+        "label": "Slowest run ≤ 4m00s",
+        "pass": true,
+        "detail": "1m59s (6adb33234550a0c8516d03bf)"
+      },
+      {
+        "id": "cost-spread",
+        "label": "Costliest successful run ≤ 3× the cheapest at the same page count",
+        "pass": true,
+        "detail": "4 pages: 14–34 credits; 8 pages: 14–38 credits; 12 pages: 42–43 credits; 15 pages: 26–26 credits"
+      },
+      {
+        "id": "default-system",
+        "label": "Default design system (margin) has no failures",
+        "pass": true,
+        "detail": "margin: 0 failures"
+      }
+    ],
+    "systems": [
+      {
+        "designSystemId": "margin",
+        "runs": 3,
+        "failures": 0,
+        "verdict": "LIST"
+      },
+      {
+        "designSystemId": "afterglow",
+        "runs": 3,
+        "failures": 0,
+        "verdict": "LIST"
+      },
+      {
+        "designSystemId": "broadside",
+        "runs": 3,
+        "failures": 1,
+        "verdict": "RERUN_OR_UNLIST"
+      },
+      {
+        "designSystemId": "colophon",
+        "runs": 3,
+        "failures": 2,
+        "verdict": "UNLIST"
+      },
+      {
+        "designSystemId": "overprint",
+        "runs": 3,
+        "failures": 2,
+        "verdict": "UNLIST"
+      },
+      {
+        "designSystemId": "schematic",
+        "runs": 3,
+        "failures": 2,
+        "verdict": "UNLIST"
+      }
+    ],
+    "passed": false
+  },
+  "covers": [
+    {
+      "runId": "6adb2eb74550a0c8516d039f",
+      "key": "margin/4p",
+      "designSystemId": "margin",
+      "pageCount": 4,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6adb2eb74550a0c8516d039c/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261023%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261023T101803Z&X-Amz-Expires=86400&X-Amz-Signature=65677bdbe1979f6a174447b3f1e82c8e6d9659eb70f9273821ad5f8610c205d6&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6adb2eb74550a0c8516d039e",
+      "key": "margin/8p",
+      "designSystemId": "margin",
+      "pageCount": 8,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6adb2eb74550a0c8516d039d/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261023%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261023T101803Z&X-Amz-Expires=86400&X-Amz-Signature=4a0dbf6ff179eec3ba77d40396cca99edd314217d10f6a9aae293326fa541adc&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6adb2ecb4550a0c8516d03a1",
+      "key": "margin/15p",
+      "designSystemId": "margin",
+      "pageCount": 15,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6adb2ecb4550a0c8516d03a0/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261023%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261023T101803Z&X-Amz-Expires=86400&X-Amz-Signature=67056ee190b9fd3be45a023c95d092d5325b5c16becc8c286baf7868c9ccccd4&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6adb2edf4550a0c8516d03a3",
+      "key": "afterglow/4p",
+      "designSystemId": "afterglow",
+      "pageCount": 4,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6adb2edf4550a0c8516d03a2/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261023%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261023T101803Z&X-Amz-Expires=86400&X-Amz-Signature=d3fdd1039bc4d980709c297356709b27379efa06acfa2a5de064db89f8f2594b&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6adb2f074550a0c8516d03a5",
+      "key": "afterglow/8p",
+      "designSystemId": "afterglow",
+      "pageCount": 8,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6adb2f074550a0c8516d03a4/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261023%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261023T101803Z&X-Amz-Expires=86400&X-Amz-Signature=806ab3ae9ae5ee0adbd05e911b0342d99daec2fe7fb2ae427df417b2d3581b31&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6adb2f434550a0c8516d03a7",
+      "key": "afterglow/12p",
+      "designSystemId": "afterglow",
+      "pageCount": 12,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6adb2f434550a0c8516d03a6/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261023%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261023T101803Z&X-Amz-Expires=86400&X-Amz-Signature=76129ec1902afd2c28d7e261b5e1fe3f127ae36ff82e4fd0538527681473f4e3&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6adb2fe44550a0c8516d03ab",
+      "key": "broadside/8p",
+      "designSystemId": "broadside",
+      "pageCount": 8,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6adb2fe44550a0c8516d03aa/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261023%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261023T101803Z&X-Amz-Expires=86400&X-Amz-Signature=96c5fbc0af6ad36201e93bd6fe4b42f001a538fecbf335bf3c1aef6026c3df54&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6adb30344550a0c8516d03ad",
+      "key": "broadside/12p",
+      "designSystemId": "broadside",
+      "pageCount": 12,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6adb30344550a0c8516d03ac/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261023%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261023T101803Z&X-Amz-Expires=86400&X-Amz-Signature=47f1fa1b9c70e4f24860fef326de175d80b5d8bfe3a9311b8da1ebbbca5c03c6&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6adb308e4550a0c8516d03af",
+      "key": "colophon/4p",
+      "designSystemId": "colophon",
+      "pageCount": 4,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6adb308e4550a0c8516d03ae/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261023%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261023T101803Z&X-Amz-Expires=86400&X-Amz-Signature=22e9af75b194dc5d09b8cd740714d77f7af9fa620cb4cbfe1c0c26afba28698f&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6adb32294550a0c8516d03b9",
+      "key": "overprint/12p",
+      "designSystemId": "overprint",
+      "pageCount": 12,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6adb32294550a0c8516d03b8/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261023%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261023T101803Z&X-Amz-Expires=86400&X-Amz-Signature=c9e3ca5c467724cf31addf09ffae08d3ef01ba90600e5ce4e9c08db143169083&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6adb32794550a0c8516d03bb",
+      "key": "schematic/4p",
+      "designSystemId": "schematic",
+      "pageCount": 4,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6adb32794550a0c8516d03ba/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261023%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261023T101803Z&X-Amz-Expires=86400&X-Amz-Signature=fbe1a07e34c29cbbe65b0387e973788172353119a1615759289d3d53ff47d97a&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6adb33ec4550a0c8516d03c0",
+      "key": "refine/carry-pin",
+      "designSystemId": "margin",
+      "pageCount": 4,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6adb2eb74550a0c8516d039c/2/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261023%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261023T101803Z&X-Amz-Expires=86400&X-Amz-Signature=2ea8cd2cf346ae8bc6152e5485e540f9699a5364aab63d22361184989aed9127&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6adb33ec4550a0c8516d03c1",
+      "key": "refine/switch-system",
+      "designSystemId": "afterglow",
+      "pageCount": 8,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6adb2eb74550a0c8516d039d/2/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261023%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261023T101803Z&X-Amz-Expires=86400&X-Amz-Signature=4fbe87ee50ab55f997cb3477d9d9d5d4aa8b2e40a9a41776a3104a545438f781&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    }
+  ]
+}

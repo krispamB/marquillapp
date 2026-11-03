@@ -56,7 +56,7 @@ import RefineDesignControl from "./RefineDesignControl";
 import { isDesignSystemUnavailable } from "./designSystems";
 import useDesignSystems from "./useDesignSystems";
 import RedesignShell from "./Shell";
-import { useArtifactRun } from "./useArtifactRun";
+import { useArtifactRun, type InlineArtifactResult } from "./useArtifactRun";
 import useArtifactPostDraft from "./useArtifactPostDraft";
 
 type ConversationEntry =
@@ -64,6 +64,15 @@ type ConversationEntry =
   | { id: string; role: "assistant"; artifact: ArtifactDetailData; credits?: number };
 
 const REFINE_TEXTAREA_MAX_HEIGHT = 168;
+
+/**
+ * Drops `?run=` from the address bar without a Next.js navigation, so the page
+ * neither re-renders on the server nor remounts. The App Router syncs its own
+ * URL state from `history.replaceState`.
+ */
+function replaceUrlWithoutNavigation(url: string) {
+  window.history.replaceState(window.history.state, "", url);
+}
 
 function prefersReducedMotion() {
   return typeof window.matchMedia === "function"
@@ -113,6 +122,8 @@ export default function ArtifactConversationClient({
   const [entries, setEntries] = useState<ConversationEntry[]>([]);
   const [artifactType, setArtifactType] = useState<ArtifactType>();
   const [artifactTitle, setArtifactTitle] = useState<string>();
+  const artifactTitleRef = useRef(artifactTitle);
+  useEffect(() => { artifactTitleRef.current = artifactTitle; }, [artifactTitle]);
   const [activeRunId, setActiveRunId] = useState(initialRunId);
   const [isHydrated, setIsHydrated] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -192,16 +203,30 @@ export default function ArtifactConversationClient({
     return response.data;
   }, [artifactId]);
 
-  const handleArtifactReady = useCallback(async (version: number, credits: number) => {
+  const handleArtifactReady = useCallback(async (
+    version: number,
+    credits: number,
+    inline?: InlineArtifactResult,
+  ) => {
     try {
-      const artifact = await readArtifact(version);
+      // A live POST/POLL completion carries the version itself; otherwise read it.
+      const artifact: ArtifactDetailData = inline ? {
+        id: inline.artifactId,
+        type: inline.type,
+        title: inline.title ?? artifactTitleRef.current,
+        currentVersion: version,
+        version,
+        status: "READY",
+        content: inline.content,
+        updatedAt: new Date().toISOString(),
+      } : await readArtifact(version);
       appendArtifact(artifact, credits);
       setLoadError(null);
     } finally {
       setActiveRunId(undefined);
-      router.replace(cleanArtifactUrl);
+      replaceUrlWithoutNavigation(cleanArtifactUrl);
     }
-  }, [appendArtifact, cleanArtifactUrl, readArtifact, router]);
+  }, [appendArtifact, cleanArtifactUrl, readArtifact]);
 
   const handleTerminalFailure = useCallback(() => {
     // Keep ?run= in the URL so refresh can replay the retained terminal reason.
@@ -215,8 +240,10 @@ export default function ArtifactConversationClient({
     retryCompletedVersion,
     showDurableFailure,
   } = useArtifactRun({
+    artifactId,
     runId: activeRunId,
-    enabled: isHydrated,
+    // Follow a ?run= from the first render; the hook does nothing without a run id.
+    enabled: true,
     initialType: artifactType,
     onType: setArtifactType,
     onArtifactReady: handleArtifactReady,
@@ -246,7 +273,7 @@ export default function ArtifactConversationClient({
         if (!attempt) {
           setActiveRunId(undefined);
           clearRun();
-          if (initialRunIdRef.current) router.replace(cleanArtifactUrl);
+          if (initialRunIdRef.current) replaceUrlWithoutNavigation(cleanArtifactUrl);
           return;
         }
 
@@ -284,7 +311,6 @@ export default function ArtifactConversationClient({
     cleanArtifactUrl,
     clearRun,
     readArtifact,
-    router,
     showDurableFailure,
   ]);
 
@@ -571,6 +597,9 @@ export default function ArtifactConversationClient({
                   artifactId={artifactId}
                   onRetryLoad={retryCompletedVersion}
                 />
+                {run.draftCommentary ? (
+                  <p className="mq-studio-post-copy mq-studio-draft-preview">{run.draftCommentary}</p>
+                ) : null}
               </div>
             </div>
           ) : null}

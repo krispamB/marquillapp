@@ -41,16 +41,22 @@ import { AgentRunnerService } from './agent-runner.service';
 import type {
   AgentRunConfig,
   DocumentGenerateInput,
+  DocumentRepairFallbackInput,
   DocumentRepairInput,
   GenerateInput,
   Tool,
 } from './agent-runner.interface';
+import {
+  buildDocumentPatchRepairUserPrompt,
+  buildDocumentRepairFallbackUserPrompt,
+} from './prompts';
 import { StylePreset } from './style-presets.config';
 
 const GENERATION_MODEL = 'test/generation-model';
 const RESEARCH_MODEL = 'test/research-model';
 const TAVILY_API_KEY = 'test/tavily-key';
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+const RESEARCH_TURN_TIMEOUT_MS = 45_000;
 
 const CONFIG: Record<string, string> = {
   GENERATION_MODEL,
@@ -91,6 +97,8 @@ interface ServiceConfig {
   researchMaxOutputTokens?: string | number;
   generationMaxOutputTokens?: string | number;
   documentMaxOutputTokens?: string | number;
+  /** Any other optional key, e.g. a `*_REASONING_EFFORT`. */
+  env?: Record<string, string>;
 }
 
 const makeService = ({
@@ -99,10 +107,11 @@ const makeService = ({
   researchMaxOutputTokens,
   generationMaxOutputTokens,
   documentMaxOutputTokens,
+  env = {},
 }: ServiceConfig = {}) => {
   const llmService = { complete: jest.fn(), completeWithTools: jest.fn() };
   const configService = {
-    getOrThrow: jest.fn((key: string) => CONFIG[key]),
+    getOrThrow: jest.fn((key: string) => env[key] ?? CONFIG[key]),
     get: jest.fn((key: string) => {
       if (key === 'RESEARCH_MAX_STEPS') return maxSteps;
       if (key === 'RESEARCH_MAX_SUCCESSFUL_SEARCHES') {
@@ -117,7 +126,7 @@ const makeService = ({
       if (key === 'DOCUMENT_GENERATION_MAX_OUTPUT_TOKENS') {
         return documentMaxOutputTokens;
       }
-      return undefined;
+      return env[key];
     }),
   };
 
@@ -132,6 +141,7 @@ const makeService = ({
   const input: GenerateInput = {
     type: ArtifactType.POST,
     prompt: 'Why staff engineers should write more',
+    today: '2026-10-25',
   };
 
   return { service, mocks: { llmService, configService }, fixtures: { input } };
@@ -360,6 +370,271 @@ describe('AgentRunnerService', () => {
       });
     });
 
+    describe('repeated poll options', () => {
+      const pollJson = (options: string[]) =>
+        generatedJson({
+          poll: { question: 'Which one?', options, durationDays: 7 },
+        });
+
+      it('should drop a repeated option, keeping the first, without a repair call', async () => {
+        const log = jest
+          .spyOn(Logger.prototype, 'log')
+          .mockImplementation(() => undefined);
+        mocks.llmService.complete.mockResolvedValue(
+          completion(pollJson(['Yes', 'No', ' yes '])),
+        );
+
+        await expect(
+          service.generate({ ...fixtures.input, type: ArtifactType.POLL }),
+        ).resolves.toMatchObject({
+          content: { poll: { options: ['Yes', 'No'] } },
+        });
+        expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+        expect(log).toHaveBeenCalledWith(
+          expect.stringContaining('Dropped 1 repeated POLL option'),
+        );
+        log.mockRestore();
+      });
+
+      it('should still repair when fewer than two options would remain', async () => {
+        mocks.llmService.complete
+          .mockResolvedValueOnce(completion(pollJson(['Yes', 'yes'])))
+          .mockResolvedValueOnce(completion(pollJson(['Yes', 'No'])));
+
+        await expect(
+          service.generate({ ...fixtures.input, type: ArtifactType.POLL }),
+        ).resolves.toMatchObject({
+          content: { poll: { options: ['Yes', 'No'] } },
+        });
+        expect(mocks.llmService.complete).toHaveBeenCalledTimes(2);
+        expect(messagesOfCall(2)[3].content).toContain(
+          'poll options must be unique',
+        );
+      });
+    });
+
+    describe('streamed commentary', () => {
+      const STREAM_ON = { env: { STREAM_POST_COMMENTARY: 'true' } };
+
+      /** A completion that streams `text` in `pieces` through `onTextDelta` first. */
+      const streamed =
+        (text: string, pieces: number) =>
+        (
+          _provider: unknown,
+          _messages: unknown,
+          options?: CompletionOptions,
+        ) => {
+          const size = Math.ceil(text.length / pieces);
+          let soFar = '';
+          for (let at = 0; at < text.length; at += size) {
+            const delta = text.slice(at, at + size);
+            soFar += delta;
+            options?.onTextDelta?.(delta, soFar);
+          }
+          return Promise.resolve(completion(text));
+        };
+
+      it('should not stream when STREAM_POST_COMMENTARY is off', async () => {
+        mocks.llmService.complete.mockResolvedValue(
+          completion(generatedJson({ commentary: 'Write more.' })),
+        );
+
+        await service.generate(fixtures.input, { onCommentary: jest.fn() });
+
+        expect(completeCalls()[0][2]?.onTextDelta).toBeUndefined();
+      });
+
+      it('should not stream when the caller takes no commentary', async () => {
+        ({ service, mocks, fixtures } = makeService(STREAM_ON));
+        mocks.llmService.complete.mockResolvedValue(
+          completion(generatedJson({ commentary: 'Write more.' })),
+        );
+
+        await service.generate(fixtures.input, { onUsage: jest.fn() });
+
+        expect(completeCalls()[0][2]?.onTextDelta).toBeUndefined();
+      });
+
+      it('should fail boot when STREAM_POST_COMMENTARY is not a boolean', () => {
+        expect(() =>
+          makeService({ env: { STREAM_POST_COMMENTARY: 'yes' } }),
+        ).toThrow('STREAM_POST_COMMENTARY');
+      });
+
+      it('should hand the commentary written so far to onCommentary as the text streams', async () => {
+        ({ service, mocks, fixtures } = makeService(STREAM_ON));
+        mocks.llmService.complete.mockImplementation(
+          streamed('{"commentary":"Write more, ship more.","title":"T"}', 6),
+        );
+        const onCommentary = jest.fn();
+
+        await expect(
+          service.generate(fixtures.input, { onCommentary }),
+        ).resolves.toMatchObject({
+          content: { commentary: 'Write more, ship more.' },
+        });
+
+        const seen = onCommentary.mock.calls.map(([text]) => text as string);
+        expect(seen.length).toBeGreaterThan(1);
+        expect(seen.at(-1)).toBe('Write more, ship more.');
+        seen.forEach((text) =>
+          expect('Write more, ship more.'.startsWith(text)).toBe(true),
+        );
+      });
+
+      it('should announce a rewrite before the repair turn and stream the repair', async () => {
+        ({ service, mocks, fixtures } = makeService(STREAM_ON));
+        mocks.llmService.complete
+          .mockImplementationOnce(
+            streamed(generatedJson({ commentary: '' }), 2),
+          )
+          .mockImplementationOnce(
+            streamed(generatedJson({ commentary: 'Repaired.' }), 3),
+          );
+        const order: string[] = [];
+        const onCommentary = jest.fn((text: string) =>
+          order.push(`text:${text}`),
+        );
+        const onRewrite = jest.fn(() => order.push('rewrite'));
+
+        await service.generate(fixtures.input, { onCommentary, onRewrite });
+
+        expect(onRewrite).toHaveBeenCalledTimes(1);
+        const rewriteAt = order.indexOf('rewrite');
+        expect(completeCalls()[1][2]?.onTextDelta).toBeDefined();
+        expect(order.slice(rewriteAt + 1)).toContain('text:Repaired.');
+      });
+
+      it('should announce no rewrite when the first draft is valid', async () => {
+        ({ service, mocks, fixtures } = makeService(STREAM_ON));
+        mocks.llmService.complete.mockImplementation(
+          streamed(generatedJson({ commentary: 'Fine.' }), 2),
+        );
+        const onRewrite = jest.fn();
+
+        await service.generate(fixtures.input, {
+          onCommentary: jest.fn(),
+          onRewrite,
+        });
+
+        expect(onRewrite).not.toHaveBeenCalled();
+      });
+
+      it('should announce no rewrite when it is not streaming', async () => {
+        mocks.llmService.complete
+          .mockResolvedValueOnce(completion(generatedJson({ commentary: '' })))
+          .mockResolvedValueOnce(
+            completion(generatedJson({ commentary: 'Repaired.' })),
+          );
+        const onRewrite = jest.fn();
+
+        await service.generate(fixtures.input, {
+          onCommentary: jest.fn(),
+          onRewrite,
+        });
+
+        expect(onRewrite).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('the per-type model', () => {
+      const invalidPoll = generatedJson({
+        poll: { question: '', options: [] },
+      });
+      const validPoll = generatedJson({
+        poll: {
+          question: 'Tabs or spaces?',
+          options: ['Tabs', 'Spaces'],
+          durationDays: 3,
+        },
+      });
+      const pollInput: GenerateInput = {
+        type: ArtifactType.POLL,
+        prompt: 'Tabs or spaces?',
+        today: '2026-10-25',
+      };
+
+      it('should use GENERATION_MODEL for POST and POLL when neither key is set', async () => {
+        mocks.llmService.complete.mockResolvedValue(
+          completion(generatedJson({ commentary: 'Hi.' })),
+        );
+        await service.generate(fixtures.input);
+        expect(completeCalls()[0][2]?.model).toBe(GENERATION_MODEL);
+
+        mocks.llmService.complete.mockResolvedValue(completion(validPoll));
+        await service.generate(pollInput);
+        expect(completeCalls()[1][2]?.model).toBe(GENERATION_MODEL);
+      });
+
+      it('should send POST_GENERATION_MODEL to POST only, repair turn included', async () => {
+        ({ service, mocks } = makeService({
+          env: { POST_GENERATION_MODEL: 'fast/post' },
+        }));
+        mocks.llmService.complete
+          .mockResolvedValueOnce(completion(generatedJson({ commentary: '' })))
+          .mockResolvedValueOnce(
+            completion(generatedJson({ commentary: 'Fixed.' })),
+          )
+          .mockResolvedValueOnce(completion(validPoll));
+
+        await service.generate(fixtures.input);
+        await service.generate(pollInput);
+
+        expect(completeCalls().map((call) => call[2]?.model)).toEqual([
+          'fast/post',
+          'fast/post',
+          GENERATION_MODEL,
+        ]);
+      });
+
+      it('should send POLL_GENERATION_MODEL to POLL only, repair turn included', async () => {
+        ({ service, mocks } = makeService({
+          env: { POLL_GENERATION_MODEL: 'fast/poll' },
+        }));
+        mocks.llmService.complete
+          .mockResolvedValueOnce(completion(invalidPoll))
+          .mockResolvedValueOnce(completion(validPoll))
+          .mockResolvedValueOnce(
+            completion(generatedJson({ commentary: 'Hi.' })),
+          );
+
+        await service.generate(pollInput);
+        await service.generate(fixtures.input);
+
+        expect(completeCalls().map((call) => call[2]?.model)).toEqual([
+          'fast/poll',
+          'fast/poll',
+          GENERATION_MODEL,
+        ]);
+      });
+
+      it('should leave DOCUMENT drafts on GENERATION_MODEL', async () => {
+        ({ service, mocks } = makeService({
+          env: {
+            POST_GENERATION_MODEL: 'fast/post',
+            POLL_GENERATION_MODEL: 'fast/poll',
+          },
+        }));
+        mocks.llmService.complete.mockResolvedValue(
+          completion(
+            JSON.stringify({
+              title: 'T',
+              commentary: 'C',
+              html: '<p>x</p>',
+            }),
+          ),
+        );
+        await service.generateDocument({
+          prompt: 'Three fixes',
+          today: '2026-10-25',
+          fragment: 'FRAGMENT',
+          includeTitle: true,
+          maxEnvelopeRepairs: 1,
+        });
+        expect(completeCalls()[0][2]?.model).toBe(GENERATION_MODEL);
+      });
+    });
+
     describe('the inline repair retry', () => {
       it('should re-prompt with the validation error and return the repaired content', async () => {
         mocks.llmService.complete
@@ -483,6 +758,7 @@ describe('AgentRunnerService', () => {
 
     const documentInput: DocumentGenerateInput = {
       prompt: 'Three fixes for documents',
+      today: '2026-10-25',
       fragment: 'DESIGN SYSTEM: Margin (margin v2)',
       includeTitle: true,
       maxEnvelopeRepairs: 1,
@@ -603,6 +879,24 @@ describe('AgentRunnerService', () => {
       expect(repairPrompt).toContain('rejected');
     });
 
+    it('should tag the draft turn and its envelope repair turn with the call they made', async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(completion(draftJson({ html: '' }), 0.03))
+        .mockResolvedValueOnce(completion(draftJson(), 0.04));
+      const onUsage = jest.fn();
+
+      await service.generateDocument(documentInput, { onUsage });
+
+      expect(onUsage).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ call: 'draft', model: GENERATION_MODEL }),
+      );
+      expect(onUsage).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ call: 'envelope' }),
+      );
+    });
+
     it('should log the envelope repair without the model output when the draft is invalid', async () => {
       const warn = jest
         .spyOn(Logger.prototype, 'warn')
@@ -662,12 +956,17 @@ describe('AgentRunnerService', () => {
     const HTML = '<!doctype html><html><body></body></html>';
     const CANDIDATE = '<!doctype html><html><body>13px</body></html>';
     const repairJson = (overrides: Record<string, unknown> = {}) =>
-      JSON.stringify({
-        title: 'A different title',
-        commentary: 'Different commentary.',
-        html: HTML,
-        ...overrides,
-      });
+      JSON.stringify({ html: HTML, ...overrides });
+
+    /** The properties of the response schema sent on the nth (1-based) call. */
+    const responseSchemaPropertiesOfCall = (n: number): string[] => {
+      const schema = completeCalls()[n - 1][2]?.responseSchema?.schema;
+      const jsonSchema = z.toJSONSchema(schema as z.ZodType, {
+        target: 'draft-7',
+        io: 'output',
+      }) as { properties?: Record<string, unknown> };
+      return Object.keys(jsonSchema.properties ?? {});
+    };
 
     const repairInput: DocumentRepairInput = {
       fragment: 'DESIGN SYSTEM: Margin (margin v2)',
@@ -688,7 +987,7 @@ describe('AgentRunnerService', () => {
       maxEnvelopeRepairs: 1,
     };
 
-    it('should keep only the Candidate Source, ignoring the title and commentary', async () => {
+    it('should return the Candidate Source the model wrote', async () => {
       mocks.llmService.complete.mockResolvedValue(completion(repairJson()));
 
       await expect(service.repairDocument(repairInput)).resolves.toEqual({
@@ -696,6 +995,48 @@ describe('AgentRunnerService', () => {
         envelopeRepairs: 0,
       });
       expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+    });
+
+    it('should constrain the Repair to a schema with only html, even when a title is asked for', async () => {
+      mocks.llmService.complete.mockResolvedValue(completion(repairJson()));
+
+      await service.repairDocument(repairInput);
+
+      expect(responseSchemaPropertiesOfCall(1)).toEqual(['html']);
+    });
+
+    it('should keep the html-only schema on the envelope repair turn', async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(completion(repairJson({ html: '' })))
+        .mockResolvedValueOnce(completion(repairJson()));
+
+      await service.repairDocument(repairInput);
+
+      expect(responseSchemaPropertiesOfCall(2)).toEqual(['html']);
+    });
+
+    it('should drop a title and commentary the model writes anyway', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        completion(
+          repairJson({ title: 'A different title', commentary: 'Different.' }),
+        ),
+      );
+
+      await expect(service.repairDocument(repairInput)).resolves.toEqual({
+        html: HTML,
+        envelopeRepairs: 0,
+      });
+    });
+
+    it('should end the user message by asking for the html JSON only', async () => {
+      mocks.llmService.complete.mockResolvedValue(completion(repairJson()));
+
+      await service.repairDocument(repairInput);
+
+      const user = messagesOfCall(1)[1].content ?? '';
+      expect(user.split('\n').at(-1)).toBe(
+        'Answer with JSON {"html": …} only.',
+      );
     });
 
     it('should send a fresh two-message call whose system message is byte-identical to the draft call', async () => {
@@ -709,6 +1050,7 @@ describe('AgentRunnerService', () => {
 
       await service.generateDocument({
         prompt: 'Three fixes for documents',
+        today: '2026-10-25',
         stylePreset: StylePreset.CONTRARIAN,
         research: { findings: 'RESEARCH FINDINGS TEXT', sources: [] },
         fragment: repairInput.fragment,
@@ -760,6 +1102,24 @@ describe('AgentRunnerService', () => {
       expect(onUsage).toHaveBeenCalledTimes(2);
     });
 
+    it('should tag the Repair turn and its envelope repair turn with the call they made', async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(completion(repairJson({ html: '' }), 0.03))
+        .mockResolvedValueOnce(completion(repairJson(), 0.04));
+      const onUsage = jest.fn();
+
+      await service.repairDocument(repairInput, { onUsage });
+
+      expect(onUsage).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ call: 'repair' }),
+      );
+      expect(onUsage).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ call: 'envelope' }),
+      );
+    });
+
     it('should throw ContentValidationError without a repair turn when none is left', async () => {
       mocks.llmService.complete.mockResolvedValue(
         completion(repairJson({ html: '' })),
@@ -807,6 +1167,245 @@ describe('AgentRunnerService', () => {
       await expect(service.repairDocument(repairInput)).rejects.toBeInstanceOf(
         DocumentTruncatedError,
       );
+    });
+  });
+
+  describe('repairDocumentPatch', () => {
+    const HTML = '<!doctype html><html><body></body></html>';
+    const CANDIDATE = '<!doctype html><html><body>13px</body></html>';
+    const EDITS = [{ find: '13px', replace: '14px' }];
+    const answer = (value: Record<string, unknown>) =>
+      completion(JSON.stringify(value));
+
+    const repairInput: DocumentRepairInput = {
+      fragment: 'DESIGN SYSTEM: Margin (margin v2)',
+      includeTitle: true,
+      candidate: CANDIDATE,
+      violations: {
+        violations: [
+          {
+            code: 'typography.rules.minPx',
+            detail: 'font-size 13px is below 14px',
+          },
+        ],
+        omitted: [],
+      },
+      maxEnvelopeRepairs: 1,
+    };
+
+    it('should return the edits the model answered with when its html is null', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        answer({ edits: EDITS, html: null }),
+      );
+
+      await expect(service.repairDocumentPatch(repairInput)).resolves.toEqual({
+        edits: EDITS,
+        envelopeRepairs: 0,
+      });
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return the html the model answered with when its edits are null', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        answer({ edits: null, html: HTML }),
+      );
+
+      await expect(service.repairDocumentPatch(repairInput)).resolves.toEqual({
+        html: HTML,
+        envelopeRepairs: 0,
+      });
+    });
+
+    it('should constrain the Repair to the patch schema and send the patch prompt', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        answer({ edits: EDITS, html: null }),
+      );
+
+      await service.repairDocumentPatch(repairInput);
+
+      const [, messages, options] = completeCalls()[0];
+      const jsonSchema = z.toJSONSchema(
+        options?.responseSchema?.schema as z.ZodType,
+        { target: 'draft-7', io: 'output' },
+      ) as { properties?: Record<string, unknown> };
+      expect(Object.keys(jsonSchema.properties ?? {})).toEqual([
+        'edits',
+        'html',
+      ]);
+      expect(messages).toHaveLength(2);
+      expect(messages[1].content).toBe(
+        buildDocumentPatchRepairUserPrompt(CANDIDATE, repairInput.violations),
+      );
+      expectGenerationOptions(options, 16384);
+    });
+
+    it('should send the same system message as the full-mode Repair', async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(answer({ html: HTML }))
+        .mockResolvedValueOnce(answer({ edits: EDITS, html: null }));
+
+      await service.repairDocument(repairInput);
+      await service.repairDocumentPatch(repairInput);
+
+      expect(messagesOfCall(2)[0]).toEqual(messagesOfCall(1)[0]);
+    });
+
+    it('should spend an envelope repair turn when the model answers with both edits and html', async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(answer({ edits: EDITS, html: HTML }))
+        .mockResolvedValueOnce(answer({ edits: EDITS, html: null }));
+      const onUsage = jest.fn();
+
+      await expect(
+        service.repairDocumentPatch(repairInput, { onUsage }),
+      ).resolves.toEqual({ edits: EDITS, envelopeRepairs: 1 });
+      expect(onUsage).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ call: 'repair' }),
+      );
+      expect(onUsage).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ call: 'envelope' }),
+      );
+    });
+
+    it('should throw DocumentTruncatedError before parsing when the patch Repair hit the cap', async () => {
+      mocks.llmService.complete.mockResolvedValue({
+        ...answer({ edits: EDITS, html: null }),
+        finishReason: 'length',
+      });
+
+      await expect(
+        service.repairDocumentPatch(repairInput),
+      ).rejects.toBeInstanceOf(DocumentTruncatedError);
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('repairDocumentFallback', () => {
+    const HTML = '<!doctype html><html><body>14px</body></html>';
+    const CANDIDATE = '<!doctype html><html><body>13px</body></html>';
+    const EDITS = [{ find: '12px', replace: '14px' }];
+    const PROBLEMS = ['Edit 1: find not found: "12px".'];
+
+    const fallbackInput: DocumentRepairFallbackInput = {
+      fragment: 'DESIGN SYSTEM: Margin (margin v2)',
+      includeTitle: false,
+      candidate: CANDIDATE,
+      violations: {
+        violations: [
+          {
+            code: 'typography.rules.minPx',
+            detail: 'font-size 13px is below 14px',
+          },
+        ],
+        omitted: [],
+      },
+      maxEnvelopeRepairs: 1,
+      edits: EDITS,
+      problems: PROBLEMS,
+    };
+
+    it('should return the Candidate Source the model wrote', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        completion(JSON.stringify({ html: HTML })),
+      );
+
+      await expect(
+        service.repairDocumentFallback(fallbackInput),
+      ).resolves.toEqual({ html: HTML, envelopeRepairs: 0 });
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+    });
+
+    it('should continue the patch Repair with its edits as the assistant turn and the problems as the user turn', async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(
+          completion(JSON.stringify({ edits: EDITS, html: null })),
+        )
+        .mockResolvedValueOnce(completion(JSON.stringify({ html: HTML })));
+
+      await service.repairDocumentPatch(fallbackInput);
+      await service.repairDocumentFallback(fallbackInput);
+
+      const [system, user, assistant, followUp] = messagesOfCall(2);
+      expect(messagesOfCall(2)).toHaveLength(4);
+      expect([system, user]).toEqual(messagesOfCall(1));
+      expect(assistant).toEqual({
+        role: MessageRole.Assistant,
+        content: JSON.stringify({ edits: EDITS, html: null }),
+      });
+      expect(followUp).toEqual({
+        role: MessageRole.User,
+        content: buildDocumentRepairFallbackUserPrompt(PROBLEMS),
+      });
+    });
+
+    it('should constrain the fallback to the html-only schema with the DOCUMENT cap', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        completion(JSON.stringify({ html: HTML })),
+      );
+
+      await service.repairDocumentFallback(fallbackInput);
+
+      const options = completeCalls()[0][2];
+      const jsonSchema = z.toJSONSchema(
+        options?.responseSchema?.schema as z.ZodType,
+        { target: 'draft-7', io: 'output' },
+      ) as { properties?: Record<string, unknown> };
+      expect(Object.keys(jsonSchema.properties ?? {})).toEqual(['html']);
+      expectGenerationOptions(options, 16384);
+    });
+
+    it('should report the fallback turn and its envelope repair turn to onUsage, tagged with the call they made', async () => {
+      mocks.llmService.complete
+        .mockResolvedValueOnce(completion(JSON.stringify({ html: '' }), 0.03))
+        .mockResolvedValueOnce(
+          completion(JSON.stringify({ html: HTML }), 0.04),
+        );
+      const onUsage = jest.fn();
+
+      await expect(
+        service.repairDocumentFallback(fallbackInput, { onUsage }),
+      ).resolves.toEqual({ html: HTML, envelopeRepairs: 1 });
+      expect(onUsage).toHaveBeenCalledTimes(2);
+      expect(onUsage).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ call: 'fallback', cost: 0.03 }),
+      );
+      expect(onUsage).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ call: 'envelope', cost: 0.04 }),
+      );
+    });
+
+    it('should throw ContentValidationError without a repair turn when none is left', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        completion(JSON.stringify({ html: '' })),
+      );
+
+      await expect(
+        service.repairDocumentFallback({
+          ...fallbackInput,
+          maxEnvelopeRepairs: 0,
+        }),
+      ).rejects.toBeInstanceOf(ContentValidationError);
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw DocumentTruncatedError before parsing when the fallback hit the cap', async () => {
+      mocks.llmService.complete.mockResolvedValue({
+        ...completion('{"html": "<!doctype'),
+        finishReason: 'length',
+      });
+      const onUsage = jest.fn();
+
+      await expect(
+        service.repairDocumentFallback(fallbackInput, { onUsage }),
+      ).rejects.toThrow(
+        'The DOCUMENT Repair fallback hit the output token cap',
+      );
+      expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+      expect(onUsage).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -967,6 +1566,37 @@ describe('AgentRunnerService', () => {
       expect(result.usage.cost).toBeCloseTo(0.1);
     });
 
+    it('should sum reasoning, cached and cache-write tokens and latency across turns', async () => {
+      const execute = jest.fn().mockResolvedValue({ ok: true });
+      const detailed: Usage = {
+        ...usage(0.03),
+        reasoningTokens: 20,
+        cachedTokens: 60,
+        cacheWriteTokens: 10,
+        latencyMs: 1500,
+      };
+      mocks.llmService.completeWithTools.mockResolvedValue({
+        ...toolTurn([{ id: 'c', name: 'echo', input: { q: 'x' } }]),
+        usage: detailed,
+      });
+      // The finalization turn reports no details: it adds nothing to them.
+      mocks.llmService.complete.mockResolvedValue({
+        text: 'final',
+        usage: { ...usage(0.04), latencyMs: 500 },
+      });
+
+      const result = await service.run(configWith(makeTool(execute), 2));
+
+      expect(result.usage).toMatchObject({
+        promptTokens: 300,
+        completionTokens: 150,
+        reasoningTokens: 40,
+        cachedTokens: 120,
+        cacheWriteTokens: 20,
+        latencyMs: 3500,
+      });
+    });
+
     it('should invoke onUsage per LLM turn and onToolCall per tool', async () => {
       const execute = jest.fn().mockResolvedValue({ ok: true });
       mocks.llmService.completeWithTools
@@ -1041,6 +1671,7 @@ describe('AgentRunnerService', () => {
 
       const result = await service.research({
         prompt: 'topic',
+        today: '2026-10-25',
         type: ArtifactType.POST,
       });
 
@@ -1073,6 +1704,7 @@ describe('AgentRunnerService', () => {
 
       const result = await service.research({
         prompt: 'topic',
+        today: '2026-10-25',
         type: ArtifactType.POST,
       });
 
@@ -1092,6 +1724,7 @@ describe('AgentRunnerService', () => {
 
       const result = await service.research({
         prompt: 'topic',
+        today: '2026-10-25',
         type: ArtifactType.POST,
       });
 
@@ -1114,7 +1747,7 @@ describe('AgentRunnerService', () => {
       const onToolCall = jest.fn();
 
       await service.research(
-        { prompt: 'topic', type: ArtifactType.POST },
+        { prompt: 'topic', today: '2026-10-25', type: ArtifactType.POST },
         { onToolCall },
       );
 
@@ -1136,7 +1769,11 @@ describe('AgentRunnerService', () => {
         .mockResolvedValueOnce(toolTurn(calls))
         .mockResolvedValueOnce(toolTurn([], 0.01, 'findings'));
 
-      await service.research({ prompt: 'topic', type: ArtifactType.POST });
+      await service.research({
+        prompt: 'topic',
+        today: '2026-10-25',
+        type: ArtifactType.POST,
+      });
 
       expect(tavilySearch).toHaveBeenCalledTimes(5);
     });
@@ -1156,7 +1793,7 @@ describe('AgentRunnerService', () => {
       const onToolCall = jest.fn();
 
       await service.research(
-        { prompt: 'topic', type: ArtifactType.POST },
+        { prompt: 'topic', today: '2026-10-25', type: ArtifactType.POST },
         { onToolCall },
       );
 
@@ -1177,7 +1814,11 @@ describe('AgentRunnerService', () => {
         .mockResolvedValueOnce(toolTurn(calls('b')))
         .mockResolvedValueOnce(toolTurn([], 0.01, 'findings'));
 
-      await service.research({ prompt: 'topic', type: ArtifactType.POST });
+      await service.research({
+        prompt: 'topic',
+        today: '2026-10-25',
+        type: ArtifactType.POST,
+      });
 
       expect(tavilySearch).toHaveBeenCalledTimes(5);
     });
@@ -1187,12 +1828,17 @@ describe('AgentRunnerService', () => {
         toolTurn([], 0.01, 'no search needed'),
       );
 
-      await service.research({ prompt: 'topic', type: ArtifactType.POST });
+      await service.research({
+        prompt: 'topic',
+        today: '2026-10-25',
+        type: ArtifactType.POST,
+      });
 
       const [, , tools, options] = completeWithToolsCalls()[0];
       expect(options).toEqual({
         model: RESEARCH_MODEL,
         max_tokens: DEFAULT_MAX_OUTPUT_TOKENS,
+        timeoutMs: RESEARCH_TURN_TIMEOUT_MS,
       });
       expect(tools).toEqual([expect.objectContaining({ name: 'searchWeb' })]);
     });
@@ -1212,6 +1858,7 @@ describe('AgentRunnerService', () => {
 
       await service.research({
         prompt: 'topic',
+        today: '2026-10-25',
         type: ArtifactType.POST,
       });
 
@@ -1219,11 +1866,13 @@ describe('AgentRunnerService', () => {
         expect(call[3]).toEqual({
           model: RESEARCH_MODEL,
           max_tokens: 4096,
+          timeoutMs: RESEARCH_TURN_TIMEOUT_MS,
         });
       }
       expect(completeCalls()[0][2]).toEqual({
         model: RESEARCH_MODEL,
         max_tokens: 4096,
+        timeoutMs: RESEARCH_TURN_TIMEOUT_MS,
       });
     });
 
@@ -1239,11 +1888,487 @@ describe('AgentRunnerService', () => {
 
       const result = await service.research({
         prompt: 'topic',
+        today: '2026-10-25',
         type: ArtifactType.POST,
       });
 
       expect(mocks.llmService.completeWithTools).toHaveBeenCalledTimes(2);
       expect(result.findings).toBe('forced synthesis');
+    });
+
+    it('should leave mode unset on agent research when RESEARCH_MODE is agent', async () => {
+      ({ service, mocks, fixtures } = makeService({
+        env: { RESEARCH_MODE: 'agent' },
+      }));
+      mocks.llmService.completeWithTools.mockResolvedValueOnce(
+        toolTurn([], 0.01, 'findings'),
+      );
+
+      const result = await service.research({
+        prompt: 'topic',
+        type: ArtifactType.POST,
+        today: '2026-10-25',
+      });
+
+      expect(result).toEqual({ findings: 'findings', sources: [] });
+      expect(mocks.llmService.complete).not.toHaveBeenCalled();
+    });
+
+    it('should warn at boot when RESEARCH_MODE is snippets and RESEARCH_REASONING_EFFORT is unset', () => {
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+
+      makeService({ env: { RESEARCH_MODE: 'snippets' } });
+      makeService({
+        env: { RESEARCH_MODE: 'snippets', RESEARCH_REASONING_EFFORT: 'none' },
+      });
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('RESEARCH_REASONING_EFFORT'),
+      );
+      warn.mockRestore();
+    });
+
+    describe('in snippets mode', () => {
+      const queriesJson = (...queries: string[]) =>
+        completion(JSON.stringify({ queries }));
+
+      const searchedQueries = (): string[] =>
+        (tavilySearch.mock.calls as Array<[string]>).map(([query]) => query);
+
+      const withContent = (
+        sources: Array<{ title: string; url: string; content: string }>,
+      ) => ({ results: sources.map((s) => ({ ...s, score: 1 })) });
+
+      beforeEach(() => {
+        ({ service, mocks, fixtures } = makeService({
+          env: { RESEARCH_MODE: 'snippets' },
+        }));
+      });
+
+      it('should make one research-model call for the queries and no tool turns', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(queriesJson('q1'));
+        tavilySearch.mockResolvedValue(withContent([]));
+
+        await service.research({
+          prompt: 'topic',
+          type: ArtifactType.POST,
+          sessionId: 'run-1',
+        });
+
+        expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+        expect(mocks.llmService.completeWithTools).not.toHaveBeenCalled();
+        const [provider, messages, options] = completeCalls()[0];
+        expect(provider).toBe(LLMProvider.OPENROUTER);
+        expect(messages.map((m) => m.role)).toEqual([
+          MessageRole.System,
+          MessageRole.User,
+        ]);
+        expect(messages[1].content).toContain('topic');
+        const { responseSchema, ...rest } = options!;
+        expect(rest).toEqual({
+          model: RESEARCH_MODEL,
+          max_tokens: DEFAULT_MAX_OUTPUT_TOKENS,
+          sessionId: 'run-1',
+          timeoutMs: RESEARCH_TURN_TIMEOUT_MS,
+        });
+        expect(responseSchema?.name).toBe('research_queries');
+        expect(responseSchema?.schema).toBeInstanceOf(z.ZodType);
+      });
+
+      it('should send RESEARCH_REASONING_EFFORT on the query call when it is set', async () => {
+        ({ service, mocks, fixtures } = makeService({
+          env: { RESEARCH_MODE: 'snippets', RESEARCH_REASONING_EFFORT: 'none' },
+        }));
+        mocks.llmService.complete.mockResolvedValueOnce(queriesJson('q1'));
+        tavilySearch.mockResolvedValue(withContent([]));
+
+        await service.research({ prompt: 'topic', type: ArtifactType.POST });
+
+        expect(completeCalls()[0][2]?.reasoningEffort).toBe('none');
+      });
+
+      it('should run every query in parallel before any search returns', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(
+          queriesJson('q1', 'q2', 'q3'),
+        );
+        const pending: Array<() => void> = [];
+        tavilySearch.mockImplementation(
+          () =>
+            new Promise((resolve) =>
+              pending.push(() => resolve(withContent([]))),
+            ),
+        );
+
+        const research = service.research({
+          prompt: 'topic',
+          type: ArtifactType.POST,
+        });
+        await new Promise((resolve) => setImmediate(resolve));
+
+        expect(searchedQueries()).toEqual(['q1', 'q2', 'q3']);
+        pending.forEach((resolve) => resolve());
+        await research;
+      });
+
+      it('should charge each successful search and not a failed one', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(
+          queriesJson('q1', 'q2', 'q3'),
+        );
+        tavilySearch
+          .mockResolvedValueOnce(withContent([]))
+          .mockRejectedValueOnce(new Error('Tavily unavailable'))
+          .mockResolvedValueOnce(withContent([]));
+        const onToolCall = jest.fn();
+        const onUsage = jest.fn();
+
+        await service.research(
+          { prompt: 'topic', type: ArtifactType.POST },
+          { onToolCall, onUsage },
+        );
+
+        expect(onToolCall).toHaveBeenCalledTimes(2);
+        expect(onToolCall).toHaveBeenCalledWith({ name: 'searchWeb' });
+        expect(onUsage).toHaveBeenCalledTimes(1);
+        expect(onUsage).toHaveBeenCalledWith(
+          expect.objectContaining({ cost: 0.02, model: RESEARCH_MODEL }),
+        );
+      });
+
+      it('should return deduped, interleaved, numbered snippets with mode snippets', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(
+          queriesJson('q1', 'q2'),
+        );
+        tavilySearch
+          .mockResolvedValueOnce(
+            withContent([
+              { title: 'A1', url: 'https://a.com/1', content: 'a one' },
+              { title: 'A2', url: 'https://a.com/2', content: 'a two' },
+            ]),
+          )
+          .mockResolvedValueOnce(
+            withContent([
+              { title: 'Dup', url: 'https://www.a.com/1/', content: 'again' },
+              { title: 'B2', url: 'https://b.com/2', content: 'b two' },
+            ]),
+          );
+
+        const result = await service.research({
+          prompt: 'topic',
+          type: ArtifactType.POST,
+        });
+
+        expect(result).toEqual({
+          findings: [
+            '[1] A1 (https://a.com/1)\na one',
+            '[2] A2 (https://a.com/2)\na two',
+            '[3] B2 (https://b.com/2)\nb two',
+          ].join('\n\n'),
+          sources: [
+            { title: 'A1', url: 'https://a.com/1' },
+            { title: 'A2', url: 'https://a.com/2' },
+            { title: 'B2', url: 'https://b.com/2' },
+          ],
+          mode: 'snippets',
+        });
+      });
+
+      it('should cap snippets at RESEARCH_MAX_SNIPPETS and cut each to RESEARCH_SNIPPET_CHARS', async () => {
+        ({ service, mocks, fixtures } = makeService({
+          env: {
+            RESEARCH_MODE: 'snippets',
+            RESEARCH_MAX_SNIPPETS: '2',
+            RESEARCH_SNIPPET_CHARS: '10',
+          },
+        }));
+        mocks.llmService.complete.mockResolvedValueOnce(queriesJson('q1'));
+        tavilySearch.mockResolvedValueOnce(
+          withContent(
+            ['1', '2', '3'].map((n) => ({
+              title: n,
+              url: `https://a.com/${n}`,
+              content: 'x'.repeat(40),
+            })),
+          ),
+        );
+
+        const result = await service.research({
+          prompt: 'topic',
+          type: ArtifactType.POST,
+        });
+
+        expect(result.sources).toHaveLength(2);
+        expect(result.findings).toBe(
+          `[1] 1 (https://a.com/1)\n${'x'.repeat(9)}…\n\n[2] 2 (https://a.com/2)\n${'x'.repeat(9)}…`,
+        );
+      });
+
+      it('should search at most four distinct queries', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(
+          queriesJson('q1', ' Q1 ', '', 'q2', 'q3', 'q4', 'q5'),
+        );
+        tavilySearch.mockResolvedValue(withContent([]));
+
+        await service.research({ prompt: 'topic', type: ArtifactType.POST });
+
+        expect(searchedQueries()).toEqual(['q1', 'q2', 'q3', 'q4']);
+      });
+
+      it('should search the brief itself when the query call answers with invalid JSON', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(completion('not json'));
+        tavilySearch.mockResolvedValue(withContent([]));
+
+        await service.research({
+          prompt: 'the brief',
+          type: ArtifactType.POST,
+        });
+
+        expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+        expect(searchedQueries()).toEqual(['the brief']);
+      });
+
+      it('should return empty findings when every search fails', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(
+          queriesJson('q1', 'q2'),
+        );
+        tavilySearch.mockRejectedValue(new Error('Tavily unavailable'));
+
+        await expect(
+          service.research({ prompt: 'topic', type: ArtifactType.POST }),
+        ).resolves.toEqual({ findings: '', sources: [], mode: 'snippets' });
+      });
+
+      it('should let a transport error from the query call fail the research', async () => {
+        const error = new LLMError('upstream down', { retryable: true });
+        mocks.llmService.complete.mockRejectedValueOnce(error);
+
+        await expect(
+          service.research({ prompt: 'topic', type: ArtifactType.POST }),
+        ).rejects.toBe(error);
+        expect(tavilySearch).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('research configuration', () => {
+      it.each([
+        [{ RESEARCH_MODE: 'snippet' }, 'RESEARCH_MODE'],
+        [{ RESEARCH_MAX_SNIPPETS: '0' }, 'RESEARCH_MAX_SNIPPETS'],
+        [{ RESEARCH_SNIPPET_CHARS: 'lots' }, 'RESEARCH_SNIPPET_CHARS'],
+      ])('should fail construction when %p is invalid', (env, key) => {
+        expect(() => makeService({ env })).toThrow(key);
+      });
+    });
+  });
+
+  describe('LLM_PROVIDER', () => {
+    const ANTHROPIC_ENV = {
+      LLM_PROVIDER: 'anthropic',
+      ANTHROPIC_API_KEY: 'test-anthropic-key',
+      GENERATION_MODEL: 'anthropic/claude-haiku-5.5',
+      RESEARCH_MODEL: 'claude-haiku-5-5',
+    };
+
+    it('should send generation to OpenRouter when LLM_PROVIDER is unset', async () => {
+      mocks.llmService.complete.mockResolvedValueOnce(
+        completion(generatedJson({ commentary: 'Body' })),
+      );
+
+      await service.generate(fixtures.input);
+
+      expect(completeCalls()[0][0]).toBe(LLMProvider.OPENROUTER);
+    });
+
+    it('should send generation, research turns and the cap completion to Anthropic when LLM_PROVIDER is anthropic', async () => {
+      ({ service, mocks, fixtures } = makeService({
+        maxSteps: 1,
+        env: ANTHROPIC_ENV,
+      }));
+      mocks.llmService.complete
+        .mockResolvedValueOnce(
+          completion(generatedJson({ commentary: 'Body' })),
+        )
+        .mockResolvedValueOnce(completion('Final findings.'));
+      mocks.llmService.completeWithTools.mockResolvedValueOnce(
+        toolTurn([{ id: 'c1', name: 'nope', input: {} }]),
+      );
+
+      await service.generate(fixtures.input);
+      await service.research({
+        prompt: 'topic',
+        type: ArtifactType.POST,
+        today: '2026-10-25',
+      });
+
+      expect(completeCalls().map(([provider]) => provider)).toEqual([
+        LLMProvider.ANTHROPIC,
+        LLMProvider.ANTHROPIC,
+      ]);
+      expect(completeWithToolsCalls()[0][0]).toBe(LLMProvider.ANTHROPIC);
+    });
+
+    it('should fail construction when LLM_PROVIDER is not a known provider', () => {
+      expect(() => makeService({ env: { LLM_PROVIDER: 'claude' } })).toThrow(
+        'LLM_PROVIDER',
+      );
+    });
+
+    it('should fail construction when LLM_PROVIDER is anthropic and ANTHROPIC_API_KEY is unset', () => {
+      const env = { ...ANTHROPIC_ENV, ANTHROPIC_API_KEY: '' };
+
+      expect(() => makeService({ env })).toThrow('ANTHROPIC_API_KEY');
+    });
+
+    it('should fail construction naming the model when LLM_PROVIDER is anthropic and a model is not a Claude model', () => {
+      expect(() =>
+        makeService({
+          env: { ...ANTHROPIC_ENV, POST_GENERATION_MODEL: 'openai/gpt-5-mini' },
+        }),
+      ).toThrow('openai/gpt-5-mini');
+    });
+
+    it("should carry a tool turn's provider content onto the assistant message when the strategy returns some", async () => {
+      const providerContent = [{ type: 'thinking', signature: 's' }];
+      mocks.llmService.completeWithTools
+        .mockResolvedValueOnce({
+          ...toolTurn([{ id: 'c1', name: 'nope', input: {} }]),
+          providerContent,
+        })
+        .mockResolvedValueOnce(toolTurn([], 0.01, 'Done.'));
+
+      await service.research({
+        prompt: 'topic',
+        type: ArtifactType.POST,
+        today: '2026-10-25',
+      });
+
+      const assistant = completeWithToolsCalls()[1][1].find(
+        (m) => m.role === MessageRole.Assistant,
+      );
+      expect(assistant).toMatchObject({ providerContent });
+    });
+
+    it('should add no provider content key when the strategy returns none', async () => {
+      mocks.llmService.completeWithTools
+        .mockResolvedValueOnce(
+          toolTurn([{ id: 'c1', name: 'nope', input: {} }]),
+        )
+        .mockResolvedValueOnce(toolTurn([], 0.01, 'Done.'));
+
+      await service.research({
+        prompt: 'topic',
+        type: ArtifactType.POST,
+        today: '2026-10-25',
+      });
+
+      const assistant = completeWithToolsCalls()[1][1].find(
+        (m) => m.role === MessageRole.Assistant,
+      );
+      expect(assistant).not.toHaveProperty('providerContent');
+    });
+
+    describe('research in native mode', () => {
+      const NATIVE_ENV = { ...ANTHROPIC_ENV, RESEARCH_MODE: 'native' };
+      const nativeAnswer = (): CompletionResult => ({
+        text: '  Heat pump sales rose 12% in 2026.  ',
+        usage: { ...usage(0.031), webSearchRequests: 3 },
+        model: 'claude-haiku-5-5',
+        citations: [
+          { url: 'https://www.a.com/x/', title: 'A' },
+          { url: 'https://a.com/x', title: 'A again' },
+          { url: 'https://b.com', title: 'B' },
+        ],
+      });
+
+      beforeEach(() => {
+        ({ service, mocks, fixtures } = makeService({ env: NATIVE_ENV }));
+      });
+
+      it('should fail construction when LLM_PROVIDER is not anthropic', () => {
+        expect(() => makeService({ env: { RESEARCH_MODE: 'native' } })).toThrow(
+          'RESEARCH_MODE=native needs LLM_PROVIDER=anthropic',
+        );
+      });
+
+      it('should make one Anthropic call with the web search tool and no Tavily search', async () => {
+        ({ service, mocks, fixtures } = makeService({
+          maxSuccessfulSearches: 2,
+          env: { ...NATIVE_ENV, RESEARCH_REASONING_EFFORT: 'low' },
+        }));
+        mocks.llmService.complete.mockResolvedValueOnce(nativeAnswer());
+
+        await service.research({
+          prompt: 'heat pumps',
+          type: ArtifactType.DOCUMENT,
+          today: '2026-10-25',
+          sessionId: 'run-1',
+        });
+
+        expect(mocks.llmService.complete).toHaveBeenCalledTimes(1);
+        expect(mocks.llmService.completeWithTools).not.toHaveBeenCalled();
+        expect(tavilySearch).not.toHaveBeenCalled();
+        const [provider, messages, options] = completeCalls()[0];
+        expect(provider).toBe(LLMProvider.ANTHROPIC);
+        expect(messages.map((m) => m.role)).toEqual([
+          MessageRole.System,
+          MessageRole.User,
+        ]);
+        expect(messages[0].content).toContain('web_search');
+        expect(messages[1].content).toContain('heat pumps');
+        expect(options).toEqual({
+          model: 'claude-haiku-5-5',
+          max_tokens: DEFAULT_MAX_OUTPUT_TOKENS,
+          reasoningEffort: 'low',
+          sessionId: 'run-1',
+          timeoutMs: 120_000,
+          webSearch: { maxUses: 2 },
+        });
+      });
+
+      it('should return the synthesis and the cited pages deduped, as native research', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(nativeAnswer());
+
+        await expect(
+          service.research({
+            prompt: 'heat pumps',
+            type: ArtifactType.POST,
+            today: '2026-10-25',
+          }),
+        ).resolves.toEqual({
+          findings: 'Heat pump sales rose 12% in 2026.',
+          sources: [
+            { title: 'A', url: 'https://www.a.com/x/' },
+            { title: 'B', url: 'https://b.com' },
+          ],
+          mode: 'native',
+        });
+      });
+
+      it('should report the call with its search count and never fire onToolCall', async () => {
+        mocks.llmService.complete.mockResolvedValueOnce(nativeAnswer());
+        const onUsage = jest.fn();
+        const onToolCall = jest.fn();
+
+        await service.research(
+          {
+            prompt: 'heat pumps',
+            type: ArtifactType.POST,
+            today: '2026-10-25',
+          },
+          { onUsage, onToolCall },
+        );
+
+        expect(onUsage).toHaveBeenCalledTimes(1);
+        expect(onUsage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            cost: 0.031,
+            webSearchRequests: 3,
+            model: 'claude-haiku-5-5',
+          }),
+        );
+        expect(onToolCall).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -1265,6 +2390,7 @@ describe('AgentRunnerService', () => {
         await service.generate(fixtures.input);
         await service.research({
           prompt: 'topic',
+          today: '2026-10-25',
           type: ArtifactType.POST,
         });
 
@@ -1272,8 +2398,369 @@ describe('AgentRunnerService', () => {
         expect(completeWithToolsCalls()[0][3]).toEqual({
           model: RESEARCH_MODEL,
           max_tokens: DEFAULT_MAX_OUTPUT_TOKENS,
+          timeoutMs: RESEARCH_TURN_TIMEOUT_MS,
         });
       },
     );
+  });
+
+  describe('per-call reasoning effort and session affinity', () => {
+    const EFFORT_KEYS = [
+      'RESEARCH_REASONING_EFFORT',
+      'GENERATION_REASONING_EFFORT',
+      'DOCUMENT_DRAFT_REASONING_EFFORT',
+      'DOCUMENT_REPAIR_REASONING_EFFORT',
+    ] as const;
+    type EffortKey = (typeof EFFORT_KEYS)[number];
+
+    // The call sites each key owns, named after the four runner entry points.
+    const SITES_OF: Record<EffortKey, CallSite> = {
+      RESEARCH_REASONING_EFFORT: 'research',
+      GENERATION_REASONING_EFFORT: 'generate',
+      DOCUMENT_DRAFT_REASONING_EFFORT: 'draft',
+      DOCUMENT_REPAIR_REASONING_EFFORT: 'repair',
+    };
+    type CallSite = 'research' | 'generate' | 'draft' | 'repair';
+
+    const HTML = '<!doctype html><html><body></body></html>';
+    const draftInput: DocumentGenerateInput = {
+      prompt: 'Three fixes for documents',
+      today: '2026-10-25',
+      fragment: 'FRAGMENT',
+      includeTitle: true,
+      maxEnvelopeRepairs: 1,
+    };
+    const repairInput: DocumentRepairInput = {
+      fragment: 'FRAGMENT',
+      includeTitle: true,
+      candidate: HTML,
+      violations: { violations: [], omitted: [] },
+      maxEnvelopeRepairs: 1,
+    };
+
+    /**
+     * Drives every LLM call site the runner has, each through its repair
+     * path: research to its cap plus the closing call, generate plus its Zod
+     * repair, and a draft and a Repair each plus an envelope repair. Returns
+     * the options each call sent, grouped by entry point.
+     */
+    const optionsByCallSite = async (
+      sessionId?: string,
+    ): Promise<Record<CallSite, CompletionOptions[]>> => {
+      const session = sessionId === undefined ? {} : { sessionId };
+      const sent = (): CompletionOptions[] =>
+        completeCalls().map(([, , options]) => options!);
+
+      tavilySearch.mockResolvedValue({ results: [] });
+      mocks.llmService.completeWithTools.mockResolvedValue(
+        toolTurn([{ id: 'c', name: 'searchWeb', input: { query: 'x' } }]),
+      );
+      mocks.llmService.complete.mockResolvedValue(completion('synthesis'));
+      await service.research({
+        prompt: 'topic',
+        today: '2026-10-25',
+        type: ArtifactType.POST,
+        ...session,
+      });
+      const research = [
+        ...completeWithToolsCalls().map(([, , , options]) => options!),
+        ...sent(),
+      ];
+
+      mocks.llmService.complete
+        .mockReset()
+        .mockResolvedValueOnce(completion('not json'))
+        .mockResolvedValueOnce(completion(generatedJson({ commentary: 'ok' })));
+      await service.generate({ ...fixtures.input, ...session });
+      const generate = sent();
+
+      mocks.llmService.complete
+        .mockReset()
+        .mockResolvedValueOnce(completion('not json'))
+        .mockResolvedValueOnce(
+          completion(
+            JSON.stringify({ title: 't', commentary: 'c', html: HTML }),
+          ),
+        );
+      await service.generateDocument({ ...draftInput, ...session });
+      const draft = sent();
+
+      mocks.llmService.complete
+        .mockReset()
+        .mockResolvedValueOnce(completion('not json'))
+        .mockResolvedValueOnce(completion(JSON.stringify({ html: HTML })));
+      await service.repairDocument({ ...repairInput, ...session });
+      const repair = sent();
+
+      return { research, generate, draft, repair };
+    };
+
+    const useService = (env: Record<string, string> = {}): void => {
+      ({ service, mocks, fixtures } = makeService({ maxSteps: 1, env }));
+    };
+
+    it('should make two calls at each call site when every first answer needs a repair', async () => {
+      useService();
+
+      const sites = await optionsByCallSite();
+
+      expect(sites.research).toHaveLength(2);
+      expect(sites.generate).toHaveLength(2);
+      expect(sites.draft).toHaveLength(2);
+      expect(sites.repair).toHaveLength(2);
+    });
+
+    it("should send today's options when every effort key is unset and no session is given", async () => {
+      useService();
+
+      const sites = await optionsByCallSite();
+
+      for (const options of sites.research) {
+        expect(options).toEqual({
+          model: RESEARCH_MODEL,
+          max_tokens: DEFAULT_MAX_OUTPUT_TOKENS,
+          timeoutMs: RESEARCH_TURN_TIMEOUT_MS,
+        });
+      }
+      const anySchema: unknown = expect.any(z.ZodType);
+      for (const site of ['generate', 'draft', 'repair'] as const) {
+        for (const options of sites[site]) {
+          expect(options).toEqual({
+            model: GENERATION_MODEL,
+            max_tokens: site === 'generate' ? DEFAULT_MAX_OUTPUT_TOKENS : 16384,
+            responseSchema: {
+              name: 'artifact_generation',
+              schema: anySchema,
+            },
+          });
+        }
+      }
+    });
+
+    it.each(EFFORT_KEYS)(
+      'should send the effort on its own call sites only when %s is set',
+      async (key) => {
+        useService({ [key]: 'low' });
+
+        const sites = await optionsByCallSite();
+
+        for (const [site, calls] of Object.entries(sites)) {
+          for (const options of calls) {
+            if (site === SITES_OF[key]) {
+              expect(options.reasoningEffort).toBe('low');
+            } else {
+              expect(options).not.toHaveProperty('reasoningEffort');
+            }
+          }
+        }
+      },
+    );
+
+    it('should send each call site its own effort when every key is set', async () => {
+      useService({
+        RESEARCH_REASONING_EFFORT: 'minimal',
+        GENERATION_REASONING_EFFORT: 'medium',
+        DOCUMENT_DRAFT_REASONING_EFFORT: 'low',
+        DOCUMENT_REPAIR_REASONING_EFFORT: 'none',
+      });
+
+      const sites = await optionsByCallSite();
+
+      expect(sites.research.map((o) => o.reasoningEffort)).toEqual([
+        'minimal',
+        'minimal',
+      ]);
+      expect(sites.generate.map((o) => o.reasoningEffort)).toEqual([
+        'medium',
+        'medium',
+      ]);
+      expect(sites.draft.map((o) => o.reasoningEffort)).toEqual(['low', 'low']);
+      expect(sites.repair.map((o) => o.reasoningEffort)).toEqual([
+        'none',
+        'none',
+      ]);
+    });
+
+    it('should treat an empty effort key as unset', async () => {
+      useService({ GENERATION_REASONING_EFFORT: '' });
+
+      const sites = await optionsByCallSite();
+
+      for (const options of sites.generate) {
+        expect(options).not.toHaveProperty('reasoningEffort');
+      }
+    });
+
+    it.each(EFFORT_KEYS)(
+      'should fail construction naming %s when its value is not an effort',
+      (key) => {
+        expect(() => makeService({ env: { [key]: 'turbo' } })).toThrow(
+          `${key} must be one of`,
+        );
+      },
+    );
+
+    it('should forward the session id on every call when one is given', async () => {
+      useService();
+
+      const sites = await optionsByCallSite('run-1');
+
+      for (const calls of Object.values(sites)) {
+        for (const options of calls) {
+          expect(options.sessionId).toBe('run-1');
+        }
+      }
+    });
+
+    it('should cap every research turn at 45 s and give it no deadline when the generation is research', async () => {
+      useService();
+
+      const sites = await optionsByCallSite();
+
+      for (const options of sites.research) {
+        expect(options.timeoutMs).toBe(RESEARCH_TURN_TIMEOUT_MS);
+        expect(options).not.toHaveProperty('deadlineAt');
+      }
+    });
+
+    it('should bound neither the timeout nor a deadline when the generation is POST or POLL', async () => {
+      useService();
+
+      const sites = await optionsByCallSite();
+
+      for (const options of sites.generate) {
+        expect(options).not.toHaveProperty('timeoutMs');
+        expect(options).not.toHaveProperty('deadlineAt');
+      }
+    });
+
+    it('should give a draft and a Repair, envelope repairs included, one deadline when the run has time left', async () => {
+      jest.useFakeTimers({ now: 1_000_000 });
+      try {
+        useService();
+        mocks.llmService.complete
+          .mockResolvedValueOnce(completion('not json'))
+          .mockImplementationOnce(() => {
+            // The envelope repair keeps the deadline the call started with.
+            jest.advanceTimersByTime(5_000);
+            return Promise.resolve(
+              completion(
+                JSON.stringify({ title: 't', commentary: 'c', html: HTML }),
+              ),
+            );
+          })
+          .mockResolvedValueOnce(completion('not json'))
+          .mockResolvedValueOnce(completion(JSON.stringify({ html: HTML })));
+
+        await service.generateDocument({ ...draftInput, timeLeftMs: 90_000 });
+        await service.repairDocument({ ...repairInput, timeLeftMs: 30_000 });
+
+        const sent = completeCalls().map(([, , options]) => options!);
+        expect(sent.map((o) => o.deadlineAt)).toEqual([
+          1_090_000, 1_090_000, 1_035_000, 1_035_000,
+        ]);
+        for (const options of sent) {
+          expect(options).not.toHaveProperty('timeoutMs');
+        }
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('should send no deadline for a draft or a Repair when the caller gives no time left', async () => {
+      useService();
+
+      const sites = await optionsByCallSite();
+
+      for (const options of [...sites.draft, ...sites.repair]) {
+        expect(options).not.toHaveProperty('deadlineAt');
+        expect(options).not.toHaveProperty('timeoutMs');
+      }
+    });
+
+    it('should send no session id when none is given', async () => {
+      useService();
+
+      const sites = await optionsByCallSite();
+
+      for (const calls of Object.values(sites)) {
+        for (const options of calls) {
+          expect(options).not.toHaveProperty('sessionId');
+        }
+      }
+    });
+  });
+
+  describe('the model reported to onUsage', () => {
+    const ANSWERED_BY = 'openai/gpt-5.4-20260301';
+
+    it('should report the model the provider says answered a generation turn', async () => {
+      mocks.llmService.complete.mockResolvedValue({
+        ...completion(generatedJson({ commentary: 'ok' })),
+        model: ANSWERED_BY,
+      });
+      const onUsage = jest.fn();
+
+      await service.generate(fixtures.input, { onUsage });
+
+      expect(onUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ model: ANSWERED_BY }),
+      );
+    });
+
+    it('should report the requested model when the provider does not say', async () => {
+      mocks.llmService.complete.mockResolvedValue(
+        completion(generatedJson({ commentary: 'ok' })),
+      );
+      const onUsage = jest.fn();
+
+      await service.generate(fixtures.input, { onUsage });
+
+      expect(onUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ model: GENERATION_MODEL }),
+      );
+    });
+
+    it('should report the answering model for research turns and the closing call', async () => {
+      ({ service, mocks, fixtures } = makeService({ maxSteps: 1 }));
+      tavilySearch.mockResolvedValue({ results: [] });
+      mocks.llmService.completeWithTools.mockResolvedValue({
+        ...toolTurn([{ id: 'c', name: 'searchWeb', input: { query: 'x' } }]),
+        model: 'openai/gpt-5-mini-a',
+      });
+      mocks.llmService.complete.mockResolvedValue({
+        ...completion('synthesis'),
+        model: 'openai/gpt-5-mini-b',
+      });
+      const onUsage = jest.fn();
+
+      await service.research(
+        { prompt: 'topic', today: '2026-10-25', type: ArtifactType.POST },
+        { onUsage },
+      );
+
+      expect(
+        onUsage.mock.calls.map(([turn]: [{ model: string }]) => turn.model),
+      ).toEqual(['openai/gpt-5-mini-a', 'openai/gpt-5-mini-b']);
+    });
+
+    it('should report the requested research model when the provider does not say', async () => {
+      ({ service, mocks, fixtures } = makeService({ maxSteps: 1 }));
+      tavilySearch.mockResolvedValue({ results: [] });
+      mocks.llmService.completeWithTools.mockResolvedValue(
+        toolTurn([{ id: 'c', name: 'searchWeb', input: { query: 'x' } }]),
+      );
+      mocks.llmService.complete.mockResolvedValue(completion('synthesis'));
+      const onUsage = jest.fn();
+
+      await service.research(
+        { prompt: 'topic', today: '2026-10-25', type: ArtifactType.POST },
+        { onUsage },
+      );
+
+      expect(
+        onUsage.mock.calls.map(([turn]: [{ model: string }]) => turn.model),
+      ).toEqual([RESEARCH_MODEL, RESEARCH_MODEL]);
+    });
   });
 });

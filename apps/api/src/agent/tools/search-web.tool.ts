@@ -24,22 +24,61 @@ const SEARCH_WEB_DESCRIPTION =
   'Returns the most relevant results with their title, url, and a content ' +
   'snippet. Call it repeatedly with refined queries to gather what you need.';
 
+export type SearchDepth = 'basic' | 'advanced';
+
+export interface SearchWebOptions {
+  /** Per-request timeout in seconds (the SDK default is 60). */
+  timeoutS: number;
+  searchDepth: SearchDepth;
+}
+
+export const DEFAULT_TAVILY_TIMEOUT_S = 10;
+export const DEFAULT_TAVILY_SEARCH_DEPTH: SearchDepth = 'advanced';
+
+/**
+ * Parses the raw `TAVILY_TIMEOUT_S` / `TAVILY_SEARCH_DEPTH` config values.
+ * Anything unset or invalid falls back to the default rather than failing boot.
+ */
+export const resolveSearchWebOptions = (
+  rawTimeoutS?: string | number | null,
+  rawDepth?: string | null,
+): SearchWebOptions => {
+  const timeout = Number(rawTimeoutS);
+  const depth =
+    typeof rawDepth === 'string' ? rawDepth.trim().toLowerCase() : '';
+  const timeoutSet =
+    rawTimeoutS !== undefined && rawTimeoutS !== null && rawTimeoutS !== '';
+  return {
+    timeoutS:
+      timeoutSet && Number.isFinite(timeout) && timeout > 0
+        ? timeout
+        : DEFAULT_TAVILY_TIMEOUT_S,
+    searchDepth:
+      depth === 'basic' || depth === 'advanced'
+        ? depth
+        : DEFAULT_TAVILY_SEARCH_DEPTH,
+  };
+};
+
+type TavilyClient = ReturnType<typeof tavily>;
+
 /**
  * Plain Tavily search, extracted from the former Mark agent's `web_search` tool.
  *
- * **Never throws.** A Tavily fault comes back as `{ error }` so the agent loop
- * absorbs it and lets the model adapt its next query, rather than failing the
- * whole run on a transient outage.
+ * **Never throws.** A Tavily fault (including a timeout) comes back as
+ * `{ error }` so the agent loop absorbs it and lets the model adapt its next
+ * query, rather than failing the whole run on a transient outage.
  */
 export const runSearchWeb = async (
-  apiKey: string,
+  client: TavilyClient,
   query: string,
+  options: SearchWebOptions,
 ): Promise<SearchWebOutput> => {
-  const client = tavily({ apiKey });
   try {
     const response: TavilySearchResponse = await client.search(query, {
-      searchDepth: 'advanced',
+      searchDepth: options.searchDepth,
       maxResults: 5,
+      timeout: options.timeoutS,
     });
     return {
       query,
@@ -58,14 +97,18 @@ export const runSearchWeb = async (
 };
 
 /**
- * Wraps the Tavily search as the research agent's single `Tool`. Built once from
- * the configured API key and handed to `AgentRunner.run`.
+ * Wraps the Tavily search as the research agent's single `Tool`. Built once per
+ * process from the configured API key: one Tavily client is shared by every call.
  */
 export const createSearchWebTool = (
   apiKey: string,
-): Tool<SearchWebInput, SearchWebOutput> => ({
-  name: 'searchWeb',
-  description: SEARCH_WEB_DESCRIPTION,
-  parameters: searchWebParameters,
-  execute: ({ query }) => runSearchWeb(apiKey, query),
-});
+  options: SearchWebOptions = resolveSearchWebOptions(),
+): Tool<SearchWebInput, SearchWebOutput> => {
+  const client = tavily({ apiKey });
+  return {
+    name: 'searchWeb',
+    description: SEARCH_WEB_DESCRIPTION,
+    parameters: searchWebParameters,
+    execute: ({ query }) => runSearchWeb(client, query, options),
+  };
+};

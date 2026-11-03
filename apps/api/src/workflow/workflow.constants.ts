@@ -1,3 +1,6 @@
+// Type-only: artifact.schema imports FailureCode from here.
+import type { ArtifactType } from '../database/schemas/artifact.schema';
+
 export enum WorkflowStep {
   RESOLVE_INPUT = 'RESOLVE_INPUT',
   RESEARCH = 'RESEARCH',
@@ -6,7 +9,16 @@ export enum WorkflowStep {
   PERSIST_VERSION = 'PERSIST_VERSION',
 }
 
+/** POST and POLL runs, and DOCUMENT jobs enqueued before the split. */
 export const QUEUE_NAME = 'workflow';
+/** DOCUMENT runs, on their own queue so a burst of documents can't hold up text runs. */
+export const DOCUMENT_QUEUE_NAME = 'workflow-document';
+export type WorkflowQueueName = typeof QUEUE_NAME | typeof DOCUMENT_QUEUE_NAME;
+
+/** The queue an artifact run of `type` is enqueued on. */
+export const queueNameFor = (type: ArtifactType): WorkflowQueueName =>
+  (type as string) === 'DOCUMENT' ? DOCUMENT_QUEUE_NAME : QUEUE_NAME;
+
 export const SCHEDULE_QUEUE_NAME = 'post-schedule';
 export const LINKEDIN_AVATAR_REFRESH_QUEUE_NAME = 'linkedin-avatar-refresh';
 export const LINKEDIN_AVATAR_REFRESH_JOB_NAME = 'refresh-linkedin-avatar';
@@ -25,6 +37,23 @@ export const SCHEDULED_POST_PUBLISHED_EMAIL_JOB_NAME =
  */
 export const DOCUMENT_REPAIR_BUDGET = 2;
 
+/** What a Repair answers with (spec §7.2): the whole document, or edits to it. */
+export type DocumentRepairMode = 'full' | 'patch';
+
+/**
+ * Deploy-switched, like every module constant here (spec §10): `full` asks a
+ * Repair for the complete Candidate Source, `patch` for edits, with one
+ * `{ html }` fallback per job attempt when they do not apply. Go/no-go for
+ * `patch` is an eval fallback rate under 20%.
+ */
+export const DOCUMENT_REPAIR_MODE: DocumentRepairMode = 'full';
+
+/**
+ * `patch`-mode fallbacks per job attempt: warm `{ html }` follow-ups after
+ * edits that did not apply. Billed, but not turns of `DOCUMENT_REPAIR_BUDGET`.
+ */
+export const DOCUMENT_REPAIR_FALLBACKS = 1;
+
 /**
  * The wall-clock bound on one DOCUMENT job attempt (spec §7.5), checked before
  * each model call and render session.
@@ -36,6 +65,13 @@ export const DOCUMENT_RUN_DEADLINE_MS = 6 * 60 * 1000;
  * `render.fonts.failed` is retried once in-step (spec §7.3).
  */
 export const RENDER_RETRY_DELAY_MS = 2000;
+
+/**
+ * A render waits for a Browserless slot only while this much of the job
+ * attempt would still be left (M4.2): its wait is bounded by
+ * `min(BROWSERLESS_SLOT_WAIT_MAX_MS, time left - this)`.
+ */
+export const RENDER_SLOT_WAIT_RESERVE_MS = 20_000;
 
 /**
  * How long a DOCUMENT run keeps Candidate Source text (spec §11.5): the

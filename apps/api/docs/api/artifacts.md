@@ -46,6 +46,7 @@ Open the SSE stream in [runs.md](./runs.md) with `runId`. The version is ready o
 
 - `400` invalid body or enum value; a `designSystemId` that is unknown, superseded, retired or not listed by `GET /design-systems`; or a `designSystemId` on a type other than `DOCUMENT`. Nothing is created or charged.
 - `403` insufficient credits or no research access when `withResearch` is `true`.
+- `429` with `code: "run.too_many_in_flight"`: the caller already has the maximum number of runs in progress (`MAX_INFLIGHT_RUNS_PER_USER`; off by default). Nothing is created or charged. `message` is safe to show; retry once a run finishes. See [README.md](./README.md#rate-limits).
 
 ## `POST /artifacts/:id/refine`
 
@@ -85,6 +86,7 @@ At most one Attempt is in flight per artifact.
 - `409` an Attempt is already `GENERATING`, the artifact has no `READY` version to refine, or another refine started concurrently.
 - `409` with `code: "design_system.unavailable"`: the Current Version's Design System can no longer be used, so it cannot be refined with the same look. Nothing is appended or charged. `message` is safe to show; retry with a `designSystemId`.
 - `403` insufficient credits.
+- `429` with `code: "run.too_many_in_flight"`, as for `POST /artifacts`. Nothing is appended or charged.
 
 ```json
 {
@@ -322,6 +324,6 @@ Soft-deletes an artifact. It disappears from list results and cannot be refined,
 1. Submit `POST /artifacts` or `POST /artifacts/:id/refine`.
 2. Store the returned `artifactId`, `runId`, and refine `version` if present.
 3. Connect to `GET /runs/:runId/events`. After a reload, `latestAttempt.runId` from `GET /artifacts/:id` finds an in-flight run again.
-4. On `run.completed`, refetch `GET /artifacts/:id?version=<version>`.
+4. On `run.completed`, render its `content` (and `title` on INITIAL) when a live POST or POLL completion carries it. Otherwise refetch `GET /artifacts/:id?version=<version>`: a DOCUMENT run, a replayed or snapshot event, or a `content` that does not match the artifact or version you expect. The refetch is always safe.
 5. Allow manual edits only to the Current Version, and only while no Attempt is `GENERATING`.
 6. Bind the artifact version to LinkedIn with `POST /posts`.

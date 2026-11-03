@@ -42,6 +42,25 @@ const usableBox = ({
 }: DesignSystemDefinition['page']) =>
   `${width - safeArea.left - safeArea.right}x${height - safeArea.top - safeArea.bottom}px`;
 
+/** The share of the line budget a page may fill; the rest absorbs headings and gaps. */
+const LINE_BUDGET_FILL = 0.8;
+
+/**
+ * How many body lines the usable box holds, as a page line in PAGE. Text past
+ * the bottom edge is the most common `page.safeArea` Repair. A definition with
+ * no `body` step gets no line.
+ */
+const lineBudget = (ds: DesignSystemDefinition): string => {
+  const body = ds.typography.scale.find((s) => s.name === 'body');
+  if (body === undefined) return '';
+  const { height, safeArea } = ds.page;
+  const lines = Math.floor(
+    (height - safeArea.top - safeArea.bottom) / (body.px * body.lineHeight),
+  );
+  const fill = Math.floor(lines * LINE_BUDGET_FILL);
+  return `\n- At ${body.px}px/${body.lineHeight} body text the usable box holds about ${lines} lines, headings and gaps included. Fill at most ${LINE_BUDGET_FILL * 100}% of that (about ${fill} lines); cut words rather than shrink type.`;
+};
+
 function buildPromptFragment(ds: DesignSystemDefinition): string {
   const p = ds.page;
   const t = ds.typography;
@@ -52,7 +71,7 @@ ${ds.summary}
 ${oneLine(ds.intent)}
 
 PAGE
-- Every page is exactly ${p.width}x${p.height}px. The app already pads every page by the safe area (${p.safeArea.top}px top, ${p.safeArea.right}px right, ${p.safeArea.bottom}px bottom, ${p.safeArea.left}px left), so the usable box is ${usableBox(p)}. Content stays inside it.
+- Every page is exactly ${p.width}x${p.height}px. The app already pads every page by the safe area (${p.safeArea.top}px top, ${p.safeArea.right}px right, ${p.safeArea.bottom}px bottom, ${p.safeArea.left}px left), so the usable box is ${usableBox(p)}. Content stays inside it.${lineBudget(ds)}
 - The document has ${p.pages.min} to ${p.pages.max} pages. Default page ground is ${p.background}.
 
 COLOUR — declare these tokens once in :root, then reference them only as var(--ds-<token>)
@@ -76,6 +95,7 @@ ${ds.spacing.scale.join(', ')}
 
 ICONS
 - Available: ${ds.icons.allowed.join(', ')}. Sizes: ${ds.icons.sizes.join(', ')}px. Colours: ${ds.icons.colors.join(', ')}.
+- Give every svg an explicit colour, e.g. \`.page svg { color: var(--ds-${ds.icons.colors[0]}); }\`. Never let an icon inherit the text colour.
 - At most ${ds.icons.rules.maxPerPage} per page, and ${ds.icons.rules.role} only — an icon never carries meaning the reader needs.
 
 PAGE ROLES — every page element carries data-role="<role>"

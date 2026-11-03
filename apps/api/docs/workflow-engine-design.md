@@ -168,7 +168,7 @@ WorkflowRun {
   kind:           RunKind
   status:         RunStatus
   input:          BuildInput        // the request that spawned the run
-  currentStep?:   WorkflowStep      // updated at each step boundary (reconnect fallback)
+  currentStep?:   WorkflowStep      // legacy: no longer written (M1.1); kept optional for old docs
   researchContext?: ResearchResult  // persisted when RESEARCH completes (refine reuse + debug)
   creditsUsed:    number            // attempt-scoped accumulator (reset each attempt — §9)
   failureReason?: string            // set when FAILED
@@ -181,9 +181,9 @@ per-step checkpoints *for resume* — a retry re-runs the whole job):
 
 - **On create** (at enqueue): `{ status: RUNNING, kind, artifact, targetVersion,
   input, creditsUsed: 0 }`.
-- **On each step boundary:** update `currentStep` (+ `status`). One cheap
-  `updateOne` between steps — enough for the SSE-reconnect status fallback (#102)
-  and post-mortem debugging.
+- **On each step boundary:** nothing is written. `currentStep` is no longer
+  updated (M1.1, #209): nothing read it, and the write cost a Mongo round trip
+  per step. The field stays optional in the schema for old documents.
 - **When `RESEARCH` completes:** persist `researchContext` (the one durable thing
   refine reuse needs).
 - **During run:** accumulate `creditsUsed` via `meter.record` (§9).
@@ -338,7 +338,7 @@ interface CreditMeter {
   2. emits the `usage.tick` event (§5).
 - **Per attempt** — the engine **resets** the attempt-scoped `creditsUsed` at the
   start of each attempt, so a whole-job retry can't double-count.
-- **Post-run** — on `run.completed` the engine calls `meter.commit(runId)`: the
+- **Post-run** — right after emitting `run.completed` the engine calls `meter.commit(runId)`: the
   **only** real debit, for the winning attempt's usage. On failure → **no commit**.
 
 **Net effect:** users are charged **once, only for successful runs**. Failed runs and
@@ -366,7 +366,7 @@ interface StepContext {
   artifacts: ArtifactWriter; // #97 — set version content, flip status, read prior version
   meter:     CreditMeter;    // #100 — §9
   emit:      (e: { type: RunEventType; data: unknown }) => void; // step.progress only (§5)
-  run:       RunRecordHandle; // read/patch this WorkflowRun (researchContext, currentStep)
+  run:       RunRecordHandle; // read/patch this WorkflowRun (researchContext)
 }
 ```
 

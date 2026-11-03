@@ -1,6 +1,7 @@
 import { ContentValidationError } from '../../agent/agent-runner.error';
 import type { DocumentRefineInput } from '../../agent/agent-runner.interface';
 import { ArtifactType, RunKind } from '../../database/schemas';
+import { runDate } from '../engine/run-date';
 import { RunEventType } from '../engine/run-event.types';
 import { terminal } from '../engine/workflow.error';
 import type {
@@ -9,6 +10,7 @@ import type {
   StepHandler,
 } from '../engine/workflow.types';
 import { WorkflowStep } from '../workflow.constants';
+import { commentaryPreview } from './commentary-preview';
 import {
   callModel,
   envelopeAllowance,
@@ -25,6 +27,9 @@ import {
  * - **terminal** — content that failed Zod even after the warm repair (R2).
  * - **retryable** — an LLM transport fault, which `src/llm` already classified
  *   and the engine's `toWorkflowError` reads straight off the `LLMError`.
+ *
+ * With `STREAM_POST_COMMENTARY` on, the agent streams the commentary as it is
+ * written, and `commentaryPreview` throttles it into `writing` progress.
  *
  * DOCUMENT drafts a Candidate Source, from the brief or by rewriting the
  * refine base, and repairs it until it is statically clean (spec §7.1).
@@ -44,8 +49,13 @@ export const generateStep: StepHandler = async (state, ctx) => {
         stylePreset,
         research: state.research,
         refine: state.refine,
+        today: runDate(ctx),
+        sessionId: ctx.run.runId,
       },
-      meteredHooks(ctx),
+      {
+        ...meteredHooks(ctx),
+        ...commentaryPreview((event) => ctx.emit(event)),
+      },
     );
 
     return {
@@ -126,13 +136,16 @@ async function generateDocument(
         includeTitle,
         maxEnvelopeRepairs: draftAllowance,
         ...(refine ? { refine } : {}),
+        today: runDate(ctx),
+        sessionId: ctx.run.runId,
+        timeLeftMs: ctx.deadline.remainingMs(),
       },
       hooks,
     ),
   );
 
   ctx.diagnostics.recordRepairsSpent(draft.envelopeRepairs);
-  const { candidate, repairsSpent } = await repairStatically(
+  const { candidate, repairsSpent, fallbacksSpent } = await repairStatically(
     {
       ctx,
       step: WorkflowStep.GENERATE,
@@ -146,7 +159,12 @@ async function generateDocument(
 
   return {
     ...(draft.title !== undefined ? { generatedTitle: draft.title } : {}),
-    draft: { commentary: draft.commentary, candidate, repairsSpent },
+    draft: {
+      commentary: draft.commentary,
+      candidate,
+      repairsSpent,
+      ...(fallbacksSpent !== undefined ? { fallbacksSpent } : {}),
+    },
   };
 }
 

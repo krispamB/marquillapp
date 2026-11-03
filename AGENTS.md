@@ -28,7 +28,7 @@ Run from the repository root:
 ```bash
 bun install                         # all workspaces
 docker compose up -d                # MongoDB, Redis, BullMQ dashboard, MinIO, Browserless (the api needs these)
-bun run dev                         # web :3000, landing :3001, api :3500
+bun run dev                         # api :3500 first, then web :3000 and landing :3001 once the api answers
 bun run --filter @marquill/web dev  # a single app
 
 bun run check                       # typecheck + tests, every app

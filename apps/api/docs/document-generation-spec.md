@@ -354,9 +354,14 @@ type Violation = { code: string; detail: string; page?: number; line?: number };
 Assembly turns a statically clean Candidate Source into a Document Source by adding exactly three
 derived things:
 
-1. **The frame stylesheet** (§4.3), as a second `<style>` block.
-2. **The Google Fonts `<link>`**, built from `typography.fonts` ∩ `DESIGN_SYSTEM_FONT_ALLOWLIST`,
-   `display=block`.
+1. **The frame stylesheet** (§4.3), as the last `<style>` block.
+2. **The fonts**, from `typography.fonts` ∩ `DESIGN_SYSTEM_FONT_ALLOWLIST`, `display=block` (#235).
+   The worker's `FontInlinerService` fetches the css2 stylesheet with a Chrome User-Agent, keeps the
+   `@font-face` subsets whose `unicode-range` meets the Candidate Source's text (always `latin` and
+   `latin-ext`), and inlines each woff2 as a `data:font/woff2;base64` URL. Assembly puts that CSS in
+   a `<style>` before the frame. Every fetch is cached per process by URL, and a failed one is
+   evicted; any failure falls back to the Google Fonts `<link>`, never to a failed render.
+   `assemble()` stays pure: the CSS is an argument, and without it the `<link>` is added.
 3. **Icons.** Each `<svg data-icon data-size>` placeholder is filled from the pinned Lucide catalog
    (`lucide-static`, catalog id `app-inline-v1`): `viewBox`, paths, `stroke="currentColor"`,
    `width`/`height` from `data-size`, `aria-hidden="true"`, `focusable="false"`.
@@ -378,17 +383,23 @@ One CDP session per render replaces the REST `/pdf` call. It uses `puppeteer.con
 (`puppeteer-core`, a runtime dependency) and is one metered render:
 
 1. `setJavaScriptEnabled(false)`. CDP evaluation still runs the probe.
-2. Request interception allowlists `fonts.googleapis.com/css2` and `fonts.gstatic.com` only. A
-   refused request is recorded.
-3. `emulateMediaType('print')`; viewport at the definition's page size.
+2. Request interception allowlists `fonts.googleapis.com/css2`, `fonts.gstatic.com` and inlined
+   `data:font/` URLs only. A refused request is recorded. Chrome emits a request for each inlined
+   font and aborting one is a no-op, so the filter passes `data:font/` before its refusal branch;
+   otherwise every inlined render would end as `render.egress`. The request listener is attached
+   first.
+3. `emulateMediaType('print')`; viewport at the definition's page size. Steps 1–3 and the CDP
+   session for step 6 are sent in parallel (one round trip).
 4. `setContent(…, { waitUntil: 'load' })`. Not `networkidle0`, which never settles on Browserless.
 5. Probe: force layout, `await document.fonts.ready`, collect page boxes, line boxes, colours,
    effective backgrounds, clipping ancestors and FontFace status.
 6. Font pass: `CSS.getPlatformFontsForNode` per text element (`document.fonts.check()` cannot detect
-   fallback).
+   fallback). `DOM.enable`, `CSS.enable` and `DOM.getDocument` are pipelined; the detach is not
+   awaited.
 7. Capture `cover.png` from page 1. This is best effort: a failure is recorded and never blocks
    `READY` (#138).
-8. `page.pdf`, then count the PDF's pages.
+8. `page.pdf` (`waitForFonts: false`; the probe already awaited the fonts), then count the PDF's
+   pages. The final `browser.disconnect()` is not awaited.
 
 One deadline covers the whole session, not only `setContent`.
 
@@ -496,9 +507,10 @@ version: {
 - **Retention.** Per-version objects are never deleted while the artifact is live. A future
   soft-delete sweep must skip versions referenced by a `SCHEDULED` or `PUBLISHED` Post. Objects from
   an Attempt that never reached `READY` stay under their own prefix for that sweep.
-- A frozen Document Source references Google-hosted fonts that may one day stop being served. This
-  never affects a stored PDF, because nothing re-renders a stored version (§6.6). Self-hosting fonts
-  is the eventual fix and is out of scope.
+- A frozen Document Source carries its fonts inline (§4.5), so `source.html` is larger (about
+  0.3–1.1 MB on the launch systems). One assembled after an inlining failure references
+  Google-hosted fonts that may one day stop being served. This never affects a stored PDF, because
+  nothing re-renders a stored version (§6.6).
 
 ### 6.4 Manual edit (#138)
 
@@ -517,8 +529,9 @@ document.
 - **The prompt sees the base's Candidate Source** (`candidate.html`, verified against
   `candidateSha256`), never the assembled Document Source. Reverse-assembly is rejected.
 - The prompt also carries the base's commentary, the user's `feedback`, the original `prompt` and
-  `stylePreset`, the prompt fragment of the new Attempt's pin, and the prior run's research. There is
-  no new research pass.
+  `stylePreset`, the prompt fragment of the new Attempt's pin, the prior run's research, and the
+  refine run's own date (the `TODAY:` line every draft brief opens with). There is no new research
+  pass.
 - The model re-emits the whole document, which goes through check → Repair → assemble → render.
 - **Design System on refine:**
   1. By default the new Attempt carries the base's exact pin, whatever its status: `SUPERSEDED` and
@@ -615,7 +628,25 @@ or page-scoped repair proves necessary.
   pinned fragment, byte-identical to the draft call. The user message is the current Candidate
   Source, the bounded violations, and "fix these, re-emit the complete document, change nothing
   else". Brief, research and feedback are dropped.
-- A Repair's `title` and `commentary` are ignored; the draft's are kept.
+- **`DOCUMENT_REPAIR_MODE`** (`'full' | 'patch'`, default `'full'`, a module constant switched by
+  deploy) sets what a Repair answers. In `full` it answers `{ html }` only (`documentRepairSchema`),
+  and the user message's last line asks for exactly that. In `patch` it answers
+  `{ edits: {find, replace}[] | null, html: string | null }` (at most 40 edits, exactly one field
+  non-null), and the last line asks for edits, with `html` for structural codes (`envelope.body`,
+  `page.pages`, `composition.pageRoles`). The draft's `title` and `commentary` are kept either way.
+- **Applying edits.** The pure `applyEdits(candidate, edits)` (`document-source/candidate-patch.ts`)
+  matches `find` against the exact bytes of the Candidate Source (CRLF to LF is the only
+  normalisation). Each `find` must match exactly once, ranges must not overlap, and the edits apply
+  by offset, last to first, all or nothing. Empty `edits` is a failure. This does not sanitize
+  (§4.4): the app changes nothing on its own, it applies only what the model authored, and the
+  result is unchecked, so it goes back through `check()` and render like any Repair answer.
+- **Fallback.** When the edits do not apply, the same round sends one warm follow-up in the same
+  conversation, listing the problems, answered with `{ html }`. It is billed but does not count
+  against `DOCUMENT_REPAIR_BUDGET`, and a job attempt gets at most one. An envelope repair turn
+  inside the fallback still counts, as it does for any call. Empty `edits` or an empty `find` pass
+  the schema and fail in `applyEdits`, so they earn the fallback too. If that fallback is already
+  spent, failed edits end the run as `document.repair_exhausted`. A worst case per job attempt in
+  `patch` mode is therefore one more model call than above.
 
 ### 7.3 Render retries and the checkpoint (#139)
 
@@ -640,6 +671,11 @@ base's `candidate.html` and commentary.
 | `candidate.html` missing or hash mismatch | **terminal** + alert `artifact.source_missing` |
 | Mongo or cache read fails | transient |
 
+A DOCUMENT REFINE reads the base's Candidate Source from `run_candidate_sources` by
+`{ candidateSha256, role: 'ACCEPTED' }` first, in parallel with the cached research read, and trusts
+it only if it matches the frozen hash. A miss, a mismatch or a read error falls back to the R2 read
+above, so the failure classes in the table are unchanged.
+
 All of these precede any spend.
 
 ### 7.5 Model output and truncation (#139)
@@ -650,7 +686,9 @@ All of these precede any spend.
   raises `envelope.truncated` **before any parse**.
 - **Truncation is terminal** (`document.truncated`) and spends no Repair.
 - **`DOCUMENT_GENERATION_MAX_OUTPUT_TOKENS`, default 16384**, applies to DOCUMENT draft and Repair
-  calls. `GENERATION_MAX_OUTPUT_TOKENS` (8192) keeps serving POST, POLL and research.
+  calls, including the `patch` fallback. A Repair answer cut off by the cap is `envelope.truncated`
+  whether it carried edits or `html`; edits are never applied from a truncated answer.
+  `GENERATION_MAX_OUTPUT_TOKENS` (8192) keeps serving POST, POLL and research.
 - **`DOCUMENT_RUN_DEADLINE = 6 min`** per job attempt, checked before each model call and render
   session. Exceeding it is transient. On exhaustion the code follows the phase: `render.unavailable`
   in `RENDER_PDF`, `internal` elsewhere.
@@ -750,11 +788,19 @@ Nothing below is in `docs/api/` until then.
 | Candidate size cap | module constant | 256 KB | §4.4 |
 | Violations to the model | module constant | ≤3 per code, ≤40 total | §4.4 |
 | `DOCUMENT_REPAIR_BUDGET` | module constant | `2` | §7.2 |
+| `DOCUMENT_REPAIR_MODE` | module constant | `'full'`; `'patch'` once the eval's fallback rate is under 20% | §7.2 |
 | `DOCUMENT_RUN_DEADLINE` | module constant | 6 min | §7.5 |
 | `DOCUMENT_GENERATION_MAX_OUTPUT_TOKENS` | env var | `16384` | §7.5 |
 | `CHROME_PATH` | env var, test only | local Chrome for `test:render` | §11.2 |
 | `BROWSERLESS_URL` + `BROWSERLESS_TOKEN` | env var, test only | alternative to `CHROME_PATH`: the docker Browserless | §11.2 |
+| `BROWSERLESS_MAX_CONCURRENT_SESSIONS` | env var, worker | unset (off); `2` on Browserless Free | §11.1 |
+| `BROWSERLESS_SLOT_WAIT_MAX_MS` | env var, worker | `120000` | §11.1 |
+| `RENDER_SLOT_WAIT_RESERVE_MS` | module constant | 20 s of the run deadline kept free of slot waiting | §7.5 |
 | Candidate retention on runs | module constant | 90 days | §11.5 |
+| `FONT_INLINE_FETCH_TIMEOUT_MS` | module constant | 5 s per font inliner fetch | §4.5 |
+| `FONT_INLINE_BUDGET_MS` | module constant | 5 s per `inlineCss` call, all its fetches together | §4.5 |
+| `FONT_INLINE_USER_AGENT` | module constant | a desktop Chrome User-Agent (woff2 subsets) | §4.5 |
+| `FONT_INLINE_ALWAYS_SUBSETS` | module constant | `latin`, `latin-ext` | §4.5 |
 
 Module constants change by deploy, never by environment, so a document never renders differently per
 environment. Existing `CREDIT_SURCHARGE_PDF_RENDER` and `CREDIT_MINIMUM_PDF_RENDER` keep their values
@@ -767,17 +813,42 @@ with the per-run rule in §7.7. New dependencies: `yaml`, `parse5`, `postcss`, `
 Each DOCUMENT run records a **`documentDiagnostics`** block on `WorkflowRun`:
 
 - per candidate: every check outcome (passes included), with violation codes and counts
-- repair rounds used, `finishReason`, output tokens, page count, the pin, wall time per step and the
-  final `failureCode`
+- repair rounds used, `repairs` (one entry per Repair round: `kind` `static` or `render`, `mode`
+  `full` or `patch`, `edits` the number of edits answered, `0` for an `html` answer, and `fallback`
+  whether the edits did not apply, so the round needed the `{ html }` follow-up, sent or, with the
+  fallback already spent, ending the run; #232), `finishReason`, output tokens, page
+  count, the pin, wall time per step and the final `failureCode`
 - a reference to `renderAttempts` for session durations, units, outcome and `billed`, rather than a
   copy. Each entry also records where the session got to (#192): `phase` (the phase running when it
   ended: `pdf` for a session that finished, the phase that hung or threw otherwise) and `phaseMs`
   (milliseconds per phase entered, the last one up to the moment the session ended), and
   `timedOut: true` when the session hit its deadline. The phases are those of §5.1. Entries from
-  before #192 carry none of these. The Browserless session id is not recorded: a plain
+  before #192 carry none of these. Each entry also records `slotWaitMs` (#227): how long the render
+  waited for a Browserless slot before the session connected, outside `phaseMs` and the session
+  deadline; `0` when a slot was free or the semaphore is off. A render that got no slot in time ran
+  no session, so it records no entry. Entries from before #227 carry none. The Browserless session id is not recorded: a plain
   `puppeteer.connect` gets none from Browserless (its docs return an id only from the session API,
   `POST /session`), so a `connect` timeout cannot yet be matched to a Browserless-side session.
 - `acceptedCandidate` (§7.3) and, on failure, the failed Candidate Source
+- what the model calls cost (#207): `promptTokens`, `reasoningTokens` (the share of output tokens
+  spent reasoning) and `cachedPromptTokens` (the share of prompt tokens read from the provider's
+  cache), summed over every job attempt like `outputTokens`, and `modelTurns`, one entry per model
+  call, oldest first: `call` (`draft`, `repair`, or `envelope` for the Zod repair turn either may
+  spend), `model`, `promptTokens`, `completionTokens`, `reasoningTokens` and `cachedTokens` when
+  the provider reports them, `latencyMs` and `finishReason`. Turns from earlier job attempts carry
+  over. The list keeps the latest `MAX_MODEL_TURNS` (24); a job attempt makes at most a draft and
+  `DOCUMENT_REPAIR_BUDGET` more calls (plus one `patch` fallback), so a run never reaches it.
+  Diagnostics from before #207 carry none of these.
+
+Every run, DOCUMENT or not, also records:
+
+- `llmUsage`: its model calls summed (`calls`, `promptTokens`, `completionTokens`,
+  `reasoningTokens`, `cachedTokens`, `cacheWriteTokens`, `llmMs`), written in the same update
+  that completes or fails the run. Like `creditsUsed` it describes the final job attempt, and it
+  is absent when that attempt ran in another process than the one that failed it.
+- `queueWaitMs`: the first job attempt's wait from enqueue to worker pickup
+  (`job.processedOn - job.timestamp`). A retry's wait would include the earlier attempts and their
+  backoff, so it is not recorded.
 
 ### 11.2 Test layers (#141)
 

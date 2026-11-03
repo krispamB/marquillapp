@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 import { FailureCode, WorkflowStep } from '../workflow.constants';
-import { DocumentRunDiagnostics } from './document-run-diagnostics';
+import {
+  DocumentRunDiagnostics,
+  MAX_MODEL_TURNS,
+} from './document-run-diagnostics';
 import type { BuildInput, DocumentDiagnostics } from './workflow.types';
 
 const sha = (text: string) => createHash('sha256').update(text).digest('hex');
@@ -17,6 +20,16 @@ const input = {
 } as unknown as BuildInput;
 
 const violation = (code: string) => ({ code, detail: `secret ${code}` });
+
+const turn = (overrides: Record<string, unknown> = {}) => ({
+  model: 'test/generation-model',
+  call: 'draft' as const,
+  promptTokens: 4000,
+  completionTokens: 6000,
+  latencyMs: 30_000,
+  finishReason: 'stop',
+  ...overrides,
+});
 
 const READY = { outcome: 'READY', credits: 368 } as const;
 const exhausted = {
@@ -96,19 +109,77 @@ describe('DocumentRunDiagnostics', () => {
 
   describe('recordModelTurn', () => {
     it('should sum output tokens and keep the last finish reason', () => {
-      diagnostics.recordModelTurn({
-        completionTokens: 6000,
-        finishReason: 'stop',
-      });
-      diagnostics.recordModelTurn({
-        completionTokens: 5000,
-        finishReason: 'length',
-      });
+      diagnostics.recordModelTurn(turn({ finishReason: 'stop' }));
+      diagnostics.recordModelTurn(
+        turn({ completionTokens: 5000, finishReason: 'length' }),
+      );
 
       expect(diagnostics.finish(READY).diagnostics).toMatchObject({
         outputTokens: 11_000,
         finishReason: 'length',
       });
+    });
+
+    it('should sum prompt, reasoning and cached prompt tokens', () => {
+      diagnostics.recordModelTurn(
+        turn({ reasoningTokens: 2500, cachedTokens: 3000 }),
+      );
+      diagnostics.recordModelTurn(
+        turn({ call: 'repair', promptTokens: 5000, reasoningTokens: 1500 }),
+      );
+
+      expect(diagnostics.finish(READY).diagnostics).toMatchObject({
+        promptTokens: 9000,
+        reasoningTokens: 4000,
+        cachedPromptTokens: 3000,
+      });
+    });
+
+    it('should keep one entry per model call with its model, tokens, latency and finish reason', () => {
+      diagnostics.recordModelTurn(
+        turn({ reasoningTokens: 2500, cachedTokens: 3000, cost: 0.04 }),
+      );
+      diagnostics.recordModelTurn(
+        turn({
+          call: 'envelope',
+          completionTokens: 700,
+          latencyMs: 8000,
+          finishReason: undefined,
+        }),
+      );
+
+      expect(diagnostics.finish(READY).diagnostics.modelTurns).toEqual([
+        {
+          call: 'draft',
+          model: 'test/generation-model',
+          promptTokens: 4000,
+          completionTokens: 6000,
+          reasoningTokens: 2500,
+          cachedTokens: 3000,
+          latencyMs: 30_000,
+          finishReason: 'stop',
+        },
+        {
+          call: 'envelope',
+          model: 'test/generation-model',
+          promptTokens: 4000,
+          completionTokens: 700,
+          latencyMs: 8000,
+        },
+      ]);
+    });
+
+    it('should keep only the latest turns once the run passes the bound', () => {
+      for (let i = 0; i < MAX_MODEL_TURNS + 2; i++) {
+        diagnostics.recordModelTurn(turn({ completionTokens: i }));
+      }
+
+      const { diagnostics: finished } = diagnostics.finish(READY);
+      expect(finished.modelTurns).toHaveLength(MAX_MODEL_TURNS);
+      expect(finished.modelTurns[0].completionTokens).toBe(2);
+      expect(finished.modelTurns.at(-1)?.completionTokens).toBe(
+        MAX_MODEL_TURNS + 1,
+      );
     });
   });
 
@@ -118,6 +189,63 @@ describe('DocumentRunDiagnostics', () => {
       diagnostics.recordRepairsSpent(2);
 
       expect(diagnostics.finish(READY).diagnostics.repairRounds).toBe(2);
+    });
+  });
+
+  describe('recordRepair', () => {
+    it('should keep one entry per Repair round, in order', () => {
+      diagnostics.recordRepair({
+        kind: 'static',
+        mode: 'patch',
+        edits: 3,
+        fallback: true,
+      });
+      diagnostics.recordRepair({
+        kind: 'render',
+        mode: 'patch',
+        edits: 0,
+        fallback: false,
+      });
+
+      expect(diagnostics.finish(READY).diagnostics.repairs).toEqual([
+        { kind: 'static', mode: 'patch', edits: 3, fallback: true },
+        { kind: 'render', mode: 'patch', edits: 0, fallback: false },
+      ]);
+    });
+
+    it('should leave repairs out when no Repair ran', () => {
+      expect(diagnostics.finish(READY).diagnostics).not.toHaveProperty(
+        'repairs',
+      );
+    });
+
+    it("should carry on an earlier job attempt's Repairs before this one's", () => {
+      diagnostics.recordRepair({
+        kind: 'static',
+        mode: 'full',
+        edits: 0,
+        fallback: false,
+      });
+      const prior = diagnostics.finish({
+        outcome: 'RETRYING',
+        failureCode: FailureCode.RENDER_UNAVAILABLE,
+        message: 'render did not settle',
+        credits: 180,
+      }).diagnostics;
+
+      const next = start({ jobAttempt: 2, prior });
+      next.recordRepair({
+        kind: 'render',
+        mode: 'full',
+        edits: 0,
+        fallback: false,
+      });
+
+      expect(next.finish(READY).diagnostics.repairs).toEqual([
+        { kind: 'static', mode: 'full', edits: 0, fallback: false },
+        { kind: 'render', mode: 'full', edits: 0, fallback: false },
+      ]);
+      expect(prior.repairs).toHaveLength(1);
     });
   });
 
@@ -192,6 +320,10 @@ describe('DocumentRunDiagnostics', () => {
         candidates: [],
         repairRounds: 0,
         outputTokens: 0,
+        promptTokens: 0,
+        reasoningTokens: 0,
+        cachedPromptTokens: 0,
+        modelTurns: [],
         stepWallTimeMs: {},
         wallTimeMs: 0,
         renderAttempts: { sessions: 0 },
@@ -273,10 +405,7 @@ describe('DocumentRunDiagnostics', () => {
 
     it("should carry on an earlier job attempt's diagnostics when given them", () => {
       diagnostics.stepStarted(WorkflowStep.GENERATE);
-      diagnostics.recordModelTurn({
-        completionTokens: 6000,
-        finishReason: 'stop',
-      });
+      diagnostics.recordModelTurn(turn({ reasoningTokens: 2500 }));
       diagnostics.recordCheck('static', 'clean', []);
       diagnostics.recordAccepted('clean', 0);
       diagnostics.recordRenderSession();
@@ -294,6 +423,9 @@ describe('DocumentRunDiagnostics', () => {
       next.recordRenderSession();
       next.recordCheck('render', 'clean', []);
       next.recordPageCount(5);
+      next.recordModelTurn(
+        turn({ call: 'repair', completionTokens: 1000, cachedTokens: 4000 }),
+      );
       clock += 500;
 
       expect(next.finish({ outcome: 'READY', credits: 8 }).diagnostics).toEqual(
@@ -319,7 +451,30 @@ describe('DocumentRunDiagnostics', () => {
           ],
           repairRounds: 0,
           finishReason: 'stop',
-          outputTokens: 6000,
+          outputTokens: 7000,
+          promptTokens: 8000,
+          reasoningTokens: 2500,
+          cachedPromptTokens: 4000,
+          modelTurns: [
+            {
+              call: 'draft',
+              model: 'test/generation-model',
+              promptTokens: 4000,
+              completionTokens: 6000,
+              reasoningTokens: 2500,
+              latencyMs: 30_000,
+              finishReason: 'stop',
+            },
+            {
+              call: 'repair',
+              model: 'test/generation-model',
+              promptTokens: 4000,
+              completionTokens: 1000,
+              cachedTokens: 4000,
+              latencyMs: 30_000,
+              finishReason: 'stop',
+            },
+          ],
           pageCount: 5,
           stepWallTimeMs: { GENERATE: 1_500 },
           wallTimeMs: 1_500,

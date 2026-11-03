@@ -1,4 +1,4 @@
-import { LLMError, toLLMError } from './llm.error';
+import { LLMError, fromStreamError, toLLMError } from './llm.error';
 
 /** Stand-in for the SDK's `OpenRouterError`, which carries `statusCode`. */
 const makeHttpError = (statusCode: number, message = 'boom') =>
@@ -8,8 +8,43 @@ const makeHttpError = (statusCode: number, message = 'boom') =>
 const makeTransportError = (name: string) =>
   Object.assign(new Error(name), { name });
 
+/** An `OpenRouterError` carrying the response headers, as the SDK sets them. */
+const makeHttpErrorWithHeaders = (
+  statusCode: number,
+  headers: Record<string, string>,
+) =>
+  Object.assign(new Error('boom'), {
+    statusCode,
+    headers: new Headers(headers),
+  });
+
+/**
+ * The SDK's `ResponseValidationError` for a 200 whose body is not a
+ * completion: `body` is the raw text, `rawValue` the parsed JSON.
+ */
+const makeValidationError = (body: string) => {
+  let rawValue: unknown;
+  try {
+    rawValue = JSON.parse(body);
+  } catch {
+    rawValue = undefined;
+  }
+  return Object.assign(new Error('Response validation failed'), {
+    name: 'ResponseValidationError',
+    statusCode: 200,
+    body,
+    rawValue,
+  });
+};
+
 describe('LLMError', () => {
   describe('constructor', () => {
+    it('should leave retryAfterMs unset when none is given', () => {
+      expect(
+        new LLMError('failed', { retryable: true }).retryAfterMs,
+      ).toBeUndefined();
+    });
+
     it('should retain the retryable flag, status code and cause', () => {
       const cause = new Error('underlying');
       const error = new LLMError('failed', {
@@ -85,6 +120,126 @@ describe('toLLMError', () => {
       ).toBe(false);
     });
 
+    it('should mark a raw TimeoutError as retryable when a timeout fires while the body is read', () => {
+      const error = toLLMError(
+        new DOMException('The operation timed out.', 'TimeoutError'),
+      );
+
+      expect(error.retryable).toBe(true);
+      expect(error.statusCode).toBeUndefined();
+    });
+
+    it('should mark a raw AbortError as terminal when the caller aborts while the body is read', () => {
+      expect(
+        toLLMError(new DOMException('This operation was aborted', 'AbortError'))
+          .retryable,
+      ).toBe(false);
+    });
+  });
+
+  describe('a provider error after 200 OK', () => {
+    it.each([429, 502, 503])(
+      'should mark it retryable when the body carries error code %i',
+      (code) => {
+        const error = toLLMError(
+          makeValidationError(
+            JSON.stringify({ error: { code, message: 'Provider fell over' } }),
+          ),
+        );
+
+        expect(error.retryable).toBe(true);
+        expect(error.statusCode).toBe(code);
+        expect(error.message).toBe('Provider fell over');
+      },
+    );
+
+    it('should mark it terminal when the body carries a client error code', () => {
+      const error = toLLMError(
+        makeValidationError(
+          JSON.stringify({ error: { code: 400, message: 'Context too long' } }),
+        ),
+      );
+
+      expect(error.retryable).toBe(false);
+      expect(error.statusCode).toBe(400);
+    });
+
+    it('should read a numeric string code when the body sends one', () => {
+      const error = toLLMError(
+        makeValidationError(JSON.stringify({ error: { code: '403' } })),
+      );
+
+      expect(error).toMatchObject({ retryable: false, statusCode: 403 });
+    });
+
+    it('should mark it retryable when the body has no readable error code', () => {
+      const error = toLLMError(
+        makeValidationError(
+          JSON.stringify({ error: { code: 'server_error' } }),
+        ),
+      );
+
+      expect(error.retryable).toBe(true);
+      expect(error.statusCode).toBe(200);
+    });
+
+    it('should mark it retryable when the body is not JSON', () => {
+      expect(toLLMError(makeValidationError('<html>oops')).retryable).toBe(
+        true,
+      );
+    });
+
+    it('should read the code from the raw body when the parsed value is absent', () => {
+      const error = toLLMError(
+        Object.assign(makeValidationError(''), {
+          body: JSON.stringify({ error: { code: 401 } }),
+        }),
+      );
+
+      expect(error).toMatchObject({ retryable: false, statusCode: 401 });
+    });
+  });
+
+  describe('Retry-After', () => {
+    beforeEach(() => {
+      jest.useFakeTimers({ now: new Date('2026-10-22T12:00:00Z') });
+    });
+
+    afterEach(() => jest.useRealTimers());
+
+    it('should read Retry-After in seconds when a 429 sends one', () => {
+      const error = toLLMError(
+        makeHttpErrorWithHeaders(429, { 'retry-after': '7' }),
+      );
+
+      expect(error.retryAfterMs).toBe(7_000);
+    });
+
+    it('should read Retry-After as an HTTP date when a 503 sends one', () => {
+      const error = toLLMError(
+        makeHttpErrorWithHeaders(503, {
+          'retry-after': 'Thu, 22 Oct 2026 12:00:03 GMT',
+        }),
+      );
+
+      expect(error.retryAfterMs).toBe(3_000);
+    });
+
+    it('should leave retryAfterMs unset when the header is absent, malformed or in the past', () => {
+      expect(toLLMError(makeHttpError(429)).retryAfterMs).toBeUndefined();
+      expect(
+        toLLMError(makeHttpErrorWithHeaders(429, { 'retry-after': 'soon' }))
+          .retryAfterMs,
+      ).toBeUndefined();
+      expect(
+        toLLMError(
+          makeHttpErrorWithHeaders(429, {
+            'retry-after': 'Thu, 22 Oct 2026 11:59:00 GMT',
+          }),
+        ).retryAfterMs,
+      ).toBeUndefined();
+    });
+
     it('should mark an unrecognised error as terminal', () => {
       const error = toLLMError(new Error('who knows'));
 
@@ -107,6 +262,33 @@ describe('toLLMError', () => {
       expect(error).toBeInstanceOf(LLMError);
       expect(error.retryable).toBe(false);
       expect(error.cause).toBe('a bare string');
+    });
+  });
+});
+
+describe('fromStreamError', () => {
+  it.each([429, 502, 503])(
+    'should mark it retryable when the chunk carries code %i',
+    (code) => {
+      const error = fromStreamError({ code, message: 'Upstream died' });
+      expect(error).toMatchObject({
+        retryable: true,
+        statusCode: code,
+        message: 'Upstream died',
+      });
+    },
+  );
+
+  it('should mark it terminal when the chunk carries a client error code', () => {
+    expect(fromStreamError({ code: 400, message: 'bad' }).retryable).toBe(
+      false,
+    );
+  });
+
+  it('should mark it retryable when the code is not an error status', () => {
+    expect(fromStreamError({ code: 0, message: '' })).toMatchObject({
+      retryable: true,
+      message: 'Provider failed mid-stream',
     });
   });
 });

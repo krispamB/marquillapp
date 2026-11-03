@@ -37,4 +37,5 @@ export const RunCandidateSourceSchema =
   SchemaFactory.createForClass(RunCandidateSource);
 
 RunCandidateSourceSchema.index({ run: 1, role: 1 }, { unique: true });
+RunCandidateSourceSchema.index({ candidateSha256: 1, role: 1 });
 RunCandidateSourceSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });

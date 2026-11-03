@@ -12,12 +12,24 @@ jest.mock(
       READY: 'READY',
       FAILED: 'FAILED',
     },
+    // For the real gate in the gating-read count.
+    SubscriptionStatus: { ACTIVE: 'ACTIVE', PAST_DUE: 'PAST_DUE' },
+    Subscription: class Subscription {},
+    Tier: class Tier {},
+    Usage: class Usage {},
+    Artifact: class Artifact {},
   }),
   { virtual: true },
 );
 
 import { ContentValidationError } from '../../agent/agent-runner.error';
+import { Types } from 'mongoose';
+import { CreditMeterService } from '../../feature-gating/credit-meter.service';
 import { FeatureGateForbiddenException } from '../../feature-gating/feature-gating.exception';
+import {
+  FeatureGatingService,
+  type Entitlement,
+} from '../../feature-gating/feature-gating.service';
 import { WorkflowError, withFailureCode } from '../engine/workflow.error';
 import { FailureCode } from '../workflow.constants';
 import type { BuildInput } from '../engine/workflow.types';
@@ -25,6 +37,7 @@ import {
   ArtifactRunProcessor,
   isTerminalJobFailure,
 } from './artifact-run.worker.handler';
+import { STALLED_FAILURE_REASON } from './stalled-failure';
 
 // These POST-run tests never reach RENDER_PDF, so never-called stubs suffice.
 // The DOCUMENT pipeline runs through this processor in
@@ -51,8 +64,19 @@ const makeJob = (overrides: Partial<Job<BuildInput>> = {}): Job<BuildInput> =>
     data: buildInput(),
     attemptsMade: 1,
     opts: { attempts: 3 },
+    timestamp: Date.parse('2026-10-25T23:30:00Z'),
     ...overrides,
   }) as unknown as Job<BuildInput>;
+
+const ENTITLEMENT: Entitlement = {
+  tier: null,
+  source: 'subscription',
+  subscriptionStatus: null,
+  period: {
+    periodStart: new Date('2026-03-14T00:00:00.000Z'),
+    periodEnd: new Date('2026-04-14T00:00:00.000Z'),
+  },
+};
 
 const makeProcessor = () => {
   const logger = {
@@ -83,24 +107,32 @@ const makeProcessor = () => {
   };
   const runHandle = {
     runId: 'run-1',
-    setCurrentStep: jest.fn().mockResolvedValue(undefined),
     saveResearchContext: jest.fn().mockResolvedValue(undefined),
+    readResearchContext: jest.fn().mockResolvedValue(undefined),
     recordRenderAttempt: jest.fn().mockResolvedValue(undefined),
     recordDocumentCheck: jest.fn().mockResolvedValue(undefined),
     getLatestCompletedResearch: jest.fn(),
+    readAcceptedCandidateText: jest.fn(),
     complete: jest.fn().mockResolvedValue(undefined),
     fail: jest.fn().mockResolvedValue(undefined),
     readAcceptedCandidate: jest.fn().mockResolvedValue(undefined),
     readDocumentDiagnostics: jest.fn().mockResolvedValue(undefined),
     saveDocumentDiagnostics: jest.fn().mockResolvedValue(undefined),
+    recordQueueWait: jest.fn().mockResolvedValue(undefined),
+    recordModelCall: jest.fn(),
   };
   const runs = { handleFor: jest.fn().mockReturnValue(runHandle) };
+  const inflight = {
+    refresh: jest.fn().mockResolvedValue(undefined),
+    release: jest.fn().mockResolvedValue(undefined),
+  };
   const creditMeter = {
     assertBalance: jest.fn().mockResolvedValue(undefined),
     toCredits: jest.fn().mockReturnValue(20),
     debit: jest.fn().mockResolvedValue(undefined),
   };
   const featureGating = {
+    resolveEntitlement: jest.fn().mockResolvedValue(ENTITLEMENT),
     assertResearchAccess: jest.fn().mockResolvedValue(undefined),
   };
 
@@ -109,10 +141,12 @@ const makeProcessor = () => {
     artifacts: artifacts as any,
     designSystems: stubDesignSystems as never,
     renderer: stubRenderer as any,
+    fonts: { inlineCss: jest.fn().mockResolvedValue(null) },
     objects: stubObjects as never,
     creditMeter: creditMeter as any,
     featureGating: featureGating as any,
     runs: runs as any,
+    inflight,
     redis: redis as any,
     logger,
   });
@@ -126,6 +160,7 @@ const makeProcessor = () => {
       artifacts,
       runs,
       runHandle,
+      inflight,
       creditMeter,
       featureGating,
     },
@@ -221,8 +256,53 @@ describe('ArtifactRunProcessor', () => {
 
       expect(mocks.featureGating.assertResearchAccess).toHaveBeenCalledWith(
         'user-1',
+        ENTITLEMENT,
       );
       expect(mocks.agent.research).toHaveBeenCalledTimes(1);
+    });
+
+    it('should resolve the entitlement once and reuse it when running the research check, balance check and debit', async () => {
+      mocks.agent.research.mockResolvedValue({
+        findings: 'Found',
+        sources: [],
+      });
+      mocks.agent.generate.mockImplementation(
+        (_input: unknown, hooks: { onUsage: (usage: object) => void }) => {
+          hooks.onUsage({ totalTokens: 15, cost: 0.02, model: 'm' });
+          return Promise.resolve({
+            title: 'Writing more',
+            content: { commentary: 'Write more.' },
+          });
+        },
+      );
+
+      await processor.process(
+        makeJob({ data: buildInput({ withResearch: true }) }),
+      );
+
+      expect(mocks.featureGating.resolveEntitlement).toHaveBeenCalledTimes(1);
+      expect(mocks.featureGating.resolveEntitlement).toHaveBeenCalledWith(
+        'user-1',
+      );
+      expect(mocks.creditMeter.assertBalance).toHaveBeenCalledWith(
+        'user-1',
+        ENTITLEMENT,
+      );
+      expect(mocks.creditMeter.debit).toHaveBeenCalledWith(
+        'user-1',
+        expect.any(Number),
+        ENTITLEMENT.period,
+      );
+    });
+
+    it('should leave the job to retry, having run nothing, when the entitlement cannot be resolved', async () => {
+      const outage = new Error('database unavailable');
+      mocks.featureGating.resolveEntitlement.mockRejectedValue(outage);
+
+      await expect(processor.process(makeJob())).rejects.toBe(outage);
+
+      expect(mocks.creditMeter.assertBalance).not.toHaveBeenCalled();
+      expect(mocks.agent.generate).not.toHaveBeenCalled();
     });
 
     it('should leave non-research worker behavior outside the capability gate', async () => {
@@ -278,6 +358,98 @@ describe('ArtifactRunProcessor', () => {
       );
       expect(mocks.runHandle.complete).toHaveBeenCalledTimes(1);
       expect(mocks.artifacts.failVersion).not.toHaveBeenCalled();
+    });
+
+    it("should date the prompts from the job's creation time when a retry runs on a later day", async () => {
+      jest.useFakeTimers({ advanceTimers: true });
+      jest.setSystemTime(new Date('2027-03-01T12:00:00Z'));
+
+      try {
+        await processor.process(makeJob({ attemptsMade: 2 }));
+      } finally {
+        jest.useRealTimers();
+      }
+
+      expect(mocks.agent.generate).toHaveBeenCalledWith(
+        expect.objectContaining({ today: '2026-10-25' }),
+        expect.anything(),
+      );
+    });
+
+    it("should refresh the run's in-flight lease at the start of each attempt", async () => {
+      await processor.process(makeJob());
+
+      expect(mocks.inflight.refresh).toHaveBeenCalledWith('user-1', 'run-1');
+    });
+
+    it('should release the in-flight slot when the run succeeds', async () => {
+      await processor.process(makeJob());
+
+      expect(mocks.inflight.release).toHaveBeenCalledWith('user-1', 'run-1');
+    });
+
+    it('should keep the in-flight slot when an attempt fails and will be retried', async () => {
+      mocks.agent.generate.mockRejectedValue(new Error('transient'));
+
+      await expect(processor.process(makeJob())).rejects.toThrow('transient');
+
+      expect(mocks.inflight.release).not.toHaveBeenCalled();
+    });
+
+    it('should record how long the job waited in the queue when its first attempt is picked up', async () => {
+      await processor.process(
+        makeJob({
+          attemptsMade: 0,
+          attemptsStarted: 1,
+          timestamp: 1_000,
+          processedOn: 5_200,
+        }),
+      );
+
+      expect(mocks.runHandle.recordQueueWait).toHaveBeenCalledWith(4_200);
+    });
+
+    it('should not record a queue wait for a retried job attempt, whose wait includes the earlier attempts', async () => {
+      await processor.process(
+        makeJob({
+          attemptsMade: 1,
+          attemptsStarted: 2,
+          timestamp: 1_000,
+          processedOn: 90_000,
+        }),
+      );
+
+      expect(mocks.runHandle.recordQueueWait).not.toHaveBeenCalled();
+    });
+
+    it('should not record a queue wait for a stalled job restarted without a failed attempt', async () => {
+      await processor.process(
+        makeJob({
+          attemptsMade: 0,
+          attemptsStarted: 2,
+          timestamp: 1_000,
+          processedOn: 90_000,
+        }),
+      );
+
+      expect(mocks.runHandle.recordQueueWait).not.toHaveBeenCalled();
+    });
+
+    it('should still run the job when the queue wait cannot be recorded', async () => {
+      mocks.runHandle.recordQueueWait.mockRejectedValue(
+        new Error('mongo down'),
+      );
+
+      await processor.process(
+        makeJob({
+          attemptsMade: 0,
+          attemptsStarted: 1,
+          timestamp: 1_000,
+          processedOn: 5_200,
+        }),
+      );
+
+      expect(mocks.runHandle.complete).toHaveBeenCalledTimes(1);
     });
 
     it('should emit the honest three-step lifecycle', async () => {
@@ -365,7 +537,11 @@ describe('ArtifactRunProcessor', () => {
         detail: { model: 'test/generation-model', totalTokens: 15 },
       });
       expect(mocks.creditMeter.debit).toHaveBeenCalledTimes(1);
-      expect(mocks.creditMeter.debit).toHaveBeenCalledWith('user-1', 20);
+      expect(mocks.creditMeter.debit).toHaveBeenCalledWith(
+        'user-1',
+        20,
+        ENTITLEMENT.period,
+      );
       expect(mocks.runHandle.complete).toHaveBeenCalledWith(20);
     });
 
@@ -395,7 +571,11 @@ describe('ArtifactRunProcessor', () => {
       });
       expect(mocks.creditMeter.toCredits).toHaveBeenCalledTimes(2);
       expect(mocks.runHandle.complete).toHaveBeenCalledWith(52);
-      expect(mocks.creditMeter.debit).toHaveBeenCalledWith('user-1', 52);
+      expect(mocks.creditMeter.debit).toHaveBeenCalledWith(
+        'user-1',
+        52,
+        ENTITLEMENT.period,
+      );
       const usageTicks = mocks.redis.xadd.mock.calls
         .filter((call) => call[6] === 'usage.tick')
         .map((call) => JSON.parse(call[8] as string));
@@ -427,7 +607,11 @@ describe('ArtifactRunProcessor', () => {
         expect.objectContaining({ kind: 'web_search' }),
       );
       expect(mocks.runHandle.complete).toHaveBeenCalledWith(20);
-      expect(mocks.creditMeter.debit).toHaveBeenCalledWith('user-1', 20);
+      expect(mocks.creditMeter.debit).toHaveBeenCalledWith(
+        'user-1',
+        20,
+        ENTITLEMENT.period,
+      );
       expect(
         mocks.redis.xadd.mock.calls.filter((call) => call[6] === 'usage.tick'),
       ).toHaveLength(1);
@@ -437,6 +621,120 @@ describe('ArtifactRunProcessor', () => {
       await expect(
         processor.process(makeJob({ id: undefined })),
       ).rejects.toBeInstanceOf(UnrecoverableError);
+    });
+  });
+
+  describe('gating reads', () => {
+    /**
+     * The real gate and meter service over counting model mocks: one
+     * `findOne`/`findById` is one database read. The worker process is long
+     * lived, so its tier cache is warm after the first job.
+     */
+    const makeGatedProcessor = () => {
+      const paidTier = {
+        _id: new Types.ObjectId(),
+        name: 'Starter',
+        monthlyPrice: 9.99,
+        limits: { credits: 1000, research: 1 },
+      };
+      const subscriptionModel = {
+        findOne: jest.fn(() => ({
+          sort: () => ({
+            lean: () =>
+              Promise.resolve({
+                status: 'ACTIVE',
+                tierId: paidTier._id,
+                currentPeriodStart: new Date(Date.now() - 86_400_000),
+                currentPeriodEnd: new Date(Date.now() + 86_400_000),
+              }),
+          }),
+        })),
+      };
+      const tierModel = {
+        findById: jest.fn(() => ({ lean: () => Promise.resolve(paidTier) })),
+        findOne: jest.fn(),
+      };
+      const usageModel = {
+        findOne: jest.fn(() => ({ lean: () => Promise.resolve({ count: 1 }) })),
+        updateOne: jest.fn().mockResolvedValue({ acknowledged: true }),
+      };
+      const featureGating = new FeatureGatingService(
+        subscriptionModel as never,
+        tierModel as never,
+        usageModel as never,
+        {} as never,
+        {} as never,
+        {} as never,
+      );
+      const creditMeter = new CreditMeterService(
+        { get: () => undefined } as never,
+        featureGating,
+      );
+      const { mocks } = makeProcessor();
+      mocks.agent.research.mockResolvedValue({
+        findings: 'Found',
+        sources: [],
+      });
+      mocks.agent.generate.mockImplementation(
+        (_input: unknown, hooks: { onUsage: (usage: object) => void }) => {
+          hooks.onUsage({ totalTokens: 15, cost: 0.02, model: 'm' });
+          return Promise.resolve({
+            title: 'Writing more',
+            content: { commentary: 'Write more.' },
+          });
+        },
+      );
+      const gated = new ArtifactRunProcessor({
+        agent: mocks.agent as never,
+        artifacts: mocks.artifacts as never,
+        designSystems: stubDesignSystems as never,
+        renderer: stubRenderer as never,
+        fonts: { inlineCss: jest.fn().mockResolvedValue(null) },
+        objects: stubObjects as never,
+        creditMeter,
+        featureGating,
+        runs: mocks.runs as never,
+        inflight: mocks.inflight,
+        redis: mocks.redis as never,
+        logger: mocks.logger,
+      });
+      const reads = () =>
+        subscriptionModel.findOne.mock.calls.length +
+        tierModel.findById.mock.calls.length +
+        tierModel.findOne.mock.calls.length +
+        usageModel.findOne.mock.calls.length;
+      return { gated, subscriptionModel, tierModel, usageModel, reads };
+    };
+
+    const researchJob = () =>
+      makeJob({
+        data: buildInput({
+          userId: new Types.ObjectId().toString(),
+          withResearch: true,
+        }),
+      });
+
+    it('should make 2 gating reads for a research job when the tier is cached', async () => {
+      const run = makeGatedProcessor();
+      await run.gated.process(researchJob());
+      const before = run.reads();
+
+      await run.gated.process(researchJob());
+
+      expect(run.reads() - before).toBe(2);
+    });
+
+    it('should read the subscription and usage once each, and the tier once when cold', async () => {
+      const run = makeGatedProcessor();
+
+      await run.gated.process(researchJob());
+
+      expect(run.subscriptionModel.findOne).toHaveBeenCalledTimes(1);
+      expect(run.tierModel.findById).toHaveBeenCalledTimes(1);
+      // The balance check, kept because the wallet can drain while the job
+      // waits; the debit writes into the resolved period without a read.
+      expect(run.usageModel.findOne).toHaveBeenCalledTimes(1);
+      expect(run.usageModel.updateOne).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -464,6 +762,72 @@ describe('ArtifactRunProcessor', () => {
       });
     });
 
+    it('should release the in-flight slot on a terminal failure', async () => {
+      await processor.onFailed(
+        makeJob(),
+        new UnrecoverableError('commentary must not be empty'),
+      );
+
+      expect(mocks.inflight.release).toHaveBeenCalledWith('user-1', 'run-1');
+    });
+
+    it('should release the in-flight slot when the job stalled out', async () => {
+      await processor.onFailed(
+        makeJob(),
+        new UnrecoverableError(STALLED_FAILURE_REASON),
+      );
+
+      expect(mocks.inflight.release).toHaveBeenCalledWith('user-1', 'run-1');
+    });
+
+    it('should release the in-flight slot even when the run had already ended', async () => {
+      mocks.runHandle.fail.mockResolvedValue('ALREADY_ENDED');
+
+      await processor.onFailed(
+        makeJob(),
+        new UnrecoverableError(STALLED_FAILURE_REASON),
+      );
+
+      expect(mocks.inflight.release).toHaveBeenCalledWith('user-1', 'run-1');
+    });
+
+    it('should release the in-flight slot when the version cannot be marked FAILED', async () => {
+      mocks.artifacts.failVersion.mockRejectedValue(new Error('mongo down'));
+
+      await processor.onFailed(makeJob(), new UnrecoverableError('boom'));
+
+      expect(mocks.inflight.release).toHaveBeenCalledWith('user-1', 'run-1');
+    });
+
+    it('should keep the in-flight slot when the attempt will be retried', async () => {
+      await processor.onFailed(
+        makeJob({ attemptsMade: 1 }),
+        new Error('flaky'),
+      );
+
+      expect(mocks.inflight.release).not.toHaveBeenCalled();
+    });
+
+    it("should fail the run through the job attempt's own handle, which holds its LLM usage", async () => {
+      const handles: Array<typeof mocks.runHandle> = [];
+      mocks.runs.handleFor.mockImplementation(() => {
+        const handle = { ...mocks.runHandle, fail: jest.fn() };
+        handles.push(handle);
+        return handle;
+      });
+      const error = new UnrecoverableError('commentary must not be empty');
+      mocks.agent.generate.mockRejectedValue(error);
+      const job = makeJob();
+
+      await expect(processor.process(job)).rejects.toThrow();
+      await processor.onFailed(job, error);
+
+      expect(handles[0].fail).toHaveBeenCalledTimes(1);
+      expect(
+        handles.slice(1).every((handle) => !handle.fail.mock.calls.length),
+      ).toBe(true);
+    });
+
     it('should record no document diagnostics and log no completion line for a POST run', async () => {
       await processor.process(makeJob());
       await processor.onFailed(makeJob(), new UnrecoverableError('nope'));
@@ -474,6 +838,33 @@ describe('ArtifactRunProcessor', () => {
           String(line).startsWith('[DOCUMENT_RUN]'),
         ),
       ).toEqual([]);
+    });
+
+    it('should emit run.failed once when the same terminal failure is reported twice', async () => {
+      mocks.runHandle.fail
+        .mockResolvedValueOnce('FAILED')
+        .mockResolvedValue('ALREADY_ENDED');
+      const job = makeJob();
+      const error = new UnrecoverableError(STALLED_FAILURE_REASON);
+
+      await Promise.all([
+        processor.onFailed(job, error),
+        processor.onFailed(job, error),
+      ]);
+
+      expect(emittedTypes(mocks.redis)).toEqual(['run.failed']);
+    });
+
+    it('should give the user the temporary-failure reason when the job stalled out', async () => {
+      await processor.onFailed(
+        makeJob(),
+        new UnrecoverableError(STALLED_FAILURE_REASON),
+      );
+
+      expect(mocks.runHandle.fail).toHaveBeenCalledWith(
+        'internal',
+        'Generation is temporarily unavailable. Please try again.',
+      );
     });
 
     describe('for a DOCUMENT run', () => {
@@ -514,6 +905,14 @@ describe('ArtifactRunProcessor', () => {
           }),
           undefined,
         );
+      });
+
+      it('should record no second set of diagnostics when the run had already ended', async () => {
+        mocks.runHandle.fail.mockResolvedValue('ALREADY_ENDED');
+
+        await processor.onFailed(documentJob(1), secret);
+
+        expect(mocks.runHandle.saveDocumentDiagnostics).not.toHaveBeenCalled();
       });
 
       it('should log the code, not the error text, when the job attempt will be retried', async () => {
@@ -685,6 +1084,46 @@ describe('ArtifactRunProcessor', () => {
 
       expect(mocks.runHandle.fail).not.toHaveBeenCalled();
       expect(mocks.logger.error).toHaveBeenCalled();
+    });
+  });
+
+  describe('idle', () => {
+    it('should resolve at once when no failure handler is in flight', async () => {
+      await expect(processor.idle()).resolves.toBeUndefined();
+    });
+
+    it('should wait for an in-flight failure handler when one is running', async () => {
+      let release!: () => void;
+      mocks.runHandle.fail.mockReturnValue(
+        new Promise<void>((resolve) => (release = resolve)),
+      );
+      let idle = false;
+
+      const failed = processor.onFailed(
+        makeJob(),
+        new UnrecoverableError('nope'),
+      );
+      const waiting = processor.idle().then(() => (idle = true));
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      expect(idle).toBe(false);
+
+      release();
+      await failed;
+      await waiting;
+      expect(idle).toBe(true);
+    });
+
+    it('should resolve when an in-flight failure handler rejects', async () => {
+      mocks.runs.handleFor.mockImplementation(() => {
+        throw new Error('no handle');
+      });
+
+      const failed = expect(
+        processor.onFailed(makeJob(), new UnrecoverableError('nope')),
+      ).rejects.toThrow('no handle');
+
+      await expect(processor.idle()).resolves.toBeUndefined();
+      await failed;
     });
   });
 });

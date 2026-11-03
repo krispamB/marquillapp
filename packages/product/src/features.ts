@@ -20,7 +20,7 @@ export const features: Feature[] = [
     public: { title: 'Posts', body: 'LinkedIn text posts, drafted from your prompt.' },
     board: true,
     since: '2026-01-27',
-    docs: ['apps/api/docs/artifact-workflow-prd.md', 'apps/api/docs/api/artifacts.md'],
+    docs: ['apps/api/docs/artifact-workflow-prd.md', 'apps/api/docs/api/artifacts.md', 'apps/api/docs/linkedin-dwell-time-and-ai-content-research.md'],
   },
   {
     id: 'style-presets',
@@ -41,7 +41,7 @@ export const features: Feature[] = [
     board: true,
     since: '2026-08-06',
     issues: [114, 121],
-    docs: ['apps/api/docs/linkedin-poll-document-api-research.md'],
+    docs: ['apps/api/docs/linkedin-poll-document-api-research.md', 'apps/api/docs/linkedin-dwell-time-and-ai-content-research.md'],
   },
   {
     id: 'artifact-studio',
@@ -61,6 +61,30 @@ export const features: Feature[] = [
     since: '2026-07-18',
     issues: [112],
     docs: ['apps/api/docs/sse-progress-contract-design.md', 'apps/api/docs/api/runs.md'],
+  },
+  {
+    id: 'run-in-flight-cap',
+    name: 'Per-user cap on runs in flight',
+    area: 'creation',
+    status: 'building',
+    summary: 'A user can have at most MAX_INFLIGHT_RUNS_PER_USER artifact runs going at once, so one batch cannot fill the queue for everyone. A launch over the cap gets a 429 run.too_many_in_flight whose message the app shows; nothing is created or charged.',
+    issues: [230],
+    docs: ['apps/api/docs/artifact-generation-performance-plan.md'],
+    notes: [
+      'Built but shipped off: MAX_INFLIGHT_RUNS_PER_USER defaults to 0 (no cap). The plan is to turn it on at 3 if queueWaitMs shows users waiting behind another user\'s batch. Set live (with since and a changelog entry) only once it is switched on in production.',
+    ],
+  },
+  {
+    id: 'streamed-commentary',
+    name: 'Streamed post and poll text',
+    area: 'creation',
+    status: 'building',
+    summary: 'While Mark writes a POST or POLL Artifact, its commentary appears in the conversation as it is written, in a preview that the finished artifact replaces. A Zod repair or a retry clears the preview and it starts again.',
+    issues: [238],
+    docs: ['apps/api/docs/artifact-generation-performance-plan.md', 'apps/api/docs/api/runs.md'],
+    notes: [
+      'Built but shipped off: STREAM_POST_COMMENTARY defaults to false on the worker. Before switching it on, verify the POST and POLL models stream with json_schema and requireParameters on OpenRouter. Set live (with since and a changelog entry) only once it is on in production.',
+    ],
   },
   {
     id: 'artifact-refine',
@@ -93,7 +117,7 @@ export const features: Feature[] = [
     board: true,
     since: '2026-08-06',
     issues: [115, 121],
-    docs: ['apps/api/docs/document-generation-spec.md', 'apps/api/docs/carousel-template-system-design.md'],
+    docs: ['apps/api/docs/document-generation-spec.md', 'apps/api/docs/carousel-template-system-design.md', 'apps/api/docs/linkedin-dwell-time-and-ai-content-research.md'],
     notes: ['Documents are now made from a Design System; the template carousels were retired in the #177 cutover.'],
   },
   {

@@ -1,10 +1,15 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OpenRouter } from '@openrouter/sdk';
 import type {
   ChatFunctionTool,
   ChatMessages,
   ChatResult,
+  ChatStreamChunk,
   ChatUsage,
 } from '@openrouter/sdk/models';
 import { z } from 'zod';
@@ -19,7 +24,12 @@ import {
   ToolTurnResult,
   Usage,
 } from '../interfaces';
-import { LLMError, toLLMError } from '../errors';
+import { LLMError, fromStreamError } from '../errors';
+import {
+  readRetryPolicy,
+  sendWithRetries,
+  type RetryPolicy,
+} from './llm-retry';
 
 const DEFAULT_MODEL = 'openai/gpt-5-mini';
 
@@ -31,16 +41,40 @@ const emptyUsage = (): Usage => ({
   cost: 0,
 });
 
-/** OpenRouter reports cost only when the provider supplies it. */
-const toUsage = (usage: ChatUsage | undefined): Usage =>
-  usage
-    ? {
-        promptTokens: usage.promptTokens,
-        completionTokens: usage.completionTokens,
-        totalTokens: usage.totalTokens,
-        cost: usage.cost ?? 0,
-      }
-    : emptyUsage();
+/**
+ * The call's USD cost. A BYOK call (the provider billed on our own key)
+ * reports `cost: 0`, with the provider's real price only in
+ * `costDetails.upstreamInferenceCost`; that is used whenever `cost` is zero
+ * or missing, so the meter never falls back to token pricing for it.
+ */
+const reportedCost = (usage: ChatUsage): number => {
+  if (usage.cost != null && usage.cost > 0) return usage.cost;
+  const upstream = usage.costDetails?.upstreamInferenceCost;
+  if (upstream != null && upstream > 0) return upstream;
+  return usage.cost ?? 0;
+};
+
+/**
+ * OpenRouter reports cost, and the reasoning and cache token details, only
+ * when the provider supplies them. An absent detail is omitted, not zeroed.
+ */
+const toUsage = (usage: ChatUsage | undefined, latencyMs: number): Usage => {
+  if (!usage) return { ...emptyUsage(), latencyMs };
+
+  const reasoningTokens = usage.completionTokensDetails?.reasoningTokens;
+  const cachedTokens = usage.promptTokensDetails?.cachedTokens;
+  const cacheWriteTokens = usage.promptTokensDetails?.cacheWriteTokens;
+  return {
+    promptTokens: usage.promptTokens,
+    completionTokens: usage.completionTokens,
+    totalTokens: usage.totalTokens,
+    cost: reportedCost(usage),
+    ...(reasoningTokens != null ? { reasoningTokens } : {}),
+    ...(cachedTokens != null ? { cachedTokens } : {}),
+    ...(cacheWriteTokens != null ? { cacheWriteTokens } : {}),
+    latencyMs,
+  };
+};
 
 const toChatMessage = (message: LLMMessage): ChatMessages => {
   switch (message.role) {
@@ -185,9 +219,15 @@ const readText = (
   content: ChatResult['choices'][number]['message']['content'],
 ) => (typeof content === 'string' ? content : undefined);
 
+/** The model that answered, when the provider says; absent is omitted. */
+const reportedModel = (result: ChatResult): { model?: string } =>
+  result.model ? { model: result.model } : {};
+
 @Injectable()
 export class OpenRouterStrategy implements LLMStrategy {
+  private readonly logger = new Logger(OpenRouterStrategy.name);
   private client: OpenRouter;
+  private readonly retry: RetryPolicy;
 
   constructor(private config: ConfigService) {
     const apiKey = this.config.get<string>('OPENROUTER_API_KEY');
@@ -195,8 +235,13 @@ export class OpenRouterStrategy implements LLMStrategy {
       throw new InternalServerErrorException(
         'OPENROUTER_API_KEY was not configured',
       );
+    // A bad OPENROUTER_* retry key throws here, which fails boot.
+    this.retry = readRetryPolicy(this.config);
+    // The SDK's retry loop shares one timeout across every try and skips 429s;
+    // `send` retries instead.
     this.client = new OpenRouter({
       apiKey,
+      retryConfig: { strategy: 'none' },
     });
   }
 
@@ -204,7 +249,7 @@ export class OpenRouterStrategy implements LLMStrategy {
     messages: Array<LLMMessage>,
     options?: CompletionOptions,
   ): Promise<CompletionResult> {
-    const result = await this.send(messages, options);
+    const { result, latencyMs } = await this.send(messages, options);
     const choice = result.choices[0];
     const text = readText(choice?.message?.content);
 
@@ -214,8 +259,9 @@ export class OpenRouterStrategy implements LLMStrategy {
     if (text === undefined && choice?.finishReason === 'length') {
       return {
         text: '',
-        usage: toUsage(result.usage),
+        usage: toUsage(result.usage, latencyMs),
         finishReason: choice.finishReason,
+        ...reportedModel(result),
       };
     }
 
@@ -227,8 +273,9 @@ export class OpenRouterStrategy implements LLMStrategy {
 
     return {
       text,
-      usage: toUsage(result.usage),
+      usage: toUsage(result.usage, latencyMs),
       ...(choice?.finishReason ? { finishReason: choice.finishReason } : {}),
+      ...reportedModel(result),
     };
   }
 
@@ -237,7 +284,7 @@ export class OpenRouterStrategy implements LLMStrategy {
     tools: Array<ToolDefinition>,
     options?: CompletionOptions,
   ): Promise<ToolTurnResult> {
-    const result = await this.send(messages, options, tools);
+    const { result, latencyMs } = await this.send(messages, options, tools);
     const message = result.choices[0]?.message;
 
     const toolCalls: ToolCall[] = (message?.toolCalls ?? []).map((call) => ({
@@ -252,7 +299,8 @@ export class OpenRouterStrategy implements LLMStrategy {
       // A tool-calling turn usually has no prose; omit the key rather than pass ''.
       ...(text ? { text } : {}),
       toolCalls,
-      usage: toUsage(result.usage),
+      usage: toUsage(result.usage, latencyMs),
+      ...reportedModel(result),
     };
   }
 
@@ -269,7 +317,14 @@ export class OpenRouterStrategy implements LLMStrategy {
     messages: Array<LLMMessage>,
     options?: CompletionOptions,
     tools?: Array<ToolDefinition>,
-  ): Promise<ChatResult> {
+  ): Promise<{ result: ChatResult; latencyMs: number }> {
+    if (options?.webSearch) {
+      throw new LLMError(
+        'OpenRouter does not run model web search; set LLM_PROVIDER=anthropic to use CompletionOptions.webSearch',
+        { retryable: false },
+      );
+    }
+
     const responseJsonSchema = options?.responseSchema
       ? (toProviderJsonSchema(
           z.toJSONSchema(options.responseSchema.schema, {
@@ -302,13 +357,92 @@ export class OpenRouterStrategy implements LLMStrategy {
             provider: { requireParameters: true },
           }
         : {}),
+      ...(options?.reasoningEffort
+        ? { reasoning: { effort: options.reasoningEffort } }
+        : {}),
+      ...(options?.sessionId ? { sessionId: options.sessionId } : {}),
       stream: false as const,
     };
 
-    try {
-      return await this.client.chat.send({ chatRequest });
-    } catch (error) {
-      throw toLLMError(error);
+    const retry = {
+      label: 'OpenRouter',
+      policy: this.retry,
+      logger: this.logger,
+    };
+    const onTextDelta = tools ? undefined : options?.onTextDelta;
+    if (onTextDelta) {
+      return sendWithRetries(
+        retry,
+        (signal) =>
+          this.streamOnce(
+            { ...chatRequest, stream: true },
+            signal,
+            onTextDelta,
+          ),
+        options,
+      );
     }
+
+    return sendWithRetries(
+      retry,
+      (signal) => this.client.chat.send({ chatRequest }, { signal }),
+      options,
+    );
+  }
+
+  /**
+   * One streamed try, gathered back into the `ChatResult` a non-streamed try
+   * returns. The per-try timeout covers the whole stream, and there is no
+   * shorter idle timer: a reasoning model sends nothing while it thinks. A
+   * provider error mid-stream is classified as an HTTP status would be. A
+   * delta callback that throws loses its preview, never the call.
+   */
+  private async streamOnce(
+    chatRequest: Parameters<OpenRouter['chat']['send']>[0]['chatRequest'] & {
+      stream: true;
+    },
+    signal: AbortSignal,
+    onTextDelta: (delta: string, text: string) => void,
+  ): Promise<ChatResult> {
+    const stream = await this.client.chat.send({ chatRequest }, { signal });
+    let text = '';
+    let finishReason: ChatResult['choices'][number]['finishReason'] = null;
+    let usage: ChatUsage | undefined;
+    let last: ChatStreamChunk | undefined;
+
+    for await (const chunk of stream) {
+      if (chunk.error) throw fromStreamError(chunk.error);
+      last = chunk;
+      usage = chunk.usage ?? usage;
+      const choice = chunk.choices[0];
+      finishReason = choice?.finishReason ?? finishReason;
+      const delta = choice?.delta?.content;
+      if (!delta) continue;
+      text += delta;
+      try {
+        onTextDelta(delta, text);
+      } catch (error: unknown) {
+        this.logger.warn(
+          `A text delta callback failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    return {
+      id: last?.id ?? '',
+      created: last?.created ?? 0,
+      model: last?.model ?? '',
+      object: 'chat.completion',
+      systemFingerprint: null,
+      choices: [
+        {
+          index: 0,
+          finishReason,
+          // No text reads as no content, as it does unstreamed.
+          message: { role: 'assistant', content: text === '' ? null : text },
+        },
+      ],
+      ...(usage ? { usage } : {}),
+    };
   }
 }

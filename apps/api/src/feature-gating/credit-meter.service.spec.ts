@@ -199,6 +199,18 @@ describe('CreditMeterService', () => {
 
       expect(mocks.featureGatingService.assertBalance).toHaveBeenCalledWith(
         fixtures.userId,
+        undefined,
+      );
+    });
+
+    it('should pass a resolved entitlement through without re-reading it when one is supplied', async () => {
+      const entitlement = { tier: null, period: {} } as never;
+
+      await service.assertBalance(fixtures.userId, entitlement);
+
+      expect(mocks.featureGatingService.assertBalance).toHaveBeenCalledWith(
+        fixtures.userId,
+        entitlement,
       );
     });
 
@@ -220,6 +232,22 @@ describe('CreditMeterService', () => {
       expect(mocks.featureGatingService.debit).toHaveBeenCalledWith(
         fixtures.userId,
         42,
+        undefined,
+      );
+    });
+
+    it('should pass a resolved period through without re-reading it when one is supplied', async () => {
+      const period = {
+        periodStart: new Date('2026-03-01T00:00:00.000Z'),
+        periodEnd: new Date('2026-04-01T00:00:00.000Z'),
+      };
+
+      await service.debit(fixtures.userId, 42, period);
+
+      expect(mocks.featureGatingService.debit).toHaveBeenCalledWith(
+        fixtures.userId,
+        42,
+        period,
       );
     });
   });

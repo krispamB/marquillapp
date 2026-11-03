@@ -72,6 +72,7 @@ export class DocumentMetricsService {
           },
           candidates: '$documentDiagnostics.candidates',
           repairRounds: '$documentDiagnostics.repairRounds',
+          repairs: '$documentDiagnostics.repairs',
           wallTimeMs: '$documentDiagnostics.wallTimeMs',
           credits: '$documentDiagnostics.credits',
           pageCount: '$documentDiagnostics.pageCount',

@@ -70,6 +70,21 @@ describe('LLMService', () => {
       });
     });
 
+    it('should resolve the Anthropic strategy when the provider is ANTHROPIC', async () => {
+      mocks.strategy.complete.mockResolvedValue({ text: 'hi', usage });
+
+      await service.complete(LLMProvider.ANTHROPIC, messages, {
+        webSearch: { maxUses: 2 },
+      });
+
+      expect(mocks.llmFactory.getStrategy).toHaveBeenCalledWith(
+        LLMProvider.ANTHROPIC,
+      );
+      expect(mocks.strategy.complete).toHaveBeenCalledWith(messages, {
+        webSearch: { maxUses: 2 },
+      });
+    });
+
     it('should propagate the error when the provider is unsupported', async () => {
       mocks.llmFactory.getStrategy.mockImplementation(() => {
         throw new Error('Unsupported LLM provider: openai');

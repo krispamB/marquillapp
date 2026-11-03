@@ -59,6 +59,48 @@ describe('renderPromptFragment', () => {
     expect(fragment).toContain('usable box is 1020x1310px');
   });
 
+  // usable height / (body px × line-height), floored; then 80% of that, floored.
+  it.each([
+    ['afterglow', '28px/1.5', 27, 21],
+    ['broadside', '30px/1.4', 28, 22],
+    ['colophon', '28px/1.5', 27, 21],
+    ['margin', '30px/1.45', 25, 20],
+    ['overprint', '28px/1.45', 29, 23],
+    ['schematic', '26px/1.5', 30, 24],
+  ])(
+    'should state the line budget for %s when given its seed',
+    (id, body, lines, fill) => {
+      const fragment = renderPromptFragment(load(id));
+
+      expect(fragment).toContain(
+        `At ${body} body text the usable box holds about ${lines} lines, headings and gaps included. Fill at most 80% of that (about ${fill} lines); cut words rather than shrink type.`,
+      );
+    },
+  );
+
+  it('should omit the line budget when the scale has no body step', () => {
+    const ds = load('margin');
+
+    const fragment = renderPromptFragment({
+      ...ds,
+      version: 97,
+      typography: {
+        ...ds.typography,
+        scale: ds.typography.scale.filter((s) => s.name !== 'body'),
+      },
+    });
+
+    expect(fragment).not.toContain('body text the usable box holds');
+  });
+
+  it('should give svgs the first icon colour when it describes icons', () => {
+    const fragment = renderPromptFragment(load('broadside'));
+
+    expect(fragment).toContain(
+      'Give every svg an explicit colour, e.g. `.page svg { color: var(--ds-ink); }`. Never let an icon inherit the text colour.',
+    );
+  });
+
   it('should mark a role required when it may sit on any page', () => {
     const ds = load('margin');
     const roles = ds.composition.pageRoles.map((role, i) =>

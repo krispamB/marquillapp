@@ -10,6 +10,7 @@ import {
   type StoredAcceptedCandidate,
 } from '../database/schemas';
 import { sha256Hex } from '../document-source/sha256';
+import type { UsageRecord } from '../feature-gating/credit-meter.constants';
 import type { ResearchResult } from '../agent/agent-runner.interface';
 import type { RenderAttemptUsage } from '../document-render/render-usage.types';
 import type {
@@ -17,15 +18,20 @@ import type {
   BuildInput,
   DocumentCheck,
   DocumentDiagnostics,
+  RunFailOutcome,
+  RunLlmUsage,
   RunRecordHandle,
+  SavedResearch,
 } from './engine/workflow.types';
+import type { Usage } from '../llm/interfaces';
 import {
   CANDIDATE_SOURCE_RETENTION_MS,
   FailureCode,
-  WorkflowStep,
 } from './workflow.constants';
 
 export interface CreateRunInput {
+  /** The run's `_id`, when the caller chose it before the write. */
+  runId?: string;
   userId: string;
   artifactId: string;
   targetVersion: number;
@@ -51,6 +57,7 @@ export class WorkflowRunService {
 
   async createRun(input: CreateRunInput): Promise<WorkflowRun> {
     return this.workflowRunModel.create({
+      ...(input.runId ? { _id: new Types.ObjectId(input.runId) } : {}),
       user: new Types.ObjectId(input.userId),
       artifact: new Types.ObjectId(input.artifactId),
       targetVersion: input.targetVersion,
@@ -85,6 +92,23 @@ export class WorkflowRunService {
       .sort({ createdAt: -1 });
 
     return run?.researchContext;
+  }
+
+  /**
+   * The text of any run's ACCEPTED Candidate Source with this hash, or
+   * `undefined` when none is kept (it expires). The caller verifies the hash.
+   */
+  private async readAcceptedCandidateText(
+    candidateSha256: string,
+  ): Promise<string | undefined> {
+    const doc = await this.candidateSourceModel
+      .findOne(
+        { candidateSha256, role: RunCandidateSourceRole.ACCEPTED },
+        { candidate: 1 },
+      )
+      .lean<{ candidate: string }>()
+      .exec();
+    return doc?.candidate;
   }
 
   /**
@@ -131,12 +155,16 @@ export class WorkflowRunService {
    * runId here keeps every call site from re-threading it.
    */
   handleFor(runId: string): RunRecordHandle {
+    let llmUsage: RunLlmUsage | undefined;
+    // Rides along with the run's final update rather than costing its own.
+    const withLlmUsage = <T extends Partial<WorkflowRun>>(fields: T) =>
+      llmUsage ? { ...fields, llmUsage } : fields;
+
     return {
       runId,
-      setCurrentStep: (step: WorkflowStep) =>
-        this.patch(runId, { currentStep: step }),
-      saveResearchContext: (research: ResearchResult) =>
-        this.patch(runId, { researchContext: research }),
+      saveResearchContext: (research: ResearchResult, usage: UsageRecord[]) =>
+        this.patch(runId, { researchContext: research, researchUsage: usage }),
+      readResearchContext: () => this.readResearchContext(runId),
       recordRenderAttempt: (usage: RenderAttemptUsage) =>
         this.appendRenderAttempt(runId, usage),
       recordDocumentCheck: (check: DocumentCheck) =>
@@ -152,15 +180,39 @@ export class WorkflowRunService {
         this.saveDocumentDiagnostics(runId, diagnostics, failedCandidateSource),
       getLatestCompletedResearch: (artifactId: string) =>
         this.getLatestCompletedResearch(artifactId),
+      recordQueueWait: (queueWaitMs: number) =>
+        this.patch(runId, { queueWaitMs }),
+      recordModelCall: (usage: Usage) => {
+        llmUsage = addModelCall(llmUsage, usage);
+      },
+      readAcceptedCandidateText: (candidateSha256: string) =>
+        this.readAcceptedCandidateText(candidateSha256),
       complete: (creditsUsed: number) =>
-        this.patch(runId, { status: RunStatus.COMPLETED, creditsUsed }),
+        this.patch(
+          runId,
+          withLlmUsage({ status: RunStatus.COMPLETED, creditsUsed }),
+        ),
       fail: (failureCode: FailureCode, failureReason: string) =>
-        this.patch(runId, {
-          status: RunStatus.FAILED,
-          failureCode,
-          failureReason,
-        }),
+        this.failIfRunning(
+          runId,
+          withLlmUsage({
+            status: RunStatus.FAILED,
+            failureCode,
+            failureReason,
+          }),
+        ),
     };
+  }
+
+  private async failIfRunning(
+    runId: string,
+    fields: Partial<WorkflowRun>,
+  ): Promise<RunFailOutcome> {
+    const result = await this.workflowRunModel.updateOne(
+      { _id: new Types.ObjectId(runId), status: RunStatus.RUNNING },
+      { $set: fields },
+    );
+    return result.matchedCount === 0 ? 'ALREADY_ENDED' : 'FAILED';
   }
 
   private async patch(
@@ -188,6 +240,24 @@ export class WorkflowRunService {
     );
     const stored: StoredAcceptedCandidate = { ...accepted, candidateSha256 };
     await this.patch(runId, { acceptedCandidate: stored });
+  }
+
+  private async readResearchContext(
+    runId: string,
+  ): Promise<SavedResearch | undefined> {
+    const run = await this.workflowRunModel
+      .findById(runId)
+      .select({ researchContext: 1, researchUsage: 1 })
+      .lean<{
+        researchContext?: ResearchResult;
+        researchUsage?: UsageRecord[];
+      }>()
+      .exec();
+    // Research saved before its usage was cannot be billed again, so it is
+    // searched afresh rather than reused for free.
+    if (!run?.researchContext || !run.researchUsage) return undefined;
+
+    return { research: run.researchContext, usage: run.researchUsage };
   }
 
   /**
@@ -287,6 +357,33 @@ export class WorkflowRunService {
     );
   }
 }
+
+const addModelCall = (
+  total: RunLlmUsage | undefined,
+  usage: Usage,
+): RunLlmUsage => {
+  // Only once a call searched, so runs without model web search are unchanged.
+  const webSearchRequests =
+    (total?.webSearchRequests ?? 0) + (usage.webSearchRequests ?? 0);
+  return {
+    ...sumModelCall(total, usage),
+    ...(webSearchRequests > 0 ? { webSearchRequests } : {}),
+  };
+};
+
+const sumModelCall = (
+  total: RunLlmUsage | undefined,
+  usage: Usage,
+): RunLlmUsage => ({
+  calls: (total?.calls ?? 0) + 1,
+  promptTokens: (total?.promptTokens ?? 0) + usage.promptTokens,
+  completionTokens: (total?.completionTokens ?? 0) + usage.completionTokens,
+  reasoningTokens: (total?.reasoningTokens ?? 0) + (usage.reasoningTokens ?? 0),
+  cachedTokens: (total?.cachedTokens ?? 0) + (usage.cachedTokens ?? 0),
+  cacheWriteTokens:
+    (total?.cacheWriteTokens ?? 0) + (usage.cacheWriteTokens ?? 0),
+  llmMs: (total?.llmMs ?? 0) + (usage.latencyMs ?? 0),
+});
 
 /** The one Candidate Source a run keeps in `role`. */
 const candidateSourceOf = (runId: string, role: RunCandidateSourceRole) => ({

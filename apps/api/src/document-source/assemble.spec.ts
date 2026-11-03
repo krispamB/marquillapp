@@ -13,6 +13,7 @@ import {
   fontStylesheetUrl,
   frameCss,
   isFontRequest,
+  isInlinedFont,
 } from './assemble';
 import { check } from './candidate-check';
 import { IconInliningError } from './icon-inlining.error';
@@ -174,6 +175,24 @@ describe('isFontRequest', () => {
   });
 });
 
+describe('isInlinedFont', () => {
+  it.each(['data:font/woff2;base64,AAAA', 'data:font/woff;base64,AAAA'])(
+    'should allow %s',
+    (url) => {
+      expect(isInlinedFont(url)).toBe(true);
+    },
+  );
+
+  it.each([
+    'data:image/png;base64,AAAA',
+    'data:text/css,body{}',
+    'https://fonts.gstatic.com/s/a.woff2',
+    'DATA:font/woff2;base64,AAAA',
+  ])('should refuse %s', (url) => {
+    expect(isInlinedFont(url)).toBe(false);
+  });
+});
+
 describe('assemble', () => {
   const page =
     '<section class="page" data-role="end"><p><svg class="i" data-icon="arrow-right" data-size="24"></svg>Next</p></section>';
@@ -203,6 +222,20 @@ describe('assemble', () => {
     expect(links.map(attrs)).toEqual([
       { rel: 'stylesheet', href: fontStylesheetUrl(margin) },
     ]);
+  });
+
+  it('should put the font CSS in a <style> before the frame, and add no <link>, when fontCss is given', () => {
+    const fontCss =
+      "@font-face { font-family: 'Inter Tight'; src: url(data:font/woff2;base64,AAAA) format('woff2'); }";
+    const head = headOf(assemble(margin, candidate(page), fontCss));
+    const styles = elements(head).filter((e) => e.tagName === 'style');
+
+    expect(elements(head).filter((e) => e.tagName === 'link')).toEqual([]);
+    expect(styles).toHaveLength(3);
+    expect((styles[1].childNodes[0] as { value: string }).value).toBe(fontCss);
+    expect((styles[2].childNodes[0] as { value: string }).value).toBe(
+      frameCss(margin),
+    );
   });
 
   it('should fill each icon placeholder from the pinned catalog', () => {

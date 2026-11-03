@@ -18,7 +18,7 @@ import type { Violation } from '../../document-source/violation';
 import { USAGE_KINDS } from '../../feature-gating/credit-meter.constants';
 import { alert, alertSubject, type AlertSubject } from '../engine/alert';
 import { RunEventType } from '../engine/run-event.types';
-import { terminal, transient } from '../engine/workflow.error';
+import { describeError, terminal, transient } from '../engine/workflow.error';
 import type {
   DesignSystemPin,
   DocumentDraftState,
@@ -29,6 +29,7 @@ import type {
 import {
   FailureCode,
   RENDER_RETRY_DELAY_MS,
+  RENDER_SLOT_WAIT_RESERVE_MS,
   WorkflowStep,
 } from '../workflow.constants';
 import { sha256Hex } from '../../document-source/sha256';
@@ -66,7 +67,7 @@ export const documentObjectKey = (
  * into a Document Source, render it in one CDP session, and judge what the
  * session measured. On `repair` findings it spends a render Repair from the
  * budget `GENERATE` shares, statically re-checks (and, if need be, repairs)
- * the re-emitted Candidate Source, and renders again. On a pass it uploads
+ * the repaired Candidate Source, and renders again. On a pass it uploads
  * the four objects and puts the keys, hashes and measured `pageCount` in run
  * state for `PERSIST_VERSION`.
  *
@@ -91,6 +92,11 @@ export const documentObjectKey = (
  *
  * A session that fails outright is transient, `render.unavailable` if it ends
  * the run. A failed cover capture is recorded and never blocks the version.
+ *
+ * Each session first waits for a Browserless slot, at most until
+ * `RENDER_SLOT_WAIT_RESERVE_MS` of the attempt is left. No slot in time is a
+ * transient `render.unavailable` with no session recorded and nothing billed.
+ * The retry pause and Repairs hold no slot.
  */
 export const renderPdfStep: StepHandler = async (state, ctx) => {
   const { artifactId, version, kind } = state.input;
@@ -118,6 +124,9 @@ export const renderPdfStep: StepHandler = async (state, ctx) => {
   let current: RepairedCandidate = {
     candidate: draft.candidate,
     repairsSpent: draft.repairsSpent,
+    ...(draft.fallbacksSpent !== undefined
+      ? { fallbacksSpent: draft.fallbacksSpent }
+      : {}),
   };
   // Sessions that produced a verdict, all billed as one record on a pass.
   const verdicts: BrowserlessUsage[] = [];
@@ -194,7 +203,7 @@ export const renderPdfStep: StepHandler = async (state, ctx) => {
   };
 
   for (;;) {
-    const documentSource = assembleSource(
+    const documentSource = await assembleSource(
       ctx,
       definition,
       current.candidate,
@@ -203,8 +212,10 @@ export const renderPdfStep: StepHandler = async (state, ctx) => {
 
     // The checkpoint: a job retry after a render outage resumes from here
     // without calling the model (spec §7.3).
+    // Fallbacks are per job attempt, so the checkpoint does not keep them.
     await ctx.run.saveAcceptedCandidate({
-      ...current,
+      candidate: current.candidate,
+      repairsSpent: current.repairsSpent,
       commentary: draft.commentary,
       ...(state.generatedTitle !== undefined
         ? { title: state.generatedTitle }
@@ -248,17 +259,20 @@ interface JudgedSession {
 }
 
 /**
- * Assembles the Document Source. An icon assembly cannot fill is terminal and
- * alerts; the icon's name stays out of the alert and in the run's failure.
+ * Assembles the Document Source, with the fonts inlined when the worker could
+ * fetch them and the Google Fonts `<link>` when it could not (spec §4.5). An
+ * icon assembly cannot fill is terminal and alerts; the icon's name stays out
+ * of the alert and in the run's failure.
  */
-function assembleSource(
+async function assembleSource(
   ctx: StepContext,
   definition: DesignSystemDefinition,
   candidate: string,
   subject: AlertSubject,
-): string {
+): Promise<string> {
+  const fontCss = await ctx.fonts.inlineCss(definition, candidate);
   try {
-    return assemble(definition, candidate);
+    return assemble(definition, candidate, fontCss ?? undefined);
   } catch (error: unknown) {
     if (error instanceof IconInliningError) {
       alert(ctx.logger, error.alertTag, subject);
@@ -277,11 +291,13 @@ function attemptOf({
   usage,
   trace,
   facts,
+  slotWaitMs,
 }: RenderSessionResult): Omit<RenderAttemptUsage, 'outcome' | 'billed'> {
   return {
     ...usage,
     ...trace,
     ...(facts.timedOut ? { timedOut: true } : {}),
+    ...(slotWaitMs !== undefined ? { slotWaitMs } : {}),
   };
 }
 
@@ -311,19 +327,27 @@ async function recordRenderAttempt(
   ctx.diagnostics.recordRenderSession();
 }
 
-/** One render session. A session that fails outright is recorded, unbilled. */
+/**
+ * One render session. A session that fails outright is recorded, unbilled.
+ * A render that got no Browserless slot ran no session, so nothing is recorded.
+ */
 async function renderSession(
   ctx: StepContext,
   definition: DesignSystemDefinition,
   documentSource: string,
 ): Promise<RenderSessionResult> {
   try {
-    return await ctx.renderer.render(definition, documentSource);
+    return await ctx.renderer.render(definition, documentSource, {
+      maxSlotWaitMs: ctx.deadline.remainingMs(RENDER_SLOT_WAIT_RESERVE_MS),
+    });
   } catch (error: unknown) {
     if (error instanceof RenderSessionError) {
       await recordRenderAttempt(ctx, {
         ...error.usage,
         ...error.trace,
+        ...(error.slotWaitMs !== undefined
+          ? { slotWaitMs: error.slotWaitMs }
+          : {}),
         outcome: 'ERROR',
         billed: false,
       });
@@ -394,24 +418,30 @@ async function publish(
     Buffer.from(documentSource, 'utf8'),
     HTML_MIME_TYPE,
   );
-  await ctx.objects.put(pdfKey, Buffer.from(pdf), PDF_MIME_TYPE);
-
-  let coverKey: string | undefined;
-  let coverFailure: string | undefined;
-  if (session.cover.ok) {
+  // The PDF and the cover upload together. The cover keeps its own catch, so
+  // its failure is reported as `coverFailure` and never fails the PDF.
+  const uploadCover = async (): Promise<{
+    coverKey?: string;
+    coverFailure?: string;
+  }> => {
+    if (!session.cover.ok) return { coverFailure: session.cover.reason };
     try {
       await ctx.objects.put(
         keyOf('cover.png'),
         Buffer.from(session.cover.png),
         PNG_MIME_TYPE,
       );
-      coverKey = keyOf('cover.png');
+      return { coverKey: keyOf('cover.png') };
     } catch (error: unknown) {
-      coverFailure = `upload failed: ${error instanceof Error ? error.message : String(error)}`;
+      return {
+        coverFailure: `upload failed: ${describeError(error)}`,
+      };
     }
-  } else {
-    coverFailure = session.cover.reason;
-  }
+  };
+  const [, { coverKey, coverFailure }] = await Promise.all([
+    ctx.objects.put(pdfKey, Buffer.from(pdf), PDF_MIME_TYPE),
+    uploadCover(),
+  ]);
   if (coverFailure !== undefined) {
     ctx.logger.warn(
       `cover.png missing for artifact ${artifactId} v${version}: ${coverFailure}`,

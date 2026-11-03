@@ -1,6 +1,7 @@
 import type { Logger } from '@nestjs/common';
 import type { UsageRecord } from '../../feature-gating/credit-meter.constants';
 import type { CreditMeterService } from '../../feature-gating/credit-meter.service';
+import type { Entitlement } from '../../feature-gating/feature-gating.service';
 import { FeatureGateForbiddenException } from '../../feature-gating/feature-gating.exception';
 import { alert, type AlertSubject } from './alert';
 import { RunEventType, type EmittedEvent } from './run-event.types';
@@ -24,6 +25,12 @@ export class RunCreditMeter implements CreditMeter {
     private readonly subject: AlertSubject,
     private readonly emit: (event: EmittedEvent) => void,
     private readonly logger: Logger,
+    /**
+     * The owner's entitlement, resolved once per job attempt. The balance
+     * check then reads only usage, and the debit lands in its period. Absent,
+     * both resolve it themselves.
+     */
+    private readonly entitlement?: Entitlement,
   ) {}
 
   get creditsUsed(): number {
@@ -38,7 +45,10 @@ export class RunCreditMeter implements CreditMeter {
    */
   async assertBalance(): Promise<void> {
     try {
-      await this.creditMeterService.assertBalance(this.userId);
+      await this.creditMeterService.assertBalance(
+        this.userId,
+        this.entitlement,
+      );
     } catch (error: unknown) {
       if (error instanceof FeatureGateForbiddenException) {
         throw terminal('insufficient credits', error);
@@ -81,7 +91,11 @@ export class RunCreditMeter implements CreditMeter {
     if (this.used <= 0) return;
 
     try {
-      await this.creditMeterService.debit(this.userId, this.used);
+      await this.creditMeterService.debit(
+        this.userId,
+        this.used,
+        this.entitlement?.period,
+      );
     } catch (error: unknown) {
       alert(this.logger, 'credit.commit_failed', this.subject, {
         credits: this.used,

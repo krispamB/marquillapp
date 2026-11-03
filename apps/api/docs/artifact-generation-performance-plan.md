@@ -101,7 +101,7 @@ Tests per item are listed in §8.
   | `RESEARCH_REASONING_EFFORT` | research tool turns and the closing call (`agent-runner.service.ts:217-222`, `:282-286`) |
   | `GENERATION_REASONING_EFFORT` | POST/POLL `generate` and its Zod repair |
   | `DOCUMENT_DRAFT_REASONING_EFFORT` | `completeDocument('draft')` + envelope repair |
-  | `DOCUMENT_REPAIR_REASONING_EFFORT` | `completeDocument('Repair')` |
+  | `DOCUMENT_REPAIR_REASONING_EFFORT` | `completeDocument('Repair')` + envelope repair |
 
 - `complete()` stops hard-coding `this.generationModel` (`:604`, `:619`) and reports the model actually used to `onUsage` (needed by P3).
 - `.env.example`: note that an effort on a non-reasoning model makes OpenRouter require reasoning-capable providers (`requireParameters: true` is already sent with schemas), which can 404.
@@ -127,6 +127,7 @@ Procedure: worker restarted per setting; `bun run eval:documents --concurrency 2
 - In `OpenRouterStrategy.send`, per try: `signal = AbortSignal.any([AbortSignal.timeout(perTryMs), opts.signal])`, passed as `chat.send({ chatRequest }, { signal })` (an explicit signal takes precedence and also bounds the body read). On a retryable `LLMError`, sleep `Retry-After` if present, else full jitter `rand(0, min(cap, base·2^n))`; stop when tries run out or `now + sleep > deadlineAt`.
 - `toLLMError` (`llm/errors/llm.error.ts:28-31`): retry a raw `TimeoutError`; for `ResponseValidationError` with `statusCode 200`, parse the body's `error.code` and classify it (unparseable = retryable); retry 429; keep a caller's `AbortError` terminal. Add `retryAfterMs?` to `LLMError`.
 - Keys: `OPENROUTER_TIMEOUT_MS` (default 240000, must exceed the slowest healthy draft, 212 s measured), `OPENROUTER_MAX_ATTEMPTS` (3), `OPENROUTER_RETRY_BASE_MS` (1000), `OPENROUTER_RETRY_MAX_DELAY_MS` (15000), `OPENROUTER_RETRY_BUDGET_MS` (45000). Per call site: research turns ~45 s; DOCUMENT draft and Repair `min(timeout, deadline.remainingMs())`, which adds `remainingMs()` to `RunDeadline` (`engine/run-deadline.ts`, `workflow.types.ts:304-306`).
+- Budget vs deadline (as built, #220): `OPENROUTER_RETRY_BUDGET_MS` bounds the total time one call sleeps between tries, `Retry-After` included; a sleep that would pass it ends the call with its last (still retryable) error, so the job's own retry decides. `deadlineAt` is separate and optional: it cuts each try's timeout to the time left and stops a retry whose sleep would end past it. Calls without one (POST/POLL generation, research) are bounded by tries × timeout + budget. DOCUMENT drafts and Repairs fix `deadlineAt` once from `remainingMs()`, so the envelope repair turn shares it.
 - Rollback: `OPENROUTER_MAX_ATTEMPTS=1` and a large timeout (still no 1 h spin).
 - Effect: a 429 or a 502 no longer replays the whole job (research, draft, render); a hung call ends.
 
@@ -137,6 +138,7 @@ Procedure: worker restarted per setting; `bun run eval:documents --concurrency 2
 **M3.3 — Graceful worker shutdown and stalled-job failure.** S + M. Must ship before M4.
 - Extract `workers/worker-shutdown.ts`. On `SIGTERM`/`SIGINT` (once): `Promise.allSettled(workers.map(w => w.close()))` for all workers → await in-flight `onFailed` promises (`ArtifactRunProcessor.idle()`, tracked in a set) → `app.close()` → `exit(0)`; a `WORKER_SHUTDOWN_TIMEOUT_MS` timer (default 120000) forces `exit(1)`. Do **not** use Nest `enableShutdownHooks`: `onModuleDestroy` closes Redis and Mongo before jobs finish.
 - Stalled failures: a `QueueEvents` listener for `failed` with `failedReason === 'job stalled more than allowable limit'` calls the existing idempotent `handleTerminalFailure` (fail Attempt, fail run, emit `run.failed`). Then set `maxStalledCount: 2` and `stalledInterval: 10000` on the workflow workers.
+  - As built (bullmq 5.66.5): the stalled checker only marks the job (`defa`) and puts it back in wait; the next worker to pick it up fails it with an `UnrecoverableError` of that reason, so its own `failed` event fires too. Both reports reach `onFailed`, and `handleTerminalFailure` is made idempotent by `RunRecordHandle.fail` writing only while the run is `RUNNING` (`'ALREADY_ENDED'` otherwise): the second report emits nothing. The user sees the temporary-failure reason, not BullMQ's text.
 - Railway: the drain window is the service variable `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` (time between `SIGTERM` and `SIGKILL`; reported defaults are 0–3 s, so today a deploy kills running jobs almost at once). Set it to 130 on the worker, ≥ `WORKER_SHUTDOWN_TIMEOUT_MS` / 1000 + 10. The worker must be started with `node` directly (the Dockerfile does), since a package-manager wrapper can swallow `SIGTERM`. A DOCUMENT attempt can run 6 min, so the longest ones will still be force-stopped and resume from the `acceptedCandidate` checkpoint.
 
 **M3.4 — Entitlement resolved once (A4, backlog 7 + 8).** S–M.
@@ -193,7 +195,7 @@ Ship only when M3.1, M3.3 and M3.5 are in production. With Browserless Free (2 s
 - New pure `document-source/candidate-patch.ts` `applyEdits(candidate, edits)`: exact bytes (CRLF→LF only), each `find` matches **exactly once**, no overlapping ranges, applied by offset last-to-first, atomic, empty `edits` is a failure.
 - On failure: one warm follow-up in the same round listing the problems, answered with `{ html }`. Billed but not counted against `DOCUMENT_REPAIR_BUDGET`; cap one fallback per job attempt.
 - Model-authored edits are not sanitising: spec §4.4 "reject only, never sanitize" holds because the app changes nothing itself and `check()` re-runs on the result. Amend §7.2, §7.5 and the CONTEXT.md "Repair" entry ("produces a revised Candidate Source, as edits or in full").
-- Switch: module constant `DOCUMENT_REPAIR_MODE: 'full' | 'patch'` (deploy-switched, per spec §10). Record `repairs: [{ kind, mode, edits }]` in diagnostics. Go/no-go: fallback rate < 20% in the eval.
+- Switch: module constant `DOCUMENT_REPAIR_MODE: 'full' | 'patch'` (deploy-switched, per spec §10). Record `repairs: [{ kind, mode, edits, fallback }]` in diagnostics. Go/no-go: fallback rate < 20% in the eval.
 
 ### M6. Render network
 
@@ -232,7 +234,7 @@ Decide from M0.2 production `phaseMs`.
 - Switch: `STREAM_POST_COMMENTARY` (false). Verify streaming + `json_schema` + `requireParameters` on the production model.
 - Docs: `docs/api/runs.md:74-102`, `sse-progress-contract-design.md` §3; a product ledger entry (user-visible).
 
-**M7.4 — P3 faster model for POLL/POST.** S + eval. `POLL_GENERATION_MODEL`, `POST_GENERATION_MODEL`, falling back to `GENERATION_MODEL`. Needs a text eval script modelled on `scripts/eval-documents` (N briefs per type, outputs side by side, latency and tokens).
+**M7.4 — P3 faster model for POLL/POST.** S + eval. `POLL_GENERATION_MODEL`, `POST_GENERATION_MODEL`, falling back to `GENERATION_MODEL`. Needs a text eval script modelled on `scripts/eval-documents` (N briefs per type, outputs side by side, latency and tokens). Built as `bun run eval:text` ([text-eval-runbook.md](text-eval-runbook.md)); choosing the models is a human step.
 
 **M7.5 — A5 content in `run.completed`.** M, low priority (0.1–0.25 s). For POST/POLL only, `run.completed` carries `content` (and `title` on INITIAL); the web appends it without the GET and falls back to the GET on replay, snapshot, mismatch or error. Verify `promoteVersion` stores content unchanged. Docs: `docs/api/runs.md:48,~170`, `sse-progress-contract-design.md:146,182`, `docs/api/artifacts.md:325`.
 

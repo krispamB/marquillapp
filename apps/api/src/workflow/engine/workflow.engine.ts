@@ -1,5 +1,7 @@
 import { UnrecoverableError } from 'bullmq';
 import type { Logger } from '@nestjs/common';
+import { ArtifactType, RunKind } from '../../database/schemas';
+import type { ArtifactContent } from '../../artifact/schemas';
 import { FailureCode, WorkflowStep } from '../workflow.constants';
 import { RunEventEmitter } from './run-event.emitter';
 import { RunEventType } from './run-event.types';
@@ -72,7 +74,6 @@ export async function runWorkflow(
       );
     }
 
-    await ctx.run.setCurrentStep(step);
     ctx.diagnostics.stepStarted(step);
     emitter.emit({
       type: RunEventType.STEP_STARTED,
@@ -98,15 +99,50 @@ export async function runWorkflow(
   // Persist before announcing: a client that reacts to `run.completed` by
   // re-reading the run must never find it still RUNNING.
   await ctx.run.complete(ctx.meter.creditsUsed);
-  await ctx.meter.commit();
 
+  // Emit is fire-and-forget, so the stream write overlaps the debit below. The
+  // user sees the finished run without waiting on the wallet. Never
+  // Promise.all complete + commit: the run must be persisted first.
   emitter.emit({
     type: RunEventType.RUN_COMPLETED,
-    data: { artifactId: input.artifactId, version: input.version },
+    data: {
+      artifactId: input.artifactId,
+      version: input.version,
+      ...inlineResult(input, state),
+    },
   });
-  await emitter.flush();
+  try {
+    await ctx.meter.commit();
+  } finally {
+    // The run is already announced, so make sure the event is written even
+    // when the debit rejects.
+    await emitter.flush();
+  }
 
   return state;
+}
+
+/**
+ * POST and POLL only: what `PERSIST_VERSION` promoted, so the web can render
+ * the finished version without the follow-up read. `title` rides along on an
+ * INITIAL run, the only run `promoteVersion` writes one for. Verified equal
+ * to what is stored: GENERATE already parsed `state.content` with the
+ * per-type content schema that `promoteVersion` re-parses it with, and that
+ * parse only strips unknown keys, so the second one changes nothing. A
+ * DOCUMENT's content is a signed PDF link minted per read, so it is never
+ * inlined.
+ */
+function inlineResult(
+  input: BuildInput,
+  state: RunState,
+): { content?: ArtifactContent; title?: string } {
+  if (input.type === ArtifactType.DOCUMENT || !state.content) return {};
+  return {
+    content: state.content,
+    ...(input.kind === RunKind.INITIAL && state.generatedTitle !== undefined
+      ? { title: state.generatedTitle }
+      : {}),
+  };
 }
 
 /**
@@ -184,12 +220,19 @@ export const ARTIFACT_DELETED_FAILURE_REASON =
  * An artifact the user deleted mid-run fails its run silently, as `internal`:
  * the client that deleted it is not waiting for the result.
  *
- * Returns the code the run was failed with.
+ * Idempotent: a run that is no longer `RUNNING` already ended, through an
+ * earlier call for the same job (the worker's `failed` event and the
+ * stalled-job listener can both report one) or a completion. It is left as it
+ * is and nothing is emitted. The run's conditional write decides the race, so
+ * this holds across processes.
+ *
+ * Returns the code the run was failed with, or `null` when it had already
+ * ended.
  */
 export async function handleTerminalFailure(
   { artifacts, run, emitter, logger }: TerminalFailureDeps,
   { artifactId, version, failureCode, failureReason }: TerminalFailure,
-): Promise<FailureCode> {
+): Promise<FailureCode | null> {
   const report = (what: string, error: unknown): void =>
     logger.error(
       `Terminal-failure handler could not ${what} for artifact ${artifactId} v${version}: ${describeError(error)}`,
@@ -208,12 +251,21 @@ export async function handleTerminalFailure(
     report('mark the version FAILED', error);
   }
 
+  let alreadyEnded = false;
   try {
-    await (deleted
+    const outcome = await (deleted
       ? run.fail(FailureCode.INTERNAL, ARTIFACT_DELETED_FAILURE_REASON)
       : run.fail(failureCode, failureReason));
+    alreadyEnded = outcome === 'ALREADY_ENDED';
   } catch (error: unknown) {
     report('mark the run FAILED', error);
+  }
+
+  if (alreadyEnded) {
+    logger.log(
+      `Run for artifact ${artifactId} v${version} had already ended; not failing it again`,
+    );
+    return null;
   }
 
   if (deleted) {

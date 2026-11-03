@@ -131,6 +131,8 @@ services:
     profiles: ["app"]
     image: marquill-api
     command: ["node", "dist/workflow/workers/workflow.worker.js"]
+    # Matches the Railway drain window: the worker lets running jobs finish.
+    stop_grace_period: 130s
     env_file: apps/api/.env
     environment: *app_env
     depends_on:

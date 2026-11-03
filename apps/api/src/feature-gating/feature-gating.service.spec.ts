@@ -1,4 +1,7 @@
-import { InternalServerErrorException } from '@nestjs/common';
+import {
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Types } from 'mongoose';
 
 jest.mock(
@@ -19,11 +22,24 @@ jest.mock(
   { virtual: true },
 );
 
-import { SubscriptionStatus } from '../database/schemas';
+import { SubscriptionStatus, Tier } from '../database/schemas';
 import { FeatureGatingService } from './feature-gating.service';
 
+const PERIOD = {
+  periodStart: new Date('2026-03-01T00:00:00.000Z'),
+  periodEnd: new Date('2026-04-01T00:00:00.000Z'),
+};
+
+/** An already-resolved entitlement, so a test reads nothing to get one. */
+const entitlementFor = (tier: unknown) => ({
+  tier: tier as Tier | null,
+  source: 'default' as const,
+  subscriptionStatus: null,
+  period: PERIOD,
+});
+
 describe('FeatureGatingService', () => {
-  const makeService = () => {
+  const makeService = (env: Record<string, string> = {}) => {
     const subscriptionModel = {
       findOne: jest.fn(),
     };
@@ -49,6 +65,7 @@ describe('FeatureGatingService', () => {
       usageModel as any,
       connectedAccountModel as any,
       artifactModel as any,
+      env as any,
     );
 
     return {
@@ -73,6 +90,7 @@ describe('FeatureGatingService', () => {
     };
     const subscription = {
       status: SubscriptionStatus.ACTIVE,
+      currentPeriodStart: new Date(Date.now() - 60_000),
       currentPeriodEnd: new Date(Date.now() + 60_000),
       tierId: paidTier._id,
     };
@@ -92,6 +110,10 @@ describe('FeatureGatingService', () => {
       tier: paidTier,
       source: 'subscription',
       subscriptionStatus: SubscriptionStatus.ACTIVE,
+      period: {
+        periodStart: subscription.currentPeriodStart,
+        periodEnd: subscription.currentPeriodEnd,
+      },
     });
   });
 
@@ -113,12 +135,18 @@ describe('FeatureGatingService', () => {
       lean: jest.fn().mockResolvedValue(defaultTier),
     });
 
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-14T10:20:00.000Z'));
     const entitlement = await service.resolveEntitlement(userId);
+    jest.useRealTimers();
 
     expect(entitlement).toEqual({
       tier: defaultTier,
       source: 'default',
       subscriptionStatus: null,
+      period: {
+        periodStart: new Date('2026-03-01T00:00:00.000Z'),
+        periodEnd: new Date('2026-04-01T00:00:00.000Z'),
+      },
     });
   });
 
@@ -143,10 +171,11 @@ describe('FeatureGatingService', () => {
         name: 'Free',
         limits: { research: 0 },
       } as any;
-      jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
-
       await expect(
-        service.assertResearchAccess(new Types.ObjectId().toString()),
+        service.assertResearchAccess(
+          new Types.ObjectId().toString(),
+          entitlementFor(tier),
+        ),
       ).rejects.toMatchObject({
         response: {
           code: 'FEATURE_LIMIT_EXCEEDED',
@@ -165,10 +194,11 @@ describe('FeatureGatingService', () => {
         name: 'Starter',
         limits: { research: 1 },
       } as any;
-      jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
-
       await expect(
-        service.assertResearchAccess(new Types.ObjectId().toString()),
+        service.assertResearchAccess(
+          new Types.ObjectId().toString(),
+          entitlementFor(tier),
+        ),
       ).resolves.toBeUndefined();
     });
 
@@ -180,10 +210,11 @@ describe('FeatureGatingService', () => {
         monthlyPrice: 0,
         limits: { credits: 120 },
       } as any;
-      jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
-
       await expect(
-        service.assertResearchAccess(new Types.ObjectId().toString()),
+        service.assertResearchAccess(
+          new Types.ObjectId().toString(),
+          entitlementFor(tier),
+        ),
       ).rejects.toMatchObject({
         response: { feature: 'research', limit: 0, currentUsage: 0 },
         status: 403,
@@ -198,10 +229,11 @@ describe('FeatureGatingService', () => {
         monthlyPrice: 9.99,
         limits: { credits: 2000 },
       } as any;
-      jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
-
       await expect(
-        service.assertResearchAccess(new Types.ObjectId().toString()),
+        service.assertResearchAccess(
+          new Types.ObjectId().toString(),
+          entitlementFor(tier),
+        ),
       ).resolves.toBeUndefined();
     });
   });
@@ -269,10 +301,14 @@ describe('FeatureGatingService', () => {
       sort: jest.fn().mockReturnValue({
         lean: jest.fn().mockResolvedValue({
           status: SubscriptionStatus.ACTIVE,
+          tierId: new Types.ObjectId(),
           currentPeriodStart,
           currentPeriodEnd: new Date(Date.now() + 60_000),
         }),
       }),
+    });
+    mocks.tierModel.findById.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({ _id: new Types.ObjectId() }),
     });
 
     const periodStart = await (service as any).resolveUsagePeriodStart(userId);
@@ -310,6 +346,7 @@ describe('FeatureGatingService', () => {
             status: SubscriptionStatus.ACTIVE,
             currentPeriodStart,
             currentPeriodEnd,
+            tierId,
           }),
       }),
     });
@@ -465,6 +502,9 @@ describe('FeatureGatingService', () => {
         lean: jest.fn().mockResolvedValue(null),
       }),
     });
+    mocks.tierModel.findOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({ _id: new Types.ObjectId() }),
+    });
 
     const periodStart = await (service as any).resolveUsagePeriodStart(userId);
     expect(periodStart).toEqual(new Date('2026-03-01T00:00:00.000Z'));
@@ -576,10 +616,9 @@ describe('FeatureGatingService', () => {
         name: 'Starter',
         limits: { credits: limit },
       } as any;
-      jest.spyOn(service, 'resolveEntitlementTier').mockResolvedValue(tier);
       jest
-        .spyOn<any, any>(service as any, 'resolveUsagePeriodStart')
-        .mockResolvedValue(new Date('2026-03-01T00:00:00.000Z'));
+        .spyOn(service, 'resolveEntitlement')
+        .mockResolvedValue(entitlementFor(tier));
       mocks.usageModel.findOne.mockReturnValue({
         lean: jest.fn().mockResolvedValue({ count: currentUsage }),
       });
@@ -749,6 +788,409 @@ describe('FeatureGatingService', () => {
       await service.debit(userId, -5);
 
       expect(mocks.usageModel.updateOne).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * Wires the three models a gating read touches, so a test can count the
+   * calls: one `subscriptionModel.findOne`, `tierModel.findById` or
+   * `tierModel.findOne`, or `usageModel.findOne` is one database read.
+   */
+  const wireReads = (
+    mocks: ReturnType<typeof makeService>['mocks'],
+    {
+      subscription = null,
+      paidTier = null,
+      defaultTier = null,
+      creditsUsed = 0,
+    }: {
+      subscription?: Record<string, unknown> | null;
+      paidTier?: Record<string, unknown> | null;
+      defaultTier?: Record<string, unknown> | null;
+      creditsUsed?: number;
+    },
+  ) => {
+    mocks.subscriptionModel.findOne.mockImplementation(() => ({
+      sort: () => ({ lean: () => Promise.resolve(subscription) }),
+    }));
+    mocks.tierModel.findById.mockImplementation(() => ({
+      lean: () => Promise.resolve(paidTier),
+    }));
+    mocks.tierModel.findOne.mockImplementation(() => ({
+      lean: () => Promise.resolve(defaultTier),
+    }));
+    mocks.usageModel.findOne.mockImplementation(() => ({
+      lean: () => Promise.resolve({ count: creditsUsed }),
+    }));
+    mocks.usageModel.updateOne.mockResolvedValue({ acknowledged: true });
+  };
+
+  const readsOf = (mocks: ReturnType<typeof makeService>['mocks']) => ({
+    subscription: mocks.subscriptionModel.findOne.mock.calls.length,
+    tier:
+      mocks.tierModel.findById.mock.calls.length +
+      mocks.tierModel.findOne.mock.calls.length,
+    usage: mocks.usageModel.findOne.mock.calls.length,
+  });
+
+  const NOW = new Date('2026-03-20T12:00:00.000Z');
+  const paidTier = {
+    _id: new Types.ObjectId(),
+    name: 'Starter',
+    monthlyPrice: 9.99,
+    limits: { credits: 1000, research: 1 },
+  };
+  const freeTier = {
+    _id: new Types.ObjectId(),
+    name: 'Free',
+    monthlyPrice: 0,
+    limits: { credits: 120, research: 0 },
+  };
+  const activeSubscription = {
+    status: SubscriptionStatus.ACTIVE,
+    tierId: paidTier._id,
+    currentPeriodStart: new Date('2026-03-14T00:00:00.000Z'),
+    currentPeriodEnd: new Date('2026-04-14T00:00:00.000Z'),
+  };
+
+  describe('resolveEntitlement', () => {
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should take the tier, status and period from one subscription read when the subscription is active', async () => {
+      const { service, mocks } = makeService();
+      wireReads(mocks, { subscription: activeSubscription, paidTier });
+
+      const entitlement = await service.resolveEntitlement(
+        new Types.ObjectId().toString(),
+      );
+
+      expect(entitlement).toEqual({
+        tier: paidTier,
+        source: 'subscription',
+        subscriptionStatus: SubscriptionStatus.ACTIVE,
+        period: {
+          periodStart: activeSubscription.currentPeriodStart,
+          periodEnd: activeSubscription.currentPeriodEnd,
+        },
+      });
+      expect(readsOf(mocks)).toEqual({ subscription: 1, tier: 1, usage: 0 });
+    });
+
+    it('should use the default tier and the default period together when the paid tier document is missing', async () => {
+      const { service, mocks } = makeService();
+      wireReads(mocks, {
+        subscription: activeSubscription,
+        paidTier: null,
+        defaultTier: freeTier,
+      });
+      const userId = new Types.ObjectId().toString();
+
+      const entitlement = await service.resolveEntitlement(userId);
+
+      expect(entitlement).toEqual({
+        tier: freeTier,
+        source: 'default',
+        subscriptionStatus: SubscriptionStatus.ACTIVE,
+        period: PERIOD,
+      });
+      // Usage settles against the same period the tier came from.
+      await service.debit(userId, 10);
+      expect(mocks.usageModel.updateOne).toHaveBeenCalledWith(
+        expect.objectContaining({ periodStart: PERIOD.periodStart }),
+        expect.anything(),
+        { upsert: true },
+      );
+    });
+
+    it('should return a null tier with the default period when no default tier is configured', async () => {
+      const { service, mocks } = makeService();
+      wireReads(mocks, {});
+
+      await expect(
+        service.resolveEntitlement(new Types.ObjectId().toString()),
+      ).resolves.toEqual({
+        tier: null,
+        source: 'default',
+        subscriptionStatus: null,
+        period: PERIOD,
+      });
+    });
+  });
+
+  describe('tier cache', () => {
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should serve the tier from the cache but re-read the subscription when within the TTL', async () => {
+      const { service, mocks } = makeService();
+      wireReads(mocks, { subscription: activeSubscription, paidTier });
+      const userId = new Types.ObjectId().toString();
+
+      await service.resolveEntitlement(userId);
+      jest.advanceTimersByTime(59_999);
+      await service.resolveEntitlement(userId);
+
+      expect(readsOf(mocks)).toEqual({ subscription: 2, tier: 1, usage: 0 });
+    });
+
+    it('should re-read the tier when the TTL has passed', async () => {
+      const { service, mocks } = makeService();
+      wireReads(mocks, { defaultTier: freeTier });
+      const userId = new Types.ObjectId().toString();
+
+      await service.resolveEntitlement(userId);
+      jest.advanceTimersByTime(60_000);
+      await service.resolveEntitlement(userId);
+
+      expect(mocks.tierModel.findOne).toHaveBeenCalledTimes(2);
+    });
+
+    it('should honour a configured TTL when FEATURE_TIER_CACHE_TTL_MS is set', async () => {
+      const { service, mocks } = makeService({
+        FEATURE_TIER_CACHE_TTL_MS: '1000',
+      });
+      wireReads(mocks, { defaultTier: freeTier });
+      const userId = new Types.ObjectId().toString();
+
+      await service.resolveEntitlement(userId);
+      jest.advanceTimersByTime(999);
+      await service.resolveEntitlement(userId);
+      jest.advanceTimersByTime(1);
+      await service.resolveEntitlement(userId);
+
+      expect(mocks.tierModel.findOne).toHaveBeenCalledTimes(2);
+    });
+
+    it('should read the tier every time when FEATURE_TIER_CACHE_TTL_MS is 0', async () => {
+      const { service, mocks } = makeService({
+        FEATURE_TIER_CACHE_TTL_MS: '0',
+      });
+      wireReads(mocks, { subscription: activeSubscription, paidTier });
+      const userId = new Types.ObjectId().toString();
+
+      await service.resolveEntitlement(userId);
+      await service.resolveEntitlement(userId);
+
+      expect(readsOf(mocks)).toEqual({ subscription: 2, tier: 2, usage: 0 });
+    });
+
+    it('should not cache the default tier when it is missing', async () => {
+      const { service, mocks } = makeService();
+      wireReads(mocks, {});
+      const userId = new Types.ObjectId().toString();
+
+      await service.resolveEntitlement(userId);
+      mocks.tierModel.findOne.mockImplementation(() => ({
+        lean: () => Promise.resolve(freeTier),
+      }));
+      const entitlement = await service.resolveEntitlement(userId);
+
+      expect(entitlement.tier).toBe(freeTier);
+      expect(mocks.tierModel.findOne).toHaveBeenCalledTimes(2);
+    });
+
+    it('should keep paid and default tiers apart when both are cached', async () => {
+      const { service, mocks } = makeService();
+      wireReads(mocks, { defaultTier: freeTier, paidTier });
+
+      const free = await service.resolveEntitlement(
+        new Types.ObjectId().toString(),
+      );
+      mocks.subscriptionModel.findOne.mockImplementation(() => ({
+        sort: () => ({ lean: () => Promise.resolve(activeSubscription) }),
+      }));
+      const paid = await service.resolveEntitlement(
+        new Types.ObjectId().toString(),
+      );
+
+      expect(free.tier).toBe(freeTier);
+      expect(paid.tier).toBe(paidTier);
+    });
+
+    it('should fail boot naming the key when FEATURE_TIER_CACHE_TTL_MS is not an integer', () => {
+      expect(() => makeService({ FEATURE_TIER_CACHE_TTL_MS: 'soon' })).toThrow(
+        'FEATURE_TIER_CACHE_TTL_MS',
+      );
+    });
+  });
+
+  describe('assertLaunch', () => {
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should make 3 gating reads for a research launch when the tier cache is cold', async () => {
+      const { service, mocks } = makeService();
+      wireReads(mocks, {
+        subscription: activeSubscription,
+        paidTier,
+        creditsUsed: 10,
+      });
+
+      await service.assertLaunch(new Types.ObjectId().toString(), {
+        withResearch: true,
+      });
+
+      expect(readsOf(mocks)).toEqual({ subscription: 1, tier: 1, usage: 1 });
+    });
+
+    it('should make 2 gating reads when the tier is cached', async () => {
+      const { service, mocks } = makeService();
+      wireReads(mocks, {
+        subscription: activeSubscription,
+        paidTier,
+        creditsUsed: 10,
+      });
+      const userId = new Types.ObjectId().toString();
+      await service.assertLaunch(userId, { withResearch: true });
+      jest.clearAllMocks();
+
+      await service.assertLaunch(userId, { withResearch: false });
+
+      expect(readsOf(mocks)).toEqual({ subscription: 1, tier: 0, usage: 1 });
+    });
+
+    it('should read usage in the subscription period when a subscription resolves', async () => {
+      const { service, mocks } = makeService();
+      wireReads(mocks, { subscription: activeSubscription, paidTier });
+      const userId = new Types.ObjectId().toString();
+
+      await service.assertLaunch(userId, { withResearch: false });
+
+      expect(mocks.usageModel.findOne).toHaveBeenCalledWith({
+        user_id: new Types.ObjectId(userId),
+        feature: 'credits',
+        periodStart: activeSubscription.currentPeriodStart,
+      });
+    });
+
+    it('should return the checked entitlement when the launch is allowed', async () => {
+      const { service, mocks } = makeService();
+      wireReads(mocks, { defaultTier: freeTier });
+
+      await expect(
+        service.assertLaunch(new Types.ObjectId().toString(), {
+          withResearch: false,
+        }),
+      ).resolves.toMatchObject({ tier: freeTier, period: PERIOD });
+    });
+
+    it('should reject research before reading usage when the tier disables it', async () => {
+      const { service, mocks } = makeService();
+      wireReads(mocks, { defaultTier: freeTier });
+
+      await expect(
+        service.assertLaunch(new Types.ObjectId().toString(), {
+          withResearch: true,
+        }),
+      ).rejects.toMatchObject({ response: { feature: 'research' } });
+      expect(mocks.usageModel.findOne).not.toHaveBeenCalled();
+    });
+
+    it('should reject when the credit balance is exhausted', async () => {
+      const { service, mocks } = makeService();
+      wireReads(mocks, { defaultTier: freeTier, creditsUsed: 120 });
+
+      await expect(
+        service.assertLaunch(new Types.ObjectId().toString(), {
+          withResearch: false,
+        }),
+      ).rejects.toMatchObject({ response: { feature: 'credits' } });
+    });
+  });
+
+  describe('passed entitlements', () => {
+    it('should check research without any read when given an entitlement', async () => {
+      const { service, mocks } = makeService();
+      wireReads(mocks, {});
+
+      await service.assertResearchAccess(
+        new Types.ObjectId().toString(),
+        entitlementFor(paidTier),
+      );
+
+      expect(readsOf(mocks)).toEqual({ subscription: 0, tier: 0, usage: 0 });
+    });
+
+    it('should check the balance with only the usage read when given an entitlement', async () => {
+      const { service, mocks } = makeService();
+      wireReads(mocks, {});
+      const userId = new Types.ObjectId().toString();
+
+      await service.assertBalance(userId, entitlementFor(paidTier));
+
+      expect(readsOf(mocks)).toEqual({ subscription: 0, tier: 0, usage: 1 });
+      expect(mocks.usageModel.findOne).toHaveBeenCalledWith({
+        user_id: new Types.ObjectId(userId),
+        feature: 'credits',
+        periodStart: PERIOD.periodStart,
+      });
+    });
+
+    it('should throw NotFoundException when the passed entitlement has no tier', async () => {
+      const { service } = makeService();
+
+      await expect(
+        service.assertBalance(
+          new Types.ObjectId().toString(),
+          entitlementFor(null),
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        service.assertResearchAccess(
+          new Types.ObjectId().toString(),
+          entitlementFor(null),
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('should resolve the entitlement itself when none is passed', async () => {
+      const { service, mocks } = makeService();
+      jest.useFakeTimers().setSystemTime(NOW);
+      wireReads(mocks, { defaultTier: freeTier, creditsUsed: 5 });
+      const userId = new Types.ObjectId().toString();
+
+      await service.assertBalance(userId);
+      await expect(service.assertResearchAccess(userId)).rejects.toMatchObject({
+        response: { feature: 'research' },
+      });
+      jest.useRealTimers();
+
+      expect(mocks.subscriptionModel.findOne).toHaveBeenCalledTimes(2);
+    });
+
+    it('should debit into the passed period without reading the subscription when a period is supplied', async () => {
+      const { service, mocks } = makeService();
+      wireReads(mocks, {});
+      const userId = new Types.ObjectId().toString();
+
+      await service.debit(userId, 40, PERIOD);
+
+      expect(readsOf(mocks)).toEqual({ subscription: 0, tier: 0, usage: 0 });
+      expect(mocks.usageModel.updateOne).toHaveBeenCalledWith(
+        {
+          user_id: new Types.ObjectId(userId),
+          feature: 'credits',
+          periodStart: PERIOD.periodStart,
+        },
+        expect.objectContaining({ $inc: { count: 40 } }),
+        { upsert: true },
+      );
     });
   });
 });

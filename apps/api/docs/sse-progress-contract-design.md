@@ -143,7 +143,7 @@ the client contract:
 | `step.progress` | Fine-grained within a step (optional) | `{ step, ...signal }` e.g. `{ sourcesFound }` (#99 §7) |
 | `usage.tick` | Credits consumed | `{ kind, credits, detail? }` (#100 `UsageKind`) |
 | `step.failed` | Step failed **but will retry** (non-terminal) | `{ step, retryable: true, message }` |
-| `run.completed` | Terminal ✔ — version is now `READY` | `{ artifactId, version }` |
+| `run.completed` | Terminal ✔ — version is now `READY` | `{ artifactId, version, content?, title? }` — POST and POLL only: `content` is the promoted version's content, `title` is added on INITIAL runs. Both are absent for DOCUMENT runs and for the snapshot written when the stream has expired. |
 | `run.failed` | Terminal ✘ | `{ failureReason }` |
 
 - **"Artifact ready" = `run.completed`.** The issue lists "artifact ready" in the
@@ -156,6 +156,15 @@ the client contract:
   a step emits it via `ctx.emit` only when it has a meaningful sub-signal
   (research `sourcesFound`, PDF `pageRendered`). Clients must treat it as
   best-effort UI polish, never as a required checkpoint.
+- **Streamed commentary (`STREAM_POST_COMMENTARY`, #238).** With the switch
+  on, POST and POLL `GENERATE` stream the model's answer and emit
+  `{ step: 'GENERATE', phase: 'writing', partial: { commentary } }` at most
+  every 250 ms while the commentary grows. `partial.commentary` is the whole
+  commentary written so far, not a delta, so a client replaces its preview
+  with it and loses nothing when an event is skipped. `{ phase: 'rewrite' }`
+  comes before a Zod repair turn, which writes the commentary again: the
+  client drops its preview. A retrying `step.failed` drops it too. The preview
+  is never the result; `run.completed` is. With the switch off nothing changes.
 - **Progress-bar math** is `index/total` from `step.started/completed`, where
   `total = steps.length` from `run.started`. Because #98 §2's builder emits an
   **honest** step list (only steps that actually run), `total` is exact — no
@@ -179,7 +188,7 @@ type ProgressEvent =
   | { event: 'step.progress'; data: { seq: number; ts: number; step: WorkflowStep; [k: string]: unknown } }
   | { event: 'usage.tick';    data: { seq: number; ts: number; kind: string; credits: number; detail?: unknown } }
   | { event: 'step.failed';   data: { seq: number; ts: number; step: WorkflowStep; retryable: true; message: string } }
-  | { event: 'run.completed'; data: { seq: number; ts: number; artifactId: string; version: number } }
+  | { event: 'run.completed'; data: { seq: number; ts: number; artifactId: string; version: number; content?: ArtifactContent; title?: string } }
   | { event: 'run.failed';    data: { seq: number; ts: number; failureReason: string } };
 ```
 
@@ -225,7 +234,7 @@ hand-off seam (which events belong to replay vs live?) reintroducing exactly the
 subscribe-race #98 §6 wanted gone. `XREAD BLOCK` collapses both.
 
 **Rejected — poll the `WorkflowRun` Mongo doc.** The run record only holds coarse
-`currentStep` (#98 §4), not the event stream; polling it can't deliver
+`status` (`currentStep` is no longer written, M1.1), not the event stream; polling it can't deliver
 `usage.tick`/`step.progress` and adds DB load. It is used **only** as the
 cold-start fallback (§5), not the live path.
 
@@ -254,11 +263,12 @@ branches:
   hit the 204.
 - **Cold-start fallback (stream gone, run still known):** if the stream key has
   expired (§8) but the `WorkflowRun` doc exists, synthesize a **single snapshot**
-  from the durable record (#98 §4: `status`, `currentStep`) — emit a
+  from the durable record (#98 §4: `status`; `currentStep` is no longer written, M1.1) — emit a
   `run.started` (reconstructed `steps` from `buildWorkflow(input)`) and, if
   terminal, the matching `run.completed`/`run.failed` — then close. The client
   reaches a correct final UI state even after the fine-grained log is reclaimed.
-  This is exactly the "reconnect fallback" #98 §4 parked `currentStep` for.
+  `currentStep` was once parked for this fallback but is no longer written
+  (M1.1), so the snapshot cannot report a mid-run step.
 
 ## 6. Heartbeats & the terminal/close handshake
 
@@ -364,8 +374,9 @@ es.addEventListener('usage.tick',     (e) => bumpCredits(JSON.parse(e.data)));
 es.addEventListener('step.failed',    (e) => showRetrying(JSON.parse(e.data)));
 
 es.addEventListener('run.completed', (e) => {
-  const { artifactId, version } = JSON.parse(e.data);
-  refetchArtifact(artifactId, version);   // now READY
+  const { artifactId, version, content } = JSON.parse(e.data);
+  if (content) renderVersion(JSON.parse(e.data));  // live POST/POLL: no refetch
+  else refetchArtifact(artifactId, version);       // now READY
   es.close();                             // deliberate close — no reconnect
 });
 es.addEventListener('run.failed', (e) => {

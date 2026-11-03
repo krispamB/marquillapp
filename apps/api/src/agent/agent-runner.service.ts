@@ -1,19 +1,28 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ArtifactType } from 'src/database/schemas';
 import type { ZodType } from 'zod';
 import {
   ArtifactContent,
+  dedupePollOptions,
   DocumentDraft,
   documentDraftSchemaFor,
+  documentPatchRepairSchema,
+  documentRepairSchema,
   generationSchemaFor,
 } from '../artifact/schemas';
+import { type IntEnvOptions, readIntEnv } from '../common/env';
 import { LLMProvider, MessageRole } from '../llm/interfaces';
 import type {
+  CompletionOptions,
   LLMMessage,
+  ReasoningEffort,
   ToolCall,
   ToolDefinition,
   Usage,
 } from '../llm/interfaces';
+import { toAnthropicModelId } from '../llm/anthropic-model';
+import { readLlmProvider } from '../llm/llm-provider';
 import { LLMService } from '../llm/llm.service';
 import { ResponseParserService } from '../llm/parsers/responseParser.service';
 import {
@@ -28,27 +37,56 @@ import type {
   AgentRunner,
   AgentStep,
   DocumentDraftResult,
+  DocumentModelCall,
   DocumentGenerateInput,
+  DocumentPatchRepairResult,
+  DocumentRepairFallbackInput,
   DocumentRepairInput,
   DocumentRepairResult,
   GenerateInput,
   ResearchInput,
+  ResearchMode,
   ResearchResult,
   ResearchSource,
   Tool,
 } from './agent-runner.interface';
+import { readBoolEnv } from '../common/env';
+import { extractStringField } from './extract-string-field';
+import {
+  resolveTextGenerationModels,
+  type TextGenerationModels,
+} from './generation-model';
+import { readReasoningEffort } from './reasoning-effort';
+import { buildNativeResearch } from './research-native';
+import {
+  buildSnippetResearch,
+  cleanSnippetQueries,
+  DEFAULT_RESEARCH_MAX_SNIPPETS,
+  DEFAULT_RESEARCH_SNIPPET_CHARS,
+  readResearchMode,
+  type SnippetLimits,
+  type SnippetSearch,
+  snippetQueriesAnswerSchema,
+  snippetQueriesSchema,
+} from './research-snippets';
 import {
   buildDocumentGenerationUserPrompt,
+  buildDocumentPatchRepairUserPrompt,
+  buildDocumentRepairFallbackUserPrompt,
   buildDocumentRepairUserPrompt,
   buildGenerationUserPrompt,
   buildRepairUserPrompt,
   documentGenerationSystemPrompt,
   generationSystemPrompt,
+  nativeResearchSystemPrompt,
   researchSystemPrompt,
   researchUserPrompt,
+  snippetQueriesSystemPrompt,
+  snippetQueriesUserPrompt,
 } from './prompts';
 import {
   createSearchWebTool,
+  resolveSearchWebOptions,
   type SearchWebOutput,
   type WebSearchResult,
 } from './tools';
@@ -57,6 +95,16 @@ const DEFAULT_RESEARCH_MAX_STEPS = 5;
 const DEFAULT_RESEARCH_MAX_SUCCESSFUL_SEARCHES = 5;
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 const DEFAULT_DOCUMENT_MAX_OUTPUT_TOKENS = 16384;
+/**
+ * A research turn is short (a tool choice, or the synthesis), so a hung one
+ * ends long before the provider's per-try timeout would end it.
+ */
+const RESEARCH_TURN_TIMEOUT_MS = 45_000;
+/**
+ * A native research call runs several server-side searches before it
+ * answers, so its per-try timeout is longer than a research turn's.
+ */
+const NATIVE_RESEARCH_TIMEOUT_MS = 120_000;
 
 const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -75,7 +123,19 @@ const addUsage = (into: Usage, turn: Usage): void => {
   into.completionTokens += turn.completionTokens;
   into.totalTokens += turn.totalTokens;
   into.cost += turn.cost;
+  for (const key of OPTIONAL_USAGE_KEYS) {
+    const value = turn[key];
+    if (value !== undefined) into[key] = (into[key] ?? 0) + value;
+  }
 };
+
+// Reported only by some providers and calls, so summed only when present.
+const OPTIONAL_USAGE_KEYS = [
+  'reasoningTokens',
+  'cachedTokens',
+  'cacheWriteTokens',
+  'latencyMs',
+] as const satisfies ReadonlyArray<keyof Usage>;
 
 const hasResults = (
   output: unknown,
@@ -88,6 +148,35 @@ const hasResults = (
 // contract). Such a call did no useful work, so it is not billed.
 const isToolError = (output: unknown): boolean =>
   typeof output === 'object' && output !== null && 'error' in output;
+
+/**
+ * The per-call options a call site may add. Each is included only when set,
+ * so with nothing configured a request is exactly what it was before them.
+ */
+const callOptions = (
+  reasoningEffort: ReasoningEffort | undefined,
+  sessionId: string | undefined,
+): Pick<CompletionOptions, 'reasoningEffort' | 'sessionId'> => ({
+  ...(reasoningEffort ? { reasoningEffort } : {}),
+  ...(sessionId ? { sessionId } : {}),
+});
+
+/** A DOCUMENT call, as its errors and logs name it. */
+type DocumentCall = 'draft' | 'Repair' | 'Repair fallback';
+
+/** How each DOCUMENT call's first turn is tagged for usage. */
+const DOCUMENT_MODEL_CALLS: Record<DocumentCall, DocumentModelCall> = {
+  draft: 'draft',
+  Repair: 'repair',
+  'Repair fallback': 'fallback',
+};
+
+interface DocumentCallOptions<T> {
+  schema: ZodType<T>;
+  maxEnvelopeRepairs: number;
+  sessionId?: string;
+  timeLeftMs?: number;
+}
 
 const toToolDefinition = (tool: Tool): ToolDefinition => ({
   name: tool.name,
@@ -105,13 +194,26 @@ const toToolDefinition = (tool: Tool): ToolDefinition => ({
 @Injectable()
 export class AgentRunnerService implements AgentRunner {
   private readonly logger = new Logger(AgentRunnerService.name);
+  /** `LLM_PROVIDER`: where every model call goes. */
+  private readonly provider: LLMProvider;
   private readonly generationModel: string;
+  // POST and POLL generation (and its Zod repair); DOCUMENT keeps generationModel.
+  private readonly textModels: TextGenerationModels;
   private readonly researchModel: string;
   private readonly researchMaxSteps: number;
   private readonly researchMaxSuccessfulSearches: number;
   private readonly researchMaxOutputTokens: number;
+  private readonly researchMode: ResearchMode;
+  private readonly snippetLimits: SnippetLimits;
   private readonly generationMaxOutputTokens: number;
   private readonly documentMaxOutputTokens: number;
+  // Each effort applies to its own call sites only; unset sends none.
+  private readonly researchReasoningEffort?: ReasoningEffort;
+  private readonly generationReasoningEffort?: ReasoningEffort;
+  private readonly documentDraftReasoningEffort?: ReasoningEffort;
+  private readonly documentRepairReasoningEffort?: ReasoningEffort;
+  /** `STREAM_POST_COMMENTARY`: stream POST and POLL commentary as it is written. */
+  private readonly streamPostCommentary: boolean;
   private readonly searchWebTool: Tool;
 
   constructor(
@@ -121,8 +223,16 @@ export class AgentRunnerService implements AgentRunner {
   ) {
     this.generationModel =
       this.configService.getOrThrow<string>('GENERATION_MODEL');
+    this.textModels = resolveTextGenerationModels(this.generationModel, (key) =>
+      this.configService.get<string | number>(key),
+    );
     this.researchModel =
       this.configService.getOrThrow<string>('RESEARCH_MODEL');
+    // A bad value throws here, failing worker boot.
+    this.provider = readLlmProvider(
+      this.configService.get<string>('LLM_PROVIDER'),
+    );
+    if (this.provider === LLMProvider.ANTHROPIC) this.assertAnthropicReady();
     this.researchMaxSteps = this.readMaxSteps();
     this.researchMaxSuccessfulSearches = Math.min(
       this.readPositiveInteger(
@@ -135,6 +245,28 @@ export class AgentRunnerService implements AgentRunner {
       'RESEARCH_MAX_OUTPUT_TOKENS',
       DEFAULT_MAX_OUTPUT_TOKENS,
     );
+    // A bad value throws here, failing worker boot like an unknown effort.
+    this.researchMode = readResearchMode(
+      this.configService.get<string>('RESEARCH_MODE'),
+    );
+    if (
+      this.researchMode === 'native' &&
+      this.provider !== LLMProvider.ANTHROPIC
+    ) {
+      throw new Error(
+        'RESEARCH_MODE=native needs LLM_PROVIDER=anthropic: only the Anthropic provider runs the model web search',
+      );
+    }
+    this.snippetLimits = {
+      maxSnippets: this.readInt('RESEARCH_MAX_SNIPPETS', {
+        default: DEFAULT_RESEARCH_MAX_SNIPPETS,
+        min: 1,
+      }),
+      snippetChars: this.readInt('RESEARCH_SNIPPET_CHARS', {
+        default: DEFAULT_RESEARCH_SNIPPET_CHARS,
+        min: 1,
+      }),
+    };
     this.generationMaxOutputTokens = this.readPositiveInteger(
       'GENERATION_MAX_OUTPUT_TOKENS',
       DEFAULT_MAX_OUTPUT_TOKENS,
@@ -143,24 +275,68 @@ export class AgentRunnerService implements AgentRunner {
       'DOCUMENT_GENERATION_MAX_OUTPUT_TOKENS',
       DEFAULT_DOCUMENT_MAX_OUTPUT_TOKENS,
     );
+    // An unknown effort throws here, which fails worker boot (the API never builds this service).
+    this.researchReasoningEffort = this.readEffort('RESEARCH_REASONING_EFFORT');
+    this.generationReasoningEffort = this.readEffort(
+      'GENERATION_REASONING_EFFORT',
+    );
+    this.documentDraftReasoningEffort = this.readEffort(
+      'DOCUMENT_DRAFT_REASONING_EFFORT',
+    );
+    this.documentRepairReasoningEffort = this.readEffort(
+      'DOCUMENT_REPAIR_REASONING_EFFORT',
+    );
+    if (
+      this.researchMode === 'snippets' &&
+      this.researchReasoningEffort === undefined
+    ) {
+      this.logger.warn(
+        'RESEARCH_MODE is snippets but RESEARCH_REASONING_EFFORT is unset; the query call runs at the model default effort, not its lowest',
+      );
+    }
+    this.streamPostCommentary = readBoolEnv(
+      {
+        STREAM_POST_COMMENTARY: this.configService.get<string>(
+          'STREAM_POST_COMMENTARY',
+        ),
+      },
+      'STREAM_POST_COMMENTARY',
+      false,
+    );
     this.searchWebTool = createSearchWebTool(
       this.configService.getOrThrow<string>('TAVILY_API_KEY'),
+      resolveSearchWebOptions(
+        this.configService.get<string | number>('TAVILY_TIMEOUT_S'),
+        this.configService.get<string>('TAVILY_SEARCH_DEPTH'),
+      ),
     );
   }
 
   /**
-   * The agentic half. One tool (`searchWeb`), fully autonomous: the model
-   * self-directs its queries across turns and, when done, answers in prose.
+   * Research in the configured `RESEARCH_MODE`. Both modes return the same
+   * shape, so the run record, refine reuse and GENERATE take either; the
+   * whole result is persisted on the run record so a later refine reuses it
+   * with zero re-search.
    *
-   * `findings` is that final synthesis — not a dump of raw search bodies —
-   * keeping the generation prompt tight. `sources` is deduped across every
-   * search the loop made. The whole result is persisted on the run record so a
-   * later refine reuses it with zero re-search.
+   * `agent` (the default): one tool (`searchWeb`), fully autonomous. The
+   * model self-directs its queries across turns and, when done, answers in
+   * prose. `findings` is that final synthesis, not a dump of raw search
+   * bodies, keeping the generation prompt tight. `sources` is deduped across
+   * every search the loop made.
+   *
+   * `snippets`: see `researchSnippets`.
    */
   async research(
     input: ResearchInput,
     hooks?: AgentHooks,
   ): Promise<ResearchResult> {
+    if (this.researchMode === 'snippets') {
+      return this.researchSnippets(input, hooks);
+    }
+    if (this.researchMode === 'native') {
+      return this.researchNative(input, hooks);
+    }
+
     const result = await this.run(
       {
         system: researchSystemPrompt(),
@@ -171,6 +347,9 @@ export class AgentRunnerService implements AgentRunner {
         maxSteps: this.researchMaxSteps,
         maxSuccessfulToolCalls: this.researchMaxSuccessfulSearches,
         model: this.researchModel,
+        reasoningEffort: this.researchReasoningEffort,
+        sessionId: input.sessionId,
+        turnTimeoutMs: RESEARCH_TURN_TIMEOUT_MS,
       },
       hooks,
     );
@@ -179,6 +358,105 @@ export class AgentRunnerService implements AgentRunner {
       findings: result.text,
       sources: this.collectSources(result.steps),
     };
+  }
+
+  /**
+   * Snippet research (plan M7.2): one research-model call plans 1–4 queries,
+   * they are searched in parallel, and the raw excerpts are returned as
+   * numbered `[n] Title (url)` blocks, with no synthesis turn.
+   *
+   * The query call runs at `RESEARCH_REASONING_EFFORT`, which a deployment
+   * using this mode sets to the model's lowest (`none` on Luna). Each search
+   * that returns charges `web_search` through `onToolCall`, exactly as in
+   * the agent loop; a failed search charges nothing. An answer that is not
+   * the asked-for JSON is not repaired: the brief itself is searched.
+   */
+  private async researchSnippets(
+    input: ResearchInput,
+    hooks?: AgentHooks,
+  ): Promise<ResearchResult> {
+    const queries = await this.planSnippetQueries(input, hooks);
+    const outputs = await Promise.all(
+      queries.map((query, i) =>
+        this.executeTool(
+          [this.searchWebTool],
+          {
+            id: `snippet-${i + 1}`,
+            name: this.searchWebTool.name,
+            input: { query },
+          },
+          hooks,
+        ),
+      ),
+    );
+    const searches = outputs.filter((output): output is SnippetSearch =>
+      hasResults(output),
+    );
+    return buildSnippetResearch(searches, this.snippetLimits);
+  }
+
+  /**
+   * Native research: one `RESEARCH_MODEL` call in which the model runs up to
+   * `RESEARCH_MAX_SUCCESSFUL_SEARCHES` web searches server-side and writes
+   * the synthesis; the pages it cites become `sources`. Its usage carries
+   * the searches' price in `cost` and their count in `webSearchRequests`,
+   * and `onToolCall` never fires, so no `web_search` surcharge is charged on
+   * top of what the provider billed.
+   */
+  private async researchNative(
+    input: ResearchInput,
+    hooks?: AgentHooks,
+  ): Promise<ResearchResult> {
+    const { text, usage, citations, model } = await this.llmService.complete(
+      this.provider,
+      [
+        { role: MessageRole.System, content: nativeResearchSystemPrompt() },
+        { role: MessageRole.User, content: researchUserPrompt(input) },
+      ],
+      {
+        model: this.researchModel,
+        max_tokens: this.researchMaxOutputTokens,
+        ...callOptions(this.researchReasoningEffort, input.sessionId),
+        timeoutMs: NATIVE_RESEARCH_TIMEOUT_MS,
+        webSearch: { maxUses: this.researchMaxSuccessfulSearches },
+      },
+    );
+    hooks?.onUsage?.({ ...usage, model: model ?? this.researchModel });
+    return buildNativeResearch(text, citations ?? []);
+  }
+
+  private async planSnippetQueries(
+    input: ResearchInput,
+    hooks?: AgentHooks,
+  ): Promise<string[]> {
+    const { text } = await this.complete(
+      [
+        { role: MessageRole.System, content: snippetQueriesSystemPrompt() },
+        { role: MessageRole.User, content: snippetQueriesUserPrompt(input) },
+      ],
+      hooks,
+      snippetQueriesSchema,
+      {
+        model: this.researchModel,
+        maxTokens: this.researchMaxOutputTokens,
+        reasoningEffort: this.researchReasoningEffort,
+        sessionId: input.sessionId,
+        timeoutMs: RESEARCH_TURN_TIMEOUT_MS,
+        schemaName: 'research_queries',
+      },
+    );
+
+    let planned: string[] = [];
+    try {
+      planned = this.parser.parseWithSchema(text, snippetQueriesAnswerSchema, {
+        stripNullObjectValues: true,
+      }).queries;
+    } catch (error: unknown) {
+      this.logger.warn(
+        `Snippet research query plan failed validation; searching the brief: ${describeError(error)}`,
+      );
+    }
+    return cleanSnippetQueries(planned, input.prompt);
   }
 
   /**
@@ -198,11 +476,27 @@ export class AgentRunnerService implements AgentRunner {
     config: AgentRunConfig,
     hooks?: AgentHooks,
   ): Promise<AgentRunResult> {
-    const { system, messages, tools, maxSteps, maxSuccessfulToolCalls, model } =
-      config;
-    // A label for the usage tag; the request itself passes `model` through as-is,
-    // letting the strategy fall back to its default when it is undefined.
+    const {
+      system,
+      messages,
+      tools,
+      maxSteps,
+      maxSuccessfulToolCalls,
+      model,
+      reasoningEffort,
+      sessionId,
+      turnTimeoutMs,
+    } = config;
+    // A label for the usage tag when the provider does not name the model that
+    // answered; the request itself passes `model` through as-is, letting the
+    // strategy fall back to its default when it is undefined.
     const usageModel = model ?? 'default';
+    const options: CompletionOptions = {
+      model,
+      max_tokens: this.researchMaxOutputTokens,
+      ...callOptions(reasoningEffort, sessionId),
+      ...(turnTimeoutMs !== undefined ? { timeoutMs: turnTimeoutMs } : {}),
+    };
     const toolDefinitions = tools.map(toToolDefinition);
 
     const conversation: LLMMessage[] = [
@@ -215,13 +509,13 @@ export class AgentRunnerService implements AgentRunner {
 
     for (let step = 0; step < maxSteps; step++) {
       const turn = await this.llmService.completeWithTools(
-        LLMProvider.OPENROUTER,
+        this.provider,
         conversation,
         toolDefinitions,
-        { model, max_tokens: this.researchMaxOutputTokens },
+        options,
       );
       addUsage(usage, turn.usage);
-      hooks?.onUsage?.({ ...turn.usage, model: usageModel });
+      hooks?.onUsage?.({ ...turn.usage, model: turn.model ?? usageModel });
 
       if (turn.toolCalls.length === 0) {
         return { text: turn.text ?? '', steps, usage };
@@ -231,6 +525,10 @@ export class AgentRunnerService implements AgentRunner {
         role: MessageRole.Assistant,
         content: turn.text,
         toolCalls: turn.toolCalls,
+        // Anthropic needs the turn's own blocks (thinking included) back verbatim.
+        ...(turn.providerContent
+          ? { providerContent: turn.providerContent }
+          : {}),
       });
 
       const toolResults: unknown[] = [];
@@ -280,12 +578,12 @@ export class AgentRunnerService implements AgentRunner {
     // Budget spent, model still reaching for tools: one tools-free completion so
     // the run yields usable text rather than a stranded tool call.
     const final = await this.llmService.complete(
-      LLMProvider.OPENROUTER,
+      this.provider,
       conversation,
-      { model, max_tokens: this.researchMaxOutputTokens },
+      options,
     );
     addUsage(usage, final.usage);
-    hooks?.onUsage?.({ ...final.usage, model: usageModel });
+    hooks?.onUsage?.({ ...final.usage, model: final.model ?? usageModel });
 
     return { text: final.text, steps, usage };
   }
@@ -296,6 +594,11 @@ export class AgentRunnerService implements AgentRunner {
    *
    * The repair re-prompts with the exact validation error. A failure that
    * survives it is a `ContentValidationError` — terminal, per R2.
+   *
+   * With `STREAM_POST_COMMENTARY` on and an `onCommentary` hook, both calls
+   * stream, and the hook gets the commentary written so far as it grows
+   * (`commentary` is the schema's first key, so it arrives first). The repair
+   * rewrites it, so `onRewrite` fires before the repair call.
    */
   async generate(
     input: GenerateInput,
@@ -311,14 +614,45 @@ export class AgentRunnerService implements AgentRunner {
       { role: MessageRole.User, content: buildGenerationUserPrompt(input) },
     ];
 
-    const { text: draft } = await this.complete(messages, hooks, schema);
+    // A repeated POLL option is fixed in place rather than spending a repair
+    // turn on it (plan M1.9); every other miss goes to the repair below.
+    const parseOptions = {
+      stripNullObjectValues: true,
+      ...(input.type === ArtifactType.POLL
+        ? { prepare: (value: unknown) => this.dropRepeatedPollOptions(value) }
+        : {}),
+    };
+
+    const onCommentary = this.streamPostCommentary
+      ? hooks?.onCommentary
+      : undefined;
+    const options = {
+      model:
+        input.type === ArtifactType.POLL || input.type === ArtifactType.POST
+          ? this.textModels[input.type]
+          : this.generationModel,
+      ...callOptions(this.generationReasoningEffort, input.sessionId),
+      ...(onCommentary
+        ? {
+            onTextDelta: (_delta: string, text: string) => {
+              const commentary = extractStringField(text, 'commentary');
+              if (commentary !== undefined) onCommentary(commentary);
+            },
+          }
+        : {}),
+    };
+
+    const { text: draft } = await this.complete(
+      messages,
+      hooks,
+      schema,
+      options,
+    );
 
     let validationError: unknown;
     try {
       return this.toGenerationResult(
-        this.parser.parseWithSchema(draft, schema, {
-          stripNullObjectValues: true,
-        }),
+        this.parser.parseWithSchema(draft, schema, parseOptions),
         includeTitle,
       );
     } catch (error: unknown) {
@@ -328,6 +662,7 @@ export class AgentRunnerService implements AgentRunner {
     this.logger.warn(
       `Generated ${input.type} first draft failed validation; attempting one repair: ${describeError(validationError)}`,
     );
+    if (onCommentary) hooks?.onRewrite?.();
 
     const { text: repaired } = await this.complete(
       [
@@ -340,13 +675,12 @@ export class AgentRunnerService implements AgentRunner {
       ],
       hooks,
       schema,
+      options,
     );
 
     try {
       return this.toGenerationResult(
-        this.parser.parseWithSchema(repaired, schema, {
-          stripNullObjectValues: true,
-        }),
+        this.parser.parseWithSchema(repaired, schema, parseOptions),
         includeTitle,
       );
     } catch (error: unknown) {
@@ -382,7 +716,12 @@ export class AgentRunnerService implements AgentRunner {
           content: buildDocumentGenerationUserPrompt(input),
         },
       ],
-      input,
+      {
+        schema: documentDraftSchemaFor(input.includeTitle),
+        maxEnvelopeRepairs: input.maxEnvelopeRepairs,
+        sessionId: input.sessionId,
+        timeLeftMs: input.timeLeftMs,
+      },
       hooks,
     );
 
@@ -393,10 +732,10 @@ export class AgentRunnerService implements AgentRunner {
   }
 
   /**
-   * One Repair (spec §7.2): a fresh two-message call whose system message is
-   * byte-identical to the draft's, and whose user message is the Candidate
-   * Source and its bounded violations. The model still answers in the draft's
-   * JSON shape, but only `html` is kept.
+   * One `full`-mode Repair (spec §7.2): a fresh two-message call whose system
+   * message is byte-identical to the draft's, and whose user message is the
+   * Candidate Source and its bounded violations. The model answers with
+   * `{ html }` only: a Repair's title and commentary would be thrown away.
    */
   async repairDocument(
     input: DocumentRepairInput,
@@ -405,13 +744,7 @@ export class AgentRunnerService implements AgentRunner {
     const { parsed, envelopeRepairs } = await this.completeDocument(
       'Repair',
       [
-        {
-          role: MessageRole.System,
-          content: documentGenerationSystemPrompt(
-            input.fragment,
-            input.includeTitle,
-          ),
-        },
+        this.repairSystemMessage(input),
         {
           role: MessageRole.User,
           content: buildDocumentRepairUserPrompt(
@@ -420,11 +753,99 @@ export class AgentRunnerService implements AgentRunner {
           ),
         },
       ],
-      input,
+      this.repairOptions(input, documentRepairSchema),
       hooks,
     );
 
     return { html: parsed.html, envelopeRepairs };
+  }
+
+  /**
+   * One `patch`-mode Repair (spec §7.2): the same fresh two-message call,
+   * answered with edits, or with the whole Candidate Source for structural
+   * codes. Whether the edits apply is the caller's question.
+   */
+  async repairDocumentPatch(
+    input: DocumentRepairInput,
+    hooks?: AgentHooks,
+  ): Promise<DocumentPatchRepairResult> {
+    const { parsed, envelopeRepairs } = await this.completeDocument(
+      'Repair',
+      this.patchRepairMessages(input),
+      this.repairOptions(input, documentPatchRepairSchema),
+      hooks,
+    );
+
+    // The schema lets exactly one through.
+    return parsed.edits !== undefined
+      ? { edits: parsed.edits, envelopeRepairs }
+      : { html: parsed.html!, envelopeRepairs };
+  }
+
+  /**
+   * The warm follow-up to a `patch`-mode Repair whose edits did not apply
+   * (spec §7.2): the Repair's own messages, its edits as the assistant turn,
+   * and the problems as the user turn, answered with `{ html }`. Its own call,
+   * so it is billed and checked for truncation like any other.
+   */
+  async repairDocumentFallback(
+    input: DocumentRepairFallbackInput,
+    hooks?: AgentHooks,
+  ): Promise<DocumentRepairResult> {
+    const { parsed, envelopeRepairs } = await this.completeDocument(
+      'Repair fallback',
+      [
+        ...this.patchRepairMessages(input),
+        {
+          role: MessageRole.Assistant,
+          content: JSON.stringify({ edits: input.edits, html: null }),
+        },
+        {
+          role: MessageRole.User,
+          content: buildDocumentRepairFallbackUserPrompt(input.problems),
+        },
+      ],
+      this.repairOptions(input, documentRepairSchema),
+      hooks,
+    );
+
+    return { html: parsed.html, envelopeRepairs };
+  }
+
+  /** The draft's system message, byte for byte (spec §7.2). */
+  private repairSystemMessage(input: DocumentRepairInput): LLMMessage {
+    return {
+      role: MessageRole.System,
+      content: documentGenerationSystemPrompt(
+        input.fragment,
+        input.includeTitle,
+      ),
+    };
+  }
+
+  private patchRepairMessages(input: DocumentRepairInput): LLMMessage[] {
+    return [
+      this.repairSystemMessage(input),
+      {
+        role: MessageRole.User,
+        content: buildDocumentPatchRepairUserPrompt(
+          input.candidate,
+          input.violations,
+        ),
+      },
+    ];
+  }
+
+  private repairOptions<T>(
+    input: DocumentRepairInput,
+    schema: ZodType<T>,
+  ): DocumentCallOptions<T> {
+    return {
+      schema,
+      maxEnvelopeRepairs: input.maxEnvelopeRepairs,
+      sessionId: input.sessionId,
+      timeLeftMs: input.timeLeftMs,
+    };
   }
 
   /**
@@ -433,25 +854,44 @@ export class AgentRunnerService implements AgentRunner {
    * validation failure and spend a repair turn it cannot use.
    *
    * An invalid envelope gets one Zod repair turn when the caller's Repair
-   * budget allows it, and is final when it does not.
+   * budget allows it, and is final when it does not. That repair turn is
+   * part of the call it repairs, so it carries the same effort, session and
+   * deadline.
    */
-  private async completeDocument(
-    call: 'draft' | 'Repair',
+  private async completeDocument<T>(
+    call: DocumentCall,
     messages: LLMMessage[],
     {
-      includeTitle,
+      schema,
       maxEnvelopeRepairs,
-    }: { includeTitle: boolean; maxEnvelopeRepairs: number },
+      sessionId,
+      timeLeftMs,
+    }: DocumentCallOptions<T>,
     hooks?: AgentHooks,
-  ): Promise<{ parsed: DocumentDraft; envelopeRepairs: number }> {
-    const schema = documentDraftSchemaFor(includeTitle);
-    const options = { maxTokens: this.documentMaxOutputTokens };
-    const parse = (text: string): DocumentDraft =>
+  ): Promise<{ parsed: T; envelopeRepairs: number }> {
+    const options = {
+      model: this.generationModel,
+      maxTokens: this.documentMaxOutputTokens,
+      ...callOptions(
+        call === 'draft'
+          ? this.documentDraftReasoningEffort
+          : this.documentRepairReasoningEffort,
+        sessionId,
+      ),
+      // Fixed once: the strategy cuts each try to min(timeout, time left).
+      ...(timeLeftMs !== undefined
+        ? { deadlineAt: Date.now() + timeLeftMs }
+        : {}),
+    };
+    const parse = (text: string): T =>
       this.parser.parseWithSchema(text, schema, {
         stripNullObjectValues: true,
       });
 
-    const first = await this.complete(messages, hooks, schema, options);
+    const first = await this.complete(messages, hooks, schema, {
+      ...options,
+      call: DOCUMENT_MODEL_CALLS[call],
+    });
     this.assertNotTruncated(call, first.finishReason);
 
     let validationError: unknown;
@@ -485,7 +925,7 @@ export class AgentRunnerService implements AgentRunner {
       ],
       hooks,
       schema,
-      options,
+      { ...options, call: 'envelope' },
     );
     this.assertNotTruncated(call, repaired.finishReason);
 
@@ -500,7 +940,7 @@ export class AgentRunnerService implements AgentRunner {
   }
 
   private assertNotTruncated(
-    call: 'draft' | 'Repair',
+    call: DocumentCall,
     finishReason: string | undefined,
   ): void {
     if (finishReason === 'length') {
@@ -521,6 +961,16 @@ export class AgentRunnerService implements AgentRunner {
       commentary: parsed.commentary,
       html: parsed.html,
     };
+  }
+
+  private dropRepeatedPollOptions(value: unknown): unknown {
+    const { value: deduped, removed } = dedupePollOptions(value);
+    if (removed > 0) {
+      this.logger.log(
+        `Dropped ${removed} repeated POLL option(s) before validation`,
+      );
+    }
+    return deduped;
   }
 
   private toGenerationResult(
@@ -587,40 +1037,100 @@ export class AgentRunnerService implements AgentRunner {
   }
 
   /**
-   * A repair turn is real spend, so it is announced like any other. Transport
-   * errors are left alone: `src/llm` already classified them as retryable or
-   * not, and this layer would only be guessing.
+   * A repair turn is real spend, so it is announced like any other, tagged
+   * with the model the provider says answered (or the requested one, when it
+   * does not say). Transport errors are left alone: `src/llm` already
+   * classified them as retryable or not, and this layer would only be guessing.
    */
   private async complete(
     messages: LLMMessage[],
-    hooks?: AgentHooks,
-    responseSchema?: ZodType,
-    options: { maxTokens?: number } = {},
+    hooks: AgentHooks | undefined,
+    responseSchema: ZodType | undefined,
+    options: {
+      model: string;
+      maxTokens?: number;
+      call?: DocumentModelCall;
+      /** The structured-output name; artifact generation unless set. */
+      schemaName?: string;
+    } & Pick<
+      CompletionOptions,
+      | 'reasoningEffort'
+      | 'sessionId'
+      | 'deadlineAt'
+      | 'timeoutMs'
+      | 'onTextDelta'
+    >,
   ): Promise<{ text: string; finishReason?: string }> {
-    const { text, usage, finishReason } = await this.llmService.complete(
-      LLMProvider.OPENROUTER,
-      messages,
-      {
-        model: this.generationModel,
-        max_tokens: options.maxTokens ?? this.generationMaxOutputTokens,
-        ...(responseSchema
-          ? {
-              responseSchema: {
-                name: 'artifact_generation',
-                schema: responseSchema,
-              },
-            }
-          : {}),
-      },
-    );
+    const {
+      text,
+      usage,
+      finishReason,
+      model: answeredBy,
+    } = await this.llmService.complete(this.provider, messages, {
+      model: options.model,
+      max_tokens: options.maxTokens ?? this.generationMaxOutputTokens,
+      ...callOptions(options.reasoningEffort, options.sessionId),
+      ...(options.timeoutMs !== undefined
+        ? { timeoutMs: options.timeoutMs }
+        : {}),
+      ...(options.deadlineAt !== undefined
+        ? { deadlineAt: options.deadlineAt }
+        : {}),
+      ...(options.onTextDelta ? { onTextDelta: options.onTextDelta } : {}),
+      ...(responseSchema
+        ? {
+            responseSchema: {
+              name: options.schemaName ?? 'artifact_generation',
+              schema: responseSchema,
+            },
+          }
+        : {}),
+    });
 
     hooks?.onUsage?.({
       ...usage,
-      model: this.generationModel,
+      model: answeredBy ?? options.model,
       ...(finishReason ? { finishReason } : {}),
+      ...(options.call ? { call: options.call } : {}),
     });
 
     return { text, ...(finishReason ? { finishReason } : {}) };
+  }
+
+  /**
+   * `LLM_PROVIDER=anthropic` fails worker boot without a key, or with a
+   * configured model that is not a Claude model, instead of failing each run.
+   */
+  private assertAnthropicReady(): void {
+    if (!this.configService.get<string>('ANTHROPIC_API_KEY')) {
+      throw new Error(
+        'LLM_PROVIDER is anthropic but ANTHROPIC_API_KEY is unset',
+      );
+    }
+    for (const model of new Set([
+      this.generationModel,
+      this.textModels.POST,
+      this.textModels.POLL,
+      this.researchModel,
+    ])) {
+      toAnthropicModelId(model);
+    }
+  }
+
+  private readEffort(key: string): ReasoningEffort | undefined {
+    return readReasoningEffort(
+      this.configService.get<string | number>(key),
+      key,
+    );
+  }
+
+  private readInt(key: string, options: IntEnvOptions): number {
+    const raw = this.configService.get<string | number>(key);
+    return readIntEnv(
+      { [key]: raw === undefined || raw === null ? undefined : String(raw) },
+      key,
+      options,
+    );
   }
 
   private readMaxSteps(): number {

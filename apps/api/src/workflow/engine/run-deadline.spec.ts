@@ -53,4 +53,34 @@ describe('RunDeadline', () => {
       expect((error as WorkflowError).code).toBeUndefined();
     });
   });
+
+  describe('remainingMs', () => {
+    it('should report the time left when the deadline has not been reached', () => {
+      const deadline = RunDeadline.after(500, now);
+      clock = 1_200;
+
+      expect(deadline.remainingMs()).toBe(300);
+    });
+
+    it('should report zero when the deadline has passed', () => {
+      const deadline = RunDeadline.after(500, now);
+      clock = 1_700;
+
+      expect(deadline.remainingMs()).toBe(0);
+    });
+
+    it('should report the time left after the reserve when a reserve is kept', () => {
+      const deadline = RunDeadline.after(500, now);
+      clock = 1_200;
+
+      expect(deadline.remainingMs(100)).toBe(200);
+    });
+
+    it('should report zero when the reserve is more than the time left', () => {
+      const deadline = RunDeadline.after(500, now);
+      clock = 1_200;
+
+      expect(deadline.remainingMs(400)).toBe(0);
+    });
+  });
 });

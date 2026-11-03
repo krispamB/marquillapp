@@ -25,7 +25,7 @@ The HTML and CSS a generation attempt produces, before the app has accepted it. 
 _Avoid_: Draft HTML, raw output
 
 **Document Source**:
-The complete, self-contained HTML and CSS of one Document Version, assembled from a validated Candidate Source by adding the app-derived frame stylesheet, font link, and inline icons. Frozen with its version and never re-validated.
+The complete, self-contained HTML and CSS of one Document Version, assembled from a validated Candidate Source by adding the app-derived frame stylesheet, fonts (inlined as data URLs, or the Google Fonts link when inlining fails), and inline icons. Frozen with its version and never re-validated.
 _Avoid_: Template output, slide fields
 
 **Document Version**:
@@ -45,5 +45,5 @@ A user-requested AI regeneration of the Current Version that appends a new immut
 _Avoid_: Edit, fix, patch
 
 **Repair**:
-A backend-initiated model turn, inside one Attempt, that re-emits a Candidate Source to fix the violations the app found in it. Bounded by a shared budget, never requested by the user, and never creates a version.
+A backend-initiated model turn, inside one Attempt, that produces a revised Candidate Source, as edits or in full, to fix the violations the app found in it. Bounded by a shared budget, never requested by the user, and never creates a version.
 _Avoid_: Refinement, retry, revision

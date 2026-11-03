@@ -7,7 +7,11 @@ import {
   UsageDetail,
   UsageRecord,
 } from './credit-meter.constants';
-import { FeatureGatingService } from './feature-gating.service';
+import {
+  Entitlement,
+  FeatureGatingService,
+  UsagePeriod,
+} from './feature-gating.service';
 
 // Converts raw usage signals into credits and settles them against the period
 // aggregate. The stateful, per-run half — the `creditsUsed` accumulator and its
@@ -72,12 +76,12 @@ export class CreditMeterService {
     return this.toWholeCredits(usage.amount * surcharge);
   }
 
-  assertBalance(userId: string): Promise<void> {
-    return this.featureGatingService.assertBalance(userId);
+  assertBalance(userId: string, entitlement?: Entitlement): Promise<void> {
+    return this.featureGatingService.assertBalance(userId, entitlement);
   }
 
-  debit(userId: string, credits: number): Promise<void> {
-    return this.featureGatingService.debit(userId, credits);
+  debit(userId: string, credits: number, period?: UsagePeriod): Promise<void> {
+    return this.featureGatingService.debit(userId, credits, period);
   }
 
   private llmCredits(

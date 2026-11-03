@@ -10,11 +10,63 @@ import { z, ZodError } from 'zod';
 import { ArtifactType } from 'src/database/schemas';
 import {
   documentDraftSchemaFor,
+  documentPatchRepairSchema,
+  documentRepairSchema,
   generationSchemaFor,
   parseArtifactContent,
+  postContentSchema,
 } from './artifact-content.schema';
 
 describe('generationSchemaFor', () => {
+  const pollJsonSchema = () =>
+    z.toJSONSchema(generationSchemaFor(ArtifactType.POLL, true), {
+      target: 'draft-7',
+      io: 'output',
+    });
+
+  it('should constrain durationDays to the LinkedIn durations in the JSON schema', () => {
+    expect(pollJsonSchema()).toMatchObject({
+      properties: {
+        poll: {
+          properties: {
+            durationDays: { type: 'number', enum: [1, 3, 7, 14] },
+          },
+        },
+      },
+    });
+  });
+
+  it('should constrain the poll question and options to non-blank, LinkedIn-length strings in the JSON schema', () => {
+    expect(pollJsonSchema()).toMatchObject({
+      properties: {
+        poll: {
+          properties: {
+            question: { type: 'string', pattern: '\\S', maxLength: 140 },
+            options: {
+              items: { type: 'string', pattern: '\\S', maxLength: 30 },
+              minItems: 2,
+              maxItems: 4,
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it('should cap the commentary in the JSON schema', () => {
+    expect(pollJsonSchema()).toMatchObject({
+      properties: { commentary: { maxLength: 3000 } },
+    });
+    expect(
+      z.toJSONSchema(generationSchemaFor(ArtifactType.POST, false), {
+        target: 'draft-7',
+        io: 'output',
+      }),
+    ).toMatchObject({
+      properties: { commentary: { minLength: 1, maxLength: 3000 } },
+    });
+  });
+
   it('should refuse a DOCUMENT, whose contract is the draft envelope', () => {
     expect(() => generationSchemaFor(ArtifactType.DOCUMENT, true)).toThrow(
       'No generation schema implemented',
@@ -48,6 +100,104 @@ describe('documentDraftSchemaFor', () => {
     expect(() =>
       documentDraftSchemaFor(false).parse({ commentary: 'Hi', html: '' }),
     ).toThrow(ZodError);
+  });
+});
+
+describe('documentRepairSchema', () => {
+  it('should expose only html to the provider', () => {
+    const jsonSchema = z.toJSONSchema(documentRepairSchema, {
+      target: 'draft-7',
+      io: 'output',
+    });
+
+    expect(jsonSchema).toMatchObject({
+      properties: { html: { type: 'string', minLength: 1 } },
+      required: ['html'],
+    });
+    expect(Object.keys(jsonSchema.properties ?? {})).toEqual(['html']);
+  });
+
+  it('should reject an empty html', () => {
+    expect(() => documentRepairSchema.parse({ html: '' })).toThrow(ZodError);
+  });
+});
+
+describe('documentPatchRepairSchema', () => {
+  const HTML = '<!doctype html><html><body></body></html>';
+  const edit = { find: '13px', replace: '14px' };
+
+  it('should accept edits alone', () => {
+    expect(documentPatchRepairSchema.parse({ edits: [edit] })).toEqual({
+      edits: [edit],
+    });
+  });
+
+  it('should accept html alone', () => {
+    expect(documentPatchRepairSchema.parse({ html: HTML })).toEqual({
+      html: HTML,
+    });
+  });
+
+  it('should reject an answer with both edits and html', () => {
+    expect(() =>
+      documentPatchRepairSchema.parse({ edits: [edit], html: HTML }),
+    ).toThrow(ZodError);
+  });
+
+  it('should reject an answer with neither edits nor html', () => {
+    expect(() => documentPatchRepairSchema.parse({})).toThrow(ZodError);
+  });
+
+  it('should accept an empty edits list, which applyEdits then fails', () => {
+    expect(() => documentPatchRepairSchema.parse({ edits: [] })).not.toThrow();
+  });
+
+  it('should accept 40 edits and reject 41', () => {
+    const edits = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({ find: `f${i}`, replace: '' }));
+
+    expect(() =>
+      documentPatchRepairSchema.parse({ edits: edits(40) }),
+    ).not.toThrow();
+    expect(() => documentPatchRepairSchema.parse({ edits: edits(41) })).toThrow(
+      ZodError,
+    );
+  });
+
+  it('should accept an empty find, which applyEdits then fails, and an empty replace', () => {
+    expect(() =>
+      documentPatchRepairSchema.parse({ edits: [{ find: '', replace: 'x' }] }),
+    ).not.toThrow();
+    expect(() =>
+      documentPatchRepairSchema.parse({ edits: [{ find: 'x', replace: '' }] }),
+    ).not.toThrow();
+  });
+
+  it('should reject an empty html', () => {
+    expect(() => documentPatchRepairSchema.parse({ html: '' })).toThrow(
+      ZodError,
+    );
+  });
+
+  it('should expose edits and html to the provider as two optional fields', () => {
+    const jsonSchema = z.toJSONSchema(documentPatchRepairSchema, {
+      target: 'draft-7',
+      io: 'output',
+    });
+
+    expect(Object.keys(jsonSchema.properties ?? {})).toEqual(['edits', 'html']);
+    expect(jsonSchema.required ?? []).toEqual([]);
+    expect(jsonSchema.properties?.edits).toMatchObject({
+      type: 'array',
+      maxItems: 40,
+      items: {
+        properties: {
+          find: { type: 'string' },
+          replace: { type: 'string' },
+        },
+        required: ['find', 'replace'],
+      },
+    });
   });
 });
 
@@ -96,6 +246,14 @@ describe('parseArtifactContent', () => {
           commentary: '🎉'.repeat(1501),
         }),
       ).toThrow(ZodError);
+    });
+
+    it('should report an over-long commentary once, not once per check', () => {
+      const result = postContentSchema.safeParse({
+        commentary: 'a'.repeat(3001),
+      });
+
+      expect(result.error?.issues).toHaveLength(1);
     });
 
     it('should reject the commentary when it is empty', () => {

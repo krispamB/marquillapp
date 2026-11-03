@@ -9,14 +9,41 @@ jest.mock(
 );
 
 import { tavily } from '@tavily/core';
-import { createSearchWebTool, runSearchWeb } from './search-web.tool';
+import {
+  createSearchWebTool,
+  resolveSearchWebOptions,
+  runSearchWeb,
+} from './search-web.tool';
 
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
+const OPTIONS = { timeoutS: 10, searchDepth: 'advanced' as const };
+
+describe('resolveSearchWebOptions', () => {
+  it('should default to a 10 s timeout and advanced depth when unset', () => {
+    expect(resolveSearchWebOptions()).toEqual(OPTIONS);
+  });
+
+  it('should accept a numeric-string timeout and basic depth', () => {
+    expect(resolveSearchWebOptions('4', 'basic')).toEqual({
+      timeoutS: 4,
+      searchDepth: 'basic',
+    });
+  });
+
+  it('should fall back to the defaults when values are invalid', () => {
+    expect(resolveSearchWebOptions('abc', 'deep')).toEqual(OPTIONS);
+    expect(resolveSearchWebOptions(0, '')).toEqual(OPTIONS);
+    expect(resolveSearchWebOptions(-3, 'fast')).toEqual(OPTIONS);
+  });
+});
+
 describe('runSearchWeb', () => {
-  it('should map Tavily results to the {title,url,content,score} shape with advanced depth', async () => {
+  const client = { search } as unknown as Parameters<typeof runSearchWeb>[0];
+
+  it('should map Tavily results to the {title,url,content,score} shape and pass depth and timeout', async () => {
     search.mockResolvedValue({
       results: [
         {
@@ -29,12 +56,12 @@ describe('runSearchWeb', () => {
       ],
     });
 
-    const output = await runSearchWeb('key', 'staff engineers');
+    const output = await runSearchWeb(client, 'staff engineers', OPTIONS);
 
-    expect(tavily).toHaveBeenCalledWith({ apiKey: 'key' });
     expect(search).toHaveBeenCalledWith('staff engineers', {
       searchDepth: 'advanced',
       maxResults: 5,
+      timeout: 10,
     });
     expect(output).toEqual({
       query: 'staff engineers',
@@ -47,7 +74,7 @@ describe('runSearchWeb', () => {
   it('should return an { error } instead of throwing when Tavily fails', async () => {
     search.mockRejectedValue(new Error('rate limited'));
 
-    await expect(runSearchWeb('key', 'q')).resolves.toEqual({
+    await expect(runSearchWeb(client, 'q', OPTIONS)).resolves.toEqual({
       error: 'rate limited',
     });
   });
@@ -55,7 +82,7 @@ describe('runSearchWeb', () => {
   it('should fall back to a generic message when the failure is not an Error', async () => {
     search.mockRejectedValue('boom');
 
-    await expect(runSearchWeb('key', 'q')).resolves.toEqual({
+    await expect(runSearchWeb(client, 'q', OPTIONS)).resolves.toEqual({
       error: 'Search request failed',
     });
   });
@@ -71,15 +98,36 @@ describe('createSearchWebTool', () => {
     expect(tool.parameters.safeParse({}).success).toBe(false);
   });
 
-  it('should run the search when executed', async () => {
+  it('should build one client and reuse it across calls, with default depth and timeout', async () => {
     search.mockResolvedValue({ results: [] });
     const tool = createSearchWebTool('key');
 
     await tool.execute({ query: 'hello' });
+    await tool.execute({ query: 'again' });
 
+    expect(tavily).toHaveBeenCalledTimes(1);
+    expect(tavily).toHaveBeenCalledWith({ apiKey: 'key' });
+    expect(search).toHaveBeenCalledTimes(2);
     expect(search).toHaveBeenCalledWith('hello', {
       searchDepth: 'advanced',
       maxResults: 5,
+      timeout: 10,
+    });
+  });
+
+  it('should pass the configured basic depth and timeout', async () => {
+    search.mockResolvedValue({ results: [] });
+    const tool = createSearchWebTool(
+      'key',
+      resolveSearchWebOptions('3', 'basic'),
+    );
+
+    await tool.execute({ query: 'hello' });
+
+    expect(search).toHaveBeenCalledWith('hello', {
+      searchDepth: 'basic',
+      maxResults: 5,
+      timeout: 3,
     });
   });
 });

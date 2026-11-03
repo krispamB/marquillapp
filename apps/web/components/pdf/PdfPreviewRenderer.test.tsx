@@ -109,6 +109,61 @@ describe("PdfPreviewRenderer", () => {
     expect(openLink.getAttribute("target")).toBe("_blank");
   });
 
+  test("opens the expanded view when a page is clicked", async () => {
+    const onExpand = mock(() => undefined);
+    const view = render(<PdfPreviewRenderer source="carousel.pdf" onExpand={onExpand} />);
+
+    await waitFor(() => expect(view.container.querySelectorAll("canvas")).toHaveLength(3));
+    fireEvent.click(view.getByRole("button", { name: "Expand document, page 2 of 3" }));
+
+    expect(onExpand).toHaveBeenCalledTimes(1);
+  });
+
+  test("opens the expanded view from the keyboard on the current page only", async () => {
+    const onExpand = mock(() => undefined);
+    const view = render(<PdfPreviewRenderer source="carousel.pdf" onExpand={onExpand} />);
+
+    await waitFor(() => expect(view.container.querySelectorAll("canvas")).toHaveLength(3));
+    const pages = view.getAllByRole("button", { name: /^Expand document, page/ });
+    expect(pages.map((page) => page.tabIndex)).toEqual([0, -1, -1]);
+
+    fireEvent.keyDown(pages[0], { key: "Enter" });
+    fireEvent.keyDown(pages[0], { key: " " });
+    fireEvent.keyDown(pages[0], { key: "a" });
+    expect(onExpand).toHaveBeenCalledTimes(2);
+  });
+
+  test("a mouse drag across the pages scrolls without expanding", async () => {
+    const onExpand = mock(() => undefined);
+    const view = render(<PdfPreviewRenderer source="carousel.pdf" onExpand={onExpand} />);
+
+    await waitFor(() => expect(view.container.querySelectorAll("canvas")).toHaveLength(3));
+    const rail = view.container.querySelector(".mq-pdf-preview-rail") as HTMLElement;
+    Object.defineProperties(rail, {
+      setPointerCapture: { configurable: true, value: () => undefined },
+      hasPointerCapture: { configurable: true, value: () => false },
+    });
+    const page = view.getByRole("button", { name: "Expand document, page 1 of 3" });
+
+    fireEvent.pointerDown(page, { pointerId: 1, pointerType: "mouse", button: 0, clientX: 200 });
+    fireEvent.pointerMove(page, { pointerId: 1, pointerType: "mouse", clientX: 120 });
+    fireEvent.pointerUp(page, { pointerId: 1, pointerType: "mouse", clientX: 120 });
+    fireEvent.click(page);
+    expect(onExpand).not.toHaveBeenCalled();
+
+    fireEvent.pointerDown(page, { pointerId: 2, pointerType: "mouse", button: 0, clientX: 200 });
+    fireEvent.pointerUp(page, { pointerId: 2, pointerType: "mouse", clientX: 201 });
+    fireEvent.click(page);
+    expect(onExpand).toHaveBeenCalledTimes(1);
+  });
+
+  test("pages are not buttons when nothing can expand them", async () => {
+    const view = render(<PdfPreviewRenderer source="carousel.pdf" />);
+
+    await waitFor(() => expect(view.container.querySelectorAll("canvas")).toHaveLength(3));
+    expect(view.queryAllByRole("button", { name: /^Expand document/ })).toHaveLength(0);
+  });
+
   test("shows loading metadata while the document is pending", () => {
     documentMode = "loading";
     const view = render(

@@ -7,16 +7,22 @@ import type {
 } from '../../artifact/artifact-writer.interface';
 import type {
   AgentRunner,
+  DocumentModelCall,
   ResearchResult,
 } from '../../agent/agent-runner.interface';
 import type { StylePreset } from '../../agent/style-presets.config';
 import type { UsageRecord } from '../../feature-gating/credit-meter.constants';
+import type { Usage } from '../../llm/interfaces';
 import type { RenderAttemptUsage } from '../../document-render/render-usage.types';
 import type { RenderSessionResult } from '../../document-render/render-session';
 import type { DesignSystemDefinition } from '../../design-system/design-system-definition';
 import type { DesignSystemRecord } from '../../design-system/design-systems.service';
 import type { Violation } from '../../document-source/violation';
-import { FailureCode, WorkflowStep } from '../workflow.constants';
+import {
+  type DocumentRepairMode,
+  FailureCode,
+  WorkflowStep,
+} from '../workflow.constants';
 import type { EmittedEvent } from './run-event.types';
 
 export interface WorkflowDefinition {
@@ -65,14 +71,23 @@ export interface DocumentDraftState {
   candidate: string;
   /** Turns of `DOCUMENT_REPAIR_BUDGET` already spent in this job attempt. */
   repairsSpent: number;
+  /**
+   * `patch`-mode fallbacks (`DOCUMENT_REPAIR_FALLBACKS`) already spent in
+   * this job attempt; absent means none.
+   */
+  fallbacksSpent?: number;
 }
 
 /**
  * DOCUMENT: the job's only checkpoint (spec §7.3). `RENDER_PDF` saves the
  * latest statically clean Candidate Source before it renders it, so a job
  * retry after a render outage resumes from it without calling the model.
+ * Fallbacks are not kept: a resumed job attempt has its own.
  */
-export interface AcceptedCandidate extends DocumentDraftState {
+export interface AcceptedCandidate extends Omit<
+  DocumentDraftState,
+  'fallbacksSpent'
+> {
   /** The draft's title, on an INITIAL run. */
   title?: string;
   savedAt: Date;
@@ -120,6 +135,28 @@ export interface JobAttemptFailure {
   message: string;
 }
 
+/** One Repair round, as the run's diagnostics keep it. */
+export interface RepairDiagnostic {
+  kind: 'static' | 'render';
+  mode: DocumentRepairMode;
+  /** The edits the model answered with; `0` when it answered with `html`. */
+  edits: number;
+  /** The edits did not apply and the `{ html }` fallback answered instead. */
+  fallback: boolean;
+}
+
+/** One DOCUMENT model call, as the run's diagnostics keep it. */
+export interface ModelTurn {
+  model: string;
+  call?: DocumentModelCall;
+  promptTokens: number;
+  completionTokens: number;
+  reasoningTokens?: number;
+  cachedTokens?: number;
+  latencyMs?: number;
+  finishReason?: string;
+}
+
 /**
  * DOCUMENT: what one run did, across every job attempt (spec §11.1). The
  * worker writes it when a job attempt fails and when the run ends, and the
@@ -141,10 +178,26 @@ export interface DocumentDiagnostics {
   candidates: CandidateDiagnostics[];
   /** Turns of `DOCUMENT_REPAIR_BUDGET` the latest job attempt had spent. */
   repairRounds: number;
+  /**
+   * Every Repair round of every job attempt, oldest first. Absent when none
+   * ran, and from diagnostics recorded before it was kept.
+   */
+  repairs?: RepairDiagnostic[];
   /** The last model turn's. */
   finishReason?: string;
   /** Completion tokens over every model turn of every job attempt. */
   outputTokens: number;
+  /** Prompt tokens over every model turn of every job attempt. */
+  promptTokens: number;
+  /** The share of `outputTokens` the model spent reasoning. */
+  reasoningTokens: number;
+  /** The share of `promptTokens` read from the provider's prompt cache. */
+  cachedPromptTokens: number;
+  /**
+   * Every model call of every job attempt, oldest first, bounded to the
+   * latest `MAX_MODEL_TURNS`.
+   */
+  modelTurns: ModelTurn[];
   pageCount?: number;
   /** Summed over job attempts. */
   stepWallTimeMs: Partial<Record<WorkflowStep, number>>;
@@ -177,10 +230,7 @@ export interface DocumentDiagnostics {
 export interface RunDiagnostics {
   stepStarted(step: WorkflowStep): void;
   stepCompleted(step: WorkflowStep): void;
-  recordModelTurn(turn: {
-    completionTokens: number;
-    finishReason?: string;
-  }): void;
+  recordModelTurn(turn: ModelTurn): void;
   recordCheck(
     phase: DocumentCheck['phase'],
     candidate: string,
@@ -188,6 +238,8 @@ export interface RunDiagnostics {
   ): void;
   /** The job attempt's running total, as it changes. */
   recordRepairsSpent(repairsSpent: number): void;
+  /** One per Repair round that produced a Candidate Source. */
+  recordRepair(repair: RepairDiagnostic): void;
   recordAccepted(candidate: string, repairsSpent: number): void;
   recordRenderSession(): void;
   recordPageCount(pageCount: number): void;
@@ -235,10 +287,28 @@ export type StepHandlerMap = Partial<Record<WorkflowStep, StepHandler>>;
  * measures and never decides; `RENDER_PDF` judges the facts.
  */
 export interface DocumentRenderer {
+  /**
+   * One render session. It first waits up to `maxSlotWaitMs` for a Browserless
+   * slot, and throws `RenderSlotUnavailableError` without a session if none
+   * comes free.
+   */
   render(
     definition: DesignSystemDefinition,
     documentSource: string,
+    options?: { maxSlotWaitMs?: number },
   ): Promise<RenderSessionResult>;
+}
+
+/**
+ * DOCUMENT-only: the Design System's fonts as self-contained CSS for
+ * `assemble()` (spec §4.5 item 2), or `null` to assemble with the Google
+ * Fonts `<link>`. It never throws; a failed fetch is `null`.
+ */
+export interface DocumentFontInliner {
+  inlineCss(
+    definition: DesignSystemDefinition,
+    candidate: string,
+  ): Promise<string | null>;
 }
 
 /** DOCUMENT-only: the private object store a Document Version lives in. */
@@ -270,11 +340,42 @@ export interface CreditMeter {
   commit(): Promise<void>;
 }
 
+/**
+ * What one job attempt's model calls cost, summed. Written with the run's
+ * completion or failure; like `creditsUsed`, it describes the final attempt.
+ */
+export interface RunLlmUsage {
+  calls: number;
+  promptTokens: number;
+  completionTokens: number;
+  reasoningTokens: number;
+  cachedTokens: number;
+  cacheWriteTokens: number;
+  /** Wall time spent waiting on the model, summed over the calls. */
+  llmMs: number;
+  /**
+   * Server-side web searches the model ran (`RESEARCH_MODE=native`). Present
+   * only when a call ran some; their price is already in the LLM cost.
+   */
+  webSearchRequests?: number;
+}
+
+/** Research a run finished, and the usage it recorded while doing so. */
+export interface SavedResearch {
+  research: ResearchResult;
+  usage: UsageRecord[];
+}
+
 /** The durable run record, narrowed to what the engine and its steps write. */
 export interface RunRecordHandle {
   readonly runId: string;
-  setCurrentStep(step: WorkflowStep): Promise<void>;
-  saveResearchContext(research: ResearchResult): Promise<void>;
+  /** `usage` is what researching recorded, kept so a job retry can bill it again. */
+  saveResearchContext(
+    research: ResearchResult,
+    usage: UsageRecord[],
+  ): Promise<void>;
+  /** The research an earlier job attempt of this run finished, with its usage. */
+  readResearchContext(): Promise<SavedResearch | undefined>;
   recordRenderAttempt(usage: RenderAttemptUsage): Promise<void>;
   recordDocumentCheck(check: DocumentCheck): Promise<void>;
   saveAcceptedCandidate(accepted: AcceptedCandidate): Promise<void>;
@@ -293,9 +394,33 @@ export interface RunRecordHandle {
   getLatestCompletedResearch(
     artifactId: string,
   ): Promise<ResearchResult | undefined>;
+  /** The time from enqueue to the worker picking the job up. */
+  recordQueueWait(queueWaitMs: number): Promise<void>;
+  /**
+   * Tallies one model call in memory. `complete` and `fail` on the same
+   * handle write the sum as `llmUsage`, in the update they already make.
+   */
+  recordModelCall(usage: Usage): void;
+  /**
+   * DOCUMENT REFINE: the kept text of an ACCEPTED Candidate Source with this
+   * hash, if any. Unverified: the caller checks the hash.
+   */
+  readAcceptedCandidateText(
+    candidateSha256: string,
+  ): Promise<string | undefined>;
   complete(creditsUsed: number): Promise<void>;
-  fail(failureCode: FailureCode, failureReason: string): Promise<void>;
+  /**
+   * Fails the run only while it is still `RUNNING`, so a replayed failure
+   * neither overwrites the first one nor a completion.
+   */
+  fail(
+    failureCode: FailureCode,
+    failureReason: string,
+  ): Promise<RunFailOutcome>;
 }
+
+/** What `RunRecordHandle.fail` did. */
+export type RunFailOutcome = 'FAILED' | 'ALREADY_ENDED';
 
 /**
  * The job attempt's wall-clock bound (spec §7.5), checked before each DOCUMENT
@@ -303,6 +428,11 @@ export interface RunRecordHandle {
  */
 export interface RunDeadlineGuard {
   assertTimeLeft(step: WorkflowStep, before: string): void;
+  /**
+   * Milliseconds left before the deadline, less `reserveMs` (default `0`);
+   * never negative.
+   */
+  remainingMs(reserveMs?: number): number;
 }
 
 /**
@@ -316,10 +446,16 @@ export interface StepContext {
   meter: CreditMeter;
   designSystems: DesignSystemResolver;
   renderer: DocumentRenderer;
+  fonts: DocumentFontInliner;
   objects: DocumentObjectStore;
   deadline: RunDeadlineGuard;
   diagnostics: RunDiagnostics;
   /** `step.progress` only. Lifecycle events are the core's job. */
   emit: (event: EmittedEvent) => void;
   run: RunRecordHandle;
+  /**
+   * When the run was enqueued: its BullMQ job's `timestamp`, the same for
+   * every job attempt. Prompts date themselves from it (`runDate`).
+   */
+  runCreatedAt: Date;
 }

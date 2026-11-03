@@ -1,0 +1,1729 @@
+{
+  "startedAt": "2026-10-21T14:34:11.792Z",
+  "finishedAt": "2026-10-21T15:25:26.956Z",
+  "options": {
+    "concurrency": 2,
+    "timeoutMs": 7200000,
+    "pollMs": 10000,
+    "jsonPath": "eval-baseline.json",
+    "cleanup": false
+  },
+  "designSystemIds": [
+    "margin",
+    "afterglow",
+    "broadside",
+    "colophon",
+    "overprint",
+    "schematic"
+  ],
+  "defaultDesignSystemId": "margin",
+  "records": [
+    {
+      "key": "margin/4p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "margin",
+      "requestedPages": 4,
+      "state": "COMPLETED",
+      "artifactId": "6ad8cd6360a153fa4a1550af",
+      "runId": "6ad8cd6360a153fa4a1550b0",
+      "version": 1
+    },
+    {
+      "key": "margin/8p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "margin",
+      "requestedPages": 8,
+      "state": "COMPLETED",
+      "artifactId": "6ad8cd6360a153fa4a1550ae",
+      "runId": "6ad8cd6360a153fa4a1550b1",
+      "version": 1
+    },
+    {
+      "key": "margin/15p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "margin",
+      "requestedPages": 15,
+      "state": "COMPLETED",
+      "artifactId": "6ad8cdf060a153fa4a1550b2",
+      "runId": "6ad8cdf060a153fa4a1550b3",
+      "version": 1
+    },
+    {
+      "key": "afterglow/4p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "afterglow",
+      "requestedPages": 4,
+      "state": "COMPLETED",
+      "artifactId": "6ad8cecc60a153fa4a1550b4",
+      "runId": "6ad8cecc60a153fa4a1550b5",
+      "version": 1
+    },
+    {
+      "key": "afterglow/8p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "afterglow",
+      "requestedPages": 8,
+      "state": "COMPLETED",
+      "artifactId": "6ad8cf6260a153fa4a1550b6",
+      "runId": "6ad8cf6260a153fa4a1550b7",
+      "version": 1
+    },
+    {
+      "key": "afterglow/12p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "afterglow",
+      "requestedPages": 12,
+      "state": "COMPLETED",
+      "artifactId": "6ad8cfdb60a153fa4a1550b8",
+      "runId": "6ad8cfdb60a153fa4a1550b9",
+      "version": 1
+    },
+    {
+      "key": "broadside/4p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "broadside",
+      "requestedPages": 4,
+      "state": "COMPLETED",
+      "artifactId": "6ad8d06760a153fa4a1550ba",
+      "runId": "6ad8d06760a153fa4a1550bb",
+      "version": 1
+    },
+    {
+      "key": "broadside/8p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "broadside",
+      "requestedPages": 8,
+      "state": "COMPLETED",
+      "artifactId": "6ad8d0fd60a153fa4a1550bc",
+      "runId": "6ad8d0fd60a153fa4a1550bd",
+      "version": 1
+    },
+    {
+      "key": "broadside/12p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "broadside",
+      "requestedPages": 12,
+      "state": "COMPLETED",
+      "artifactId": "6ad8d16160a153fa4a1550be",
+      "runId": "6ad8d16160a153fa4a1550bf",
+      "version": 1
+    },
+    {
+      "key": "colophon/4p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "colophon",
+      "requestedPages": 4,
+      "state": "COMPLETED",
+      "artifactId": "6ad8d1c560a153fa4a1550c0",
+      "runId": "6ad8d1c560a153fa4a1550c1",
+      "version": 1
+    },
+    {
+      "key": "colophon/8p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "colophon",
+      "requestedPages": 8,
+      "state": "FAILED",
+      "artifactId": "6ad8d23e60a153fa4a1550c2",
+      "runId": "6ad8d23e60a153fa4a1550c3",
+      "version": 1
+    },
+    {
+      "key": "colophon/12p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "colophon",
+      "requestedPages": 12,
+      "state": "COMPLETED",
+      "artifactId": "6ad8d2b660a153fa4a1550c4",
+      "runId": "6ad8d2b660a153fa4a1550c5",
+      "version": 1
+    },
+    {
+      "key": "overprint/4p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "overprint",
+      "requestedPages": 4,
+      "state": "COMPLETED",
+      "artifactId": "6ad8d36a60a153fa4a1550c6",
+      "runId": "6ad8d36a60a153fa4a1550c7",
+      "version": 1
+    },
+    {
+      "key": "overprint/8p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "overprint",
+      "requestedPages": 8,
+      "state": "COMPLETED",
+      "artifactId": "6ad8d43260a153fa4a1550c8",
+      "runId": "6ad8d43260a153fa4a1550c9",
+      "version": 1
+    },
+    {
+      "key": "overprint/12p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "overprint",
+      "requestedPages": 12,
+      "state": "COMPLETED",
+      "artifactId": "6ad8d4b560a153fa4a1550ca",
+      "runId": "6ad8d4b560a153fa4a1550cb",
+      "version": 1
+    },
+    {
+      "key": "schematic/4p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "schematic",
+      "requestedPages": 4,
+      "state": "COMPLETED",
+      "artifactId": "6ad8d55560a153fa4a1550cc",
+      "runId": "6ad8d55560a153fa4a1550cd",
+      "version": 1
+    },
+    {
+      "key": "schematic/8p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "schematic",
+      "requestedPages": 8,
+      "state": "COMPLETED",
+      "artifactId": "6ad8d63160a153fa4a1550ce",
+      "runId": "6ad8d63160a153fa4a1550cf",
+      "version": 1
+    },
+    {
+      "key": "schematic/15p",
+      "kind": "INITIAL",
+      "requestedDesignSystemId": "schematic",
+      "requestedPages": 15,
+      "state": "COMPLETED",
+      "artifactId": "6ad8d6f960a153fa4a1550d0",
+      "runId": "6ad8d6f960a153fa4a1550d1",
+      "version": 1
+    },
+    {
+      "key": "refine/carry-pin",
+      "kind": "REFINE",
+      "requestedPages": 4,
+      "sourceKey": "margin/4p",
+      "state": "COMPLETED",
+      "artifactId": "6ad8cd6360a153fa4a1550af",
+      "runId": "6ad8d89e60a153fa4a1550d3",
+      "version": 2
+    },
+    {
+      "key": "refine/switch-system",
+      "kind": "REFINE",
+      "requestedDesignSystemId": "afterglow",
+      "requestedPages": 8,
+      "sourceKey": "margin/8p",
+      "state": "COMPLETED",
+      "artifactId": "6ad8cd6360a153fa4a1550ae",
+      "runId": "6ad8d89e60a153fa4a1550d2",
+      "version": 2
+    }
+  ],
+  "rows": [
+    {
+      "runId": "6ad8cd6360a153fa4a1550b0",
+      "designSystemId": "margin",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "8098402f6ae34261ad769c09366254ae373f44c381caf281a534c2da7cd9c127",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "icons.sizes",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "482903b612ff992ee2b72c3c58dd598a9124a79424e12d11f86bf9d93c20c4d1",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 1,
+      "wallTimeMs": 227460,
+      "credits": 34,
+      "pageCount": 4,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8cd6360a153fa4a1550b1",
+      "designSystemId": "margin",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "6b9c93a81f6412b3b038b7bcf4d07b1f8ba66d1fafb487527b31eb8b7dc90ab0",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 0,
+      "wallTimeMs": 131824,
+      "credits": 23,
+      "pageCount": 8,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8cdf060a153fa4a1550b3",
+      "designSystemId": "margin",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "66fcec86f28f024c3ba8dd7b04f918768138591624366fde76e6648dd123b98e",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 0,
+      "wallTimeMs": 142841,
+      "credits": 26,
+      "pageCount": 15,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8cecc60a153fa4a1550b5",
+      "designSystemId": "afterglow",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "7e41b2d3b58d84772198873244608a45db457af601b54d18c12a253917d48533",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 0,
+      "wallTimeMs": 126279,
+      "credits": 29,
+      "pageCount": 4,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8cf6260a153fa4a1550b7",
+      "designSystemId": "afterglow",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "420b0dab3439702e1ed420aa9a4181d1aa10ad5852b26692e3d36c539bf6af5d",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "palette.pairings",
+                  "count": 7
+                },
+                {
+                  "code": "icons.colors",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "a651708924f31288f2e2a668957f0ee1ccc3815ef26e68a2bfbdc7c288116ad1",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 1,
+      "wallTimeMs": 134134,
+      "credits": 40,
+      "pageCount": 8,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8cfdb60a153fa4a1550b9",
+      "designSystemId": "afterglow",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "4af7a1facf50495f923c332223fda02ecbbe7a5fd8cbbf82f98cb04ecf8cfbc5",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 0,
+      "wallTimeMs": 151098,
+      "credits": 32,
+      "pageCount": 12,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8d06760a153fa4a1550bb",
+      "designSystemId": "broadside",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "94cec03acd392099afd9b056d84a0722d6c1710266831541e3727da393086b70",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 0,
+      "wallTimeMs": 104474,
+      "credits": 29,
+      "pageCount": 4,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8d0fd60a153fa4a1550bd",
+      "designSystemId": "broadside",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "78216920c612c93510c3da45d0e1fe96323b6ef27094223c65f8ca188f822095",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 0,
+      "wallTimeMs": 94368,
+      "credits": 26,
+      "pageCount": 8,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8d16160a153fa4a1550bf",
+      "designSystemId": "broadside",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "f2eaf5c89170a1e55331ef41f1f50d83a7ccfdfae1326032937081b38ba7d474",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 0,
+      "wallTimeMs": 120367,
+      "credits": 31,
+      "pageCount": 12,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8d1c560a153fa4a1550c1",
+      "designSystemId": "colophon",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "7fb7cad3113d846c7ce488209ed77148aecc89eb6097ff4c6d801d9f5f0c1665",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "typography.rules.transforms",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "632d3f4dff9a43a730c801081b20d8bb338eb9ed6c64ac3feaf234d478517822",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 1,
+      "wallTimeMs": 120109,
+      "credits": 35,
+      "pageCount": 4,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8d23e60a153fa4a1550c3",
+      "designSystemId": "colophon",
+      "outcome": "FAILED",
+      "failureCode": "document.repair_exhausted",
+      "jobAttemptFailureCodes": [
+        "document.repair_exhausted"
+      ],
+      "candidates": [
+        {
+          "candidateSha256": "75a885856e232e33d8581fbf9d4a06966a258361f0e8925f7cc5f24c359d98bd",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "typography.rules.transforms",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "4ac60a439b8fa4e38f524c4e99b7f8cf19609dd549538a4c966f061da01eedce",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "render.overlap",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "90f40ca00ed448e48e9fc104dff18ff101c6691061155a8a6ab4adcce513b44e",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "render.overlap",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "repairRounds": 2,
+      "wallTimeMs": 189012,
+      "credits": 43,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8d2b660a153fa4a1550c5",
+      "designSystemId": "colophon",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "d0f9b7f4db8ecd0317bc2223b9054781e6f4ccf4577f9760f3b319fb30b34c32",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "spacing.scale",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "a461b3d3cc1a03fc57a5efcfa6d4d725de38da426fcea69b95d2d1dcb40bfba0",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "icons.colors",
+                  "count": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "b4e521340b8f76c064895f1528afe067ac60b8a0236f346b6b72f41ea39d9da9",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 2,
+      "wallTimeMs": 198529,
+      "credits": 53,
+      "pageCount": 12,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8d36a60a153fa4a1550c7",
+      "designSystemId": "overprint",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "23528a0cc861568a4899b9e99a960fbd2efac8c543bb5a008331aa656747d670",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 0,
+      "wallTimeMs": 122629,
+      "credits": 31,
+      "pageCount": 4,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8d43260a153fa4a1550c9",
+      "designSystemId": "overprint",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "88bdb8f22f0f67f77ffd701fbf9e99ee4f6c4a007458d43fbac15f09f61a81b0",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "page.safeArea",
+                  "count": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "2f6cbd71d484b8d8f420a974459339466c84e99d0f5dbeb1a1f91920a7801a28",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 1,
+      "wallTimeMs": 165283,
+      "credits": 40,
+      "pageCount": 8,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8d4b560a153fa4a1550cb",
+      "designSystemId": "overprint",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "5783f50538227dc3c1f4bf254e2cfba75083f1706b5d1cdd1c587fa526fa4384",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "page.safeArea",
+                  "count": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "8909733d33e415e327650e7c264a2c9e5e6aa986c78637f44ede224934745db0",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 1,
+      "wallTimeMs": 218305,
+      "credits": 51,
+      "pageCount": 12,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8d55560a153fa4a1550cd",
+      "designSystemId": "schematic",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "e51ee4110b70df8f2b2b1f9746f88c95723321ea59103060a8c3e57651945c92",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 0,
+      "wallTimeMs": 201389,
+      "credits": 29,
+      "pageCount": 4,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8d63160a153fa4a1550cf",
+      "designSystemId": "schematic",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "310ff7ca73d9cf46ad485e3483b27c6551744da5dee5406b247ae442fab42fa1",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 0,
+      "wallTimeMs": 159778,
+      "credits": 29,
+      "pageCount": 8,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8d6f960a153fa4a1550d1",
+      "designSystemId": "schematic",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "80e538baf69e83793fd012cfe1616ee08d7d634b4f74c4e640a873bc1323d7ab",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 0,
+      "wallTimeMs": 263599,
+      "credits": 43,
+      "pageCount": 15,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8d89e60a153fa4a1550d2",
+      "designSystemId": "afterglow",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "5431b068e16cf5ed80278019ae545fd604bbaa2930767ec214dbe3f2691be841",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": false,
+              "violations": [
+                {
+                  "code": "palette.pairings",
+                  "count": 6
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "candidateSha256": "1e7635f9fc75d2766f5575dd63c781b9d35f3307e358c08c569eac48c092b539",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 1,
+      "wallTimeMs": 142433,
+      "credits": 40,
+      "pageCount": 8,
+      "renderAttempts": [
+        {
+          "outcome": "FINDINGS",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        },
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    },
+    {
+      "runId": "6ad8d89e60a153fa4a1550d3",
+      "designSystemId": "margin",
+      "outcome": "READY",
+      "jobAttemptFailureCodes": [],
+      "candidates": [
+        {
+          "candidateSha256": "114441861a3f68d2b96723dd8883ea911dd464e84302358310389b7a30f0920e",
+          "checks": [
+            {
+              "phase": "static",
+              "passed": true,
+              "violations": []
+            },
+            {
+              "phase": "render",
+              "passed": true,
+              "violations": []
+            }
+          ]
+        }
+      ],
+      "repairRounds": 0,
+      "wallTimeMs": 48815,
+      "credits": 17,
+      "pageCount": 4,
+      "renderAttempts": [
+        {
+          "outcome": "PASSED",
+          "billed": true,
+          "units": 1,
+          "phase": "pdf"
+        }
+      ]
+    }
+  ],
+  "metrics": {
+    "since": null,
+    "overall": {
+      "runs": 20,
+      "ready": 19,
+      "readyRate": 0.95,
+      "failures": {
+        "document.repair_exhausted": 1
+      },
+      "firstCandidate": {
+        "runs": 20,
+        "passed": 12,
+        "passRate": 0.6
+      },
+      "repairRounds": {
+        "0": 12,
+        "1": 6,
+        "2": 2
+      },
+      "violations": {
+        "static": [
+          {
+            "code": "typography.rules.transforms",
+            "checks": 2,
+            "count": 2
+          },
+          {
+            "code": "icons.sizes",
+            "checks": 1,
+            "count": 1
+          },
+          {
+            "code": "spacing.scale",
+            "checks": 1,
+            "count": 1
+          }
+        ],
+        "render": [
+          {
+            "code": "palette.pairings",
+            "checks": 2,
+            "count": 13
+          },
+          {
+            "code": "page.safeArea",
+            "checks": 2,
+            "count": 4
+          },
+          {
+            "code": "icons.colors",
+            "checks": 2,
+            "count": 2
+          },
+          {
+            "code": "render.overlap",
+            "checks": 2,
+            "count": 2
+          }
+        ]
+      },
+      "truncations": 0,
+      "truncationRate": 0,
+      "renderSessions": {
+        "total": 26,
+        "perRun": 1.3,
+        "retries": 0,
+        "billedUnits": 26,
+        "absorbedUnits": 0,
+        "timeoutsByPhase": {}
+      },
+      "wallTimeMs": {
+        "p50": 142433,
+        "p95": 227460,
+        "max": 263599
+      },
+      "credits": {
+        "p50": 31,
+        "p95": 53,
+        "max": 53
+      }
+    },
+    "byDesignSystem": {
+      "afterglow": {
+        "runs": 4,
+        "ready": 4,
+        "readyRate": 1,
+        "failures": {},
+        "firstCandidate": {
+          "runs": 4,
+          "passed": 2,
+          "passRate": 0.5
+        },
+        "repairRounds": {
+          "0": 2,
+          "1": 2
+        },
+        "violations": {
+          "static": [],
+          "render": [
+            {
+              "code": "palette.pairings",
+              "checks": 2,
+              "count": 13
+            },
+            {
+              "code": "icons.colors",
+              "checks": 1,
+              "count": 1
+            }
+          ]
+        },
+        "truncations": 0,
+        "truncationRate": 0,
+        "renderSessions": {
+          "total": 6,
+          "perRun": 1.5,
+          "retries": 0,
+          "billedUnits": 6,
+          "absorbedUnits": 0,
+          "timeoutsByPhase": {}
+        },
+        "wallTimeMs": {
+          "p50": 134134,
+          "p95": 151098,
+          "max": 151098
+        },
+        "credits": {
+          "p50": 32,
+          "p95": 40,
+          "max": 40
+        }
+      },
+      "broadside": {
+        "runs": 3,
+        "ready": 3,
+        "readyRate": 1,
+        "failures": {},
+        "firstCandidate": {
+          "runs": 3,
+          "passed": 3,
+          "passRate": 1
+        },
+        "repairRounds": {
+          "0": 3
+        },
+        "violations": {
+          "static": [],
+          "render": []
+        },
+        "truncations": 0,
+        "truncationRate": 0,
+        "renderSessions": {
+          "total": 3,
+          "perRun": 1,
+          "retries": 0,
+          "billedUnits": 3,
+          "absorbedUnits": 0,
+          "timeoutsByPhase": {}
+        },
+        "wallTimeMs": {
+          "p50": 104474,
+          "p95": 120367,
+          "max": 120367
+        },
+        "credits": {
+          "p50": 29,
+          "p95": 31,
+          "max": 31
+        }
+      },
+      "colophon": {
+        "runs": 3,
+        "ready": 2,
+        "readyRate": 0.6666666666666666,
+        "failures": {
+          "document.repair_exhausted": 1
+        },
+        "firstCandidate": {
+          "runs": 3,
+          "passed": 0,
+          "passRate": 0
+        },
+        "repairRounds": {
+          "1": 1,
+          "2": 2
+        },
+        "violations": {
+          "static": [
+            {
+              "code": "typography.rules.transforms",
+              "checks": 2,
+              "count": 2
+            },
+            {
+              "code": "spacing.scale",
+              "checks": 1,
+              "count": 1
+            }
+          ],
+          "render": [
+            {
+              "code": "render.overlap",
+              "checks": 2,
+              "count": 2
+            },
+            {
+              "code": "icons.colors",
+              "checks": 1,
+              "count": 1
+            }
+          ]
+        },
+        "truncations": 0,
+        "truncationRate": 0,
+        "renderSessions": {
+          "total": 5,
+          "perRun": 1.6666666666666667,
+          "retries": 0,
+          "billedUnits": 5,
+          "absorbedUnits": 0,
+          "timeoutsByPhase": {}
+        },
+        "wallTimeMs": {
+          "p50": 189012,
+          "p95": 198529,
+          "max": 198529
+        },
+        "credits": {
+          "p50": 35,
+          "p95": 53,
+          "max": 53
+        }
+      },
+      "margin": {
+        "runs": 4,
+        "ready": 4,
+        "readyRate": 1,
+        "failures": {},
+        "firstCandidate": {
+          "runs": 4,
+          "passed": 3,
+          "passRate": 0.75
+        },
+        "repairRounds": {
+          "0": 3,
+          "1": 1
+        },
+        "violations": {
+          "static": [
+            {
+              "code": "icons.sizes",
+              "checks": 1,
+              "count": 1
+            }
+          ],
+          "render": []
+        },
+        "truncations": 0,
+        "truncationRate": 0,
+        "renderSessions": {
+          "total": 4,
+          "perRun": 1,
+          "retries": 0,
+          "billedUnits": 4,
+          "absorbedUnits": 0,
+          "timeoutsByPhase": {}
+        },
+        "wallTimeMs": {
+          "p50": 131824,
+          "p95": 227460,
+          "max": 227460
+        },
+        "credits": {
+          "p50": 23,
+          "p95": 34,
+          "max": 34
+        }
+      },
+      "overprint": {
+        "runs": 3,
+        "ready": 3,
+        "readyRate": 1,
+        "failures": {},
+        "firstCandidate": {
+          "runs": 3,
+          "passed": 1,
+          "passRate": 0.3333333333333333
+        },
+        "repairRounds": {
+          "0": 1,
+          "1": 2
+        },
+        "violations": {
+          "static": [],
+          "render": [
+            {
+              "code": "page.safeArea",
+              "checks": 2,
+              "count": 4
+            }
+          ]
+        },
+        "truncations": 0,
+        "truncationRate": 0,
+        "renderSessions": {
+          "total": 5,
+          "perRun": 1.6666666666666667,
+          "retries": 0,
+          "billedUnits": 5,
+          "absorbedUnits": 0,
+          "timeoutsByPhase": {}
+        },
+        "wallTimeMs": {
+          "p50": 165283,
+          "p95": 218305,
+          "max": 218305
+        },
+        "credits": {
+          "p50": 40,
+          "p95": 51,
+          "max": 51
+        }
+      },
+      "schematic": {
+        "runs": 3,
+        "ready": 3,
+        "readyRate": 1,
+        "failures": {},
+        "firstCandidate": {
+          "runs": 3,
+          "passed": 3,
+          "passRate": 1
+        },
+        "repairRounds": {
+          "0": 3
+        },
+        "violations": {
+          "static": [],
+          "render": []
+        },
+        "truncations": 0,
+        "truncationRate": 0,
+        "renderSessions": {
+          "total": 3,
+          "perRun": 1,
+          "retries": 0,
+          "billedUnits": 3,
+          "absorbedUnits": 0,
+          "timeoutsByPhase": {}
+        },
+        "wallTimeMs": {
+          "p50": 201389,
+          "p95": 263599,
+          "max": 263599
+        },
+        "credits": {
+          "p50": 29,
+          "p95": 43,
+          "max": 43
+        }
+      }
+    }
+  },
+  "evaluation": {
+    "gates": [
+      {
+        "id": "failing-runs",
+        "label": "Runs failing ≤ 1",
+        "pass": true,
+        "detail": "1 failing of 20: colophon/8p (document.repair_exhausted)"
+      },
+      {
+        "id": "truncated",
+        "label": "document.truncated = 0",
+        "pass": true,
+        "detail": "0 run(s) truncated"
+      },
+      {
+        "id": "egress",
+        "label": "render.egress = 0",
+        "pass": true,
+        "detail": "0 run(s) hit render.egress"
+      },
+      {
+        "id": "slowest",
+        "label": "Slowest run ≤ 4m00s",
+        "pass": false,
+        "detail": "4m24s (6ad8d6f960a153fa4a1550d1)"
+      },
+      {
+        "id": "cost-spread",
+        "label": "Costliest successful run ≤ 3× the cheapest at the same page count",
+        "pass": true,
+        "detail": "4 pages: 29–35 credits; 8 pages: 23–40 credits; 12 pages: 31–53 credits; 15 pages: 26–43 credits"
+      },
+      {
+        "id": "default-system",
+        "label": "Default design system (margin) has no failures",
+        "pass": true,
+        "detail": "margin: 0 failures"
+      }
+    ],
+    "systems": [
+      {
+        "designSystemId": "margin",
+        "runs": 3,
+        "failures": 0,
+        "verdict": "LIST"
+      },
+      {
+        "designSystemId": "afterglow",
+        "runs": 3,
+        "failures": 0,
+        "verdict": "LIST"
+      },
+      {
+        "designSystemId": "broadside",
+        "runs": 3,
+        "failures": 0,
+        "verdict": "LIST"
+      },
+      {
+        "designSystemId": "colophon",
+        "runs": 3,
+        "failures": 1,
+        "verdict": "RERUN_OR_UNLIST"
+      },
+      {
+        "designSystemId": "overprint",
+        "runs": 3,
+        "failures": 0,
+        "verdict": "LIST"
+      },
+      {
+        "designSystemId": "schematic",
+        "runs": 3,
+        "failures": 0,
+        "verdict": "LIST"
+      }
+    ],
+    "passed": false
+  },
+  "covers": [
+    {
+      "runId": "6ad8cd6360a153fa4a1550b0",
+      "key": "margin/4p",
+      "designSystemId": "margin",
+      "pageCount": 4,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8cd6360a153fa4a1550af/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=d896ce99b47aba76f25a4dd0f0691322738866453b97901fde051129103ffa34&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8cd6360a153fa4a1550b1",
+      "key": "margin/8p",
+      "designSystemId": "margin",
+      "pageCount": 8,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8cd6360a153fa4a1550ae/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=f6bbcd2061bc0c21198f4e2fd1bba45b33428c494d06d4fbcdf03c20bbccdcca&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8cdf060a153fa4a1550b3",
+      "key": "margin/15p",
+      "designSystemId": "margin",
+      "pageCount": 15,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8cdf060a153fa4a1550b2/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=27c65f6637e82b9393a77fa0670805b77ed4c2f01105debdc558ef9e9c0bd1d9&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8cecc60a153fa4a1550b5",
+      "key": "afterglow/4p",
+      "designSystemId": "afterglow",
+      "pageCount": 4,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8cecc60a153fa4a1550b4/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=83f4eebdc96139d270c8bad5cc375878c3b0b47f6a658f03c7408e1e89792d1a&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8cf6260a153fa4a1550b7",
+      "key": "afterglow/8p",
+      "designSystemId": "afterglow",
+      "pageCount": 8,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8cf6260a153fa4a1550b6/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=4eefd0dd446cac7f5507489a6780297aa723fb7f526f27c463d46e54eec673dd&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8cfdb60a153fa4a1550b9",
+      "key": "afterglow/12p",
+      "designSystemId": "afterglow",
+      "pageCount": 12,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8cfdb60a153fa4a1550b8/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=f93b186ecc207fe2327a95cf4e1fbac88de4fcb4bcf86329554cc6f11602872f&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8d06760a153fa4a1550bb",
+      "key": "broadside/4p",
+      "designSystemId": "broadside",
+      "pageCount": 4,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8d06760a153fa4a1550ba/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=72e75a287fac6e6b83646216d931d2c803c4d43561cc00d128646d1d75415344&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8d0fd60a153fa4a1550bd",
+      "key": "broadside/8p",
+      "designSystemId": "broadside",
+      "pageCount": 8,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8d0fd60a153fa4a1550bc/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=5b9fb3e822f46a4d23e640779eaf59f59b6f97aaa35632f20f9e7cbd776c80d5&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8d16160a153fa4a1550bf",
+      "key": "broadside/12p",
+      "designSystemId": "broadside",
+      "pageCount": 12,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8d16160a153fa4a1550be/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=041b1c9469e64616860f9336b66be50783ba8c9d4a4d42cebbe17123213cc7d5&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8d1c560a153fa4a1550c1",
+      "key": "colophon/4p",
+      "designSystemId": "colophon",
+      "pageCount": 4,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8d1c560a153fa4a1550c0/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=d34bc5062fa5195297cbd66e454a31efd1c4d8f1c640a8918b5d65a188e2fd16&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8d2b660a153fa4a1550c5",
+      "key": "colophon/12p",
+      "designSystemId": "colophon",
+      "pageCount": 12,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8d2b660a153fa4a1550c4/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=1911eb3d714f5b1accdb205c584b6b260937b8a89b89465984c7adb317239536&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8d36a60a153fa4a1550c7",
+      "key": "overprint/4p",
+      "designSystemId": "overprint",
+      "pageCount": 4,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8d36a60a153fa4a1550c6/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=dbccfdabbd260442e8d8b7bcd4e3fc4d91abae5f2949a74b09e49e68635cff3d&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8d43260a153fa4a1550c9",
+      "key": "overprint/8p",
+      "designSystemId": "overprint",
+      "pageCount": 8,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8d43260a153fa4a1550c8/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=8b24f2d5fcee3e5218357a4d76bf4aec200f3c496acaf54e4bbcec2b291e7002&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8d4b560a153fa4a1550cb",
+      "key": "overprint/12p",
+      "designSystemId": "overprint",
+      "pageCount": 12,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8d4b560a153fa4a1550ca/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=c58cd66af3f575e96bb878dc5c2e1852993d72908b4a9cbd4bc20f81676a3168&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8d55560a153fa4a1550cd",
+      "key": "schematic/4p",
+      "designSystemId": "schematic",
+      "pageCount": 4,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8d55560a153fa4a1550cc/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=002701d51415d90bc2b1b217a154a838ae0d84e0c07c9376b1b574d6a9a2dbb0&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8d63160a153fa4a1550cf",
+      "key": "schematic/8p",
+      "designSystemId": "schematic",
+      "pageCount": 8,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8d63160a153fa4a1550ce/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=6cda40b18b82c969a4268da00b99b6e55ea2be78b7b177e0c077d474f8d8a8aa&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8d6f960a153fa4a1550d1",
+      "key": "schematic/15p",
+      "designSystemId": "schematic",
+      "pageCount": 15,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8d6f960a153fa4a1550d0/1/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=8c68dfabe16d14feb896bbf8deae87a96e3c3433dc5a1890661b71893636717a&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8d89e60a153fa4a1550d3",
+      "key": "refine/carry-pin",
+      "designSystemId": "margin",
+      "pageCount": 4,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8cd6360a153fa4a1550af/2/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=e2d14b9792c9c227d26fae3b076c79505ebd4092d24fa9ed4e57f0f49ec7ff06&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    },
+    {
+      "runId": "6ad8d89e60a153fa4a1550d2",
+      "key": "refine/switch-system",
+      "designSystemId": "afterglow",
+      "pageCount": 8,
+      "coverUrl": "http://localhost:9000/marquill-local/artifacts/6ad8cd6360a153fa4a1550ae/2/cover.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261021%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20261021T152527Z&X-Amz-Expires=86400&X-Amz-Signature=f416120f679102f47079dc7326b5e20820de78bac7f342a1b9ff00f6b087f150&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+    }
+  ]
+}

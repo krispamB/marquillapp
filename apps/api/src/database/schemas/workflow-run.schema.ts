@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { User } from './user.schema';
 import { Artifact } from './artifact.schema';
+import type { UsageRecord } from '../../feature-gating/credit-meter.constants';
 import type { ResearchResult } from '../../agent/agent-runner.interface';
 import type { RenderAttemptUsage } from '../../document-render/render-usage.types';
 // Type-only, and to the leaf module rather than the engine barrel: the engine
@@ -11,6 +12,7 @@ import type {
   BuildInput,
   DocumentCheck,
   DocumentDiagnostics,
+  RunLlmUsage,
 } from '../../workflow/engine/workflow.types';
 import { FailureCode, WorkflowStep } from '../../workflow/workflow.constants';
 
@@ -71,6 +73,12 @@ export class WorkflowRun extends Document {
   @Prop({ type: Object })
   researchContext?: ResearchResult;
 
+  // What researching recorded on the credit meter (each LLM turn and search),
+  // saved with `researchContext`. A job retry replays it so the retried run
+  // bills like an unretried one without searching again.
+  @Prop({ type: [Object] })
+  researchUsage?: UsageRecord[];
+
   @Prop({ type: [Object], default: [] })
   renderAttempts: RenderAttemptUsage[];
 
@@ -90,6 +98,15 @@ export class WorkflowRun extends Document {
   // DOCUMENT only: what the run did, written when it ends (spec §11.1).
   @Prop({ type: Object })
   documentDiagnostics?: DocumentDiagnostics;
+
+  // What the final job attempt's model calls cost, written with the run's
+  // completion or failure.
+  @Prop({ type: Object })
+  llmUsage?: RunLlmUsage;
+
+  // The first job attempt's wait between enqueue and worker pickup.
+  @Prop()
+  queueWaitMs?: number;
 
   // Attempt-scoped: reset at the start of each attempt so a whole-job retry
   // cannot double-count. Only the winning attempt's total is ever debited.

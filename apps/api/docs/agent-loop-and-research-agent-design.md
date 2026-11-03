@@ -150,11 +150,18 @@ interface AgentRunner {
 interface GenerateInput {
   type: ArtifactType;                     // #97 — POST | POLL | DOCUMENT
   prompt: string;
+  today: string;                          // the run's UTC date, YYYY-MM-DD
   stylePreset?: StylePreset;
   research?: ResearchResult;              // cached findings (#98 research slot)
   refine?: { priorContent: ArtifactContent; feedback: string };
 }
 ```
+
+- **Every research and generation user message opens with a `TODAY:` line**
+  (`todaySection` in `agent/prompts/today.prompt.ts`), so the model does not take its
+  training-era year as the present. The steps pass `today` from `ctx.runCreatedAt`, the
+  BullMQ job's `timestamp`, so every job attempt of a run sees the same date. The system
+  prompts stay static and cacheable.
 
 - The concrete instance is resolved once in the worker bootstrap and passed as
   `ctx.agent` (the existing `app.get(...)` pattern in `workflow.worker.ts`).
@@ -194,8 +201,31 @@ on a valid render. Parked as future work.
   result even at the cap.
 
 ```ts
-interface ResearchInput { prompt: string; type: ArtifactType; stylePreset?: StylePreset }
+interface ResearchInput { prompt: string; type: ArtifactType; today: string; stylePreset?: StylePreset }
 ```
+
+**Amended (performance plan M7.2, #237) — snippet mode.** `RESEARCH_MODE` picks
+the path inside `research()`; `agent` (the default) is everything above, unchanged.
+`snippets` trades the synthesis for speed (est. 20–45 s → 3–5 s):
+
+1. One `RESEARCH_MODEL` call at `RESEARCH_REASONING_EFFORT` (deployments set the
+   model's lowest, `none` on Luna) returns `{ queries: string[1..4] }` as structured
+   output. A malformed answer is not repaired; the brief itself is searched.
+2. The queries (trimmed, deduped case-insensitively, at most 4) run through the same
+   `searchWeb` tool in parallel. Each search that returns fires `onToolCall`, so the
+   `web_search` charge is the agent loop's; a failed search charges nothing.
+3. `buildSnippetResearch` (`src/agent/research-snippets.ts`) interleaves results by
+   query (each query's best first), dedupes by normalised URL (lowercase host without
+   `www.`, no fragment, tracking parameters or trailing slash; the first URL is kept
+   as returned, since normalising can break a link), and keeps at most
+   `RESEARCH_MAX_SNIPPETS` (10) excerpts of at most `RESEARCH_SNIPPET_CHARS` (600)
+   characters, whitespace collapsed.
+
+`findings` is then the numbered `[n] Title (url)` blocks, each followed by its excerpt,
+and the result carries `mode: 'snippets'` (§6). This brings back a query-planning
+stage this section once rejected, but as one bounded call instead of the old
+pre-steps, and only behind the flag. Compare the modes with `bun run eval:research`
+(fixed POST and DOCUMENT briefs).
 
 **Rejected — port YouTube + Reddit + web as three tools now.** Triples the tool
 surface, cost, and prompt-tuning for launch; the heavy legacy YouTube pipeline
@@ -214,8 +244,13 @@ interface ResearchSource { title: string; url: string }
 interface ResearchResult {
   findings: string;                       // the loop's final synthesized brief (= AgentRunResult.text)
   sources: ResearchSource[];              // deduped from every searchWeb result across steps
+  mode?: 'agent' | 'snippets';            // set only by snippet mode (§5); absent means agent
 }
 ```
+
+In snippet mode `findings` is raw web excerpts, not a synthesis; GENERATE labels the
+section "RESEARCH SNIPPETS (raw web excerpts; use only facts they state)" instead of
+"RESEARCH FINDINGS", and leaves it out when no search returned anything.
 
 - Derivation inside `research()`: `findings = result.text` (the agent's own synthesis
   after searching); `sources = dedupeByUrl(steps.flatMap(searchWeb results →
@@ -262,7 +297,7 @@ BullMQ `attempts:3`; terminal → `UnrecoverableError`):
 |---|---|---|
 | **Tool execution error** (Tavily down / timeout / throws) | caught, returned to the model as tool-result `{ error }`; loop continues (agent adapts, bounded by `maxSteps`) | none — absorbed in-loop |
 | **LLM transport error** (429 / 5xx / network) | `src/llm` classifies and throws typed `LLMError{ retryable }` (429/5xx/network = retryable; 4xx/auth = terminal); `AgentRunner` propagates | step maps to `WorkflowError{retryable}` → whole run retried, or terminal |
-| **Bad structured output** (generation fails #97 Zod) | **one inline repair retry** in `generate()` (re-prompt with the validation error); still invalid → throw `retryable` | #98 `attempts` re-runs (research cached, so cheap) |
+| **Bad structured output** (generation fails #97 Zod) | **one inline repair retry** in `generate()` (re-prompt with the validation error); still invalid → throw `retryable` | #98 `attempts` re-runs (a job retry reuses the saved research with no model or search call, and is billed for it again) |
 
 - The `src/llm` layer owns retryable classification because it knows provider error
   semantics.

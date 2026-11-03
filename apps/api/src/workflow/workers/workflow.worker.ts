@@ -1,7 +1,8 @@
-import { Job, Worker } from 'bullmq';
+import { Job, QueueEvents, Worker } from 'bullmq';
 import {
   EMAIL_QUEUE_NAME,
   LINKEDIN_AVATAR_REFRESH_QUEUE_NAME,
+  DOCUMENT_QUEUE_NAME,
   MEDIA_UPLOAD_QUEUE_NAME,
   QUEUE_NAME,
   SCHEDULE_QUEUE_NAME,
@@ -17,15 +18,18 @@ import { User } from '../../database/schemas';
 import { AuthService } from '../../auth/auth.service';
 import { MailService } from '../../mail';
 import { EmailQueue } from '../email.queue';
+import { WorkflowQueue } from '../workflow.queue';
 import { processEmailJob } from './email.worker.handler';
 import { ArtifactRunProcessor } from './artifact-run.worker.handler';
 import { AgentRunnerService } from '../../agent/agent-runner.service';
 import { ArtifactService } from '../../artifact/artifact.service';
 import { DocumentRendererService } from '../../document-render/document-renderer.service';
+import { FontInlinerService } from '../../document-render/font-inliner.service';
 import { DesignSystemsService } from '../../design-system/design-systems.service';
 import { findFile, uploadFile } from '../../s3';
 import { CreditMeterService } from '../../feature-gating/credit-meter.service';
 import { FeatureGatingService } from '../../feature-gating/feature-gating.service';
+import { InflightRunLimiter } from '../inflight-run-limiter';
 import { RedisService } from '../../redis/redis.service';
 import { WorkflowRunService } from '../workflow-run.service';
 import { BuildInput } from '../engine/workflow.types';
@@ -35,12 +39,21 @@ import {
   handleMediaUploadJobExhausted,
   processMediaUploadJob,
 } from './media-upload.worker.handler';
+import { handleStalledFailure } from './stalled-failure';
+import {
+  installWorkerShutdown,
+  readWorkerShutdownTimeoutMs,
+} from './worker-shutdown';
+import { workflowWorkerOptions } from './workflow-worker-options';
 
 async function bootstrapWorker() {
   const logger = new Logger(
     bootstrapWorker.name.charAt(0).toUpperCase() +
       bootstrapWorker.name.slice(1),
   );
+  // Read before the app boots, so a bad value fails fast.
+  const shutdownTimeoutMs = readWorkerShutdownTimeoutMs(process.env);
+  const runWorkerOptions = workflowWorkerOptions(process.env);
   logger.log('Bootstrapping workflow context...');
   const app = await NestFactory.createApplicationContext(WorkerModule);
 
@@ -60,6 +73,7 @@ async function bootstrapWorker() {
     artifacts: app.get(ArtifactService),
     designSystems: app.get(DesignSystemsService),
     renderer: app.get(DocumentRendererService),
+    fonts: app.get(FontInlinerService),
     objects: {
       put: async (key, body, contentType) => {
         await uploadFile(key, body, contentType);
@@ -69,29 +83,56 @@ async function bootstrapWorker() {
     creditMeter: app.get(CreditMeterService),
     featureGating: app.get(FeatureGatingService),
     runs: app.get(WorkflowRunService),
+    inflight: app.get(InflightRunLimiter),
     redis: app.get(RedisService).getClient(),
     logger,
   });
 
-  const workflowWorker = new Worker(
-    QUEUE_NAME,
-    (job: Job<BuildInput>) => artifactRuns.process(job),
-    {
-      connection: {
-        url: process.env.REDIS_URL!,
-        maxRetriesPerRequest: null,
-        enableReadyCheck: false,
-      },
-    },
-  );
+  // Two workers on the same processor: `workflow` (POST, POLL, and DOCUMENT
+  // jobs enqueued before the split; the processor is type-agnostic) and
+  // `workflow-document`, each with its own concurrency.
+  const workflowQueues = app.get(WorkflowQueue);
+  const runConnection = {
+    url: process.env.REDIS_URL!,
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+  };
+  const runWorkers: Worker[] = [];
+  const runEvents: QueueEvents[] = [];
+  for (const queueName of [QUEUE_NAME, DOCUMENT_QUEUE_NAME] as const) {
+    const options = runWorkerOptions[queueName];
+    const worker = new Worker(
+      queueName,
+      (job: Job<BuildInput>) => artifactRuns.process(job),
+      { connection: runConnection, ...options },
+    );
+    logger.log(
+      `Worker on ${queueName}: concurrency ${options.concurrency}, lock ${options.lockDuration} ms`,
+    );
 
-  // Fires on every failed attempt; the processor decides which one ends the run.
-  workflowWorker.on('failed', (job, error) => {
-    if (!job) return;
-    artifactRuns.onFailed(job, error).catch((err) => logger.error(err));
-  });
+    // Fires on every failed attempt; the processor decides which one ends the run.
+    worker.on('failed', (job, error) => {
+      if (!job) return;
+      artifactRuns.onFailed(job, error).catch((err) => logger.error(err));
+    });
 
-  new Worker(
+    // Queue-wide: a job that stalled out ends its run even when no worker in
+    // this process reports it. `onFailed` ends a run at most once.
+    const queue = workflowQueues.queueFor(queueName);
+    const events = new QueueEvents(queueName, { connection: runConnection });
+    events.on('failed', (event) => {
+      handleStalledFailure(event, {
+        getJob: (jobId) => queue.getJob(jobId),
+        onFailed: (job, error) => artifactRuns.onFailed(job, error),
+        logger,
+      }).catch((err) => logger.error(err));
+    });
+
+    runWorkers.push(worker);
+    runEvents.push(events);
+  }
+
+  const scheduleWorker = new Worker(
     SCHEDULE_QUEUE_NAME,
     async (job: Job) => {
       try {
@@ -128,7 +169,7 @@ async function bootstrapWorker() {
     },
   );
 
-  new Worker(
+  const avatarRefreshWorker = new Worker(
     LINKEDIN_AVATAR_REFRESH_QUEUE_NAME,
     async (job: Job) => {
       try {
@@ -158,7 +199,7 @@ async function bootstrapWorker() {
     },
   );
 
-  new Worker(
+  const emailWorker = new Worker(
     EMAIL_QUEUE_NAME,
     async (job: Job) => {
       try {
@@ -207,6 +248,27 @@ async function bootstrapWorker() {
     logger.warn(
       `Media upload job ${job.id} failed (attempt ${job.attemptsMade}/${job.opts.attempts ?? 1}): ${error.message}`,
     );
+  });
+
+  installWorkerShutdown({
+    signals: process,
+    closables: [
+      ...runWorkers,
+      scheduleWorker,
+      avatarRefreshWorker,
+      emailWorker,
+      mediaUploadWorker,
+    ],
+    listeners: runEvents,
+    idle: () => artifactRuns.idle(),
+    app,
+    exit: (code) => process.exit(code),
+    timeoutMs: shutdownTimeoutMs,
+    timers: {
+      setTimeout: (callback, ms) => setTimeout(callback, ms),
+      clearTimeout: (handle) => clearTimeout(handle as NodeJS.Timeout),
+    },
+    logger,
   });
 }
 bootstrapWorker();

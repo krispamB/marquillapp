@@ -396,7 +396,7 @@ WorkflowRun {
   kind:             RunKind
   status:           RunStatus
   input:            BuildInput
-  currentStep?:     WorkflowStep   // updated at each boundary — SSE cold-start fallback
+  currentStep?:     WorkflowStep   // no longer written (M1.1); optional for old docs
   researchContext?: ResearchResult // persisted when RESEARCH completes; refine reuses it
   creditsUsed:      number         // attempt-scoped accumulator, reset each attempt
   failureReason?:   string
@@ -1136,7 +1136,7 @@ which is small: a user watches their own generation.
 | With `Last-Event-ID` | Resume strictly after that entry. No duplicates, no gap |
 | Run terminal **and** client current | **HTTP 204** — per the SSE spec this tells `EventSource` to stop reconnecting, preventing a finished run from being polled forever by a stale tab |
 | Run terminal, client behind | Open, replay the tail including the terminal event, close; the *next* reconnect hits the 204 |
-| Stream expired, run doc present | Synthesize a snapshot from `WorkflowRun` (`status`, `currentStep`, `steps` reconstructed via `buildWorkflow(input)`), then close |
+| Stream expired, run doc present | Synthesize a snapshot from `WorkflowRun` (`status`, `steps` reconstructed via `buildWorkflow(input)`), then close |
 | Stream expired, run doc gone | `404` |
 
 **Failures are data, not HTTP status.** Only pre-stream problems (auth, ownership, unknown
