@@ -51,7 +51,7 @@ export class AuthController {
       await this.authService.linkedinCallback(code, state);
       return this.sendLinkedinCallbackHtml(res, {
         statusCode: HttpStatus.OK,
-        title: 'LinkedIn Connected',
+        title: 'LinkedIn connected',
         message: 'Your LinkedIn account is now connected.',
         variant: 'success',
       });
@@ -67,7 +67,7 @@ export class AuthController {
             : 'LinkedIn authorization was not completed. Start again from Marquill.';
         return this.sendLinkedinCallbackHtml(res, {
           statusCode: HttpStatus.BAD_REQUEST,
-          title: 'LinkedIn Connection Error',
+          title: "LinkedIn couldn't connect",
           message,
           variant: 'error',
         });
@@ -82,7 +82,7 @@ export class AuthController {
             : 'A different LinkedIn account is already connected to this user.';
         return this.sendLinkedinCallbackHtml(res, {
           statusCode: HttpStatus.CONFLICT,
-          title: 'LinkedIn Connection Error',
+          title: "LinkedIn couldn't connect",
           message,
           variant: 'error',
         });
@@ -175,17 +175,42 @@ export class AuthController {
     variant: 'success' | 'error';
     nonce: string;
   }) {
-    const accentColor = params.variant === 'success' ? '#0f766e' : '#b91c1c';
-    const borderColor = params.variant === 'success' ? '#99f6e4' : '#fecaca';
-    const background = params.variant === 'success' ? '#f0fdfa' : '#fef2f2';
+    // Mirrors the web app's workspace tokens: warm canvas, hairline borders,
+    // ink-first controls, colour only on the status dot.
+    const statusColor = params.variant === 'success' ? '#1f9d55' : '#c2410c';
+    const statusLabel =
+      params.variant === 'success' ? 'Connected' : 'Not connected';
 
     return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${params.title}</title>
+  <meta name="color-scheme" content="light dark">
+  <title>${params.title} · Marquill</title>
   <style>
+    :root {
+      --canvas: #f6f6f4;
+      --surface: #ffffff;
+      --ink-900: #0a0a0a;
+      --ink-700: #3a3a38;
+      --ink-500: #76766f;
+      --line: #e7e7e3;
+      --button-bg: #0a0a0a;
+      --button-fg: #ffffff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --canvas: #0c0c0b;
+        --surface: #161614;
+        --ink-900: #f4f4f1;
+        --ink-700: #c6c6bf;
+        --ink-500: #8f8f88;
+        --line: #262624;
+        --button-bg: #f4f4f1;
+        --button-fg: #0a0a0a;
+      }
+    }
     * { box-sizing: border-box; }
     body {
       margin: 0;
@@ -193,44 +218,86 @@ export class AuthController {
       display: grid;
       place-items: center;
       padding: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f8fafc;
-      color: #0f172a;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--canvas);
+      color: var(--ink-900);
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { width: 100%; max-width: 400px; }
+    .wordmark {
+      display: block;
+      margin: 0 0 16px 4px;
+      font-family: "Courier Prime", "Courier New", Courier, monospace;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--ink-900);
     }
     main {
-      width: 100%;
-      max-width: 440px;
-      background: ${background};
-      border: 1px solid ${borderColor};
-      border-radius: 12px;
-      padding: 20px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 24px;
+    }
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0 0 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: ${statusColor};
+    }
+    .status::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: ${statusColor};
     }
     h1 {
-      margin: 0 0 8px;
-      font-size: 20px;
+      margin: 0 0 6px;
+      font-size: 18px;
+      font-weight: 600;
       line-height: 1.3;
-      color: ${accentColor};
+      letter-spacing: -0.01em;
     }
-    p { margin: 0 0 8px; font-size: 15px; line-height: 1.5; }
-    small { color: #475569; display: block; margin-bottom: 14px; }
+    p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--ink-700); }
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    small { font-size: 12px; color: var(--ink-500); }
     button {
+      flex-shrink: 0;
       border: 0;
-      border-radius: 8px;
-      padding: 10px 14px;
-      background: ${accentColor};
-      color: #ffffff;
-      font-size: 14px;
+      border-radius: 10px;
+      padding: 9px 14px;
+      background: var(--button-bg);
+      color: var(--button-fg);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
       cursor: pointer;
     }
+    button:focus-visible { outline: 2px solid #2a6fdb; outline-offset: 2px; }
   </style>
 </head>
 <body>
-  <main>
-    <h1>${params.title}</h1>
-    <p>${params.message}</p>
-    <small id="close-status">Closing in ${this.LINKEDIN_CALLBACK_CLOSE_DELAY_SECONDS}s...</small>
-    <button type="button" id="close-window">Close window</button>
-  </main>
+  <div class="wrap">
+    <span class="wordmark" aria-label="Marquill">marquill_</span>
+    <main>
+      <div class="status">${statusLabel}</div>
+      <h1>${params.title}</h1>
+      <p>${params.message}</p>
+      <div class="footer">
+        <small id="close-status">Closing in ${this.LINKEDIN_CALLBACK_CLOSE_DELAY_SECONDS}s...</small>
+        <button type="button" id="close-window">Close window</button>
+      </div>
+    </main>
+  </div>
   <script nonce="${params.nonce}">
     (function () {
       document.getElementById('close-window').addEventListener('click', function () {

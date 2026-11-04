@@ -59,7 +59,7 @@ describe('AuthController linkedin callback html responses', () => {
       expect.stringContaining('<!doctype html>'),
     );
     expect(res.send).toHaveBeenCalledWith(
-      expect.stringContaining('LinkedIn Connected'),
+      expect.stringContaining('LinkedIn connected'),
     );
     expect(res.send).toHaveBeenCalledWith(
       expect.stringContaining('window.close()'),
