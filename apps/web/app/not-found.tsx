@@ -3,7 +3,7 @@ import MarquillLockup from '../components/brand/MarquillLockup';
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen bg-[var(--color-background)] flex flex-col font-sans text-[var(--color-text-primary)]">
+    <div className="min-h-svh bg-[var(--color-background)] flex flex-col font-sans text-[var(--color-text-primary)]">
 
       {/* Header Layout */}
       <header className="flex w-full items-center justify-between px-6 py-6 sm:px-12 sm:py-8">
