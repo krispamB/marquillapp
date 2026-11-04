@@ -12,7 +12,7 @@
 .picker {
   display: flex;
   width: min(928px, 100%);
-  height: min(636px, calc(100vh - 48px));
+  height: min(636px, calc(100dvh - 48px));
   flex-direction: column;
   overflow: hidden;
   border: 1px solid rgba(18, 24, 38, .14);

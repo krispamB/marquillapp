@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Courier_Prime, Inter, JetBrains_Mono } from "next/font/google";
@@ -42,7 +42,21 @@ export const metadata: Metadata = {
     title: 'Marquill - AI-Powered LinkedIn Content Platform',
     description: 'Generate LinkedIn posts from YouTube research, schedule, and publish in one place.',
   },
-};;
+};
+
+// App-like viewport: content can use the notch/home-bar area (padded with
+// safe-area insets in globals.css), and the on-screen keyboard shrinks the
+// layout instead of overlaying it. Pinch zoom stays enabled for accessibility.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f6f6f4" },
+    { media: "(prefers-color-scheme: dark)", color: "#0c0c0b" },
+  ],
+};
 
 export default function RootLayout({
   children,

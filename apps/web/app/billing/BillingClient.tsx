@@ -158,7 +158,7 @@ export default function BillingClient({
     const planName = subscriptionName ?? activePlan?.name ?? tierMatch?.name ?? user?.tier?.name ?? "Free";
 
     return (
-        <div className="relative min-h-screen bg-[var(--color-background)] font-sans text-[var(--color-text-primary)]">
+        <div className="relative min-h-svh bg-[var(--color-background)] font-sans text-[var(--color-text-primary)]">
             {/* Decorative Gradients */}
             <div
                 className="pointer-events-none fixed left-1/2 top-0 h-[700px] w-[1100px] -translate-x-1/2 -translate-y-1/2"

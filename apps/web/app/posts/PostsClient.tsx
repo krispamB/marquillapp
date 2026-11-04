@@ -1038,7 +1038,7 @@ export default function PostsClient({
   }, []);
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[var(--color-background)]">
+    <div className="relative min-h-svh overflow-x-hidden bg-[var(--color-background)]">
       <div
         className="pointer-events-none absolute -left-40 -top-10 h-[34rem] w-[34rem]"
         style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--color-accent) 25%, transparent), transparent 70%)" }}
@@ -1048,7 +1048,7 @@ export default function PostsClient({
         style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--color-primary) 20%, transparent), transparent 70%)" }}
       />
 
-      <div className="relative flex min-h-screen w-full flex-col gap-8 px-4 pt-8 pb-28 sm:px-6 md:py-10 lg:px-8">
+      <div className="relative flex min-h-svh w-full flex-col gap-8 px-4 pt-8 pb-28 sm:px-6 md:py-10 lg:px-8">
         <header className="md:hidden">
           <p className="text-sm font-semibold text-[var(--color-text-secondary)]">
             Manage your workflow
