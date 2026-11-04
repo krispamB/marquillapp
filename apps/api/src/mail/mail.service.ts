@@ -11,6 +11,7 @@ import Handlebars from 'handlebars';
 import { CreateEmailResponse, Resend } from 'resend';
 import {
   MailTemplateDataMap,
+  MAIL_LOGO_URL,
   MailTemplateKey,
   mailTemplates,
 } from './templates';
@@ -29,6 +30,8 @@ export class MailService implements OnModuleInit {
   private readonly logger = new Logger(MailService.name);
   private readonly templatesDir = join(process.cwd(), 'assets/mail/templates');
   private resend: Resend;
+  private readonly handlebars = Handlebars.create();
+  private partialsLoaded?: Promise<void>;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -81,10 +84,30 @@ export class MailService implements OnModuleInit {
     templateFile: string,
     data: MailTemplateDataMap[TTemplate],
   ): Promise<string> {
+    await this.loadPartials();
     const source = await fs.readFile(
       join(this.templatesDir, templateFile),
       'utf-8',
     );
-    return Handlebars.compile(source)(data);
+    return this.handlebars.compile(source)({
+      logoUrl: MAIL_LOGO_URL,
+      ...data,
+    });
+  }
+
+  private loadPartials(): Promise<void> {
+    this.partialsLoaded ??= (async () => {
+      const partialsDir = join(this.templatesDir, 'partials');
+      const files = await fs.readdir(partialsDir);
+      await Promise.all(
+        files
+          .filter((file) => file.endsWith('.hbs'))
+          .map(async (file) => {
+            const source = await fs.readFile(join(partialsDir, file), 'utf-8');
+            this.handlebars.registerPartial(file.replace(/\.hbs$/, ''), source);
+          }),
+      );
+    })();
+    return this.partialsLoaded;
   }
 }

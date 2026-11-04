@@ -10,6 +10,12 @@ export interface MailTemplateDataMap {
   };
 }
 
+/**
+ * Logo shown at the top of every email. Leave it empty to fall back to the
+ * "marquill_" text wordmark. Use a PNG: Gmail and Outlook don't render SVG.
+ */
+export const MAIL_LOGO_URL = '';
+
 export type MailTemplateKey = keyof MailTemplateDataMap;
 
 interface MailTemplateDefinition<TTemplate extends MailTemplateKey> {
