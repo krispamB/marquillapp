@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Bug, Check, Lightbulb, X, XCircle } from "lucide-react";
 import { API_BASE, jsonRequest, readApi } from "./api";
 import MarquillSelect, { type MarquillSelectOption } from "../../components/ui/MarquillSelect";
+import { useBodyScrollLock } from "../lib/bodyScrollLock";
 
 type FeedbackKind = "BUG" | "FEATURE_REQUEST";
 type ModalState = "form" | "submitting" | "success" | "error";
@@ -33,6 +34,7 @@ async function getDeviceReport() {
 }
 
 export default function FeedbackModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  useBodyScrollLock(isOpen);
   const [modalState, setModalState] = useState<ModalState>("form");
   const [kind, setKind] = useState<FeedbackKind>("BUG");
   const [title, setTitle] = useState("");

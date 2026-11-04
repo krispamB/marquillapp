@@ -8,6 +8,7 @@ import { API_BASE, readApi } from "./api";
 import useDebouncedSearch from "./useDebouncedSearch";
 import type { ArtifactSummary, ArtifactType, ArtifactsListResponse } from "./artifactTypes";
 import { artifactTypeIcons } from "./artifactPresentation";
+import { useBodyScrollLock } from "../lib/bodyScrollLock";
 
 type ArtifactFilter = "ALL" | ArtifactType;
 
@@ -43,6 +44,7 @@ export default function PostArtifactPicker({
   onClose: () => void;
   onSelect: (artifact: ArtifactSummary) => void;
 }) {
+  useBodyScrollLock(isOpen);
   const dialogRef = useRef<HTMLElement | null>(null);
   const [artifacts, setArtifacts] = useState<ArtifactSummary[]>([]);
   const [filter, setFilter] = useState<ArtifactFilter>("ALL");

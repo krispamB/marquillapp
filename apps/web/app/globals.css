@@ -1650,3 +1650,11 @@ button, a, [role="button"], label, summary, select { touch-action: manipulation;
   .mq-artifact-empty-types button:hover > svg { transform: translate(1px, -1px); }
   .mq-artifact-type-options button:hover { border-color: var(--line-strong); background: var(--surface); color: var(--ink-800); transform: translateY(-1px); }
 }
+
+/* On-screen keyboard (see KeyboardInsetSync): the tab bar would ride on top of
+   the keyboard or hide under it, so it steps aside; the refine box sits just
+   above the keyboard instead of above the hidden tab bar. */
+@media (max-width: 700px) {
+  html.mq-keyboard-open .mq-mobile-tabbar { display: none; }
+  html.mq-keyboard-open .mq-studio-refine-wrap { bottom: calc(var(--mq-keyboard-inset, 0px) + 8px); }
+}

@@ -4,6 +4,8 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, ImageOff, Search, X } from "lucide-react";
 import styles from "./StockImagePicker.module.css";
+import { hasFinePointer } from "../lib/device";
+import { useBodyScrollLock } from "../lib/bodyScrollLock";
 
 type Provider = "pexels" | "unsplash";
 
@@ -114,6 +116,7 @@ function appendUniqueImages(current: StockImage[], incoming: StockImage[]) {
 }
 
 export default function StockImagePicker({ provider, onClose, onSelect }: { provider: Provider; onClose: () => void; onSelect: (image: StockImage) => void }) {
+  useBodyScrollLock(true);
   const [query, setQuery] = useState("business");
   const [images, setImages] = useState<StockImage[]>([]);
   const [orientation, setOrientation] = useState<Orientation>("landscape");
@@ -267,7 +270,7 @@ export default function StockImagePicker({ provider, onClose, onSelect }: { prov
         <form className={styles.searchForm} onSubmit={submit}>
           <label className={styles.searchField}>
             <Search size={18} aria-hidden="true" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${label} photos`} autoFocus aria-label={`Search ${label} photos`} />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${label} photos`} autoFocus={hasFinePointer()} aria-label={`Search ${label} photos`} />
             {query ? <button type="button" onClick={() => setQuery("")} aria-label="Clear search"><X size={16} /></button> : null}
           </label>
           <button className={styles.searchButton} type="submit" disabled={isInitialLoading}>Search</button>

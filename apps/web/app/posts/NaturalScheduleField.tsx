@@ -6,6 +6,7 @@ import {
     getGhostCompletion,
     parseNaturalDate,
 } from "./naturalDate";
+import { hasFinePointer } from "../lib/device";
 
 export default function NaturalScheduleField({
     text,
@@ -68,7 +69,8 @@ export default function NaturalScheduleField({
                 id={id}
                 ref={inputRef}
                 type="text"
-                autoFocus={autoFocus}
+                // Touch devices: don't open the keyboard until the user taps the field.
+                autoFocus={autoFocus && hasFinePointer()}
                 value={text}
                 disabled={disabled}
                 onChange={(event) => updateText(event.target.value)}

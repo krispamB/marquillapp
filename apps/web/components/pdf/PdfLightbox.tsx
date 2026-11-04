@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import PdfPreview, { type PdfSource } from "./PdfPreview";
+import { lockBodyScroll } from "@/app/lib/bodyScrollLock";
 
 /** A full-screen viewer for reading a PDF's pages at the largest size the screen allows. */
 export default function PdfLightbox({
@@ -44,8 +45,7 @@ export default function PdfLightbox({
 
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlockScroll = lockBodyScroll();
     closeRef.current?.focus();
 
     function handleKeyDown(event: KeyboardEvent) {
@@ -54,7 +54,7 @@ export default function PdfLightbox({
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousOverflow;
+      unlockScroll();
       previousFocus?.focus();
     };
   }, [requestClose]);

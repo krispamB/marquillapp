@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, X } from "lucide-react";
+import { useBodyScrollLock } from "../lib/bodyScrollLock";
 
 export default function ArtifactDeleteConfirmModal({
   isOpen,
@@ -17,6 +18,7 @@ export default function ArtifactDeleteConfirmModal({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  useBodyScrollLock(isOpen);
   if (!isOpen) return null;
 
   return (
