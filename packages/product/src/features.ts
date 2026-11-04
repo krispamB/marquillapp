@@ -359,6 +359,16 @@ export const features: Feature[] = [
     status: 'live',
     summary: 'A theme toggle in the app shell.',
     since: '2026-07-12',
+    notes: ['Moving from the topbar to Settings and syncing across devices; see account-preferences.'],
+  },
+  {
+    id: 'account-preferences',
+    name: 'Theme and timezone preferences',
+    area: 'workspace',
+    status: 'building',
+    summary: 'Settings saves a System, Light, or Dark theme and a timezone to the account, so they follow the user to every device. With no timezone chosen, the browser\'s is used. The theme control leaves the topbar for Settings.',
+    docs: ['apps/api/docs/api/users.md'],
+    notes: ['Scheduling still sends the browser\'s timezone; the saved one is stored, not yet used for scheduling.'],
   },
   {
     id: 'welcome-email',
@@ -372,11 +382,11 @@ export const features: Feature[] = [
   /* ------------------------------------------------------------------- ideas */
   {
     id: 'notification-preferences',
-    name: 'Notification and timezone preferences',
+    name: 'Publishing notifications',
     area: 'workspace',
     status: 'idea',
-    summary: 'A reminder before a scheduled post publishes, and an explicit timezone setting. Settings shows both as unavailable today.',
-    discussed: { date: '2026-07-17', summary: 'Placeholders added to the Settings redesign; the api has no endpoints for them.' },
+    summary: 'A reminder before a scheduled post publishes. The timezone half moved to account-preferences.',
+    discussed: { date: '2026-11-04', summary: 'Placeholder removed from Settings until the app sends notifications; timezone and theme preferences are being built.' },
   },
   {
     id: 'comment-generator',

@@ -78,7 +78,7 @@ Every feature Marquill has, is building, or has discussed. `live` means deployed
 | Id | Feature | Status | Date | What it does | Landing; plans | Links |
 | --- | --- | --- | --- | --- | --- | --- |
 | `in-app-feedback` | In-app feedback | live | 2026-04-08 | The sidebar help button opens a form that files a GitHub issue with device details. |  |  |
-| `theme` | Light and dark theme | live | 2026-07-12 | A theme toggle in the app shell. |  |  |
+| `theme` | Light and dark theme | live | 2026-07-12 | A theme toggle in the app shell.<br>_Moving from the topbar to Settings and syncing across devices; see account-preferences._ |  |  |
 | `welcome-email` | Welcome email | live | 2026-04-07 | A branded welcome email on sign-up. |  |  |
 
 ## Planned and building
@@ -101,6 +101,12 @@ Every feature Marquill has, is building, or has discussed. `live` means deployed
 | Id | Feature | Status | Date | What it does | Landing; plans | Links |
 | --- | --- | --- | --- | --- | --- | --- |
 | `post-analytics` | Post analytics | planned |  | Impressions and engagement for published posts, pulled from LinkedIn, inside Marquill.<br>_No issue yet. Open one when work starts._ | board | [LINKEDIN_ORGANIZATION_ANALYTICS_RESEARCH.md](../../apps/api/docs/LINKEDIN_ORGANIZATION_ANALYTICS_RESEARCH.md) |
+
+### Workspace
+
+| Id | Feature | Status | Date | What it does | Landing; plans | Links |
+| --- | --- | --- | --- | --- | --- | --- |
+| `account-preferences` | Theme and timezone preferences | building |  | Settings saves a System, Light, or Dark theme and a timezone to the account, so they follow the user to every device. With no timezone chosen, the browser's is used. The theme control leaves the topbar for Settings.<br>_Scheduling still sends the browser's timezone; the saved one is stored, not yet used for scheduling._ |  | [users.md](../../apps/api/docs/api/users.md) |
 
 ## Ideas
 
@@ -133,7 +139,7 @@ Every feature Marquill has, is building, or has discussed. `live` means deployed
 
 | Id | Feature | Status | Date | What it does | Landing; plans | Links |
 | --- | --- | --- | --- | --- | --- | --- |
-| `notification-preferences` | Notification and timezone preferences | idea | 2026-07-17 | A reminder before a scheduled post publishes, and an explicit timezone setting. Settings shows both as unavailable today.<br>_Discussed: Placeholders added to the Settings redesign; the api has no endpoints for them._ |  |  |
+| `notification-preferences` | Publishing notifications | idea | 2026-11-04 | A reminder before a scheduled post publishes. The timezone half moved to account-preferences.<br>_Discussed: Placeholder removed from Settings until the app sends notifications; timezone and theme preferences are being built._ |  |  |
 | `whats-new` | What's new in the app | idea | 2026-10-17 | Show recent changelog entries inside the web app, read from this ledger.<br>_Discussed: Proposed with the product ledger._ |  |  |
 | `public-changelog-page` | Changelog page and feed | idea | 2026-10-17 | A full /changelog page and an RSS feed on the landing site, generated from this ledger.<br>_Discussed: Proposed with the product ledger._ |  |  |
 
@@ -141,6 +147,7 @@ Every feature Marquill has, is building, or has discussed. `live` means deployed
 
 | Date | Feature | Entry | Published |
 | --- | --- | --- | --- |
+| 2026-11-04 | `account-preferences` | **Preferences that follow you**: Pick a theme and timezone in Settings once, and every device you sign in on uses them. | draft |
 | 2026-10-15 | `design-system-picker` | **Swatch menu with hover preview**: Hover over a Design System to preview it before you pick. | yes |
 | 2026-10-15 | `design-systems` | **Design Systems for documents**: Six designed systems for one-pagers and carousels, chosen per document. | yes |
 | 2026-10-14 | `document-refine-from-source` | **Refine a document from its source**: Mark edits the document he already made, so the parts you liked stay put. | yes |

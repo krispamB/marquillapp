@@ -77,4 +77,14 @@ describe("resolveWorkspaceUser", () => {
       tier: undefined,
     });
   });
+
+  test("carries the saved preferences through", () => {
+    expect(
+      resolveWorkspaceUser({
+        name: "Ada",
+        email: "ada@example.com",
+        preferences: { theme: "dark", timezone: "Africa/Lagos" },
+      })?.preferences,
+    ).toEqual({ theme: "dark", timezone: "Africa/Lagos" });
+  });
 });
