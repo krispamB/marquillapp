@@ -1111,17 +1111,19 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
 .mq-account-connect-button { grid-column: 1 / -1; width: 100%; min-height: 44px; }
 .mq-account-empty-state > .mq-connect-error { grid-column: 1 / -1; margin: -4px 0 0; }
 .mq-setting-account-actions { display: flex; align-items: center; gap: 8px; padding: 14px 18px 0; }
-.mq-preference-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 70px; padding: 12px 18px; border-bottom: 1px solid var(--line-faint); }
-.mq-preference-row > span { display: flex; align-items: flex-start; gap: 10px; color: var(--ink-700); }
-.mq-preference-row > span > span { display: flex; flex-direction: column; gap: 3px; }
+.mq-preference-row { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; column-gap: 10px; min-height: 70px; padding: 12px 18px; border-bottom: 1px solid var(--line-faint); }
+.mq-preference-icon { display: inline-flex; align-self: start; padding-top: 1px; color: var(--ink-700); }
+.mq-preference-copy { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.mq-preference-row > button { justify-self: end; white-space: nowrap; }
 .mq-preference-row strong { color: var(--ink-800); font-size: 13px; }
 .mq-preference-row small { color: var(--ink-500); font-size: 11px; }
 .mq-toggle { width: 36px; height: 21px; padding: 2px; border: 0; border-radius: 999px; background: var(--canvas-sub); opacity: .7; }
 .mq-toggle i { display: block; width: 17px; height: 17px; border-radius: 50%; background: var(--surface); box-shadow: var(--sh-xs); }
 .mq-settings-card > .mq-missing-note { margin: 14px 18px 0; }
 .mq-danger-zone { margin-top: 16px; padding-bottom: 18px; }
-.mq-danger-zone p { margin: 14px 18px; color: var(--ink-500); }
-.mq-danger-zone > .mq-secondary-button { margin-left: 18px; }
+.mq-session-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px 0; }
+.mq-session-row p { margin: 0; color: var(--ink-500); }
+.mq-session-row > .mq-secondary-button { flex: none; }
 .mq-mobile-tabbar { display: none; }
 .mq-selected-account-name { display: none; }
 @keyframes mq-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: .5; } }
@@ -1297,15 +1299,35 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
   .mq-invoice-card { overflow-x: auto; }
   .mq-invoice-card .mq-card-heading, .mq-invoice-row { min-width: 620px; }
   .mq-settings-grid { gap: 12px; }
-  .mq-setting-account-row { min-height: 82px; padding: 14px; }
-  .mq-setting-account-name { align-items: flex-start; flex-direction: column; gap: 5px; }
-  .mq-setting-account-meta { align-items: flex-start; flex-direction: column; gap: 3px; }
-  .mq-setting-account-meta small + small::before { display: none; }
   .mq-account-empty-state { padding: 20px 14px 16px; }
   .mq-account-connect-button { min-height: 48px; font-size: 13px; }
   .mq-setting-account-actions { align-items: stretch; flex-direction: column; padding: 14px 14px 0; }
   .mq-setting-account-actions > .mq-secondary-button { width: 100%; }
-  .mq-setting-disconnect { width: 38px; height: 38px; }
+  /* Settings: one 16px gutter for every card part; rows read avatar/icon, copy, control. */
+  .mq-settings-card .mq-card-heading { min-height: 50px; padding: 0 16px; }
+  .mq-setting-account-row { align-items: start; column-gap: 12px; min-height: 0; padding: 14px 16px; }
+  .mq-setting-account-row .mq-account-avatar-wrap { margin-top: 1px; }
+  .mq-setting-account-copy { gap: 4px; }
+  .mq-setting-account-name { gap: 8px; }
+  .mq-setting-account-name > strong { font-size: 14px; }
+  .mq-setting-account-name .mq-status { padding: 2px 7px; font-size: 10px; }
+  .mq-setting-account-meta { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .mq-setting-account-meta small + small::before { display: none; }
+  .mq-setting-account-meta small { font-size: 11.5px; }
+  .mq-setting-disconnect { align-self: center; width: 36px; height: 36px; }
+  .mq-setting-account-actions { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 14px 16px 0; }
+  .mq-setting-account-actions > .mq-secondary-button { width: 100%; min-height: 42px; justify-content: center; }
+  .mq-account-empty-state { padding: 20px 16px 16px; }
+  .mq-preference-row { column-gap: 12px; min-height: 0; padding: 14px 16px; }
+  .mq-preference-row strong { font-size: 13.5px; }
+  .mq-preference-row small { font-size: 11.5px; line-height: 1.45; }
+  .mq-preference-row > .mq-secondary-button { min-height: 32px; padding: 0 12px; }
+  .mq-toggle { box-shadow: inset 0 0 0 1px var(--line); }
+  .mq-settings-card > .mq-missing-note { margin: 12px 16px 0; }
+  .mq-danger-zone { margin-top: 12px; padding-bottom: 16px; }
+  .mq-session-row { flex-direction: column; align-items: stretch; gap: 12px; padding: 14px 16px 0; }
+  .mq-session-row p { font-size: 13px; }
+  .mq-session-row > .mq-secondary-button { width: 100%; min-height: 42px; justify-content: center; }
   .mq-mobile-tabbar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 30; display: flex; align-items: center; height: 64px; padding: 0 8px; border-top: 1px solid var(--line); background: var(--surface); box-shadow: 0 -2px 10px rgba(16,16,15,.04); }
   .mq-mobile-tabbar a { display: flex; flex: 1; align-items: center; justify-content: center; flex-direction: column; gap: 3px; min-width: 0; color: var(--ink-400); font-size: 10px; font-weight: 500; text-decoration: none; }
   .mq-mobile-tabbar a.is-active { color: var(--ink-900); font-weight: 600; }
@@ -1593,12 +1615,13 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
   .mq-attach-account-picker > footer button { min-width: 0; flex: 1; }
 }
 
-/* Settings → Preferences controls */
-.mq-preference-row > .mq-preference-icon { flex: none; padding-top: 1px; }
-.mq-preference-row > .mq-preference-copy { flex: 1; min-width: 0; flex-direction: column; gap: 3px; }
-.mq-preference-select { flex: none; width: 220px; max-width: 100%; font-size: 12.5px; }
+/* Settings → Preferences controls. Rows use the icon / copy / control grid above. */
+.mq-preference-row > .mq-segmented, .mq-preference-row > .mq-preference-select { justify-self: end; }
+.mq-preference-select { width: 220px; max-width: 100%; font-size: 12.5px; }
 .mq-preference-error { margin: 12px 18px 0; }
-@media (max-width: 640px) {
-  .mq-preference-row:has(.mq-preference-select) { flex-wrap: wrap; }
+@media (max-width: 700px) {
+  .mq-preference-row > .mq-segmented, .mq-preference-row > .mq-preference-select { grid-column: 2 / -1; justify-self: stretch; margin-top: 10px; }
+  .mq-preference-row > .mq-segmented button { flex: 1; justify-content: center; }
   .mq-preference-select { width: 100%; }
+  .mq-preference-error { margin: 12px 16px 0; }
 }

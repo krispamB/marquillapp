@@ -158,7 +158,13 @@ export default function SettingsRedesignClient({
         <PreferencesCard initialPreferences={user.preferences} />
       </section>
 
-      <section className="mq-card mq-settings-card mq-danger-zone"><div className="mq-card-heading"><span className="mq-title"><LogOut size={16} /> Session</span></div><p>Sign out of Marquill on this device.</p><button type="button" className="mq-secondary-button" onClick={() => void signOut({ redirectUrl: process.env.NEXT_PUBLIC_LANDING || "/sign-in" })}><LogOut size={14} /> Sign out</button></section>
+      <section className="mq-card mq-settings-card mq-danger-zone">
+        <div className="mq-card-heading"><span className="mq-title"><LogOut size={16} /> Session</span></div>
+        <div className="mq-session-row">
+          <p>Sign out of Marquill on this device.</p>
+          <button type="button" className="mq-secondary-button" onClick={() => void signOut({ redirectUrl: process.env.NEXT_PUBLIC_LANDING || "/sign-in" })}><LogOut size={14} /> Sign out</button>
+        </div>
+      </section>
       <OrganizationConnectModal
         isOpen={isOrganizationModalOpen}
         connectedOrganizationIds={connectedOrganizationIds}
