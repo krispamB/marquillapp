@@ -12,6 +12,7 @@ The API is versioned under `/api/v1`:
 | Binding artifacts to LinkedIn posts | [posts.md](./posts.md)         |
 | LinkedIn connected accounts         | [linkedin.md](./linkedin.md)   |
 | Paddle checkout and billing         | [payment.md](./payment.md)     |
+| User profile and preferences        | [users.md](./users.md)         |
 
 ## Common conventions
 

@@ -1,3 +1,4 @@
+import type { UserPreferences } from "./preferences";
 import type { ArtifactContent } from "./artifact-content";
 
 export type TierLimits = {
@@ -32,6 +33,7 @@ export type UserProfile = {
   email: string;
   avatar?: string;
   tier?: Tier | null;
+  preferences?: UserPreferences;
 };
 
 export type SubscriptionTier = {

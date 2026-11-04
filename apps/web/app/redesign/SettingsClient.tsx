@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Check, Link2, LogOut, RefreshCw, ShieldCheck, SlidersHorizontal, Trash2 } from "lucide-react";
+import { Link2, LogOut, RefreshCw, Trash2 } from "lucide-react";
 import { useClerk } from "@clerk/nextjs";
 import RedesignShell from "./Shell";
 import LinkedInConnectButton from "./LinkedInConnectButton";
 import OrganizationConnectModal from "./OrganizationConnectModal";
+import PreferencesCard from "./PreferencesCard";
 import { API_BASE, readApi } from "./api";
 import type { ConnectedAccount, SubscriptionTier, UserProfile } from "../lib/types";
 import LinkedInIcon from "../../components/brand/LinkedInIcon";
@@ -154,11 +155,10 @@ export default function SettingsRedesignClient({
           )}
         </div>
 
-        <div className="mq-card mq-settings-card"><div className="mq-card-heading"><span className="mq-title"><SlidersHorizontal size={16} /> Preferences</span><span className="mq-mono">Unavailable</span></div><div className="mq-preference-row"><span><Bell size={16} /><span><strong>Publishing notifications</strong><small>Get a reminder before scheduled posts publish.</small></span></span><button type="button" className="mq-toggle" disabled aria-label="Publishing notifications unavailable"><i /></button></div><div className="mq-preference-row"><span><ShieldCheck size={16} /><span><strong>Timezone</strong><small>WAT (GMT+1) · inferred from your browser.</small></span></span><button type="button" className="mq-secondary-button mq-button-small" disabled>Set timezone</button></div><p className="mq-missing-note">Notification and timezone preference endpoints are not present in the current backend contract.</p></div>
+        <PreferencesCard initialPreferences={user.preferences} />
       </section>
 
       <section className="mq-card mq-settings-card mq-danger-zone"><div className="mq-card-heading"><span className="mq-title"><LogOut size={16} /> Session</span></div><p>Sign out of Marquill on this device.</p><button type="button" className="mq-secondary-button" onClick={() => void signOut({ redirectUrl: process.env.NEXT_PUBLIC_LANDING || "/sign-in" })}><LogOut size={14} /> Sign out</button></section>
-      <p className="mq-missing-note"><Check size={13} /> Account connect and disconnect use the existing LinkedIn endpoints. Preference controls are intentionally marked unavailable until their endpoints exist.</p>
       <OrganizationConnectModal
         isOpen={isOrganizationModalOpen}
         connectedOrganizationIds={connectedOrganizationIds}

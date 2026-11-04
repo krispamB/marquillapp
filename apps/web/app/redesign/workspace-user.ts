@@ -39,5 +39,6 @@ export function resolveWorkspaceUser(
     email,
     avatar: clean(apiUser?.avatar) ?? clean(clerkUser?.imageUrl),
     tier: apiUser?.tier ?? undefined,
+    preferences: apiUser?.preferences ?? undefined,
   };
 }

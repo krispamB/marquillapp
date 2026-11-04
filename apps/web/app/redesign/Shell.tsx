@@ -32,7 +32,7 @@ import LinkedInIcon from "../../components/brand/LinkedInIcon";
 import FeedbackModal from "./FeedbackModal";
 import LinkedInConnectButton from "./LinkedInConnectButton";
 import OrganizationConnectModal from "./OrganizationConnectModal";
-import ThemeToggle from "./ThemeToggle";
+import ThemePreferenceSync from "./ThemePreferenceSync";
 import { getAccountInitials, getInitials } from "./types";
 import type { WorkspacePage } from "./types";
 import MarquillSelect from "../../components/ui/MarquillSelect";
@@ -181,6 +181,7 @@ export default function RedesignShell({
 
   return (
     <div className={`mq-shell${hideMobileNav ? " mq-shell-no-mobile-nav" : ""}`}>
+      <ThemePreferenceSync preference={user.preferences?.theme} />
       <aside className="mq-sidebar">
         <Link href="/dashboard" className="mq-brand" aria-label="Marquill dashboard">
           <MarquillLockup size={29} theme="auto" className="mq-brand-lockup" />
@@ -326,7 +327,6 @@ export default function RedesignShell({
                 <span>credits</span>
               </Link>
             ) : null}
-            <ThemeToggle compact />
             <button type="button" className="mq-feedback-topbar" onClick={() => setIsFeedbackOpen(true)} aria-label="Help and feedback"><LifeBuoy size={17} /></button>
             <span className="mq-notification" aria-label="Notifications">
               <span className="mq-live-dot" />

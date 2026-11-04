@@ -9,7 +9,6 @@ import { revalidateUserCache } from "../lib/actions";
 import type { OnboardingProfile } from "../lib/onboarding";
 import { Progress, SuccessToast } from "./components";
 import MarquillLockup from "../../components/brand/MarquillLockup";
-import ThemeToggle from "../redesign/ThemeToggle";
 import {
   StepPersona,
   StepProfile,
@@ -253,7 +252,6 @@ export default function OnboardingClient({ initialProfile }: { initialProfile: O
   return (
     <>
       <div className="ob-page">
-        <ThemeToggle compact className="ob-theme-toggle" />
         <main className="ob-shell">
           <header className="ob-header">
             <MarquillLockup size={32} theme="auto" />
