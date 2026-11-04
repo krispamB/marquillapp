@@ -10,6 +10,7 @@ import {
   type LinkedInOrg,
   type ListOrgsResponse,
 } from "../lib/types";
+import { useBodyScrollLock } from "../lib/bodyScrollLock";
 
 type Phase = "loading" | "select" | "connecting" | "success" | "empty" | "all-connected" | "limit-exceeded" | "load-error" | "connect-error";
 
@@ -24,6 +25,7 @@ export default function OrganizationConnectModal({
   onClose: () => void;
   onConnected: () => void;
 }) {
+  useBodyScrollLock(isOpen);
   const [phase, setPhase] = useState<Phase>("loading");
   const [organizations, setOrganizations] = useState<LinkedInOrg[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());

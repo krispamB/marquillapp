@@ -7,6 +7,7 @@ import type { ConnectedAccount } from "../lib/types";
 import LinkedInConnectButton from "./LinkedInConnectButton";
 import { getAccountInitials } from "./types";
 import { usableConnectedAccounts } from "./linkedinAccess";
+import { useBodyScrollLock } from "../lib/bodyScrollLock";
 
 export function activeConnectedAccounts(accounts: ConnectedAccount[]) {
   return usableConnectedAccounts(accounts);
@@ -42,6 +43,7 @@ export default function ConnectedAccountPicker({
   onClose: () => void;
   onConfirm: (accountId: string) => void;
 }) {
+  useBodyScrollLock(isOpen);
   const dialogRef = useRef<HTMLElement | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const closePicker = useCallback(() => {

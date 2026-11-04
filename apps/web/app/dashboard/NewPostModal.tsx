@@ -10,6 +10,8 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { useBodyScrollLock } from "@/app/lib/bodyScrollLock";
+import { hasFinePointer } from "@/app/lib/device";
 import Image from "next/image";
 import {
   AlertTriangle,
@@ -641,21 +643,11 @@ export default function NewPostModal({
     initialImageFingerprintRef.current = initialImageUrl ?? "";
   }, [initialContent, initialImageUrl, isOpen, mode, postId, resetMediaUploads]);
 
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [isOpen]);
+  useBodyScrollLock(isOpen);
 
   useEffect(() => {
-    if (!isOpen) {
+    // On touch devices focusing here would pop the keyboard as the modal opens.
+    if (!isOpen || !hasFinePointer()) {
       return;
     }
 

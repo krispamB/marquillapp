@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, X } from "lucide-react";
+import { useBodyScrollLock } from "../lib/bodyScrollLock";
 
 export default function DeleteConfirmModal({
   isOpen,
@@ -15,6 +16,7 @@ export default function DeleteConfirmModal({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  useBodyScrollLock(isOpen);
   if (!isOpen) return null;
 
   return (

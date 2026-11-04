@@ -33,6 +33,7 @@ import FeedbackModal from "./FeedbackModal";
 import LinkedInConnectButton from "./LinkedInConnectButton";
 import OrganizationConnectModal from "./OrganizationConnectModal";
 import ThemePreferenceSync from "./ThemePreferenceSync";
+import KeyboardInsetSync from "./KeyboardInsetSync";
 import { getAccountInitials, getInitials } from "./types";
 import type { WorkspacePage } from "./types";
 import MarquillSelect from "../../components/ui/MarquillSelect";
@@ -182,6 +183,7 @@ export default function RedesignShell({
   return (
     <div className={`mq-shell${hideMobileNav ? " mq-shell-no-mobile-nav" : ""}`}>
       <ThemePreferenceSync preference={user.preferences?.theme} />
+      <KeyboardInsetSync />
       <aside className="mq-sidebar">
         <Link href="/dashboard" className="mq-brand" aria-label="Marquill dashboard">
           <MarquillLockup size={29} theme="auto" className="mq-brand-lockup" />
