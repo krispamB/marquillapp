@@ -85,9 +85,7 @@
 
 .filter { padding: 10px 20px 9px; }
 .visuallyHidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-.filter label { position: relative; display: inline-flex; align-items: center; color: #64676c; }
-.filter select { appearance: none; padding: 2px 20px 2px 1px; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
-.filter svg { position: absolute; right: 0; pointer-events: none; }
+.filter :global(.mq-select) { min-height: 30px; padding: 0 8px 0 10px; font-size: 12px; }
 
 .results {
   display: grid;

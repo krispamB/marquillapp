@@ -26,6 +26,7 @@ import type {
 } from "./artifactTypes";
 import { POLL_DURATION_DAYS } from "./artifactTypes";
 import { artifactTypeLabels } from "./artifactPresentation";
+import MarquillSelect from "../../components/ui/MarquillSelect";
 
 export { artifactTypeLabels };
 
@@ -283,18 +284,16 @@ function ArtifactEditor({
           </fieldset>
           <label className="mq-artifact-editor-duration">
             <span>Poll duration</span>
-            <select
-              value={durationDays}
-              onChange={(event) => {
-                const nextDuration = POLL_DURATION_DAYS.find((days) => days === Number(event.target.value));
+            <MarquillSelect
+              value={String(durationDays)}
+              onChange={(value) => {
+                const nextDuration = POLL_DURATION_DAYS.find((days) => days === Number(value));
                 if (nextDuration) setDurationDays(nextDuration);
               }}
               disabled={isSaving}
-            >
-              {POLL_DURATION_DAYS.map((days) => (
-                <option value={days} key={days}>{days} day{days === 1 ? "" : "s"}</option>
-              ))}
-            </select>
+              ariaLabel="Poll duration"
+              options={POLL_DURATION_DAYS.map((days) => ({ value: String(days), label: `${days} day${days === 1 ? "" : "s"}` }))}
+            />
           </label>
         </>
       ) : null}

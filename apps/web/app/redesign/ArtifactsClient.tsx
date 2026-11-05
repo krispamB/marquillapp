@@ -39,6 +39,7 @@ import type {
   ArtifactType,
   ArtifactsListResponse,
 } from "./artifactTypes";
+import MarquillSelect from "../../components/ui/MarquillSelect";
 
 type ArtifactFilter = "ALL" | ArtifactType;
 
@@ -565,14 +566,18 @@ export default function ArtifactsRedesignClient({
           <label className="mq-filter-select mq-artifact-month-filter">
             <CalendarDays size={14} />
             <span className="sr-only">Filter artifacts by month</span>
-            <select value={month} onChange={(event) => changeMonth(event.target.value)}>
-              <option value="">All months</option>
-              {availableMonths.map((value) => (
-                <option value={value} key={value}>
-                  {new Date(`${value}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
-                </option>
-              ))}
-            </select>
+            <MarquillSelect
+              value={month}
+              onChange={changeMonth}
+              ariaLabel="Filter artifacts by month"
+              options={[
+                { value: "", label: "All months" },
+                ...availableMonths.map((value) => ({
+                  value,
+                  label: new Date(`${value}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" }),
+                })),
+              ]}
+            />
           </label>
           {artifacts.length || filter !== "ALL" || Boolean(month) || Boolean(search) ? <CreateArtifactLink /> : null}
         </div>
