@@ -247,7 +247,7 @@ export const features: Feature[] = [
     name: 'Scheduled post email',
     area: 'scheduling',
     status: 'live',
-    summary: 'An email tells the user when a scheduled post goes live.',
+    summary: 'An email tells the user when a scheduled post goes live, with a link to the post on LinkedIn.',
     since: '2026-04-07',
   },
 

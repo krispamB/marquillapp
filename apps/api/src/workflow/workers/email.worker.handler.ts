@@ -15,6 +15,7 @@ interface ScheduledPostPublishedEmailJobData {
   email?: string;
   name?: string;
   postId?: string;
+  postUrl?: string;
 }
 
 async function processWelcomeEmailJob(
@@ -43,7 +44,7 @@ async function processScheduledPostPublishedEmailJob(
   logger: Logger,
   mailService: MailService,
 ) {
-  const { email, name, postId } = (job.data ??
+  const { email, name, postId, postUrl } = (job.data ??
     {}) as ScheduledPostPublishedEmailJobData;
   if (!email || !name || !postId) {
     logger.warn(
@@ -57,7 +58,7 @@ async function processScheduledPostPublishedEmailJob(
     template: 'scheduledPostPublished',
     data: {
       name,
-      postId,
+      ...(postUrl ? { postUrl } : {}),
     },
   });
 }

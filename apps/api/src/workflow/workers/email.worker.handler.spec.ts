@@ -56,6 +56,7 @@ describe('processEmailJob', () => {
           email: 'user@example.com',
           name: 'Jane Doe',
           postId: 'post123',
+          postUrl: 'https://www.linkedin.com/feed/update/urn:li:share:123/',
         },
       } as any,
       logger,
@@ -67,7 +68,7 @@ describe('processEmailJob', () => {
       template: 'scheduledPostPublished',
       data: {
         name: 'Jane Doe',
-        postId: 'post123',
+        postUrl: 'https://www.linkedin.com/feed/update/urn:li:share:123/',
       },
     });
     expect(logger.warn as jest.Mock).not.toHaveBeenCalled();

@@ -6,7 +6,7 @@ export interface MailTemplateDataMap {
   };
   scheduledPostPublished: {
     name: string;
-    postId: string;
+    postUrl?: string;
   };
 }
 
