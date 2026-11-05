@@ -78,6 +78,18 @@ Each app reads its env file from its own directory. None live at the root.
 | api | `apps/api/.env` | `apps/api/.env.example` |
 | landing | `apps/landing/.env.local` | keys listed in `apps/landing/AGENTS.md` |
 
+## Signing in locally
+
+To use the web app in a local dev environment (to check a change in the browser, for example), sign in with the shared test account:
+
+| Field | Value |
+| --- | --- |
+| Email | `agent+clerk_test@marquill.com` |
+| Password | `marquillpass` |
+| One-time code | `424242` |
+
+Whenever Clerk asks for a verification code or OTP, enter `424242`. Clerk accepts that fixed code for any `+clerk_test` address on a development instance, so no real email is sent. The account works only against the Clerk development instance in `apps/web/.env`; never use it on production.
+
 ## Worktrees
 
 Put worktrees under `.codex/worktrees/<branch>`; that path is gitignored, and so is `.claude/worktrees/`.
