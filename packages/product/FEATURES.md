@@ -94,7 +94,7 @@ Every feature Marquill has, is building, or has discussed. `live` means deployed
 
 | Id | Feature | Status | Date | What it does | Landing; plans | Links |
 | --- | --- | --- | --- | --- | --- | --- |
-| `custom-design-systems` | Create a Design System | planned |  | Users create a Design System of their own and use it for one-pagers and carousels, alongside the six app-owned ones. | board | #204, [document-generation-spec.md](../../apps/api/docs/document-generation-spec.md) |
+| `custom-design-systems` | Create a Design System | planned |  | Users create a Design System of their own and use it for one-pagers and carousels, alongside the six app-owned ones. | board | #204, [document-generation-spec.md](../../apps/api/docs/document-generation-spec.md), [custom-design-systems-intake.md](../../apps/api/docs/custom-design-systems-intake.md) |
 
 ### Insights
 

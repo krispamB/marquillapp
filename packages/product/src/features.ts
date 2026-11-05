@@ -145,7 +145,7 @@ export const features: Feature[] = [
     public: { title: 'Your own Design System', body: 'Create a Design System in your brand and use it for every document.' },
     board: true,
     issues: [204],
-    docs: ['apps/api/docs/document-generation-spec.md'],
+    docs: ['apps/api/docs/document-generation-spec.md', 'apps/api/docs/custom-design-systems-intake.md'],
   },
   {
     id: 'document-refine-from-source',
