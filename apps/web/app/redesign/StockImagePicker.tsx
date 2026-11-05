@@ -2,10 +2,11 @@
 /* eslint-disable @next/next/no-img-element -- stock-provider URLs are dynamic and cannot use Next image optimization. */
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ImageOff, Search, X } from "lucide-react";
+import { ImageOff, Search, X } from "lucide-react";
 import styles from "./StockImagePicker.module.css";
 import { hasFinePointer } from "../lib/device";
 import { useBodyScrollLock } from "../lib/bodyScrollLock";
+import MarquillSelect from "../../components/ui/MarquillSelect";
 
 type Provider = "pexels" | "unsplash";
 
@@ -276,16 +277,17 @@ export default function StockImagePicker({ provider, onClose, onSelect }: { prov
           <button className={styles.searchButton} type="submit" disabled={isInitialLoading}>Search</button>
         </form>
         <div className={styles.filter}>
-          <label>
-            <span className={styles.visuallyHidden}>Orientation</span>
-            <select value={orientation} onChange={(event) => { const next = event.target.value as Orientation; setOrientation(next); runSearch({ query, orientation: next }); }}>
-              <option value="any">Any orientation</option>
-              <option value="landscape">Landscape</option>
-              <option value="portrait">Portrait</option>
-              <option value="square">Square</option>
-            </select>
-            <ChevronDown size={15} aria-hidden="true" />
-          </label>
+          <MarquillSelect
+            value={orientation}
+            onChange={(value) => { const next = value as Orientation; setOrientation(next); runSearch({ query, orientation: next }); }}
+            ariaLabel="Orientation"
+            options={[
+              { value: "any", label: "Any orientation" },
+              { value: "landscape", label: "Landscape" },
+              { value: "portrait", label: "Portrait" },
+              { value: "square", label: "Square" },
+            ]}
+          />
         </div>
         <div ref={resultsRef} className={styles.results} aria-busy={isInitialLoading || isLoadingMore}>
           {error ? <div className={`${styles.state} ${styles.error}`}><ImageOff size={22} /><p>{error}</p><button type="button" onClick={() => runSearch({ query, orientation })}>Try again</button></div> : null}

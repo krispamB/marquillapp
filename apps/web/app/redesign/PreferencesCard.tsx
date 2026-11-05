@@ -13,6 +13,7 @@ import {
   type ThemePreference,
   type UserPreferences,
 } from "../lib/preferences";
+import MarquillSelect from "../../components/ui/MarquillSelect";
 
 const THEME_OPTIONS: Array<{ value: ThemePreference; label: string; Icon: typeof Sun }> = [
   { value: "system", label: "System", Icon: Monitor },
@@ -117,18 +118,17 @@ export default function PreferencesCard({ initialPreferences }: { initialPrefere
               : `${formatTimezoneLabel(browserTimezone)} · from your browser`}
           </small>
         </span>
-        <select
-          className="mq-input mq-preference-select"
-          aria-label="Timezone"
+        <MarquillSelect
+          className="mq-preference-select"
+          ariaLabel="Timezone"
           value={timezone ?? BROWSER_TIMEZONE}
-          onChange={(event) => changeTimezone(event.target.value)}
+          onChange={changeTimezone}
           disabled={saving === "timezone"}
-        >
-          <option value={BROWSER_TIMEZONE}>Use browser timezone</option>
-          {timezoneOptions.map((zone) => (
-            <option key={zone} value={zone}>{formatTimezoneLabel(zone)}</option>
-          ))}
-        </select>
+          options={[
+            { value: BROWSER_TIMEZONE, label: "Use browser timezone" },
+            ...timezoneOptions.map((zone) => ({ value: zone, label: formatTimezoneLabel(zone) })),
+          ]}
+        />
       </div>
     </div>
   );
