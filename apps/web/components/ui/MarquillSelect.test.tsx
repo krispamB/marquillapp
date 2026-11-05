@@ -89,4 +89,35 @@ describe("MarquillSelect", () => {
     fireEvent.keyDown(list, { key: "Enter" });
     expect(onChange).toHaveBeenCalledWith("founder");
   });
+
+  test("clicking the wrapping label while open closes the menu instead of reopening it", () => {
+    const screen = render(
+      <label data-testid="pill">
+        <span data-testid="icon">✎</span>
+        <Harness />
+      </label>,
+    );
+    fireEvent.click(screen.getByTestId("icon"));
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    const icon = screen.getByTestId("icon");
+    fireEvent.pointerDown(icon);
+    fireEvent.click(icon);
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  test("pressing on the menu header keeps the menu open", () => {
+    const screen = render(
+      <MarquillSelect value="pro" onChange={() => {}} options={options} ariaLabel="Tone" dropdownHeader="Pick a tone" />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Tone/ }));
+    fireEvent.pointerDown(screen.getByText("Pick a tone"));
+    expect(screen.getByRole("listbox")).toBeTruthy();
+  });
+
+  test("pressing outside closes the menu", () => {
+    const screen = render(<div><button type="button">elsewhere</button><Harness /></div>);
+    fireEvent.click(screen.getByRole("button", { name: /Tone/ }));
+    fireEvent.pointerDown(screen.getByRole("button", { name: "elsewhere" }));
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
 });

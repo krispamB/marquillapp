@@ -90,6 +90,7 @@ export default function MarquillSelect({
   const isSheet = useMediaQuery(SHEET_MEDIA_QUERY);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const typeahead = useRef({ text: "", timer: 0 });
   const baseId = useId();
   const listId = `${baseId}-list`;
@@ -162,7 +163,11 @@ export default function MarquillSelect({
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (listRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
+      const trigger = triggerRef.current;
+      // A wrapping <label> forwards its clicks to the trigger, which toggles the menu itself.
+      // Closing here too would make that forwarded click reopen it.
+      const label = trigger?.closest("label");
+      if (menuRef.current?.contains(target) || trigger?.contains(target) || label?.contains(target)) return;
       close(false);
     };
     const onReflow = () => position();
@@ -281,6 +286,7 @@ export default function MarquillSelect({
         <div className={`mq-select-layer${isSheet ? " is-sheet" : ""}`}>
           {isSheet ? <div className="mq-select-backdrop" aria-hidden="true" onClick={() => close()} /> : null}
           <div
+            ref={menuRef}
             className={`mq-select-menu${isSheet ? " is-sheet" : ` is-${placement?.side}`}`}
             style={isSheet ? undefined : placement?.style}
           >
