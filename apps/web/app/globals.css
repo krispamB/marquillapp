@@ -1650,10 +1650,48 @@ button, a, [role="button"], label, summary, select { touch-action: manipulation;
 
 /* On-screen keyboard (see KeyboardInsetSync): the tab bar would ride on top of
    the keyboard or hide under it, so it steps aside; the refine box sits just
-   above the keyboard instead of above the hidden tab bar. */
+   above the keyboard instead of above the hidden tab bar.
+   iOS Safari ignores interactive-widget and overlays the keyboard on the layout
+   viewport, so a centered studio form stays put and the footer slides under the
+   keyboard (and the autofill bar). Pin the form to the layout bottom and lift it
+   by --mq-keyboard-inset, which already subtracts visualViewport.offsetTop, so
+   the card tracks the visual bottom while Safari pans. Android resizes the
+   layout instead, the inset is 0, and the same bottom offset sits on the new
+   viewport edge. Fixed, not sticky: the card is not at the end of a scroller.
+   The lift is not transitioned, so it tracks the keyboard each frame, including
+   under reduced motion. */
 @media (max-width: 700px) {
   html.mq-keyboard-open .mq-mobile-tabbar { display: none; }
   html.mq-keyboard-open .mq-studio-refine-wrap { bottom: calc(var(--mq-keyboard-inset, 0px) + 8px); }
+  html.mq-keyboard-open .mq-artifact-studio { min-height: 0; padding: 0; }
+  html.mq-keyboard-open .mq-artifact-studio-logo,
+  html.mq-keyboard-open .mq-artifact-studio-heading,
+  html.mq-keyboard-open .mq-artifact-studio-note,
+  html.mq-keyboard-open .mq-artifact-type-options { display: none; }
+  html.mq-keyboard-open .mq-artifact-studio-form {
+    position: fixed;
+    z-index: 25;
+    right: 16px;
+    bottom: calc(var(--mq-keyboard-inset, 0px) + 8px);
+    left: 16px;
+  }
+  /* Three lines when the gap above the keyboard allows, never under two.
+     min-height wins over a smaller max-height, so the floor stays two lines. */
+  html.mq-keyboard-open .mq-artifact-prompt-card textarea {
+    height: 4.65em;
+    min-height: 3.1em;
+    max-height: max(3.1em, calc(100svh - var(--mq-keyboard-inset, 0px) - 150px));
+  }
+  /* The menu opens upward from the pinned card; keep the list inside the gap above the keyboard. */
+  html.mq-keyboard-open .mq-artifact-studio .mq-design-list {
+    max-height: min(180px, max(96px, calc(100svh - var(--mq-keyboard-inset, 0px) - 120px)));
+  }
+  /* Safari often leaves focus in the textarea when a button is tapped, so the
+     keyboard stays up. The style sheet is a bottom sheet; lift it with the card. */
+  html.mq-keyboard-open .mq-select-menu.is-sheet {
+    bottom: var(--mq-keyboard-inset, 0px);
+    max-height: min(70vh, 520px, calc(100svh - var(--mq-keyboard-inset, 0px) - 12px));
+  }
 }
 
 /* MarquillSelect -------------------------------------------------------------
