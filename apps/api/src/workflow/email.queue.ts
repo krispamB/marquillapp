@@ -46,10 +46,11 @@ export class EmailQueue implements OnModuleInit, OnModuleDestroy {
     email: string,
     name: string,
     postId: string,
+    postUrl?: string,
   ) {
     await this.queue.add(
       SCHEDULED_POST_PUBLISHED_EMAIL_JOB_NAME,
-      { email, name, postId },
+      { email, name, postId, ...(postUrl ? { postUrl } : {}) },
       {
         jobId: `scheduled-post-published-${postId}`,
         attempts: 3,

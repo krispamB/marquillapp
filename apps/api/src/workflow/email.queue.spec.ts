@@ -10,6 +10,7 @@ describe('EmailQueue', () => {
       'user@example.com',
       'Jane Doe',
       'post123',
+      'https://www.linkedin.com/feed/update/urn:li:share:123/',
     );
 
     expect(add).toHaveBeenCalledWith(
@@ -18,6 +19,7 @@ describe('EmailQueue', () => {
         email: 'user@example.com',
         name: 'Jane Doe',
         postId: 'post123',
+        postUrl: 'https://www.linkedin.com/feed/update/urn:li:share:123/',
       },
       expect.objectContaining({
         jobId: 'scheduled-post-published-post123',

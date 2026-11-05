@@ -14,7 +14,7 @@ const sampleData: MailTemplateDataMap = {
   },
   scheduledPostPublished: {
     name: 'Ada Lovelace',
-    postId: 'post123',
+    postUrl: 'https://www.linkedin.com/feed/update/urn:li:share:123/',
   },
 };
 

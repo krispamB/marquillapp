@@ -27,9 +27,18 @@
                 <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #3a3a38;">
                   The post you scheduled has been published to LinkedIn.
                 </p>
-                <p style="margin: 24px 0 0; padding-top: 16px; border-top: 1px solid #f0f0ec; font-size: 12px; line-height: 1.5; color: #76766f;">
-                  Post ID <span style="font-family: 'SFMono-Regular', Menlo, Consolas, monospace; color: #3a3a38;">{{postId}}</span>
+                {{#if postUrl}}
+                <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 24px 0 0;">
+                  <tr>
+                    <td style="border-radius: 8px; background: #0a0a0a;">
+                      <a href="{{postUrl}}" target="_blank" rel="noopener" style="display: inline-block; padding: 11px 18px; font-size: 14px; line-height: 1; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 8px;">View on LinkedIn</a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin: 16px 0 0; font-size: 12px; line-height: 1.5; color: #76766f; word-break: break-all;">
+                  Or open <a href="{{postUrl}}" target="_blank" rel="noopener" style="color: #3a3a38;">{{postUrl}}</a>
                 </p>
+                {{/if}}
               </td>
             </tr>
             <tr>

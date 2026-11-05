@@ -48,7 +48,7 @@ Every feature Marquill has, is building, or has discussed. `live` means deployed
 | --- | --- | --- | --- | --- | --- | --- |
 | `scheduling` | Scheduling | live | 2026-06-11 | Schedule a post by typing a time in plain language ("next Tuesday 9am"), reschedule or unschedule it, and see it on the calendar. Scheduled posts per plan are limited. | board | #122 |
 | `calendar` | Calendar | live | 2026-07-11 | The /calendar page shows scheduled and published posts by date. |  |  |
-| `scheduled-post-email` | Scheduled post email | live | 2026-04-07 | An email tells the user when a scheduled post goes live. |  |  |
+| `scheduled-post-email` | Scheduled post email | live | 2026-04-07 | An email tells the user when a scheduled post goes live, with a link to the post on LinkedIn. |  |  |
 
 ### Accounts
 

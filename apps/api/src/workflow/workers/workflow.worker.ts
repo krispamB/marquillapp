@@ -12,6 +12,7 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { WorkerModule } from './worker.module';
 import { PostService } from '../../post/post.service';
+import { linkedinPostUrl } from '../../post/linkedin-post-url';
 import { getModelToken } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from '../../database/schemas';
@@ -143,12 +144,13 @@ async function bootstrapWorker() {
           return;
         }
 
-        await postService.publishPost(postId);
+        const post = await postService.publishPost(postId);
         try {
           await emailQueue.addScheduledPostPublishedEmailJob(
             user.email,
             user.name,
             postId,
+            linkedinPostUrl(post.channelPostId),
           );
         } catch (error) {
           logger.warn(
