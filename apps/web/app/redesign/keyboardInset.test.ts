@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isKeyboardOpen, keyboardInset } from "./keyboardInset";
+import { isKeyboardOpen, keyboardInset, visualBottom } from "./keyboardInset";
 
 describe("keyboardInset", () => {
   test("is the layout height the visual viewport no longer covers", () => {
@@ -31,5 +31,15 @@ describe("isKeyboardOpen", () => {
   test("ignores a hardware keyboard and small toolbar changes", () => {
     expect(isKeyboardOpen(true, 0, 844, 844)).toBe(false);
     expect(isKeyboardOpen(true, 40, 780, 844)).toBe(false);
+  });
+});
+
+describe("visualBottom", () => {
+  test("is the visual viewport's bottom edge in layout coordinates", () => {
+    expect(visualBottom({ height: 508, offsetTop: 0 })).toBe(508);
+  });
+
+  test("follows iOS panning the visual viewport", () => {
+    expect(visualBottom({ height: 508.4, offsetTop: 100 })).toBe(608);
   });
 });

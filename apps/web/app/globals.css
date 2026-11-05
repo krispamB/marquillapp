@@ -599,7 +599,7 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
 .mq-artifact-studio-form { width: 100%; }
 .mq-artifact-prompt-card { padding: 18px 18px 15px; border: 1px solid var(--line-strong); border-radius: 22px; background: var(--surface); box-shadow: var(--sh-lg); transition: border-color .18s ease, box-shadow .18s ease; }
 .mq-artifact-prompt-card:focus-within { border-color: color-mix(in srgb, var(--accent) 62%, var(--line-strong)); box-shadow: var(--sh-lg), 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent); }
-.mq-artifact-prompt-card textarea { display: block; width: 100%; min-height: 106px; resize: none; border: 0; outline: 0; background: transparent; color: var(--ink-900); font: 400 17px/1.55 var(--font-inter); }
+.mq-artifact-prompt-card textarea { display: block; width: 100%; min-height: 106px; max-height: 320px; overflow-y: auto; resize: none; border: 0; outline: 0; background: transparent; color: var(--ink-900); font: 400 17px/1.55 var(--font-inter); }
 .mq-artifact-prompt-card textarea::placeholder { color: var(--ink-400); }
 .mq-artifact-prompt-footer { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-top: 8px; }
 .mq-artifact-prompt-modes { display: flex; min-width: 0; align-items: center; gap: 5px; }
@@ -1214,7 +1214,8 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
   .mq-artifact-studio-heading { margin-bottom: 21px; }
   .mq-artifact-studio-heading h1 { font-size: 29px; }
   .mq-artifact-prompt-card { padding: 15px 14px 13px; border-radius: 18px; }
-  .mq-artifact-prompt-card textarea { min-height: 112px; }
+  /* One line, like a chat composer; it grows with the text (ArtifactStudioClient) up to five lines. */
+  .mq-artifact-prompt-card textarea { min-height: 1.55em; max-height: 7.75em; }
   .mq-artifact-prompt-footer { align-items: center; gap: 7px; }
   .mq-artifact-prompt-modes, .mq-artifact-prompt-controls { display: contents; }
   .mq-artifact-research-toggle { width: 34px; min-height: 34px; flex: none; justify-content: center; padding: 0; }
@@ -1651,15 +1652,14 @@ button, a, [role="button"], label, summary, select { touch-action: manipulation;
 /* On-screen keyboard (see KeyboardInsetSync): the tab bar would ride on top of
    the keyboard or hide under it, so it steps aside; the refine box sits just
    above the keyboard instead of above the hidden tab bar.
-   iOS Safari ignores interactive-widget and overlays the keyboard on the layout
-   viewport, so a centered studio form stays put and the footer slides under the
-   keyboard (and the autofill bar). Pin the form to the layout bottom and lift it
-   by --mq-keyboard-inset, which already subtracts visualViewport.offsetTop, so
-   the card tracks the visual bottom while Safari pans. Android resizes the
-   layout instead, the inset is 0, and the same bottom offset sits on the new
-   viewport edge. Fixed, not sticky: the card is not at the end of a scroller.
-   The lift is not transitioned, so it tracks the keyboard each frame, including
-   under reduced motion. */
+   The studio form is pinned to the bottom of the *visible* area. iOS overlays
+   the keyboard on the layout viewport and does not report window.innerHeight
+   consistently while it is up, so the form is not placed with bottom: <inset>.
+   It uses --mq-visual-bottom (visualViewport.offsetTop + height, in the same
+   layout-viewport px that fixed positioning resolves against): bottom:
+   calc(100% - visual bottom) puts its bottom edge on the visible bottom, above
+   the keyboard and any autofill bar, and tracks Safari's panning each frame.
+   On Android the layout resizes, and the same rule lands on the new edge. */
 @media (max-width: 700px) {
   html.mq-keyboard-open .mq-mobile-tabbar { display: none; }
   html.mq-keyboard-open .mq-studio-refine-wrap { bottom: calc(var(--mq-keyboard-inset, 0px) + 8px); }
@@ -1668,29 +1668,29 @@ button, a, [role="button"], label, summary, select { touch-action: manipulation;
   html.mq-keyboard-open .mq-artifact-studio-heading,
   html.mq-keyboard-open .mq-artifact-studio-note,
   html.mq-keyboard-open .mq-artifact-type-options { display: none; }
+  /* width: auto, so left and right both apply (width: 100% overflowed the right edge). */
   html.mq-keyboard-open .mq-artifact-studio-form {
     position: fixed;
     z-index: 25;
-    right: 16px;
-    bottom: calc(var(--mq-keyboard-inset, 0px) + 8px);
-    left: 16px;
+    top: auto;
+    right: 12px;
+    bottom: calc(100% - var(--mq-visual-bottom, 100%) + 8px);
+    left: 12px;
+    width: auto;
   }
-  /* Three lines when the gap above the keyboard allows, never under two.
-     min-height wins over a smaller max-height, so the floor stays two lines. */
+  /* Room left above the keyboard for the text: card chrome is ~90px plus 16px of gaps. */
   html.mq-keyboard-open .mq-artifact-prompt-card textarea {
-    height: 4.65em;
-    min-height: 3.1em;
-    max-height: max(3.1em, calc(100svh - var(--mq-keyboard-inset, 0px) - 150px));
+    max-height: max(1.55em, min(7.75em, calc(var(--mq-visual-height, 100svh) - 170px)));
   }
-  /* The menu opens upward from the pinned card; keep the list inside the gap above the keyboard. */
+  /* The menu opens upward from the pinned card; keep the list inside the visible area. */
   html.mq-keyboard-open .mq-artifact-studio .mq-design-list {
-    max-height: min(180px, max(96px, calc(100svh - var(--mq-keyboard-inset, 0px) - 120px)));
+    max-height: min(180px, max(96px, calc(var(--mq-visual-height, 100svh) - 160px)));
   }
   /* Safari often leaves focus in the textarea when a button is tapped, so the
-     keyboard stays up. The style sheet is a bottom sheet; lift it with the card. */
+     keyboard stays up. The style sheet is a bottom sheet; sit it on the visible bottom. */
   html.mq-keyboard-open .mq-select-menu.is-sheet {
-    bottom: var(--mq-keyboard-inset, 0px);
-    max-height: min(70vh, 520px, calc(100svh - var(--mq-keyboard-inset, 0px) - 12px));
+    bottom: calc(100% - var(--mq-visual-bottom, 100%));
+    max-height: min(70vh, 520px, calc(var(--mq-visual-height, 100svh) - 12px));
   }
 }
 

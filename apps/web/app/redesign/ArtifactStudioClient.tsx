@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowUp,
@@ -74,6 +74,14 @@ export default function ArtifactStudioClient({
   const router = useRouter();
   const [type, setType] = useState<ArtifactType | undefined>(initialType);
   const [prompt, setPrompt] = useState("");
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+  // Grow the prompt with its text; CSS sets the floor (one line on phones) and the cap.
+  useLayoutEffect(() => {
+    const field = promptRef.current;
+    if (!field) return;
+    field.style.height = "auto";
+    field.style.height = `${field.scrollHeight}px`;
+  }, [prompt]);
   const [withResearch, setWithResearch] = useState(false);
   const [stylePreset, setStylePreset] = useState<StylePreset>(StylePreset.PROFESSIONAL);
   const [pickedDesignSystemId, setPickedDesignSystemId] = useState<string>();
@@ -152,6 +160,7 @@ export default function ArtifactStudioClient({
               <label htmlFor="artifact-prompt" className="sr-only">Describe the artifact you want to create</label>
               <textarea
                 id="artifact-prompt"
+                ref={promptRef}
                 value={prompt}
                 onChange={(event) => {
                   setPrompt(event.target.value);
@@ -159,7 +168,7 @@ export default function ArtifactStudioClient({
                 }}
                 placeholder="Ask Mark to create something worth sharing..."
                 maxLength={2000}
-                rows={4}
+                rows={1}
               />
 
               <div className="mq-artifact-prompt-footer">
