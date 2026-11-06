@@ -220,23 +220,27 @@ export function ArtifactCard({
         </Link>
       </h2>
 
+      {artifact.status === "READY" && attachError ? (
+        <p className="mq-artifact-card-error" role="alert">{attachError}</p>
+      ) : null}
+
       <footer className="mq-artifact-card-footer">
-        <span>{versionNote(artifact)}</span>
-        <time dateTime={artifact.updatedAt}>{formatRelativeDate(artifact.updatedAt)}</time>
-      </footer>
-      {artifact.status === "READY" ? (
-        <div className="mq-artifact-card-attach">
-          {attachError ? <p role="alert">{attachError}</p> : null}
+        <div className="mq-artifact-card-meta">
+          <span>{versionNote(artifact)}</span>
+          <time dateTime={artifact.updatedAt}>{formatRelativeDate(artifact.updatedAt)}</time>
+        </div>
+        {artifact.status === "READY" ? (
           <button
             type="button"
+            className="mq-artifact-card-attach"
             onClick={() => onAttach(artifact)}
             disabled={isAttachDisabled || isAttaching}
             aria-busy={isAttaching}
           >
             {isAttaching ? "Preparing draft…" : "Attach to post"}
           </button>
-        </div>
-      ) : null}
+        ) : null}
+      </footer>
     </article>
   );
 }

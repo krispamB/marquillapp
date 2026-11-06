@@ -171,6 +171,9 @@ export default function BillingRedesignClient({
               <div className="mq-credit-balance">
                 <strong>{creditsRemaining.toLocaleString()}</strong>
                 <span>credits left of {creditLimit.toLocaleString()}</span>
+                <button type="button" className="mq-add-credits-button" disabled title="Additional credit purchases are not available yet">
+                  <Plus size={14} /> Add more credits
+                </button>
               </div>
               <div
                 className="mq-credit-balance-progress"
@@ -193,9 +196,6 @@ export default function BillingRedesignClient({
                   ))}
                 </div>
               </div>
-              <button type="button" className="mq-add-credits-button" disabled title="Additional credit purchases are not available yet">
-                <Plus size={18} /> Add more credits
-              </button>
             </>
           ) : <p className="mq-empty">No usage data found.</p>}
         </div>
