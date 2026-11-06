@@ -1,6 +1,21 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Environment, Paddle } from '@paddle/paddle-node-sdk';
+import {
+  Environment,
+  Paddle,
+  type Transaction,
+  type TransactionStatus,
+} from '@paddle/paddle-node-sdk';
+
+// `draft` and `ready` are unfinished checkouts, not charges.
+const INVOICE_HISTORY_STATUSES: TransactionStatus[] = [
+  'billed',
+  'paid',
+  'completed',
+  'past_due',
+  'canceled',
+];
+const INVOICE_HISTORY_PAGE_SIZE = 30;
 
 @Injectable()
 export class PaddleClient {
@@ -40,14 +55,31 @@ export class PaddleClient {
     return { transactionId: transaction.id };
   }
 
-  async listTransactions(input: { customerId: string }): Promise<any[]> {
-    const results: any[] = [];
-    for await (const tx of this.paddle.transactions.list({
-      customerId: [input.customerId],
-    })) {
-      results.push(tx);
-    }
-    return results;
+  /** The customer's most recent page of transactions, newest first. */
+  async listRecentTransactions(input: {
+    customerId: string;
+  }): Promise<Transaction[]> {
+    return this.paddle.transactions
+      .list({
+        customerId: [input.customerId],
+        status: INVOICE_HISTORY_STATUSES,
+        orderBy: 'created_at[DESC]',
+        perPage: INVOICE_HISTORY_PAGE_SIZE,
+      })
+      .next();
+  }
+
+  async getTransaction(transactionId: string): Promise<Transaction> {
+    return this.paddle.transactions.get(transactionId);
+  }
+
+  /** A link to the invoice PDF. Paddle expires it after an hour. */
+  async getInvoicePdfUrl(transactionId: string): Promise<string> {
+    const { url } = await this.paddle.transactions.getInvoicePDF(
+      transactionId,
+      { disposition: 'attachment' },
+    );
+    return url;
   }
 
   async cancelSubscriptionAtPeriodEnd(subscriptionId: string): Promise<void> {

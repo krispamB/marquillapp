@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, CreditCard, ExternalLink, Plus } from "lucide-react";
+import { Check, CreditCard, Plus } from "lucide-react";
+import InvoiceHistory, { type Invoice } from "./InvoiceHistory";
 import RedesignShell from "./Shell";
 import { API_BASE, jsonRequest, readApi } from "./api";
 import {
@@ -14,7 +15,6 @@ import {
 import { revalidateSubscriptionCache } from "../lib/actions";
 import type { BillingSummaryResponse, ConnectedAccount, PaymentUsageResponse, SubscriptionTier, Tier, UserProfile } from "../lib/types";
 
-type Invoice = { id?: string; date?: string; plan?: string; amount?: string | number; status?: string; customer?: string };
 type CheckoutResponse = { transactionId?: string };
 
 function unwrapList<T>(value: unknown): T[] {
@@ -43,6 +43,7 @@ export default function BillingRedesignClient({
   const [selectedAccountId, setSelectedAccountId] = useState(primaryAccountId ?? connectedAccounts[0]?.id);
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoicesFailed, setInvoicesFailed] = useState(false);
   const [usage, setUsage] = useState<PaymentUsageResponse["data"] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [checkoutTierId, setCheckoutTierId] = useState<string | null>(null);
@@ -60,6 +61,7 @@ export default function BillingRedesignClient({
       .then(([tierResponse, invoiceResponse, usageResponse]) => {
         setTiers(unwrapList<Tier>(tierResponse));
         setInvoices(unwrapList<Invoice>(invoiceResponse));
+        setInvoicesFailed(invoiceResponse === null);
         setUsage(usageResponse?.data ?? null);
       })
       .catch((reason) => setError(reason instanceof Error ? reason.message : "Unable to load billing data."))
@@ -69,6 +71,11 @@ export default function BillingRedesignClient({
   useEffect(() => {
     void loadBillingData();
   }, [loadBillingData]);
+
+  const downloadInvoice = useCallback(async (transactionId: string) => {
+    const { url } = await readApi<{ url: string }>(`${API_BASE}/payment/invoices/${encodeURIComponent(transactionId)}/pdf`);
+    window.location.assign(url);
+  }, []);
 
   // Paddle redirects here as soon as checkout completes, but the subscription
   // is only recorded when its webhook reaches the backend. Poll until the
@@ -203,7 +210,7 @@ export default function BillingRedesignClient({
 
         <section id="change-plan"><div className="mq-section-heading"><h2>Change plan</h2><span>Plans returned by Paddle</span></div><div className="mq-plan-grid">{tiers.length ? tiers.map((tier) => { const current = tier.name.toLowerCase() === planName.toLowerCase(); const isStartingCheckout = checkoutTierId === tier._id; const features = tier.metadata?.features ?? ["LinkedIn account", "AI drafting", "Post scheduling"]; return <div key={tier._id} className={`mq-card mq-tier-card ${current ? "is-current" : ""}`}><div className="mq-tier-heading"><h3>{tier.name}</h3>{current ? <span className="mq-current-badge">Current</span> : null}</div><div className="mq-tier-price">${tier.monthlyPrice}<small>/mo</small></div><p>{tier.metadata?.description ?? "Marquill essentials."}</p><ul>{features.slice(0, 4).map((feature) => <li key={feature}><Check size={14} />{feature}</li>)}</ul><button type="button" className={current ? "mq-disabled-button" : "mq-secondary-button"} disabled={current || checkoutTierId !== null} onClick={() => void handleCheckout(tier)}>{current ? "Current plan" : isStartingCheckout ? "Redirecting…" : "View plan"}</button></div>; }) : <div className="mq-card mq-empty">No plans available right now.</div>}</div></section>
 
-      <section className="mq-card mq-invoice-card"><div className="mq-card-heading"><span className="mq-title">Payment history</span><span className="mq-mono">Powered by Paddle</span></div>{invoices.length ? invoices.map((invoice, index) => <div className="mq-invoice-row" key={invoice.id ?? `${invoice.date}-${index}`}><span>{invoice.date ? new Date(invoice.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}</span><span>{invoice.plan ?? planName}</span><strong>{typeof invoice.amount === "number" ? `$${(invoice.amount / 100).toFixed(2)}` : invoice.amount ?? "—"}</strong><span className="mq-status mq-status-published"><i />{invoice.status ?? "Paid"}</span><button type="button" disabled title="Receipt endpoint is not connected"><ExternalLink size={13} /> Receipt</button></div>) : <p className="mq-empty">No invoices found.</p>}</section>
+      <InvoiceHistory invoices={invoices} loadFailed={invoicesFailed} onDownload={downloadInvoice} />
     </RedesignShell>
   );
 }

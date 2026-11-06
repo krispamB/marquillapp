@@ -1170,8 +1170,8 @@ html[data-theme="dark"] .mq-studio-refine-submit:disabled { background: var(--ca
 .mq-invoice-card { overflow: hidden; }
 .mq-invoice-row { display: grid; grid-template-columns: 120px 1fr 90px 90px 80px; align-items: center; gap: 16px; min-height: 40px; padding: 0 var(--card-pad); border-bottom: 1px solid var(--line-faint); color: var(--ink-500); font-size: var(--fs-xs); }
 .mq-invoice-row strong { color: var(--ink-900); text-align: right; }
-.mq-invoice-row button { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; border: 0; background: none; color: var(--accent-ink); font-size: var(--fs-2xs); font-weight: 600; cursor: not-allowed; }
-.mq-invoice-row button:disabled { opacity: .6; }
+.mq-invoice-row button { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; border: 0; background: none; color: var(--accent-ink); font-size: var(--fs-2xs); font-weight: 600; cursor: pointer; }
+.mq-invoice-row button:disabled { opacity: .6; cursor: not-allowed; }
 .mq-missing-note { display: flex; align-items: center; gap: 5px; margin: 12px 0 0; color: var(--ink-500); font: 400 var(--fs-2xs)/1.45 var(--font-inter); font-variant-numeric: tabular-nums; }
 .mq-settings-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: var(--gap-section); }
 .mq-settings-card { overflow: hidden; padding-bottom: 12px; }

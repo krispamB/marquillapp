@@ -102,6 +102,12 @@ Every feature Marquill has, is building, or has discussed. `live` means deployed
 | --- | --- | --- | --- | --- | --- | --- |
 | `post-analytics` | Post analytics | planned |  | Impressions and engagement for published posts, pulled from LinkedIn, inside Marquill.<br>_No issue yet. Open one when work starts._ | board | [LINKEDIN_ORGANIZATION_ANALYTICS_RESEARCH.md](../../apps/api/docs/LINKEDIN_ORGANIZATION_ANALYTICS_RESEARCH.md) |
 
+### Billing
+
+| Id | Feature | Status | Date | What it does | Landing; plans | Links |
+| --- | --- | --- | --- | --- | --- | --- |
+| `invoice-download` | Invoice downloads | building |  | Payment history on /billing lists real charges in the currency paid, leaves out unfinished checkouts, and downloads the PDF invoice for a paid charge. |  | [payment.md](../../apps/api/docs/api/payment.md) |
+
 ### Workspace
 
 | Id | Feature | Status | Date | What it does | Landing; plans | Links |
@@ -148,6 +154,7 @@ Every feature Marquill has, is building, or has discussed. `live` means deployed
 
 | Date | Feature | Entry | Published |
 | --- | --- | --- | --- |
+| 2026-11-06 | `invoice-download` | **Download your invoices**: Payment history shows each charge in the currency you paid, with its PDF invoice one click away. | draft |
 | 2026-11-06 | `compact-workspace-ui` | **A calmer, more compact workspace**: Smaller type and controls everywhere, and the calendar now fits a phone screen. | draft |
 | 2026-11-04 | `account-preferences` | **Preferences that follow you**: Pick a theme and timezone in Settings once, and every device you sign in on uses them. | draft |
 | 2026-10-15 | `design-system-picker` | **Swatch menu with hover preview**: Hover over a Design System to preview it before you pick. | yes |

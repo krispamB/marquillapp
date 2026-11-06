@@ -342,6 +342,14 @@ export const features: Feature[] = [
     summary: 'The /billing page shows the current plan, usage against limits, and invoices, and cancels a subscription.',
     since: '2026-03-07',
   },
+  {
+    id: 'invoice-download',
+    name: 'Invoice downloads',
+    area: 'billing',
+    status: 'building',
+    summary: 'Payment history on /billing lists real charges in the currency paid, leaves out unfinished checkouts, and downloads the PDF invoice for a paid charge.',
+    docs: ['apps/api/docs/api/payment.md'],
+  },
 
   /* --------------------------------------------------------------- workspace */
   {
