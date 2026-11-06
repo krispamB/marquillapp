@@ -112,6 +112,16 @@ export default function CalendarRedesignClient({
     }
   }
 
+  function monthStepper(className: string, format: Intl.DateTimeFormatOptions) {
+    return (
+      <div className={className}>
+        <button type="button" className="mq-icon-button" onClick={() => shiftMonth(-1)} aria-label="Previous month"><ChevronLeft size={15} /></button>
+        <strong>{cursor.toLocaleDateString(undefined, format)}</strong>
+        <button type="button" className="mq-icon-button" onClick={() => shiftMonth(1)} aria-label="Next month"><ChevronRight size={15} /></button>
+      </div>
+    );
+  }
+
   return (
     <RedesignShell
       user={user}
@@ -120,14 +130,14 @@ export default function CalendarRedesignClient({
       onSelectAccount={setSelectedAccountId}
       subscription={subscription}
       active="calendar"
-      title={<span className="mq-topbar-title-dup">Calendar</span>}
-      topbarExtra={<div className="mq-calendar-top-controls"><button type="button" className="mq-icon-button" onClick={() => shiftMonth(-1)} aria-label="Previous month"><ChevronLeft size={15} /></button><strong>{cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong><button type="button" className="mq-icon-button" onClick={() => shiftMonth(1)} aria-label="Next month"><ChevronRight size={15} /></button></div>}
+      title="Calendar"
+      topbarExtra={monthStepper("mq-calendar-top-controls mq-calendar-stepper-desktop", { month: "long", year: "numeric" })}
     >
       <div className="mq-page-heading mq-page-heading-compact"><div><span className="mq-eyebrow">Scheduling queue</span><h1 className="mq-h1-dup">{cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</h1><p>Drag a post to a new day or open it to edit the draft.</p></div><Link href="/posts/new" className="mq-primary-button"><Plus size={16} /> New post</Link></div>
       {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}
       {message ? <div className="mq-alert mq-alert-success">{message}</div> : null}
 
-      <div className="mq-calendar-toolbar"><div className="mq-calendar-legend"><span><i className="mq-calendar-dot-scheduled" /> Scheduled</span><span><i className="mq-calendar-dot-published" /> Published</span><span><i className="mq-calendar-dot-draft" /> Draft</span></div><div className="mq-segmented mq-segmented-small"><button type="button" className={view === "month" ? "is-active" : ""} onClick={() => setView("month")}>Month</button><button type="button" className={view === "week" ? "is-active" : ""} onClick={() => setView("week")}>Week</button></div></div>
+      <div className="mq-calendar-toolbar">{monthStepper("mq-calendar-top-controls mq-calendar-stepper-mobile", { month: "short", year: "numeric" })}<div className="mq-calendar-legend"><span><i className="mq-calendar-dot-scheduled" /> Scheduled</span><span><i className="mq-calendar-dot-published" /> Published</span><span><i className="mq-calendar-dot-draft" /> Draft</span></div><div className="mq-segmented mq-segmented-small"><button type="button" className={view === "month" ? "is-active" : ""} onClick={() => setView("month")}>Month</button><button type="button" className={view === "week" ? "is-active" : ""} onClick={() => setView("week")}>Week</button></div></div>
 
       {view === "month" ? (
         <>

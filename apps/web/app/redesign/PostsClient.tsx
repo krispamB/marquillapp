@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { CalendarClock, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Plus, Search, Send, Trash2 } from "lucide-react";
+import { CalendarClock, ChevronDown, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Plus, Search, Send, Trash2, X } from "lucide-react";
 import RedesignShell from "./Shell";
 import { API_BASE, jsonRequest, readApi } from "./api";
 import DeleteConfirmModal from "./DeleteConfirmModal";
@@ -28,6 +28,14 @@ function compactTitle(post: DashboardPost) {
   return title.length > 150 ? `${title.slice(0, 147)}…` : title;
 }
 
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function monthLabel(value: string) {
+  const [year, month] = value.split("-");
+  const name = MONTH_NAMES[Number(month) - 1];
+  return name && year ? `${name} ${year}` : "Month";
+}
+
 function postKind(post: DashboardPost) {
   if (post.type?.toLowerCase().includes("insight")) return "Insight";
   return "Post";
@@ -49,6 +57,8 @@ export default function PostsRedesignClient({
   const [posts, setPosts] = useState<DashboardPost[]>([]);
   const [filter, setFilter] = useState<PostFilter>("ALL");
   const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -78,6 +88,7 @@ export default function PostsRedesignClient({
   }, [selectedAccountId, selectedMonth]);
 
   useEffect(() => { void loadPosts(); }, [loadPosts]);
+  useEffect(() => { if (searchOpen) searchInputRef.current?.focus(); }, [searchOpen]);
 
   const counts = useMemo(() => {
     return posts.reduce<Record<PostFilter, number>>((result, post) => {
@@ -181,8 +192,16 @@ export default function PostsRedesignClient({
           ))}
         </div>
         <div className="mq-toolbar-filters">
-          <label className="mq-filter-select"><input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} aria-label="Filter by month" /></label>
-          <label className="mq-filter-select mq-search-mobile"><Search size={14} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /></label>
+          <label className="mq-filter-select mq-month-filter">
+            <span className="mq-month-label" aria-hidden="true">{monthLabel(selectedMonth)}<ChevronDown size={14} /></span>
+            <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} aria-label="Filter by month" />
+          </label>
+          <button type="button" className="mq-icon-button mq-search-toggle" aria-label="Search posts" aria-expanded={searchOpen || Boolean(search)} onClick={() => setSearchOpen((open) => !open)}><Search size={16} /></button>
+          <label className={`mq-filter-select mq-search-mobile${searchOpen || search ? " is-open" : ""}`}>
+            <Search size={14} />
+            <input ref={searchInputRef} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search posts…" />
+            <button type="button" className="mq-search-close" aria-label="Close search" onClick={() => { setSearch(""); setSearchOpen(false); }}><X size={14} /></button>
+          </label>
         </div>
       </div>
 

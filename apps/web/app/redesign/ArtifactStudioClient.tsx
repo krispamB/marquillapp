@@ -149,11 +149,13 @@ export default function ArtifactStudioClient({
     >
       <section className="mq-artifact-studio" aria-labelledby="mq-artifact-studio-title">
         <div className="mq-artifact-studio-hero">
+          <span className="mq-artifact-studio-spacer mq-artifact-studio-spacer-top" aria-hidden="true" />
           <MarquillLockup size={28} theme="auto" className="mq-artifact-studio-logo" />
           <div className="mq-artifact-studio-heading">
             <span className="mq-eyebrow">The Artifact Studio</span>
             <h1 id="mq-artifact-studio-title">What will we make today?</h1>
           </div>
+          <span className="mq-artifact-studio-spacer mq-artifact-studio-spacer-bottom" aria-hidden="true" />
 
           <form className="mq-artifact-studio-form" onSubmit={createArtifact}>
             <div className="mq-artifact-prompt-card">
