@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import { isKeyboardOpen, keyboardInset, opensKeyboard } from "./keyboardInset";
+import { isKeyboardOpen, keyboardInset, opensKeyboard, visualBottom } from "./keyboardInset";
 
 /**
  * Publishes the on-screen keyboard to CSS so fixed and sticky UI can sit above
  * it: `--mq-keyboard-inset` on <html> (px the keyboard covers) and the
- * `mq-keyboard-open` class while it is up. Touch devices only.
+ * `mq-keyboard-open` class while it is up, plus `--mq-visual-bottom` and
+ * `--mq-visual-height` (the visible area, in layout-viewport px). Touch
+ * devices only.
  */
 export default function KeyboardInsetSync() {
   useEffect(() => {
@@ -31,6 +33,9 @@ export default function KeyboardInsetSync() {
       const open = viewport ? isKeyboardOpen(focused, inset, height, tallest) : focused;
       root.style.setProperty("--mq-keyboard-inset", `${open ? inset : 0}px`);
       root.classList.toggle("mq-keyboard-open", open);
+      const visible = viewport ?? { height: window.innerHeight, offsetTop: 0 };
+      root.style.setProperty("--mq-visual-bottom", `${visualBottom(visible)}px`);
+      root.style.setProperty("--mq-visual-height", `${Math.round(visible.height)}px`);
     };
     const schedule = () => {
       if (!frame) frame = window.requestAnimationFrame(update);
@@ -53,6 +58,8 @@ export default function KeyboardInsetSync() {
       document.removeEventListener("focusin", schedule);
       document.removeEventListener("focusout", onFocusOut);
       root.style.removeProperty("--mq-keyboard-inset");
+      root.style.removeProperty("--mq-visual-bottom");
+      root.style.removeProperty("--mq-visual-height");
       root.classList.remove("mq-keyboard-open");
     };
   }, []);

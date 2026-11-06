@@ -27,3 +27,14 @@ export function isKeyboardOpen(fieldFocused: boolean, inset: number, viewportHei
   if (!fieldFocused) return false;
   return inset > 60 || viewportHeight < tallestViewport - 120;
 }
+
+/**
+ * Where the visible area ends, in CSS px from the top of the layout viewport
+ * (the box `position: fixed` resolves against). Fixed UI that must sit above
+ * the keyboard anchors here with `bottom: calc(100% - <this>)`, so it never
+ * depends on window.innerHeight, which iOS does not report consistently while
+ * the keyboard is up.
+ */
+export function visualBottom(viewport: { height: number; offsetTop: number }): number {
+  return Math.round(viewport.offsetTop + viewport.height);
+}

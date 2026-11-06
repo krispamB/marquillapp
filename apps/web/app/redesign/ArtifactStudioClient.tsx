@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowUp,
@@ -33,6 +33,8 @@ import { createArtifactBody, createArtifactRequest } from "./artifactRequests";
 import DesignSystemMenu from "./DesignSystemMenu";
 import { resolveDesignSystemId } from "./designSystems";
 import useDesignSystems from "./useDesignSystems";
+import useMediaQuery from "./useMediaQuery";
+import StudioRecent from "./StudioRecent";
 import RedesignShell from "./Shell";
 import { canUseResearch } from "./tier-access";
 
@@ -72,8 +74,17 @@ export default function ArtifactStudioClient({
   restoreKey?: string;
 }) {
   const router = useRouter();
+  const isMobile = useMediaQuery("(max-width: 700px)");
   const [type, setType] = useState<ArtifactType | undefined>(initialType);
   const [prompt, setPrompt] = useState("");
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+  // Grow the prompt with its text; CSS sets the floor (one line on phones) and the cap.
+  useLayoutEffect(() => {
+    const field = promptRef.current;
+    if (!field) return;
+    field.style.height = "auto";
+    field.style.height = `${field.scrollHeight}px`;
+  }, [prompt]);
   const [withResearch, setWithResearch] = useState(false);
   const [stylePreset, setStylePreset] = useState<StylePreset>(StylePreset.PROFESSIONAL);
   const [pickedDesignSystemId, setPickedDesignSystemId] = useState<string>();
@@ -141,17 +152,22 @@ export default function ArtifactStudioClient({
     >
       <section className="mq-artifact-studio" aria-labelledby="mq-artifact-studio-title">
         <div className="mq-artifact-studio-hero">
-          <MarquillLockup size={52} theme="auto" className="mq-artifact-studio-logo" />
+          <span className="mq-artifact-studio-spacer mq-artifact-studio-spacer-top" aria-hidden="true" />
+          <MarquillLockup size={28} theme="auto" className="mq-artifact-studio-logo" />
           <div className="mq-artifact-studio-heading">
             <span className="mq-eyebrow">The Artifact Studio</span>
             <h1 id="mq-artifact-studio-title">What will we make today?</h1>
           </div>
+          <span className="mq-artifact-studio-spacer mq-artifact-studio-spacer-bottom" aria-hidden="true" />
+
+          {isMobile ? <StudioRecent /> : null}
 
           <form className="mq-artifact-studio-form" onSubmit={createArtifact}>
             <div className="mq-artifact-prompt-card">
               <label htmlFor="artifact-prompt" className="sr-only">Describe the artifact you want to create</label>
               <textarea
                 id="artifact-prompt"
+                ref={promptRef}
                 value={prompt}
                 onChange={(event) => {
                   setPrompt(event.target.value);
@@ -159,7 +175,7 @@ export default function ArtifactStudioClient({
                 }}
                 placeholder="Ask Mark to create something worth sharing..."
                 maxLength={2000}
-                rows={4}
+                rows={1}
               />
 
               <div className="mq-artifact-prompt-footer">

@@ -153,14 +153,14 @@ export default function BillingRedesignClient({
 
   return (
     <RedesignShell user={user} accounts={connectedAccounts} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} subscription={subscription} active="billing" title="Billing">
-      <div className="mq-page-heading mq-page-heading-compact"><div><span className="mq-eyebrow">Plan, usage &amp; payment history</span><h1>Billing</h1><p>Keep your plan and publishing capacity in view.</p></div></div>
+      <div className="mq-page-heading mq-page-heading-compact"><div><span className="mq-eyebrow">Plan, usage &amp; payment history</span><h1 className="mq-h1-dup">Billing</h1><p>Keep your plan and publishing capacity in view.</p></div></div>
       {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}
       {isLoading ? <div className="mq-alert">Loading billing data…</div> : null}
       {checkoutConfirmation === "confirming" ? <div className="mq-alert">Payment received. Confirming your new plan…</div> : null}
       {checkoutConfirmation === "timed-out" ? <div className="mq-alert">Payment received. Your new plan is taking longer than usual to activate; refresh this page in a minute.</div> : null}
 
       <section className="mq-billing-top">
-        <div className="mq-plan-card"><div className="mq-plan-card-header"><span className="mq-mono">_ current plan</span><span className="mq-active-badge">Active</span></div><div className="mq-plan-name">{planName}<span>{activeTier?.monthlyPrice ? `$${activeTier.monthlyPrice} / mo` : ""}</span></div><p>{activeTier?.metadata?.description ?? "Your current Marquill plan and publishing limits."}</p><div className="mq-plan-actions"><a href="#change-plan" className="mq-light-button">Change plan</a><button type="button" className="mq-dark-outline-button" disabled title="Payment-management endpoint is not connected"><CreditCard size={14} /> Manage payment</button></div></div>
+        <div className="mq-plan-card"><div className="mq-plan-card-header"><span className="mq-mono">Current plan</span><span className="mq-active-badge">Active</span></div><div className="mq-plan-name">{planName}<span>{activeTier?.monthlyPrice ? `$${activeTier.monthlyPrice} / mo` : ""}</span></div><p>{activeTier?.metadata?.description ?? "Your current Marquill plan and publishing limits."}</p><div className="mq-plan-actions"><a href="#change-plan" className="mq-light-button">Change plan</a><button type="button" className="mq-dark-outline-button" disabled title="Payment-management endpoint is not connected"><CreditCard size={14} /> Manage payment</button></div></div>
         <div className="mq-card mq-usage-card">
           <div className="mq-usage-heading">
             <span className="mq-title">Credit balance</span>
@@ -171,6 +171,9 @@ export default function BillingRedesignClient({
               <div className="mq-credit-balance">
                 <strong>{creditsRemaining.toLocaleString()}</strong>
                 <span>credits left of {creditLimit.toLocaleString()}</span>
+                <button type="button" className="mq-add-credits-button" disabled title="Additional credit purchases are not available yet">
+                  <Plus size={14} /> Add more credits
+                </button>
               </div>
               <div
                 className="mq-credit-balance-progress"
@@ -193,18 +196,14 @@ export default function BillingRedesignClient({
                   ))}
                 </div>
               </div>
-              <button type="button" className="mq-add-credits-button" disabled title="Additional credit purchases are not available yet">
-                <Plus size={18} /> Add more credits
-              </button>
             </>
           ) : <p className="mq-empty">No usage data found.</p>}
         </div>
       </section>
 
-        <section id="change-plan"><div className="mq-section-heading"><h2>Change plan</h2><span>Plans returned by Paddle</span></div><div className="mq-plan-grid">{tiers.length ? tiers.map((tier) => { const current = tier.name.toLowerCase() === planName.toLowerCase(); const isStartingCheckout = checkoutTierId === tier._id; const features = tier.metadata?.features ?? ["LinkedIn account", "AI drafting", "Post scheduling"]; return <div key={tier._id} className={`mq-card mq-tier-card ${current ? "is-current" : ""}`}><div className="mq-tier-heading"><h3>{tier.name}</h3>{current ? <span className="mq-current-badge">Current</span> : null}</div><div className="mq-tier-price">${tier.monthlyPrice}<small>/mo</small></div><p>{tier.metadata?.description ?? "Marquill essentials."}</p><ul>{features.slice(0, 4).map((feature) => <li key={feature}><Check size={14} />{feature}</li>)}</ul><button type="button" className={current ? "mq-disabled-button" : "mq-primary-button"} disabled={current || checkoutTierId !== null} onClick={() => void handleCheckout(tier)}>{current ? "Current plan" : isStartingCheckout ? "Redirecting…" : "View plan"}</button></div>; }) : <div className="mq-card mq-empty">No plans available right now.</div>}</div></section>
+        <section id="change-plan"><div className="mq-section-heading"><h2>Change plan</h2><span>Plans returned by Paddle</span></div><div className="mq-plan-grid">{tiers.length ? tiers.map((tier) => { const current = tier.name.toLowerCase() === planName.toLowerCase(); const isStartingCheckout = checkoutTierId === tier._id; const features = tier.metadata?.features ?? ["LinkedIn account", "AI drafting", "Post scheduling"]; return <div key={tier._id} className={`mq-card mq-tier-card ${current ? "is-current" : ""}`}><div className="mq-tier-heading"><h3>{tier.name}</h3>{current ? <span className="mq-current-badge">Current</span> : null}</div><div className="mq-tier-price">${tier.monthlyPrice}<small>/mo</small></div><p>{tier.metadata?.description ?? "Marquill essentials."}</p><ul>{features.slice(0, 4).map((feature) => <li key={feature}><Check size={14} />{feature}</li>)}</ul><button type="button" className={current ? "mq-disabled-button" : "mq-secondary-button"} disabled={current || checkoutTierId !== null} onClick={() => void handleCheckout(tier)}>{current ? "Current plan" : isStartingCheckout ? "Redirecting…" : "View plan"}</button></div>; }) : <div className="mq-card mq-empty">No plans available right now.</div>}</div></section>
 
       <section className="mq-card mq-invoice-card"><div className="mq-card-heading"><span className="mq-title">Payment history</span><span className="mq-mono">Powered by Paddle</span></div>{invoices.length ? invoices.map((invoice, index) => <div className="mq-invoice-row" key={invoice.id ?? `${invoice.date}-${index}`}><span>{invoice.date ? new Date(invoice.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}</span><span>{invoice.plan ?? planName}</span><strong>{typeof invoice.amount === "number" ? `$${(invoice.amount / 100).toFixed(2)}` : invoice.amount ?? "—"}</strong><span className="mq-status mq-status-published"><i />{invoice.status ?? "Paid"}</span><button type="button" disabled title="Receipt endpoint is not connected"><ExternalLink size={13} /> Receipt</button></div>) : <p className="mq-empty">No invoices found.</p>}</section>
-      <p className="mq-missing-note">Manage payment, cancel subscription, and receipt downloads are visible in the handoff but have no matching frontend endpoint in this repository.</p>
     </RedesignShell>
   );
 }

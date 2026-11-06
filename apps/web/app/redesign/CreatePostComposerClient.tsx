@@ -293,8 +293,8 @@ export default function CreatePostComposerClient({
         title={account && !accountAccess?.isUsable ? LINKEDIN_ACCESS_EXPIRED_MESSAGE : undefined}
       >
         {isSubmitting ? <LoaderCircle className="mq-spin" size={16} /> : scheduleMode ? <CalendarClock size={16} /> : <Send size={16} />}
-        <span className="mq-create-post-action-full">{scheduleMode ? `Schedule · ${scheduleLabel}` : "Publish now"}</span>
-        <span className="mq-create-post-action-short" aria-hidden="true">{scheduleMode ? "Schedule" : "Publish"}</span>
+        <span className="mq-create-post-action-full">{scheduleMode ? `${isScheduled ? "Reschedule" : "Schedule"} · ${scheduleLabel}` : "Publish now"}</span>
+        <span className="mq-create-post-action-short" aria-hidden="true">{scheduleMode ? (isScheduled ? "Reschedule" : "Schedule") : "Publish"}</span>
       </button>
     </div>
   ) : null;

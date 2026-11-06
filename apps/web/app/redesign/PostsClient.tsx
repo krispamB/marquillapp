@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { CalendarClock, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Plus, Search, Send, Trash2 } from "lucide-react";
+import { CalendarClock, ChevronDown, ChevronLeft, ChevronRight, Pencil, Plus, Search, Send, Trash2, X } from "lucide-react";
 import RedesignShell from "./Shell";
 import { API_BASE, jsonRequest, readApi } from "./api";
 import DeleteConfirmModal from "./DeleteConfirmModal";
+import PostRowMenu from "./PostRowMenu";
 import SchedulePicker, { getDefaultScheduleDate, localDateTimeValue } from "./SchedulePicker";
-import { formatRelativeDate, formatScheduledDate, getAccountInitials, getInitials, getPostTitle, normalizeStatus, parseDate, toYearMonth } from "./types";
+import { formatRelativeDate, formatScheduledDate, getPostTitle, normalizeStatus, parseDate, toYearMonth } from "./types";
 import type { ConnectedAccount, DashboardPost, DashboardPostsResponse, SubscriptionTier, UserProfile } from "../lib/types";
 import {
   getLinkedInAccountAccessById,
@@ -26,6 +27,14 @@ const filterLabels: Array<{ key: PostFilter; label: string }> = [
 function compactTitle(post: DashboardPost) {
   const title = post.title?.trim() || getPostTitle(post.content);
   return title.length > 150 ? `${title.slice(0, 147)}…` : title;
+}
+
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function monthLabel(value: string) {
+  const [year, month] = value.split("-");
+  const name = MONTH_NAMES[Number(month) - 1];
+  return name && year ? `${name} ${year}` : "Month";
 }
 
 function postKind(post: DashboardPost) {
@@ -49,6 +58,8 @@ export default function PostsRedesignClient({
   const [posts, setPosts] = useState<DashboardPost[]>([]);
   const [filter, setFilter] = useState<PostFilter>("ALL");
   const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -78,6 +89,7 @@ export default function PostsRedesignClient({
   }, [selectedAccountId, selectedMonth]);
 
   useEffect(() => { void loadPosts(); }, [loadPosts]);
+  useEffect(() => { if (searchOpen) searchInputRef.current?.focus(); }, [searchOpen]);
 
   const counts = useMemo(() => {
     return posts.reduce<Record<PostFilter, number>>((result, post) => {
@@ -95,6 +107,8 @@ export default function PostsRedesignClient({
       .filter((post) => !query || `${post.title ?? ""}\n${post.content ?? ""}`.toLowerCase().includes(query))
       .sort((a, b) => (parseDate(b.updatedAt ?? b.scheduledAt ?? b.createdAt)?.getTime() ?? 0) - (parseDate(a.updatedAt ?? a.scheduledAt ?? a.createdAt)?.getTime() ?? 0));
   }, [filter, posts, search]);
+  // A label every row shares says nothing; show the kind only when the list mixes them.
+  const showKind = new Set(visiblePosts.map(postKind)).size > 1;
 
   async function runAction(postId: string, action: "publish" | "delete") {
     const post = posts.find((item) => item._id === postId);
@@ -168,7 +182,7 @@ export default function PostsRedesignClient({
       }
     >
       <div className="mq-page-heading mq-page-heading-compact">
-        <div><span className="mq-eyebrow">Your content workspace</span><h1>Posts</h1><p>Draft, schedule, and publish from one calm queue.</p></div>
+        <div><span className="mq-eyebrow">Your content workspace</span><h1 className="mq-h1-dup">Posts</h1><p>Draft, schedule, and publish from one calm queue.</p></div>
         <Link href="/posts/new" className="mq-primary-button"><Plus size={16} /> New post</Link>
       </div>
 
@@ -181,8 +195,16 @@ export default function PostsRedesignClient({
           ))}
         </div>
         <div className="mq-toolbar-filters">
-          <label className="mq-filter-select"><CalendarClock size={14} /><input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} aria-label="Filter by month" /></label>
-          <label className="mq-filter-select mq-search-mobile"><Search size={14} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /></label>
+          <label className="mq-filter-select mq-month-filter">
+            <span className="mq-month-label" aria-hidden="true">{monthLabel(selectedMonth)}<ChevronDown size={14} /></span>
+            <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} aria-label="Filter by month" />
+          </label>
+          <button type="button" className="mq-icon-button mq-search-toggle" aria-label="Search posts" aria-expanded={searchOpen || Boolean(search)} onClick={() => setSearchOpen((open) => !open)}><Search size={16} /></button>
+          <label className={`mq-filter-select mq-search-mobile${searchOpen || search ? " is-open" : ""}`}>
+            <Search size={14} />
+            <input ref={searchInputRef} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search posts…" />
+            <button type="button" className="mq-search-close" aria-label="Close search" onClick={() => { setSearch(""); setSearchOpen(false); }}><X size={14} /></button>
+          </label>
         </div>
       </div>
 
@@ -195,30 +217,29 @@ export default function PostsRedesignClient({
         {visiblePosts.map((post) => {
           const status = normalizeStatus(post.status);
           const dateLabel = status === "SCHEDULED" ? formatScheduledDate(post.scheduledAt) : formatRelativeDate(post.updatedAt ?? post.createdAt);
-          const account = connectedAccounts.find((item) => item.id === post.connectedAccount);
-          const accountName = post.connectedAccountName ?? account?.displayName ?? "LinkedIn account";
-          const accountInitials = account ? getAccountInitials(account) : getInitials(accountName);
           const accountAccess = getLinkedInAccountAccessById(post.connectedAccount, connectedAccounts);
           const linkedinActionDisabled = !accountAccess?.isUsable;
           return (
             <article key={post._id} className="mq-post-row">
-              {account?.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={account.avatarUrl} alt="" className="mq-post-avatar mq-linkedin-avatar" />
-              ) : (
-                <span className={`mq-post-avatar mq-post-avatar-${status.toLowerCase()}`}>{accountInitials || "—"}</span>
-              )}
-              <div className="mq-post-row-copy">
-                <div className="mq-post-row-meta"><strong>{accountName}</strong><span>{postKind(post)}</span></div>
-                <Link href={`/posts/${post._id}/edit`} className="mq-post-row-title">{compactTitle(post)}</Link>
-              </div>
-              <div className="mq-post-row-status"><span className={`mq-status mq-status-${status.toLowerCase()}`}><i />{status[0] + status.slice(1).toLowerCase()}</span><span className="mq-mono">{dateLabel}</span></div>
+              <Link href={`/posts/${post._id}/edit`} className="mq-post-row-title">{compactTitle(post)}</Link>
+              <div className="mq-post-row-status"><span className={`mq-status mq-status-${status.toLowerCase()}`}><i />{status[0] + status.slice(1).toLowerCase()}</span><span className="mq-mono">{dateLabel}</span>{showKind ? <span className="mq-post-row-kind">{postKind(post)}</span> : null}</div>
               <div className="mq-post-row-actions">
+                <div className="mq-post-row-icons">
                 {status === "DRAFT" ? <Link href={`/posts/${post._id}/edit`} className="mq-icon-button" title="Edit post"><Pencil size={15} /></Link> : null}
                 {status === "SCHEDULED" ? <button type="button" className="mq-icon-button" title={linkedinActionDisabled ? LINKEDIN_ACCESS_EXPIRED_MESSAGE : "Schedule post"} disabled={linkedinActionDisabled} onClick={() => { setSchedulePostId(post._id); setScheduleValue(localDateTimeValue(parseDate(post.scheduledAt) ?? getDefaultScheduleDate())); }}><CalendarClock size={15} /></button> : null}
                 {status !== "PUBLISHED" ? <button type="button" className="mq-icon-button" title={linkedinActionDisabled ? LINKEDIN_ACCESS_EXPIRED_MESSAGE : "Publish now"} disabled={linkedinActionDisabled || actionId === post._id} onClick={() => void runAction(post._id, "publish")}><Send size={15} /></button> : null}
                 <button type="button" className="mq-icon-button mq-icon-danger" title="Delete post" disabled={actionId === post._id} onClick={() => setDeletePostId(post._id)}><Trash2 size={15} /></button>
-                <button type="button" className="mq-icon-button mq-more-button" aria-label="More actions"><MoreHorizontal size={16} /></button>
+                </div>
+                <PostRowMenu
+                  status={status}
+                  editHref={`/posts/${post._id}/edit`}
+                  linkedinDisabled={linkedinActionDisabled}
+                  linkedinDisabledReason={LINKEDIN_ACCESS_EXPIRED_MESSAGE}
+                  busy={actionId === post._id}
+                  onSchedule={() => { setSchedulePostId(post._id); setScheduleValue(localDateTimeValue(parseDate(post.scheduledAt) ?? getDefaultScheduleDate())); }}
+                  onPublish={() => void runAction(post._id, "publish")}
+                  onDelete={() => setDeletePostId(post._id)}
+                />
               </div>
               {schedulePostId === post._id ? (
                 <div className="mq-inline-schedule">

@@ -16,7 +16,8 @@ function monthCells(date: Date) {
   const first = new Date(date.getFullYear(), date.getMonth(), 1);
   const start = new Date(first);
   start.setDate(1 - first.getDay());
-  return Array.from({ length: 42 }, (_, index) => {
+  const weeks = Math.ceil((first.getDay() + new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()) / 7);
+  return Array.from({ length: weeks * 7 }, (_, index) => {
     const cell = new Date(start);
     cell.setDate(start.getDate() + index);
     return { date: cell, inMonth: cell.getMonth() === date.getMonth() };
@@ -88,6 +89,8 @@ export default function CalendarRedesignClient({
   }, [posts]);
   const upcoming = useMemo(() => posts.filter((post) => normalizeStatus(post.status) === "SCHEDULED").sort((a, b) => (parseDate(a.scheduledAt)?.getTime() ?? 0) - (parseDate(b.scheduledAt)?.getTime() ?? 0)), [posts]);
 
+  const monthList = useMemo(() => posts.filter((post) => post._id && parseDate(post.scheduledAt ?? post.updatedAt ?? post.createdAt)).sort((a, b) => (parseDate(a.scheduledAt ?? a.updatedAt ?? a.createdAt)?.getTime() ?? 0) - (parseDate(b.scheduledAt ?? b.updatedAt ?? b.createdAt)?.getTime() ?? 0)), [posts]);
+
   function shiftMonth(amount: number) {
     setCursor((current) => new Date(current.getFullYear(), current.getMonth() + amount, 1));
   }
@@ -109,6 +112,16 @@ export default function CalendarRedesignClient({
     }
   }
 
+  function monthStepper(className: string, format: Intl.DateTimeFormatOptions) {
+    return (
+      <div className={className}>
+        <button type="button" className="mq-icon-button" onClick={() => shiftMonth(-1)} aria-label="Previous month"><ChevronLeft size={15} /></button>
+        <strong>{cursor.toLocaleDateString(undefined, format)}</strong>
+        <button type="button" className="mq-icon-button" onClick={() => shiftMonth(1)} aria-label="Next month"><ChevronRight size={15} /></button>
+      </div>
+    );
+  }
+
   return (
     <RedesignShell
       user={user}
@@ -118,15 +131,16 @@ export default function CalendarRedesignClient({
       subscription={subscription}
       active="calendar"
       title="Calendar"
-      topbarExtra={<div className="mq-calendar-top-controls"><button type="button" className="mq-icon-button" onClick={() => shiftMonth(-1)} aria-label="Previous month"><ChevronLeft size={15} /></button><strong>{cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong><button type="button" className="mq-icon-button" onClick={() => shiftMonth(1)} aria-label="Next month"><ChevronRight size={15} /></button></div>}
+      topbarExtra={monthStepper("mq-calendar-top-controls mq-calendar-stepper-desktop", { month: "long", year: "numeric" })}
     >
-      <div className="mq-page-heading mq-page-heading-compact"><div><span className="mq-eyebrow">Scheduling queue</span><h1>{cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</h1><p>Drag a post to a new day or open it to edit the draft.</p></div><Link href="/posts/new" className="mq-primary-button"><Plus size={16} /> New post</Link></div>
+      <div className="mq-page-heading mq-page-heading-compact"><div><span className="mq-eyebrow">Scheduling queue</span><h1 className="mq-h1-dup">{cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</h1><p>Drag a post to a new day or open it to edit the draft.</p></div><Link href="/posts/new" className="mq-primary-button"><Plus size={16} /> New post</Link></div>
       {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}
       {message ? <div className="mq-alert mq-alert-success">{message}</div> : null}
 
-      <div className="mq-calendar-toolbar"><div className="mq-calendar-legend"><span><i className="mq-calendar-dot-scheduled" /> Scheduled</span><span><i className="mq-calendar-dot-published" /> Published</span><span><i className="mq-calendar-dot-draft" /> Draft</span></div><div className="mq-segmented mq-segmented-small"><button type="button" className={view === "month" ? "is-active" : ""} onClick={() => setView("month")}>Month</button><button type="button" className={view === "week" ? "is-active" : ""} onClick={() => setView("week")}>Week</button></div></div>
+      <div className="mq-calendar-toolbar">{monthStepper("mq-calendar-top-controls mq-calendar-stepper-mobile", { month: "short", year: "numeric" })}<div className="mq-calendar-legend"><span><i className="mq-calendar-dot-scheduled" /> Scheduled</span><span><i className="mq-calendar-dot-published" /> Published</span><span><i className="mq-calendar-dot-draft" /> Draft</span></div><div className="mq-segmented mq-segmented-small"><button type="button" className={view === "month" ? "is-active" : ""} onClick={() => setView("month")}>Month</button><button type="button" className={view === "week" ? "is-active" : ""} onClick={() => setView("week")}>Week</button></div></div>
 
       {view === "month" ? (
+        <>
         <div className="mq-card mq-calendar-card">
           <div className="mq-calendar-weekdays">{["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <span key={day}>{day}</span>)}</div>
           <div className="mq-calendar-grid">
@@ -140,7 +154,7 @@ export default function CalendarRedesignClient({
                     {items.slice(0, 3).map((post) => {
                       const canReschedule = getLinkedInAccountAccessById(post.connectedAccount, connectedAccounts)?.isUsable === true;
                       const label = postLabel(post);
-                      return <Link key={post._id} href={`/posts/${post._id}/edit`} draggable={canReschedule} onDragStart={(event) => { if (canReschedule) event.dataTransfer.setData("text/plain", post._id); }} className="mq-calendar-event" title={canReschedule ? label : `${label} — ${LINKEDIN_ACCESS_EXPIRED_MESSAGE}`}><i className={dotClass(post.status)} /><span>{label}</span></Link>;
+                      return <Link key={post._id} href={`/posts/${post._id}/edit`} draggable={canReschedule} onDragStart={(event) => { if (canReschedule) event.dataTransfer.setData("text/plain", post._id); }} className="mq-calendar-event" aria-label={label} title={canReschedule ? label : `${label} — ${LINKEDIN_ACCESS_EXPIRED_MESSAGE}`}><i className={dotClass(post.status)} /><span>{label}</span></Link>;
                     })}
                   </div>
                 </div>
@@ -148,6 +162,13 @@ export default function CalendarRedesignClient({
             })}
           </div>
         </div>
+        {monthList.length ? (
+          <div className="mq-card mq-agenda-card mq-calendar-month-list">
+            <div className="mq-card-heading"><span className="mq-title">This month</span><span className="mq-mono">{monthList.length} {monthList.length === 1 ? "post" : "posts"}</span></div>
+            {monthList.map((post) => <Link key={post._id} href={`/posts/${post._id}/edit`} className="mq-agenda-row"><span className="mq-agenda-dot"><i className={dotClass(post.status)} /></span><span className="mq-row-copy"><strong>{postLabel(post)}</strong><small>{formatScheduledDate(post.scheduledAt ?? post.updatedAt ?? post.createdAt)}</small></span></Link>)}
+          </div>
+        ) : null}
+        </>
       ) : (
         <div className="mq-card mq-agenda-card">
           <div className="mq-card-heading"><span className="mq-title">Upcoming agenda</span><span className="mq-mono">{upcoming.length} scheduled</span></div>

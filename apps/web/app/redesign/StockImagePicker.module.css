@@ -16,7 +16,7 @@
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--line-strong);
-  border-radius: 17px;
+  border-radius: var(--r-xl);
   background: var(--surface);
   color: var(--ink-900);
   box-shadow: 0 28px 80px rgba(0, 0, 0, .34);
@@ -31,16 +31,16 @@
 
 .brand { display: flex; align-items: center; gap: 9px; }
 .brand img { width: 18px; height: 18px; object-fit: contain; }
-.brand strong { color: var(--ink-900); font-size: 16px; font-weight: 650; }
+.brand strong { color: var(--ink-900); font-size: var(--fs-lg); font-weight: 600; }
 
 .close {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: var(--icon-btn);
+  height: var(--icon-btn);
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: transparent;
   color: var(--ink-700);
   cursor: pointer;
@@ -53,32 +53,32 @@
 .searchField {
   display: flex;
   min-width: 0;
-  min-height: 38px;
+  min-height: var(--ctl-md);
   flex: 1;
   align-items: center;
   gap: 8px;
   padding: 0 10px;
   border: 1px solid var(--line-strong);
-  border-radius: 7px;
+  border-radius: var(--r-sm);
   background: var(--surface-2);
   color: var(--ink-500);
 }
 
 .searchField:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
-.searchField input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--ink-900); font: inherit; font-size: 14px; }
+.searchField input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--ink-900); font: inherit; font-size: var(--fs-md); }
 .searchField > button { display: grid; width: 24px; height: 24px; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ink-500); cursor: pointer; }
 .searchField > button:hover { background: var(--canvas-sub); color: var(--ink-900); }
 
 .searchButton {
-  min-height: 38px;
+  min-height: var(--ctl-md);
   padding: 0 17px;
   border: 1px solid var(--accent);
-  border-radius: 7px;
+  border-radius: var(--r-sm);
   background: var(--accent);
   color: #fff;
   font: inherit;
-  font-size: 13px;
-  font-weight: 650;
+  font-size: var(--fs-sm);
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -87,7 +87,7 @@
 
 .filter { padding: 10px 20px 9px; }
 .visuallyHidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-.filter :global(.mq-select) { min-height: 30px; padding: 0 8px 0 10px; font-size: 12px; }
+.filter :global(.mq-select) { min-height: var(--ctl-sm); padding: 0 8px 0 10px; font-size: var(--fs-xs); }
 
 .results {
   display: grid;
@@ -106,15 +106,15 @@
 .imageButton::after { position: absolute; inset: 0; border: 2px solid transparent; border-radius: inherit; content: ""; }
 .imageButton:hover::after, .imageButton:focus-visible::after { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .imageButton img { display: block; width: 100%; height: auto; object-fit: cover; }
-.useImage { position: absolute; right: 8px; bottom: 8px; z-index: 1; padding: 5px 8px; border-radius: 5px; background: rgba(20, 24, 20, .82); color: #fff; font-size: 11px; font-weight: 650; opacity: 0; transform: translateY(3px); transition: opacity .15s ease, transform .15s ease; }
+.useImage { position: absolute; right: 8px; bottom: 8px; z-index: 1; padding: 5px 8px; border-radius: 5px; background: rgba(20, 24, 20, .82); color: #fff; font-size: var(--fs-2xs); font-weight: 600; opacity: 0; transform: translateY(3px); transition: opacity .15s ease, transform .15s ease; }
 .imageButton:hover .useImage, .imageButton:focus-visible .useImage { opacity: 1; transform: none; }
-.attribution { display: block; overflow: hidden; margin-top: 5px; color: var(--ink-500); font-size: 11px; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+.attribution { display: block; overflow: hidden; margin-top: 5px; color: var(--ink-500); font-size: var(--fs-2xs); line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
 .attribution a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .attribution a:hover { color: var(--ink-900); }
 
 .skeleton { min-width: 0; }
 .skeleton span { display: block; aspect-ratio: 1.42 / 1; border-radius: 4px; background: linear-gradient(100deg, var(--canvas-sub) 20%, var(--surface-2) 40%, var(--canvas-sub) 60%); background-size: 200% 100%; animation: shimmer 1.2s infinite linear; }
-.skeleton small { display: block; width: 42%; height: 8px; margin-top: 7px; border-radius: 10px; background: var(--canvas-sub); }
+.skeleton small { display: block; width: 42%; height: 8px; margin-top: 7px; border-radius: var(--r-md); background: var(--canvas-sub); }
 
 .sentinel {
   height: 1px;
@@ -129,14 +129,14 @@
   justify-content: center;
   gap: 9px;
   color: var(--ink-500);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   text-align: center;
 }
 
 .paginationState button {
   padding: 6px 10px;
   border: 1px solid var(--line-strong);
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   background: var(--surface);
   color: var(--ink-700);
   font: inherit;
@@ -145,8 +145,8 @@
 }
 
 .state { display: flex; height: 220px; grid-column: 1 / -1; flex-direction: column; align-items: center; justify-content: center; gap: 9px; color: var(--ink-500); text-align: center; }
-.state p { margin: 0; font-size: 13px; }
-.state button { padding: 7px 11px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink-700); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.state p { margin: 0; font-size: var(--fs-sm); }
+.state button { padding: 7px 11px; border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--surface); color: var(--ink-700); font: inherit; font-size: var(--fs-xs); font-weight: 600; cursor: pointer; }
 .error { color: #b33c3c; }
 :global(html[data-theme="dark"]) .error { color: #f0686d; }
 :global(html[data-theme="dark"]) .brand img[src="/unsplash.svg"] { filter: invert(1); }

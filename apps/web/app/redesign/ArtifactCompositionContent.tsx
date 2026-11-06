@@ -120,7 +120,7 @@ export default function AttachedArtifactComposition({
   return (
     <>
       <article className="mq-card mq-attached-artifact">
-        <header><span className="mq-mono">_ attached artifact</span>{canSwap ? <button type="button" onClick={onSwap} disabled={busy}>Swap</button> : null}</header>
+        <header><span className="mq-mono">Attached artifact</span>{canSwap ? <button type="button" onClick={onSwap} disabled={busy}>Swap</button> : null}</header>
         <div>
           {document?.pdfUrl ? (
             <button type="button" className="mq-pdf-thumbnail-button" onClick={openLightbox} aria-label="Expand document" title="Expand">

@@ -9,6 +9,7 @@ import type { Shipment } from './types';
  * feature flips. When it does, set `date` to the day it went live.
  */
 export const changelog: Shipment[] = [
+  { date: '2026-11-06', feature: 'compact-workspace-ui', title: 'A calmer, more compact workspace', body: 'Smaller type and controls everywhere, and the calendar now fits a phone screen.' },
   { date: '2026-11-04', feature: 'account-preferences', title: 'Preferences that follow you', body: 'Pick a theme and timezone in Settings once, and every device you sign in on uses them.' },
   { date: '2026-10-15', feature: 'design-system-picker', title: 'Swatch menu with hover preview', body: 'Hover over a Design System to preview it before you pick.' },
   { date: '2026-10-15', feature: 'design-systems', title: 'Design Systems for documents', body: 'Six designed systems for one-pagers and carousels, chosen per document.' },

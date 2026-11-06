@@ -87,7 +87,7 @@ export default function NaturalScheduleField({
                         onEnter();
                     }
                 }}
-                placeholder={ghost ? "" : "Try “tomorrow at 9am” or “in 2 hours”…"}
+                placeholder={ghost ? "" : "Try “tomorrow 9am”"}
                 autoComplete="off"
                 autoCorrect="off"
                 spellCheck={false}
