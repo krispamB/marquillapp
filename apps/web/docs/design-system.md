@@ -19,7 +19,7 @@ The tokens live in `:root` at the top of `app/globals.css`. Component styles are
 - Weights are 400, 500, and 600. Nothing is heavier than 600.
 - Tracking is `-.02em` at 20px and up, `-.01em` at 14 to 16px, and 0 below. Uppercase labels use `.04em`.
 - Text under 11px is allowed only inside decorative miniatures that imitate a document, and in brand marks.
-- The mono font is a brand accent for short captions, at `--fs-2xs` in `--ink-500`. Sentences use the sans font.
+- The mono font is for brand marks and document miniatures only, not for UI metadata. Timestamps, counts, captions, and helper text use the inherited sans font at `--fs-2xs` or `--fs-xs` in `--ink-500`, with `font-variant-numeric: tabular-nums` where digits line up.
 - Helper text people need to read uses `--ink-500`. `--ink-400` is for placeholders and disabled states; in dark mode it is too dim for anything else.
 - iOS zooms on any field under 16px, so the `@media (pointer: coarse)` block forces fields to 16px. Keep it. Design fields to look right at 16px on touch.
 

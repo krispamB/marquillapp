@@ -16,7 +16,8 @@ function monthCells(date: Date) {
   const first = new Date(date.getFullYear(), date.getMonth(), 1);
   const start = new Date(first);
   start.setDate(1 - first.getDay());
-  return Array.from({ length: 42 }, (_, index) => {
+  const weeks = Math.ceil((first.getDay() + new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()) / 7);
+  return Array.from({ length: weeks * 7 }, (_, index) => {
     const cell = new Date(start);
     cell.setDate(start.getDate() + index);
     return { date: cell, inMonth: cell.getMonth() === date.getMonth() };

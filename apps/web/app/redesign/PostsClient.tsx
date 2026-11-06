@@ -7,7 +7,7 @@ import RedesignShell from "./Shell";
 import { API_BASE, jsonRequest, readApi } from "./api";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import SchedulePicker, { getDefaultScheduleDate, localDateTimeValue } from "./SchedulePicker";
-import { formatRelativeDate, formatScheduledDate, getAccountInitials, getInitials, getPostTitle, normalizeStatus, parseDate, toYearMonth } from "./types";
+import { formatRelativeDate, formatScheduledDate, getPostTitle, normalizeStatus, parseDate, toYearMonth } from "./types";
 import type { ConnectedAccount, DashboardPost, DashboardPostsResponse, SubscriptionTier, UserProfile } from "../lib/types";
 import {
   getLinkedInAccountAccessById,
@@ -195,24 +195,12 @@ export default function PostsRedesignClient({
         {visiblePosts.map((post) => {
           const status = normalizeStatus(post.status);
           const dateLabel = status === "SCHEDULED" ? formatScheduledDate(post.scheduledAt) : formatRelativeDate(post.updatedAt ?? post.createdAt);
-          const account = connectedAccounts.find((item) => item.id === post.connectedAccount);
-          const accountName = post.connectedAccountName ?? account?.displayName ?? "LinkedIn account";
-          const accountInitials = account ? getAccountInitials(account) : getInitials(accountName);
           const accountAccess = getLinkedInAccountAccessById(post.connectedAccount, connectedAccounts);
           const linkedinActionDisabled = !accountAccess?.isUsable;
           return (
             <article key={post._id} className="mq-post-row">
-              {account?.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={account.avatarUrl} alt="" className="mq-post-avatar mq-linkedin-avatar" />
-              ) : (
-                <span className={`mq-post-avatar mq-post-avatar-${status.toLowerCase()}`}>{accountInitials || "—"}</span>
-              )}
-              <div className="mq-post-row-copy">
-                <div className="mq-post-row-meta"><strong>{accountName}</strong><span>{postKind(post)}</span></div>
-                <Link href={`/posts/${post._id}/edit`} className="mq-post-row-title">{compactTitle(post)}</Link>
-              </div>
-              <div className="mq-post-row-status"><span className={`mq-status mq-status-${status.toLowerCase()}`}><i />{status[0] + status.slice(1).toLowerCase()}</span><span className="mq-mono">{dateLabel}</span></div>
+              <Link href={`/posts/${post._id}/edit`} className="mq-post-row-title">{compactTitle(post)}</Link>
+              <div className="mq-post-row-status"><span className={`mq-status mq-status-${status.toLowerCase()}`}><i />{status[0] + status.slice(1).toLowerCase()}</span><span className="mq-mono">{dateLabel}</span><span className="mq-post-row-kind">{postKind(post)}</span></div>
               <div className="mq-post-row-actions">
                 {status === "DRAFT" ? <Link href={`/posts/${post._id}/edit`} className="mq-icon-button" title="Edit post"><Pencil size={15} /></Link> : null}
                 {status === "SCHEDULED" ? <button type="button" className="mq-icon-button" title={linkedinActionDisabled ? LINKEDIN_ACCESS_EXPIRED_MESSAGE : "Schedule post"} disabled={linkedinActionDisabled} onClick={() => { setSchedulePostId(post._id); setScheduleValue(localDateTimeValue(parseDate(post.scheduledAt) ?? getDefaultScheduleDate())); }}><CalendarClock size={15} /></button> : null}
