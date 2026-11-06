@@ -589,7 +589,7 @@ export default function ArtifactConversationClient({
 
           {run ? (
             <div className="mq-studio-assistant-message mq-studio-run-message">
-              <div className="mq-studio-mark"><MarquillMark size={24} theme="auto" title="Mark" /></div>
+              <div className="mq-studio-mark"><MarquillMark size={24} theme="auto" title="Mark" working={run.status !== "failed"} /></div>
               <div className="mq-studio-assistant-content">
                 <ArtifactRunProgress
                   run={run}

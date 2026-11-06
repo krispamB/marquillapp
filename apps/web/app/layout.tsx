@@ -29,7 +29,11 @@ export const metadata: Metadata = {
     'Marquill helps LinkedIn creators generate posts from YouTube research, schedule content, and publish faster.',
   keywords: 'LinkedIn content, AI post generator, YouTube research, scheduling, publishing',
   icons: {
-    icon: '/icon-light.svg',
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: '48x48' },
+    ],
+    apple: '/apple-touch-icon.png',
   },
   openGraph: {
     title: 'Marquill - AI-Powered LinkedIn Content Platform',

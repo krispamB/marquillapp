@@ -241,7 +241,7 @@ export default function ComposerRedesignClient({
           </div>
 
           <div className="mq-card mq-chat-card">
-            <div className="mq-chat-label"><MarquillMark size={22} theme="light" className="mq-ask-mark-small-svg" title="" /><span className="mq-mono">mark · conversation</span></div>
+            <div className="mq-chat-label"><MarquillMark size={22} theme="auto" className="mq-ask-mark-small-svg" title="" /><span className="mq-mono">mark · conversation</span></div>
             <textarea className="mq-chat-input" value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Turn our Series A closing into an insight post. Keep my voice." rows={3} />
             <div className="mq-research-row"><input className="mq-input" value={youtubeUrl} onChange={(event) => setYoutubeUrl(event.target.value)} placeholder={researchAvailable ? "Add a YouTube link for research (optional)" : "Research is available on paid plans"} disabled={!researchAvailable} title={researchAvailable ? undefined : "Upgrade your plan to use research"} /><button type="button" className="mq-chip-button" onClick={() => void generateDraft()} disabled={pendingAction !== null}><Sparkles size={14} /> {pendingAction === "generate" ? "Mark is drafting…" : "Generate"}</button></div>
             <div className="mq-chat-status"><span className="mq-live-dot" /> {statusText}</div>

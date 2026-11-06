@@ -4,6 +4,10 @@ Source: `apps/landing/app/globals.css`
 
 This covers the landing site's brand values. For size, spacing, and emphasis in the product app, see [apps/web/docs/design-system.md](../apps/web/docs/design-system.md).
 
+## Logo
+
+The mark, lockups, favicons, and usage rules are in [brand/marquill-logo](brand/marquill-logo/README.md).
+
 ## Color Palette
 
 ### Core Brand Colors

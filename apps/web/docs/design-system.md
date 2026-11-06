@@ -51,6 +51,10 @@ Size with the tokens rather than a raw `min-height`, so desktop and touch stay i
 - Cards rest on a hairline border with no shadow. Only floating layers (menus, modals, sheets, the composer) cast a shadow: `--sh-md` or `--sh-lg`.
 - Do not nest a bordered card inside a bordered card when spacing or a divider would do.
 
+## Logo
+
+The mark is Mark: a dot with one eye open and the other the underscore from `marquill_`. Use `MarquillMark` and `MarquillLockup` from `components/brand/`, with `theme="auto"` unless the surface never changes with the theme. They handle light and dark mode and switch to a heavier cut at 24px and below. Pass `working` only while a run is in progress: the caret pulses but never disappears. Source files are in [`docs/brand/marquill-logo`](../../../docs/brand/marquill-logo/README.md).
+
 ## Color
 
 Use the existing ink, line, surface, and status tokens, and do not add colors. `--neg` and `--neg-bg` are for destructive and error states only; their values come from the reds the stylesheet already used. `--ink-600` sits between `--ink-700` and `--ink-500`.

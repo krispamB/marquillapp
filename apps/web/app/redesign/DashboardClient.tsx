@@ -235,7 +235,7 @@ export default function DashboardRedesignClient({
 
       {!isWorkspace ? (
         <Link href="/posts/new" className="mq-ask-card">
-          <MarquillMark size={34} theme="light" className="mq-ask-mark-svg" title="" />
+          <MarquillMark size={34} theme="auto" className="mq-ask-mark-svg" title="" />
           <span className="mq-ask-placeholder">Ask Mark to write a post about our Series A…<span className="mq-caret" /></span>
           <span className="mq-chip"><PenLine size={13} /> Quick</span>
           <span className="mq-chip mq-chip-desktop"><Video size={13} /> Insight</span>
