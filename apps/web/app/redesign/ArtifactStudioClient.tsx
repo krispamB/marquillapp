@@ -33,6 +33,8 @@ import { createArtifactBody, createArtifactRequest } from "./artifactRequests";
 import DesignSystemMenu from "./DesignSystemMenu";
 import { resolveDesignSystemId } from "./designSystems";
 import useDesignSystems from "./useDesignSystems";
+import useMediaQuery from "./useMediaQuery";
+import StudioRecent from "./StudioRecent";
 import RedesignShell from "./Shell";
 import { canUseResearch } from "./tier-access";
 
@@ -72,6 +74,7 @@ export default function ArtifactStudioClient({
   restoreKey?: string;
 }) {
   const router = useRouter();
+  const isMobile = useMediaQuery("(max-width: 700px)");
   const [type, setType] = useState<ArtifactType | undefined>(initialType);
   const [prompt, setPrompt] = useState("");
   const promptRef = useRef<HTMLTextAreaElement>(null);
@@ -156,6 +159,8 @@ export default function ArtifactStudioClient({
             <h1 id="mq-artifact-studio-title">What will we make today?</h1>
           </div>
           <span className="mq-artifact-studio-spacer mq-artifact-studio-spacer-bottom" aria-hidden="true" />
+
+          {isMobile ? <StudioRecent /> : null}
 
           <form className="mq-artifact-studio-form" onSubmit={createArtifact}>
             <div className="mq-artifact-prompt-card">

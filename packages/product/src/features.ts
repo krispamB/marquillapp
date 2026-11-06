@@ -375,7 +375,7 @@ export const features: Feature[] = [
     name: 'Compact workspace UI',
     area: 'workspace',
     status: 'building',
-    summary: 'A shared size scale across the app: smaller type, controls, and chrome on desktop and mobile, one main action per area, and phone screens that fit without sideways scrolling. Colors and components are unchanged.',
+    summary: 'A shared size scale across the app: smaller type, controls, and chrome on desktop and mobile, one main action per area, and phone screens that fit without sideways scrolling. Studio on phones also lists recent artifacts above the composer. Colors are unchanged.',
     docs: ['apps/web/docs/design-system.md'],
   },
   {

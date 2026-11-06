@@ -34,6 +34,8 @@ The tokens live in `:root` at the top of `app/globals.css`. Component styles are
 
 Size with the tokens rather than a raw `min-height`, so desktop and touch stay in step. The mobile tab bar is the exception; it keeps its own height.
 
+**Disabled controls** keep full opacity: a `--line-strong` border, `--ink-500` text, and a quiet fill, so they read as intentionally off rather than faded. Out-of-month calendar days use `--ink-400` with no extra opacity.
+
 **One filled primary per region.** A filled ink button means "this is the action here". Actions that repeat on every card or row use the secondary or ghost variant. Do not make a button full-width on mobile unless it ends a form or a sheet. An action can change variant between contexts for this reason: 'Attach to post' is secondary on a library card, where it repeats, and filled on an artifact's own page, where it is the one main action.
 
 ## Layout

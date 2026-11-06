@@ -106,6 +106,8 @@ export default function PostsRedesignClient({
       .filter((post) => !query || `${post.title ?? ""}\n${post.content ?? ""}`.toLowerCase().includes(query))
       .sort((a, b) => (parseDate(b.updatedAt ?? b.scheduledAt ?? b.createdAt)?.getTime() ?? 0) - (parseDate(a.updatedAt ?? a.scheduledAt ?? a.createdAt)?.getTime() ?? 0));
   }, [filter, posts, search]);
+  // A label every row shares says nothing; show the kind only when the list mixes them.
+  const showKind = new Set(visiblePosts.map(postKind)).size > 1;
 
   async function runAction(postId: string, action: "publish" | "delete") {
     const post = posts.find((item) => item._id === postId);
@@ -219,7 +221,7 @@ export default function PostsRedesignClient({
           return (
             <article key={post._id} className="mq-post-row">
               <Link href={`/posts/${post._id}/edit`} className="mq-post-row-title">{compactTitle(post)}</Link>
-              <div className="mq-post-row-status"><span className={`mq-status mq-status-${status.toLowerCase()}`}><i />{status[0] + status.slice(1).toLowerCase()}</span><span className="mq-mono">{dateLabel}</span><span className="mq-post-row-kind">{postKind(post)}</span></div>
+              <div className="mq-post-row-status"><span className={`mq-status mq-status-${status.toLowerCase()}`}><i />{status[0] + status.slice(1).toLowerCase()}</span><span className="mq-mono">{dateLabel}</span>{showKind ? <span className="mq-post-row-kind">{postKind(post)}</span> : null}</div>
               <div className="mq-post-row-actions">
                 {status === "DRAFT" ? <Link href={`/posts/${post._id}/edit`} className="mq-icon-button" title="Edit post"><Pencil size={15} /></Link> : null}
                 {status === "SCHEDULED" ? <button type="button" className="mq-icon-button" title={linkedinActionDisabled ? LINKEDIN_ACCESS_EXPIRED_MESSAGE : "Schedule post"} disabled={linkedinActionDisabled} onClick={() => { setSchedulePostId(post._id); setScheduleValue(localDateTimeValue(parseDate(post.scheduledAt) ?? getDefaultScheduleDate())); }}><CalendarClock size={15} /></button> : null}
