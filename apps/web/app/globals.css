@@ -53,7 +53,7 @@
   --r-sm: 8px;
   --r-md: 8px;      /* controls */
   --r-lg: 12px;     /* cards */
-  --r-xl: 16px;     /* modals, sheets, the prompt composer */
+  --r-xl: 12px;     /* modals, sheets, the prompt composer */
   --r-full: 999px;
   --ctl-sm: 28px;
   --ctl-md: 32px;   /* default control */
@@ -390,6 +390,7 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
 /* One title per screen at every width: the top bar names the page, so the eyebrow hides and the matching h1 stays for screen readers only. */
 .mq-page-heading .mq-eyebrow { display: none; }
 @media (max-width: 700px) { .mq-page-heading > time.mq-mono { display: none; } }
+.mq-page-heading > time.mq-mono { align-self: last baseline; }
 .mq-h1-dup { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .mq-h1-dup + p { margin-top: 0; }
 .mq-mono { color: var(--ink-500); font: 400 var(--fs-2xs)/1.4 var(--font-inter); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
@@ -664,7 +665,7 @@ html[data-theme="dark"] .mq-segmented button.is-active { box-shadow: inset 0 0 0
 .mq-artifact-studio-logo { margin-bottom: 12px; }
 .mq-artifact-studio-spacer { display: none; }
 .mq-artifact-studio-heading { margin-bottom: 20px; text-align: center; }
-.mq-artifact-studio-heading h1 { margin: 4px 0 0; color: var(--ink-900); font-size: var(--fs-2xl); font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
+.mq-artifact-studio-heading h1 { margin: 4px 0 0; color: var(--ink-900); font-size: var(--fs-xl); font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
 .mq-artifact-studio-form { width: 100%; }
 .mq-artifact-prompt-card { padding: 14px 14px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-xl); background: var(--surface); box-shadow: var(--sh-md); transition: border-color .18s ease, box-shadow .18s ease; }
 .mq-artifact-prompt-card:focus-within { border-color: color-mix(in srgb, var(--accent) 62%, var(--line-strong)); box-shadow: var(--sh-md), 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent); }
@@ -916,6 +917,14 @@ html[data-theme="dark"] .mq-studio-refine-submit:disabled { background: var(--ca
 .mq-post-row-actions .mq-icon-button::after, .mq-calendar-top-controls .mq-icon-button::after { content: ""; position: absolute; inset: -2px; }
 .mq-icon-danger:hover:not(:disabled) { color: #b3353a; }
 .mq-more-button { display: none; }
+.mq-post-row-icons { display: flex; align-items: center; gap: 2px; }
+.mq-post-row-menu-list { position: fixed; z-index: 60; width: 188px; padding: 5px; border: 1px solid var(--line-strong); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--sh-lg); }
+.mq-post-row-menu-list > button, .mq-post-row-menu-list > a { display: flex; width: 100%; min-height: var(--ctl-md); align-items: center; gap: 8px; padding: 0 10px; border: 0; border-radius: var(--r-md); background: transparent; color: var(--ink-700); font: 500 var(--fs-sm) var(--font-inter); text-align: left; text-decoration: none; cursor: pointer; }
+.mq-post-row-menu-list > .is-danger { color: var(--neg); }
+.mq-post-row-menu-list > button:hover:not(:disabled), .mq-post-row-menu-list > a:hover, .mq-post-row-menu-list > button:focus-visible, .mq-post-row-menu-list > a:focus-visible { background: var(--surface-2); outline: 0; }
+.mq-post-row-menu-list > .is-danger:hover:not(:disabled), .mq-post-row-menu-list > .is-danger:focus-visible { background: color-mix(in srgb, var(--neg) 8%, var(--surface)); }
+.mq-post-row-menu-list > button:disabled { color: var(--ink-400); cursor: not-allowed; }
+.mq-post-row-menu-note { margin: 4px 0 2px; padding: 6px 10px 2px; border-top: 1px solid var(--line-faint); color: var(--ink-500); font-size: var(--fs-xs); line-height: 1.4; }
 .mq-inline-schedule { display: flex; align-items: center; gap: 8px; position: absolute; right: 18px; bottom: -62px; z-index: 2; padding: 8px; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--surface); box-shadow: var(--sh-lg); }
 .mq-inline-schedule label { display: flex; align-items: center; gap: 8px; color: var(--ink-500); font-size: var(--fs-xs); }
 .mq-schedule-picker { position: relative; min-width: 0; }
@@ -1152,7 +1161,7 @@ html[data-theme="dark"] .mq-studio-refine-submit:disabled { background: var(--ca
 .mq-tier-card.is-current { border: 1.5px solid var(--ink-900); }
 .mq-tier-heading { display: flex; align-items: center; justify-content: space-between; height: 24px; }
 .mq-tier-heading .mq-current-badge { line-height: 16px; }
-.mq-tier-heading h3 { margin: 0; font-size: var(--fs-md); }
+.mq-tier-heading h3 { margin: 0; font-size: var(--fs-md); font-weight: 600; }
 .mq-current-badge { background: #0a0a0a; color: #fff; }
 .mq-tier-price { display: flex; align-items: baseline; gap: 3px; font-size: var(--fs-xl); font-weight: 600; letter-spacing: -.02em; }
 .mq-tier-price small { color: var(--ink-500); font-size: var(--fs-xs); font-weight: 400; }
@@ -1313,7 +1322,9 @@ html[data-theme="dark"] .mq-studio-refine-submit:disabled { background: var(--ca
   .mq-artifact-empty-types button { padding: 8px; }
   .mq-artifact-studio { display: flex; align-items: stretch; min-height: calc(100svh - var(--topbar-h) - 56px - env(safe-area-inset-bottom) - var(--gutter) - var(--gutter)); margin-bottom: calc(var(--gutter) - 24px); padding: 0; }
   .mq-artifact-studio-hero { flex: 1; }
-  .mq-artifact-studio-logo { margin: 0 0 12px; }
+  .mq-artifact-studio-logo { margin: 0 0 8px; }
+  .mq-artifact-studio-logo > :not(:first-child) { display: none; }
+  .mq-artifact-studio-logo > :first-child { width: 24px; height: 24px; }
   .mq-artifact-studio-heading { margin-bottom: 0; }
   .mq-artifact-studio-heading .mq-eyebrow { display: none; }
   .mq-artifact-studio-heading h1 { margin: 0; font-size: var(--fs-xl); font-weight: 600; }
@@ -1321,8 +1332,9 @@ html[data-theme="dark"] .mq-studio-refine-submit:disabled { background: var(--ca
   .mq-artifact-studio-spacer-top { flex: 3 1 0; }
   .mq-artifact-studio-spacer-bottom { flex: 2 1 0; }
   .mq-artifact-studio-form { display: flex; flex-direction: column; margin-top: 16px; }
-  .mq-artifact-studio-hero:has(.mq-studio-recent) .mq-artifact-studio-spacer { flex: 1 1 0; }
-  .mq-studio-recent { width: 100%; margin-top: 20px; overflow: hidden; }
+  .mq-artifact-studio-hero:has(.mq-studio-recent) .mq-artifact-studio-spacer-bottom { display: none; }
+  .mq-artifact-studio-hero:has(.mq-studio-recent) .mq-artifact-studio-spacer-top { flex: 1 1 0; }
+  .mq-studio-recent { width: 100%; margin-top: 24px; overflow: hidden; }
   .mq-studio-recent-head { display: flex; align-items: center; justify-content: space-between; padding: 8px var(--card-pad) 0; color: var(--ink-500); font-size: var(--fs-xs); font-weight: 500; }
   .mq-studio-recent-head a { color: var(--ink-500); text-decoration: none; }
   .mq-studio-recent-row { min-height: 44px; align-items: center; }
@@ -1388,7 +1400,8 @@ html[data-theme="dark"] .mq-studio-refine-submit:disabled { background: var(--ca
   .mq-search-close { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--ctl-sm); height: var(--ctl-sm); margin-right: -6px; padding: 0; border: 0; background: transparent; color: var(--ink-500); }
   .mq-post-row { grid-template-areas: "title title" "meta actions"; gap: 2px 8px; padding: 10px var(--card-pad) 6px; }
   .mq-post-row-status { gap: 6px; }
-  .mq-more-button { display: none; }
+  .mq-more-button { display: inline-flex; }
+  .mq-post-row-icons { display: none; }
   .mq-post-row-actions .mq-icon-button { border-color: transparent; background: transparent; color: var(--ink-500); }
   .mq-post-row-actions .mq-icon-button:hover:not(:disabled), .mq-post-row-actions .mq-icon-button:active:not(:disabled) { border-color: transparent; background: transparent; color: var(--ink-900); }
   .mq-post-row-actions .mq-icon-danger:hover:not(:disabled), .mq-post-row-actions .mq-icon-danger:active:not(:disabled) { color: #b3353a; }
@@ -1582,6 +1595,10 @@ html[data-theme="dark"] .mq-studio-refine-submit:disabled { background: var(--ca
 .mq-create-schedule-card .mq-segmented { display: flex; }
 .mq-create-schedule-card .mq-segmented + * { margin-top: 12px; }
 .mq-create-schedule-card .mq-segmented button { flex: 1; min-height: calc(var(--ctl-md) - 8px); }
+@media (max-width: 700px) {
+  .mq-segmented, .mq-segmented-small { min-height: var(--ctl-lg); }
+  .mq-segmented button, .mq-segmented-small button, .mq-create-schedule-card .mq-segmented button { min-height: calc(var(--ctl-lg) - 4px); }
+}
 .mq-create-post-status { position: fixed; left: -9999px; }
 .mq-preview-poll { display: flex; flex-direction: column; gap: 8px; margin: 13px 14px; padding: 13px; border: 1px solid var(--line); border-radius: var(--r-md); }
 .mq-preview-poll > strong { font-size: var(--fs-sm); }

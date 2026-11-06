@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { CalendarClock, ChevronDown, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Plus, Search, Send, Trash2, X } from "lucide-react";
+import { CalendarClock, ChevronDown, ChevronLeft, ChevronRight, Pencil, Plus, Search, Send, Trash2, X } from "lucide-react";
 import RedesignShell from "./Shell";
 import { API_BASE, jsonRequest, readApi } from "./api";
 import DeleteConfirmModal from "./DeleteConfirmModal";
+import PostRowMenu from "./PostRowMenu";
 import SchedulePicker, { getDefaultScheduleDate, localDateTimeValue } from "./SchedulePicker";
 import { formatRelativeDate, formatScheduledDate, getPostTitle, normalizeStatus, parseDate, toYearMonth } from "./types";
 import type { ConnectedAccount, DashboardPost, DashboardPostsResponse, SubscriptionTier, UserProfile } from "../lib/types";
@@ -223,11 +224,22 @@ export default function PostsRedesignClient({
               <Link href={`/posts/${post._id}/edit`} className="mq-post-row-title">{compactTitle(post)}</Link>
               <div className="mq-post-row-status"><span className={`mq-status mq-status-${status.toLowerCase()}`}><i />{status[0] + status.slice(1).toLowerCase()}</span><span className="mq-mono">{dateLabel}</span>{showKind ? <span className="mq-post-row-kind">{postKind(post)}</span> : null}</div>
               <div className="mq-post-row-actions">
+                <div className="mq-post-row-icons">
                 {status === "DRAFT" ? <Link href={`/posts/${post._id}/edit`} className="mq-icon-button" title="Edit post"><Pencil size={15} /></Link> : null}
                 {status === "SCHEDULED" ? <button type="button" className="mq-icon-button" title={linkedinActionDisabled ? LINKEDIN_ACCESS_EXPIRED_MESSAGE : "Schedule post"} disabled={linkedinActionDisabled} onClick={() => { setSchedulePostId(post._id); setScheduleValue(localDateTimeValue(parseDate(post.scheduledAt) ?? getDefaultScheduleDate())); }}><CalendarClock size={15} /></button> : null}
                 {status !== "PUBLISHED" ? <button type="button" className="mq-icon-button" title={linkedinActionDisabled ? LINKEDIN_ACCESS_EXPIRED_MESSAGE : "Publish now"} disabled={linkedinActionDisabled || actionId === post._id} onClick={() => void runAction(post._id, "publish")}><Send size={15} /></button> : null}
                 <button type="button" className="mq-icon-button mq-icon-danger" title="Delete post" disabled={actionId === post._id} onClick={() => setDeletePostId(post._id)}><Trash2 size={15} /></button>
-                <button type="button" className="mq-icon-button mq-more-button" aria-label="More actions"><MoreHorizontal size={16} /></button>
+                </div>
+                <PostRowMenu
+                  status={status}
+                  editHref={`/posts/${post._id}/edit`}
+                  linkedinDisabled={linkedinActionDisabled}
+                  linkedinDisabledReason={LINKEDIN_ACCESS_EXPIRED_MESSAGE}
+                  busy={actionId === post._id}
+                  onSchedule={() => { setSchedulePostId(post._id); setScheduleValue(localDateTimeValue(parseDate(post.scheduledAt) ?? getDefaultScheduleDate())); }}
+                  onPublish={() => void runAction(post._id, "publish")}
+                  onDelete={() => setDeletePostId(post._id)}
+                />
               </div>
               {schedulePostId === post._id ? (
                 <div className="mq-inline-schedule">

@@ -13,8 +13,8 @@ The tokens live in `:root` at the top of `app/globals.css`. Component styles are
 | `--fs-sm` | 13px | Buttons, inputs, rows, default desktop body |
 | `--fs-md` | 14px | Card titles, reading text, default mobile body |
 | `--fs-lg` | 16px | Modal and sheet titles |
-| `--fs-xl` | 20px | Page headings, stat values |
-| `--fs-2xl` | 24px | One hero per screen at most (Studio, empty states, onboarding) |
+| `--fs-xl` | 20px | Page headings (the Studio's too), plan names, stat values |
+| `--fs-2xl` | 24px | Onboarding and empty states only, one per screen at most |
 
 - Weights are 400, 500, and 600. Nothing is heavier than 600.
 - Tracking is `-.02em` at 20px and up, `-.01em` at 14 to 16px, and 0 below. Uppercase labels use `.04em`.
@@ -47,7 +47,7 @@ Size with the tokens rather than a raw `min-height`, so desktop and touch stay i
 
 ## Surfaces
 
-- Radii: `--r-sm` 8px for small inner parts and chips, `--r-md` 8px for controls (so there are three radii: 8, 12, 16, plus pills; `--r-xs` 4px is only for thin decorative bars), `--r-lg` 12px for cards, `--r-xl` 16px for modals, sheets, and the prompt composer. `--r-full` is for pills and avatars.
+- Radii: `--r-sm` 8px for small inner parts and chips, `--r-md` 8px for controls (so there are two radii: 8 and 12, plus pills; `--r-xs` 4px is only for thin decorative bars), `--r-lg` 12px for cards, `--r-xl` 12px for modals, sheets, and the prompt composer. `--r-full` is for pills and avatars.
 - Cards rest on a hairline border with no shadow. Only floating layers (menus, modals, sheets, the composer) cast a shadow: `--sh-md` or `--sh-lg`.
 - Do not nest a bordered card inside a bordered card when spacing or a divider would do.
 
