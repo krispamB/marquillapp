@@ -901,7 +901,7 @@ html[data-theme="dark"] .mq-studio-refine-submit:disabled { background: var(--ca
 .mq-post-row-title { grid-area: title; display: -webkit-box; overflow: hidden; max-width: 680px; color: var(--ink-900); font-size: var(--fs-sm); font-weight: 500; line-height: 1.45; text-decoration: none; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .mq-post-row-status { grid-area: meta; display: flex; min-width: 0; align-items: center; gap: 8px; }
 .mq-post-row-kind { color: var(--ink-500); font-size: var(--fs-2xs); white-space: nowrap; }
-.mq-post-avatar { display: none; }
+.mq-post-row .mq-post-avatar { display: none; }
 .mq-status { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 999px; font-size: var(--fs-2xs); font-weight: 600; }
 .mq-status i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .mq-status-draft { background: var(--canvas-sub); color: var(--ink-700); }
