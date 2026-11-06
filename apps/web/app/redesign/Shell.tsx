@@ -186,7 +186,7 @@ export default function RedesignShell({
       <KeyboardInsetSync />
       <aside className="mq-sidebar">
         <Link href="/dashboard" className="mq-brand" aria-label="Marquill dashboard">
-          <MarquillLockup size={29} theme="auto" className="mq-brand-lockup" />
+          <MarquillLockup size={22} theme="auto" className="mq-brand-lockup" />
         </Link>
 
         <div className="mq-sidebar-section">
@@ -282,7 +282,7 @@ export default function RedesignShell({
         <div className="mq-sidebar-footer">
           <div className="mq-credit-card" aria-label="Monthly credits">
             <div className="mq-credit-heading">
-              <span className="mq-credit-title"><Coins size={17} /> Credits</span>
+              <span className="mq-credit-title"><Coins size={15} /> Credits</span>
               <span className="mq-credit-remaining">
                 {creditsRemaining === null ? "—" : numberFormatter.format(creditsRemaining)} left
               </span>
@@ -334,7 +334,7 @@ export default function RedesignShell({
               <span className="mq-live-dot" />
               <Bell className="mq-notification-icon" size={18} />
             </span>
-            <span className="mq-avatar mq-avatar-md mq-avatar-accent">{initials}</span>
+            {!showAccountSelector ? <span className="mq-avatar mq-avatar-md mq-avatar-accent">{initials}</span> : null}
             {showAccountSelector ? (
               <MarquillSelect
                 className="mq-account-select"

@@ -88,6 +88,8 @@ export default function CalendarRedesignClient({
   }, [posts]);
   const upcoming = useMemo(() => posts.filter((post) => normalizeStatus(post.status) === "SCHEDULED").sort((a, b) => (parseDate(a.scheduledAt)?.getTime() ?? 0) - (parseDate(b.scheduledAt)?.getTime() ?? 0)), [posts]);
 
+  const monthList = useMemo(() => posts.filter((post) => post._id && parseDate(post.scheduledAt ?? post.updatedAt ?? post.createdAt)).sort((a, b) => (parseDate(a.scheduledAt ?? a.updatedAt ?? a.createdAt)?.getTime() ?? 0) - (parseDate(b.scheduledAt ?? b.updatedAt ?? b.createdAt)?.getTime() ?? 0)), [posts]);
+
   function shiftMonth(amount: number) {
     setCursor((current) => new Date(current.getFullYear(), current.getMonth() + amount, 1));
   }
@@ -127,6 +129,7 @@ export default function CalendarRedesignClient({
       <div className="mq-calendar-toolbar"><div className="mq-calendar-legend"><span><i className="mq-calendar-dot-scheduled" /> Scheduled</span><span><i className="mq-calendar-dot-published" /> Published</span><span><i className="mq-calendar-dot-draft" /> Draft</span></div><div className="mq-segmented mq-segmented-small"><button type="button" className={view === "month" ? "is-active" : ""} onClick={() => setView("month")}>Month</button><button type="button" className={view === "week" ? "is-active" : ""} onClick={() => setView("week")}>Week</button></div></div>
 
       {view === "month" ? (
+        <>
         <div className="mq-card mq-calendar-card">
           <div className="mq-calendar-weekdays">{["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <span key={day}>{day}</span>)}</div>
           <div className="mq-calendar-grid">
@@ -148,6 +151,13 @@ export default function CalendarRedesignClient({
             })}
           </div>
         </div>
+        {monthList.length ? (
+          <div className="mq-card mq-agenda-card mq-calendar-month-list">
+            <div className="mq-card-heading"><span className="mq-title">This month</span><span className="mq-mono">{monthList.length} {monthList.length === 1 ? "post" : "posts"}</span></div>
+            {monthList.map((post) => <Link key={post._id} href={`/posts/${post._id}/edit`} className="mq-agenda-row"><span className="mq-agenda-dot"><i className={dotClass(post.status)} /></span><span className="mq-row-copy"><strong>{postLabel(post)}</strong><small>{formatScheduledDate(post.scheduledAt ?? post.updatedAt ?? post.createdAt)}</small></span></Link>)}
+          </div>
+        ) : null}
+        </>
       ) : (
         <div className="mq-card mq-agenda-card">
           <div className="mq-card-heading"><span className="mq-title">Upcoming agenda</span><span className="mq-mono">{upcoming.length} scheduled</span></div>

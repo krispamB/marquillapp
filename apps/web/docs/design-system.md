@@ -41,7 +41,7 @@ Size with the tokens rather than a raw `min-height`, so desktop and touch stay i
 - `--topbar-h` 48px, `--sidebar-w` 216px.
 - `--gutter` is the page edge (24px, 16px on mobile). `--card-pad` is the inside of a card (16px, 14px on mobile). `--gap-section` separates cards and sections (16px, 12px on mobile).
 - Other spacing stays on a 4px grid: 4, 8, 12, 16, 20, 24. Icon-to-label gaps may use 6px.
-- One title per screen on mobile. If the top bar already names the page, the eyebrow hides and the `h1` takes `.mq-h1-dup`, which hides it visually at 700px and under while keeping it for screen readers. A greeting that says something new, like the Dashboard's, stays.
+- One title per screen, at every width. If the top bar already names the page, the eyebrow hides and the `h1` takes `.mq-h1-dup`, which hides it visually while keeping it for screen readers. A greeting that says something new, like the Dashboard's, stays.
 
 ## Surfaces
 
