@@ -377,6 +377,7 @@ export const features: Feature[] = [
     status: 'building',
     summary: 'A shared size scale across the app: smaller type, controls, and chrome on desktop and mobile, one main action per area, and phone screens that fit without sideways scrolling. Studio on phones also lists recent artifacts above the composer. Colors are unchanged.',
     docs: ['apps/web/docs/design-system.md'],
+    notes: ['Uses the Mark logo, whose caret pulses while a run is working.'],
   },
   {
     id: 'welcome-email',

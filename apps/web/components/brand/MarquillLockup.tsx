@@ -15,7 +15,7 @@ interface MarquillLockupProps {
 /**
  * MarquillLockup — the icon and "marquill_" wordmark locked together.
  * Spacing derives from `size`: wordmark ≈ 0.72×, gap ≈ 0.3× the icon.
- * Tuned so the wordmark's cap height optically aligns with the tile.
+ * Tuned so the wordmark's x-height optically aligns with the dot.
  */
 export default function MarquillLockup({
   size = 36,

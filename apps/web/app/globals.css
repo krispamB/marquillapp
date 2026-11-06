@@ -105,11 +105,16 @@ body {
   font-family: var(--font-inter), sans-serif;
 }
 
-.mq-mark-auto { display: inline-block; line-height: 0; }
-.mq-mark-auto img { display: block; width: 100%; height: 100%; }
-.mq-mark-auto-dark { display: none !important; }
-html[data-theme="dark"] .mq-mark-auto-light { display: none; }
-html[data-theme="dark"] .mq-mark-auto-dark { display: block !important; }
+.mq-mark { --mq-mark-dot: #0a0a0a; --mq-mark-eye: #fff; --mq-mark-caret: #5A90F2; display: inline-block; flex: none; line-height: 0; }
+.mq-mark-on-dark, html[data-theme="dark"] .mq-mark-auto { --mq-mark-dot: #f4f4f1; --mq-mark-eye: #0a0a0a; --mq-mark-caret: #2A6FDB; }
+.mq-mark svg { display: block; width: 100%; height: 100%; }
+.mq-mark-dot { fill: var(--mq-mark-dot); }
+.mq-mark-eye { fill: var(--mq-mark-eye); }
+.mq-mark-caret { fill: var(--mq-mark-caret); }
+/* Mark is working. The caret dims but never disappears, so the logo stays whole. */
+.mq-mark.is-working .mq-mark-caret { animation: mqMarkWorking 1.4s ease-in-out infinite; }
+@keyframes mqMarkWorking { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .mq-mark.is-working .mq-mark-caret { animation: none; } }
 .mq-lockup-inverse-dark { display: none; }
 html[data-theme="dark"] .mq-lockup-inverse-light { display: none; }
 html[data-theme="dark"] .mq-lockup-inverse-dark { display: inline-flex; }
@@ -119,9 +124,6 @@ html[data-theme="dark"] .mq-lockup-inverse-dark { display: inline-flex; }
    ink-first controls, and brand blue reserved for live states. These tokens are
    scoped so the signed-out/auth surfaces can keep their existing treatment. */
 .mq-shell {
-  --mq-tile: #0a0a0a;
-  --mq-glyph: #fff;
-  --mq-dot: #0a66c2;
   --canvas: #f6f6f4;
   --canvas-sub: #efefec;
   --surface: #fff;
@@ -167,8 +169,6 @@ html[data-theme="dark"] .mq-lockup-inverse-dark { display: inline-flex; }
   -webkit-tap-highlight-color: transparent;
 }
 html[data-theme="dark"] .mq-shell {
-  --mq-tile: #f4f4f1;
-  --mq-glyph: #0a0a0a;
   --canvas: #0c0c0b;
   --canvas-sub: #181816;
   --surface: #161614;
@@ -236,7 +236,6 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
 .mq-main { min-height: 100vh; min-height: 100svh; margin-left: var(--sidebar-w); }
 .mq-brand { display: inline-flex; align-items: center; gap: 8px; padding: 2px 6px; color: var(--ink-900); font-size: var(--fs-xl); font-weight: 600; letter-spacing: -.05em; text-decoration: none; }
 .mq-brand-lockup { display: inline-flex; align-items: center; }
-.mq-brand-mark, .mq-ask-mark { display: inline-flex; align-items: flex-end; justify-content: flex-end; width: 29px; height: 29px; padding: 2px 3px; border-radius: var(--r-md); background: var(--ink-900); color: var(--surface); font: 500 8px/1 var(--font-jetbrains-mono); letter-spacing: -.03em; }
 .mq-primary-button, .mq-secondary-button, .mq-light-button, .mq-dark-outline-button, .mq-chip-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: var(--ctl-md); border-radius: var(--r-md); font-size: var(--fs-sm); font-weight: 500; text-decoration: none; cursor: pointer; transition: background-color .2s, border-color .2s, color .2s; }
 .mq-primary-button:hover { background: var(--ink-800); color: var(--surface); }
 .mq-sidebar-section { display: flex; flex-direction: column; gap: 6px; }
@@ -406,9 +405,7 @@ html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e
 .mq-button-small { min-height: var(--ctl-sm); padding: 0 10px; font-size: var(--fs-xs); }
 .mq-ask-card { display: flex; align-items: center; gap: 12px; min-height: 52px; margin-bottom: var(--gap-section); padding: 10px 12px 10px var(--card-pad); border: 1px solid var(--line-strong); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--sh-md); color: inherit; text-decoration: none; }
 .mq-ask-card:hover { border-color: var(--accent); }
-.mq-ask-mark { width: 28px; height: 28px; border-radius: var(--r-md); font-size: 8px; }
 .mq-ask-mark-svg { display: block; flex: none; width: 28px; height: 28px; border-radius: var(--r-md); }
-.mq-ask-mark-small { width: 22px; height: 22px; border-radius: var(--r-sm); font-size: 6px; }
 .mq-ask-mark-small-svg { display: block; flex: none; width: 22px; height: 22px; border-radius: var(--r-sm); }
 .mq-ask-placeholder { flex: 1; color: var(--ink-400); font-size: var(--fs-md); }
 .mq-caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -.16em; border-radius: 1px; background: var(--accent); animation: mq-blink 1.05s step-end infinite; }
