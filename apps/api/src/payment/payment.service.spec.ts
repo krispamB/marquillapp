@@ -1,7 +1,9 @@
 import {
   NotFoundException,
+  ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { ApiError } from '@paddle/paddle-node-sdk';
 import { Types } from 'mongoose';
 
 // Bun does not hoist jest.mock — use manual module resolution instead
@@ -272,6 +274,191 @@ describe('PaymentService.cancelSubscription', () => {
     await expect(service.cancelSubscription(userId)).rejects.toBeInstanceOf(
       UnprocessableEntityException,
     );
+  });
+});
+
+describe('PaymentService.getInvoiceHistory', () => {
+  const userId = new Types.ObjectId().toString();
+  const transactionId = `txn_${'a'.repeat(26)}`;
+  const paidTransaction = {
+    id: transactionId,
+    customerId: 'ctm_123',
+    status: 'completed',
+    collectionMode: 'automatic',
+    currencyCode: 'EUR',
+    billedAt: '2026-10-02T00:00:00.000Z',
+    createdAt: '2026-10-01T00:00:00.000Z',
+    details: {
+      totals: { subtotal: '2400', grandTotal: '2900' },
+      lineItems: [{ product: { name: 'Pro' } }],
+    },
+  };
+
+  const makeService = (
+    billingCustomer: unknown = { providerCustomerId: 'ctm_123' },
+  ) => {
+    const billingCustomerModel = {
+      findOne: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue(billingCustomer),
+      }),
+    };
+    const paddleClient = {
+      listRecentTransactions: jest.fn().mockResolvedValue([paidTransaction]),
+      getTransaction: jest.fn().mockResolvedValue(paidTransaction),
+      getInvoicePdfUrl: jest
+        .fn()
+        .mockResolvedValue('https://paddle.test/a.pdf'),
+    };
+    const service = new PaymentService(
+      {} as any,
+      {} as any,
+      {} as any,
+      billingCustomerModel as any,
+      paddleClient as any,
+      {} as any,
+      { getClient: jest.fn() } as any,
+      {} as any,
+    );
+
+    return { service, paddleClient };
+  };
+
+  describe('getInvoiceHistory', () => {
+    it('should return the fields the payment history shows when a charge exists', async () => {
+      const { service, paddleClient } = makeService();
+
+      await expect(service.getInvoiceHistory(userId)).resolves.toEqual({
+        items: [
+          {
+            id: transactionId,
+            plan: 'Pro',
+            amount: '2900',
+            currency: 'EUR',
+            status: 'completed',
+            date: '2026-10-02T00:00:00.000Z',
+            invoiceAvailable: true,
+          },
+        ],
+      });
+      expect(paddleClient.listRecentTransactions).toHaveBeenCalledWith({
+        customerId: 'ctm_123',
+      });
+    });
+
+    it.each([
+      ['an automatic charge is not completed', { status: 'past_due' }],
+      [
+        'the charge is zero-value',
+        {
+          details: {
+            totals: { subtotal: '0', grandTotal: '0' },
+            lineItems: [],
+          },
+        },
+      ],
+    ])('should mark no invoice available when %s', async (_name, overrides) => {
+      const { service, paddleClient } = makeService();
+      paddleClient.listRecentTransactions.mockResolvedValue([
+        { ...paidTransaction, ...overrides },
+      ]);
+
+      const { items } = await service.getInvoiceHistory(userId);
+
+      expect(items[0].invoiceAvailable).toBe(false);
+    });
+
+    it('should return an empty list without calling Paddle when the user has no customer', async () => {
+      const { service, paddleClient } = makeService(null);
+
+      await expect(service.getInvoiceHistory(userId)).resolves.toEqual({
+        items: [],
+      });
+      expect(paddleClient.listRecentTransactions).not.toHaveBeenCalled();
+    });
+
+    it('should answer 503 when Paddle cannot be reached', async () => {
+      const { service, paddleClient } = makeService();
+      paddleClient.listRecentTransactions.mockRejectedValue(
+        new TypeError('fetch failed', { cause: { code: 'ETIMEDOUT' } }),
+      );
+
+      await expect(service.getInvoiceHistory(userId)).rejects.toBeInstanceOf(
+        ServiceUnavailableException,
+      );
+    });
+  });
+
+  describe('getInvoicePdfUrl', () => {
+    it('should return the link when the transaction belongs to the user', async () => {
+      const { service, paddleClient } = makeService();
+
+      await expect(
+        service.getInvoicePdfUrl(userId, transactionId),
+      ).resolves.toEqual({ url: 'https://paddle.test/a.pdf' });
+      expect(paddleClient.getInvoicePdfUrl).toHaveBeenCalledWith(transactionId);
+    });
+
+    it("should answer 404 without fetching a PDF when the transaction is another customer's", async () => {
+      const { service, paddleClient } = makeService();
+      paddleClient.getTransaction.mockResolvedValue({
+        ...paidTransaction,
+        customerId: 'ctm_other',
+      });
+
+      await expect(
+        service.getInvoicePdfUrl(userId, transactionId),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(paddleClient.getInvoicePdfUrl).not.toHaveBeenCalled();
+    });
+
+    it('should answer 404 without calling Paddle when the id is malformed', async () => {
+      const { service, paddleClient } = makeService();
+
+      await expect(
+        service.getInvoicePdfUrl(userId, '../customers/ctm_123'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(paddleClient.getTransaction).not.toHaveBeenCalled();
+    });
+
+    it('should answer 404 when the transaction has no invoice', async () => {
+      const { service, paddleClient } = makeService();
+      paddleClient.getTransaction.mockResolvedValue({
+        ...paidTransaction,
+        status: 'past_due',
+      });
+
+      await expect(
+        service.getInvoicePdfUrl(userId, transactionId),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(paddleClient.getInvoicePdfUrl).not.toHaveBeenCalled();
+    });
+
+    it('should answer 404 when the user has no customer', async () => {
+      const { service, paddleClient } = makeService(null);
+
+      await expect(
+        service.getInvoicePdfUrl(userId, transactionId),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(paddleClient.getTransaction).not.toHaveBeenCalled();
+    });
+
+    it('should answer 404 when Paddle does not know the transaction', async () => {
+      const { service, paddleClient } = makeService();
+      paddleClient.getTransaction.mockRejectedValue(
+        new ApiError(
+          {
+            type: 'request_error',
+            code: 'not_found',
+            detail: 'Not found',
+          } as any,
+          null,
+        ),
+      );
+
+      await expect(
+        service.getInvoicePdfUrl(userId, transactionId),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
   });
 });
 

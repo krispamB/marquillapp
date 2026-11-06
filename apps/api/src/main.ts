@@ -4,8 +4,15 @@ import compression from 'compression';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { setDefaultAutoSelectFamilyAttemptTimeout } from 'node:net';
+
+// Node gives each address only 250 ms by default. Where IPv6 is unreachable and
+// IPv4 takes longer than that, every attempt fails and fetch throws ETIMEDOUT
+// even though the host is up.
+const CONNECT_ATTEMPT_TIMEOUT_MS = 2_000;
 
 async function bootstrap() {
+  setDefaultAutoSelectFamilyAttemptTimeout(CONNECT_ATTEMPT_TIMEOUT_MS);
   const app = await NestFactory.create(AppModule, { rawBody: true });
   const logger = new Logger(
     bootstrap.name.charAt(0).toUpperCase() + bootstrap.name.slice(1),

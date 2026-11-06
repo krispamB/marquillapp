@@ -66,6 +66,55 @@ few seconds after Paddle reports `checkout.completed`. After checkout, landing
 redirects to `/billing?checkout=success`, and the web app polls this endpoint
 until the purchased tier appears.
 
+## List invoices
+
+`GET /api/v1/payment/invoices`
+
+Returns the caller's 30 most recent Paddle transactions, newest first. Paddle is
+the source of truth, so nothing is stored locally. Unfinished checkouts (`draft`
+and `ready`) are left out. A caller with no Paddle customer gets an empty list.
+
+Response:
+
+```json
+{
+  "items": [
+    {
+      "id": "txn_01h8z9k2m4n6p8q0r1s2t3u4v5",
+      "plan": "Pro",
+      "amount": "2900",
+      "currency": "USD",
+      "status": "completed",
+      "date": "2026-10-01T00:00:00.000Z",
+      "invoiceAvailable": true
+    }
+  ]
+}
+```
+
+- `amount` is a string in the currency's lowest unit, so `"2900"` USD is $29.00.
+  JPY, KRW, VND, and CLP have no minor unit, so `"1200"` JPY is ¥1,200. It and
+  `plan` can be `null`.
+- `status` is `billed`, `paid`, `completed`, `past_due`, or `canceled`.
+- `503` means Paddle could not be reached or refused the request. It does not
+  mean the caller has no invoices.
+
+## Get an invoice PDF link
+
+`GET /api/v1/payment/invoices/:transactionId/pdf`
+
+Returns a link that downloads the invoice PDF. Request it when the user asks for
+the file, because the link expires after an hour. Limited to 20 requests per
+minute.
+
+```json
+{ "url": "https://..." }
+```
+
+Returns `404` when the transaction doesn't exist, belongs to another customer, or
+has no invoice (`invoiceAvailable` is `false`). Returns `503` when Paddle could
+not be reached or refused the request.
+
 ## Get dashboard usage
 
 `GET /api/v1/payment/usage`

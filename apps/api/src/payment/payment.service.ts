@@ -5,11 +5,13 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
 import { Model, Types } from 'mongoose';
+import { ApiError, type Transaction } from '@paddle/paddle-node-sdk';
 import {
   BillingInterval,
   BillingCustomer,
@@ -25,6 +27,25 @@ import { FeatureGatingService } from '../feature-gating/feature-gating.service';
 
 const WEBHOOK_DEDUPE_TTL_SECONDS = 172800; // 48h
 const WEBHOOK_REDIS_KEY_PREFIX = 'billing:webhook:paddle:id:';
+const PADDLE_TRANSACTION_ID = /^txn_[a-z\d]{26}$/;
+const INVOICE_NOT_FOUND = 'Invoice not found';
+
+/** Paddle has no PDF for zero-value or unpaid automatically-collected transactions. */
+function hasInvoicePdf(transaction: Transaction): boolean {
+  const isPaidOrInvoiced =
+    transaction.status === 'completed' ||
+    (transaction.status === 'billed' &&
+      transaction.collectionMode === 'manual');
+  return isPaidOrInvoiced && Number(transaction.details?.totals?.subtotal) > 0;
+}
+
+function describeError(error: unknown): string {
+  if (error instanceof ApiError) return error.code;
+  if (!(error instanceof Error)) return String(error);
+  // fetch reports network failures as "fetch failed", with the reason in `cause`.
+  const cause = error.cause as { code?: string } | undefined;
+  return cause?.code ? `${error.message} (${cause.code})` : error.message;
+}
 
 @Injectable()
 export class PaymentService {
@@ -192,30 +213,83 @@ export class PaymentService {
   }
 
   async getInvoiceHistory(userId: string) {
-    const userObjectId = new Types.ObjectId(userId);
+    const customerId = await this.findPaddleCustomerId(userId);
 
-    const billingCustomer = await this.billingCustomerModel
-      .findOne({ user: userObjectId, provider: PaymentProvider.PADDLE })
-      .lean();
-
-    if (!billingCustomer) {
+    if (!customerId) {
       return { items: [] };
     }
 
-    const transactions = await this.paddleClient.listTransactions({
-      customerId: billingCustomer.providerCustomerId,
-    });
+    const transactions = await this.callPaddle('list transactions', () =>
+      this.paddleClient.listRecentTransactions({ customerId }),
+    );
 
     const items = transactions.map((tx) => ({
       id: tx.id,
-      customer: tx.customData?.name,
-      plan: tx.details?.lineItems?.[0]?.product?.name,
-      amount: tx.details?.totals?.grandTotal,
+      plan: tx.details?.lineItems?.[0]?.product?.name ?? null,
+      amount: tx.details?.totals?.grandTotal ?? null,
+      currency: tx.currencyCode,
       status: tx.status,
-      date: tx.createdAt,
+      date: tx.billedAt ?? tx.createdAt,
+      invoiceAvailable: hasInvoicePdf(tx),
     }));
 
     return { items };
+  }
+
+  async getInvoicePdfUrl(userId: string, transactionId: string) {
+    // The id comes from the client and is sent to Paddle as a path segment.
+    if (!PADDLE_TRANSACTION_ID.test(transactionId)) {
+      throw new NotFoundException(INVOICE_NOT_FOUND);
+    }
+
+    const customerId = await this.findPaddleCustomerId(userId);
+    if (!customerId) {
+      throw new NotFoundException(INVOICE_NOT_FOUND);
+    }
+
+    const transaction = await this.callPaddle('get transaction', () =>
+      this.paddleClient.getTransaction(transactionId),
+    );
+
+    // Answers the same as a missing id, so another customer's id reveals nothing.
+    if (transaction.customerId !== customerId || !hasInvoicePdf(transaction)) {
+      throw new NotFoundException(INVOICE_NOT_FOUND);
+    }
+
+    const url = await this.callPaddle('get invoice PDF', () =>
+      this.paddleClient.getInvoicePdfUrl(transactionId),
+    );
+
+    return { url };
+  }
+
+  private async findPaddleCustomerId(userId: string) {
+    const billingCustomer = await this.billingCustomerModel
+      .findOne({
+        user: new Types.ObjectId(userId),
+        provider: PaymentProvider.PADDLE,
+      })
+      .lean();
+
+    return billingCustomer?.providerCustomerId ?? null;
+  }
+
+  /** Logs why Paddle failed, and gives the client a 503 instead of a 500. */
+  private async callPaddle<T>(
+    action: string,
+    request: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await request();
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'not_found') {
+        throw new NotFoundException(INVOICE_NOT_FOUND);
+      }
+      this.logger.error(`Paddle: ${action} failed: ${describeError(error)}`);
+      throw new ServiceUnavailableException(
+        'Billing information is unavailable right now',
+      );
+    }
   }
 
   async getUsageSummary(userId: string) {

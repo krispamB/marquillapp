@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   UseGuards,
   ValidationPipe,
@@ -51,6 +52,19 @@ export class PaymentController {
   @Get('invoices')
   async getInvoices(@GetUser() user: User) {
     return this.paymentService.getInvoiceHistory(user._id.toString());
+  }
+
+  // Each call makes two Paddle requests.
+  @Throttle({ default: { limit: 20, ttl: minutes(1) } })
+  @Get('invoices/:transactionId/pdf')
+  async getInvoicePdf(
+    @GetUser() user: User,
+    @Param('transactionId') transactionId: string,
+  ) {
+    return this.paymentService.getInvoicePdfUrl(
+      user._id.toString(),
+      transactionId,
+    );
   }
 
   @Get('usage')

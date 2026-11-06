@@ -48,6 +48,7 @@ Authenticated routes are rate-limited per user and per route. The default is 120
 | `POST /artifacts`, `POST /artifacts/:id/refine` | 10 per minute |
 | `POST /auth/linkedin` | 10 per minute |
 | `POST /payment/checkout` | 10 per minute |
+| `GET /payment/invoices/:transactionId/pdf` | 20 per minute |
 | `POST /feedback/issues` | 10 per hour |
 
 Over the limit, the server returns `429 Too Many Requests` with a `Retry-After` header in seconds. Responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.
