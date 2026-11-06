@@ -1,4 +1,5 @@
-import { BetaBadge, MarkCursor, MarkTile } from './data';
+import MarquillMark from '../brand/MarquillMark';
+import { BetaBadge, MarkCursor } from './data';
 
 const TILE =
   'animate-mq-float flex h-20 w-20 items-center justify-center rounded-[22px] border border-white/10 bg-[#101012] shadow-[0_18px_44px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.06)] xl:h-24 xl:w-24 xl:rounded-[26px]';
@@ -95,7 +96,7 @@ export default function Hero({ appUrl }: { appUrl: string }) {
 
         {/* Prompt bar */}
         <div className="mx-auto mt-10 flex max-w-[620px] items-center gap-3 rounded-[14px] border border-line-strong bg-surface p-3 pl-4 text-left shadow-md" aria-hidden="true">
-          <MarkTile />
+          <MarquillMark size={30} title="" />
           <span className="flex min-w-0 flex-1 items-center truncate text-[14px] text-ink-700 sm:text-[15.5px]">
             Turn my launch notes into a 6-slide carousel
             <MarkCursor />

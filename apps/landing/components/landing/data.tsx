@@ -77,19 +77,6 @@ export function BetaBadge({ children = 'Public beta' }: { children?: ReactNode }
   );
 }
 
-/** The "mq" tile Mark signs his work with. */
-export function MarkTile({ size = 30 }: { size?: number }) {
-  return (
-    <span
-      className="relative inline-flex flex-none items-end justify-end rounded-[8px] bg-ink-900 p-[2px_3px]"
-      style={{ width: size, height: size }}
-      aria-hidden="true"
-    >
-      <span className="ff-mono text-[8px] font-medium leading-none text-surface">mq</span>
-    </span>
-  );
-}
-
 /* ------------------------------------------------------------
    Status board and changelog. Both come from the product ledger
    (packages/product); edit features there, not here.
