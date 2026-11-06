@@ -107,6 +107,7 @@ Every feature Marquill has, is building, or has discussed. `live` means deployed
 | Id | Feature | Status | Date | What it does | Landing; plans | Links |
 | --- | --- | --- | --- | --- | --- | --- |
 | `account-preferences` | Theme and timezone preferences | building |  | Settings saves a System, Light, or Dark theme and a timezone to the account, so they follow the user to every device. With no timezone chosen, the browser's is used. The theme control leaves the topbar for Settings.<br>_Scheduling still sends the browser's timezone; the saved one is stored, not yet used for scheduling._ |  | [users.md](../../apps/api/docs/api/users.md) |
+| `compact-workspace-ui` | Compact workspace UI | building |  | A shared size scale across the app: smaller type, controls, and chrome on desktop and mobile, one main action per area, and phone screens that fit without sideways scrolling. Colors and components are unchanged. |  | [design-system.md](../../apps/web/docs/design-system.md) |
 
 ## Ideas
 
@@ -147,6 +148,7 @@ Every feature Marquill has, is building, or has discussed. `live` means deployed
 
 | Date | Feature | Entry | Published |
 | --- | --- | --- | --- |
+| 2026-11-06 | `compact-workspace-ui` | **A calmer, more compact workspace**: Smaller type and controls everywhere, and the calendar now fits a phone screen. | draft |
 | 2026-11-04 | `account-preferences` | **Preferences that follow you**: Pick a theme and timezone in Settings once, and every device you sign in on uses them. | draft |
 | 2026-10-15 | `design-system-picker` | **Swatch menu with hover preview**: Hover over a Design System to preview it before you pick. | yes |
 | 2026-10-15 | `design-systems` | **Design Systems for documents**: Six designed systems for one-pagers and carousels, chosen per document. | yes |

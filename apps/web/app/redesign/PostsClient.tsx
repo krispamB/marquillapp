@@ -168,7 +168,7 @@ export default function PostsRedesignClient({
       }
     >
       <div className="mq-page-heading mq-page-heading-compact">
-        <div><span className="mq-eyebrow">Your content workspace</span><h1>Posts</h1><p>Draft, schedule, and publish from one calm queue.</p></div>
+        <div><span className="mq-eyebrow">Your content workspace</span><h1 className="mq-h1-dup">Posts</h1><p>Draft, schedule, and publish from one calm queue.</p></div>
         <Link href="/posts/new" className="mq-primary-button"><Plus size={16} /> New post</Link>
       </div>
 
@@ -181,7 +181,7 @@ export default function PostsRedesignClient({
           ))}
         </div>
         <div className="mq-toolbar-filters">
-          <label className="mq-filter-select"><CalendarClock size={14} /><input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} aria-label="Filter by month" /></label>
+          <label className="mq-filter-select"><input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} aria-label="Filter by month" /></label>
           <label className="mq-filter-select mq-search-mobile"><Search size={14} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /></label>
         </div>
       </div>

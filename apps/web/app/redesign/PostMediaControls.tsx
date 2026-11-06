@@ -43,6 +43,8 @@ export default function PostMediaControls({
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  if (readOnly && !media.length && !error && phase === "idle") return null;
+
   return (
     <div className="mq-post-media-section">
       <header><span className="mq-mono">_ media</span>{media.length ? <span className="mq-mono mq-post-media-count">{media.length}</span> : null}</header>

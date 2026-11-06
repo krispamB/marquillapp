@@ -117,10 +117,10 @@ export default function CalendarRedesignClient({
       onSelectAccount={setSelectedAccountId}
       subscription={subscription}
       active="calendar"
-      title="Calendar"
+      title={<span className="mq-topbar-title-dup">Calendar</span>}
       topbarExtra={<div className="mq-calendar-top-controls"><button type="button" className="mq-icon-button" onClick={() => shiftMonth(-1)} aria-label="Previous month"><ChevronLeft size={15} /></button><strong>{cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong><button type="button" className="mq-icon-button" onClick={() => shiftMonth(1)} aria-label="Next month"><ChevronRight size={15} /></button></div>}
     >
-      <div className="mq-page-heading mq-page-heading-compact"><div><span className="mq-eyebrow">Scheduling queue</span><h1>{cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</h1><p>Drag a post to a new day or open it to edit the draft.</p></div><Link href="/posts/new" className="mq-primary-button"><Plus size={16} /> New post</Link></div>
+      <div className="mq-page-heading mq-page-heading-compact"><div><span className="mq-eyebrow">Scheduling queue</span><h1 className="mq-h1-dup">{cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</h1><p>Drag a post to a new day or open it to edit the draft.</p></div><Link href="/posts/new" className="mq-primary-button"><Plus size={16} /> New post</Link></div>
       {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}
       {message ? <div className="mq-alert mq-alert-success">{message}</div> : null}
 

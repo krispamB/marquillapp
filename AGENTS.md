@@ -19,6 +19,7 @@ Bun workspaces and Turborepo. There is one `bun.lock` at the root. `bunfig.toml`
 - **API contract.** `apps/api/docs/api/` is the single source of truth for the client-facing API. When you change an endpoint, update that doc and the web caller in the same change.
 - **landing → web.** Every CTA links to `NEXT_PUBLIC_APP_URL`. The plan names and limits in `apps/landing/components/landing/data.tsx` must match the tiers seeded in `apps/api/src/scripts/tier-seeds.ts`.
 - **landing ← product ledger.** The landing status board and changelog are generated from `packages/product`. Never edit them in `apps/landing`; edit the ledger.
+- **Product UI design.** `apps/web/docs/design-system.md` governs size, spacing, and emphasis in the web app. `apps/api/assets/design-systems/` is unrelated: it holds the Design Systems Mark renders documents with.
 - **Domain vocabulary.** `apps/api/CONTEXT.md` is the glossary (Artifact, Document Version, Candidate Source, ...). Use its terms in code, docs, and issues, and respect its _Avoid_ lists.
 
 ## Commands

@@ -64,7 +64,7 @@ export default function SettingsRedesignClient({
 
   return (
     <RedesignShell user={user} accounts={accounts} selectedAccountId={effectiveSelectedAccountId} onSelectAccount={setSelectedAccountId} subscription={subscription} active="settings" title="Settings">
-      <div className="mq-page-heading mq-page-heading-compact"><div><span className="mq-eyebrow">Workspace preferences</span><h1>Settings</h1><p>Manage your publishing accounts and workspace defaults.</p></div></div>
+      <div className="mq-page-heading mq-page-heading-compact"><div><span className="mq-eyebrow">Workspace preferences</span><h1 className="mq-h1-dup">Settings</h1><p>Manage your publishing accounts and workspace defaults.</p></div></div>
       {message ? <div className="mq-alert mq-alert-success">{message}</div> : null}
       {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}
 

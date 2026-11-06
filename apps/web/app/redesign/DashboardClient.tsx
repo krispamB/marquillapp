@@ -261,7 +261,7 @@ export default function DashboardRedesignClient({
             <div className="mq-card mq-stat-card">
               <span className="mq-label">Content created</span>
               <div className="mq-stat-value-row"><strong>{artifactsCreated ?? "—"}</strong><span>this cycle</span></div>
-              <span className="mq-stat-note">{artifactCounts ? `${artifactCounts.posts} posts · ${artifactCounts.documents} documents · ${artifactCounts.polls} polls` : "Usage unavailable"}</span>
+              <span className="mq-stat-note mq-stat-note-clamp" title={artifactCounts ? `${artifactCounts.posts} posts · ${artifactCounts.documents} documents · ${artifactCounts.polls} polls` : undefined}>{artifactCounts ? `${artifactCounts.posts} posts · ${artifactCounts.documents} documents · ${artifactCounts.polls} polls` : "Usage unavailable"}</span>
             </div>
             <div className="mq-card mq-stat-card">
               <span className="mq-label">Posts created</span>
@@ -271,7 +271,7 @@ export default function DashboardRedesignClient({
               </span>
             </div>
             <div className="mq-card mq-stat-card mq-connected-account-card">
-              <span className="mq-label">Connected Accounts</span>
+              <span className="mq-label">Connected accounts</span>
               <div className="mq-stat-value-row"><strong>{connectedAccounts.length}</strong></div>
               <div className="mq-connected-account-summary">
                 <span>LinkedIn Pages</span>

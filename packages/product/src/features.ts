@@ -371,6 +371,14 @@ export const features: Feature[] = [
     notes: ['Scheduling still sends the browser\'s timezone; the saved one is stored, not yet used for scheduling.'],
   },
   {
+    id: 'compact-workspace-ui',
+    name: 'Compact workspace UI',
+    area: 'workspace',
+    status: 'building',
+    summary: 'A shared size scale across the app: smaller type, controls, and chrome on desktop and mobile, one main action per area, and phone screens that fit without sideways scrolling. Colors and components are unchanged.',
+    docs: ['apps/web/docs/design-system.md'],
+  },
+  {
     id: 'welcome-email',
     name: 'Welcome email',
     area: 'workspace',

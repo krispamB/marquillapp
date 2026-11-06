@@ -63,6 +63,16 @@ Server components use the helpers in `app/lib/session.ts` to mint fresh Clerk cr
 ### Onboarding Flow (`app/onboarding/`)
 6-step post-signup flow. State is owned by `OnboardingClient.tsx`; step UIs live in `steps.tsx`; shared primitives (Progress, RadioTile, GoalTile, Chip) in `components.tsx`; styles in `onboarding.css`. The flow branches on `persona` ("creator" | "writer") — step 2 and goals differ per persona. Server enums for API payloads live in `types.ts`.
 
+## Design system
+
+[docs/design-system.md](docs/design-system.md) is the contract for size, spacing, and emphasis in the product UI. Read it before any UI change. In short:
+
+- Use the tokens at the top of `app/globals.css` (`--fs-*`, `--ctl-*`, `--r-*`, `--gutter`, `--card-pad`, `--gap-section`). Don't add raw font sizes, control heights, or radii, and don't add colors.
+- Change the shared `.mq-*` class instead of overriding it per screen. No inline size styles.
+- One filled primary button per region; actions that repeat on cards or rows use the secondary style.
+- One title per screen on mobile, and no clipping or sideways scroll at 360px.
+- Before calling a UI change done, look at real screenshots at 1440x900 and 390x844, in light and dark, with populated data rather than an empty account.
+
 ## Environment Variables
 - `NEXT_PUBLIC_API_BASE_URL` — backend root (defaults to `http://localhost:3500/api/v1`)
 - `BACKEND_API_URL` — absolute backend root for server-side requests (defaults to `http://localhost:3500/api/v1`)
