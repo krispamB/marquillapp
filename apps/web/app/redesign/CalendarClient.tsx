@@ -140,7 +140,7 @@ export default function CalendarRedesignClient({
                     {items.slice(0, 3).map((post) => {
                       const canReschedule = getLinkedInAccountAccessById(post.connectedAccount, connectedAccounts)?.isUsable === true;
                       const label = postLabel(post);
-                      return <Link key={post._id} href={`/posts/${post._id}/edit`} draggable={canReschedule} onDragStart={(event) => { if (canReschedule) event.dataTransfer.setData("text/plain", post._id); }} className="mq-calendar-event" title={canReschedule ? label : `${label} — ${LINKEDIN_ACCESS_EXPIRED_MESSAGE}`}><i className={dotClass(post.status)} /><span>{label}</span></Link>;
+                      return <Link key={post._id} href={`/posts/${post._id}/edit`} draggable={canReschedule} onDragStart={(event) => { if (canReschedule) event.dataTransfer.setData("text/plain", post._id); }} className="mq-calendar-event" aria-label={label} title={canReschedule ? label : `${label} — ${LINKEDIN_ACCESS_EXPIRED_MESSAGE}`}><i className={dotClass(post.status)} /><span>{label}</span></Link>;
                     })}
                   </div>
                 </div>

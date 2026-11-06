@@ -261,7 +261,7 @@ export default function DashboardRedesignClient({
             <div className="mq-card mq-stat-card">
               <span className="mq-label">Content created</span>
               <div className="mq-stat-value-row"><strong>{artifactsCreated ?? "—"}</strong><span>this cycle</span></div>
-              <span className="mq-stat-note mq-stat-note-clamp" title={artifactCounts ? `${artifactCounts.posts} posts · ${artifactCounts.documents} documents · ${artifactCounts.polls} polls` : undefined}>{artifactCounts ? `${artifactCounts.posts} posts · ${artifactCounts.documents} documents · ${artifactCounts.polls} polls` : "Usage unavailable"}</span>
+              <span className="mq-stat-note mq-stat-note-clamp" title={artifactCounts ? `${artifactCounts.posts} posts · ${artifactCounts.documents} documents · ${artifactCounts.polls} polls` : undefined}>{artifactCounts ? `${artifactCounts.posts} posts · ${artifactCounts.documents} docs · ${artifactCounts.polls} polls` : "Usage unavailable"}</span>
             </div>
             <div className="mq-card mq-stat-card">
               <span className="mq-label">Posts created</span>

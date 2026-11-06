@@ -35,8 +35,8 @@
 
 .close {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: var(--icon-btn);
+  height: var(--icon-btn);
   place-items: center;
   padding: 0;
   border: 0;
@@ -53,7 +53,7 @@
 .searchField {
   display: flex;
   min-width: 0;
-  min-height: 38px;
+  min-height: var(--ctl-md);
   flex: 1;
   align-items: center;
   gap: 8px;
@@ -70,7 +70,7 @@
 .searchField > button:hover { background: var(--canvas-sub); color: var(--ink-900); }
 
 .searchButton {
-  min-height: 38px;
+  min-height: var(--ctl-md);
   padding: 0 17px;
   border: 1px solid var(--accent);
   border-radius: var(--r-sm);

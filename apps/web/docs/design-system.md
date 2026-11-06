@@ -51,7 +51,7 @@ Size with the tokens rather than a raw `min-height`, so desktop and touch stay i
 
 ## Color
 
-Unchanged by this system. Use the existing ink, line, surface, and status tokens. Do not add colors. `--neg` and `--neg-bg` are for destructive and error states only.
+Use the existing ink, line, surface, and status tokens, and do not add colors. `--neg` and `--neg-bg` are for destructive and error states only; their values come from the reds the stylesheet already used. `--ink-600` sits between `--ink-700` and `--ink-500`.
 
 ## For agents changing the UI
 
