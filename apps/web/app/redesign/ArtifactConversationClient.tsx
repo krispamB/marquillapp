@@ -521,7 +521,7 @@ export default function ArtifactConversationClient({
             <div className="mq-studio-user-message" key={entry.id} ref={registerEntry(entry.id)}>{entry.text}</div>
           ) : (
             <div className="mq-studio-assistant-message" key={entry.id} ref={registerEntry(entry.id)}>
-              <div className="mq-studio-mark"><MarquillMark size={30} theme="auto" title="Mark" /></div>
+              <div className="mq-studio-mark"><MarquillMark size={24} theme="auto" title="Mark" /></div>
               <div className="mq-studio-assistant-content">
                 <div className="mq-studio-assistant-meta">
                   <span>Mark created version {entry.artifact.version}</span>
@@ -589,7 +589,7 @@ export default function ArtifactConversationClient({
 
           {run ? (
             <div className="mq-studio-assistant-message mq-studio-run-message">
-              <div className="mq-studio-mark"><MarquillMark size={30} theme="auto" title="Mark" /></div>
+              <div className="mq-studio-mark"><MarquillMark size={24} theme="auto" title="Mark" /></div>
               <div className="mq-studio-assistant-content">
                 <ArtifactRunProgress
                   run={run}

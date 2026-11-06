@@ -149,7 +149,7 @@ export default function ArtifactStudioClient({
     >
       <section className="mq-artifact-studio" aria-labelledby="mq-artifact-studio-title">
         <div className="mq-artifact-studio-hero">
-          <MarquillLockup size={52} theme="auto" className="mq-artifact-studio-logo" />
+          <MarquillLockup size={28} theme="auto" className="mq-artifact-studio-logo" />
           <div className="mq-artifact-studio-heading">
             <span className="mq-eyebrow">The Artifact Studio</span>
             <h1 id="mq-artifact-studio-title">What will we make today?</h1>
