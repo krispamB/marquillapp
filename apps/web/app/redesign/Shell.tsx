@@ -182,7 +182,7 @@ export default function RedesignShell({
 
   return (
     <div className={`mq-shell${hideMobileNav ? " mq-shell-no-mobile-nav" : ""}`}>
-      <ThemePreferenceSync preference={user.preferences?.theme} />
+      <ThemePreferenceSync preference={user.preferences?.theme} signedIn />
       <KeyboardInsetSync />
       <aside className="mq-sidebar">
         <Link href="/dashboard" className="mq-brand" aria-label="Marquill dashboard">
