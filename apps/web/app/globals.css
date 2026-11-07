@@ -213,6 +213,54 @@ html[data-theme="dark"] .mq-shell .mq-post-avatar-scheduled { color: var(--warn)
 html[data-theme="dark"] .mq-shell .mq-alert-error,
 html[data-theme="dark"] .mq-shell .mq-feedback-error { border-color: #542126; background: #2a1517; color: #f0686d; }
 html[data-theme="dark"] .mq-shell .mq-delete-warning { border-color: #57451d; background: #2a2415; color: var(--warn) !important; }
+/* Sign-in / sign-up. Follows data-theme like the workspace, so a visitor with
+   no saved choice gets their device's scheme. app/auth-appearance.ts feeds
+   these to Clerk's components. */
+.mq-auth {
+  --auth-canvas: #f6f6f4;
+  --auth-surface: #fff;
+  --auth-surface-2: #fbfbfa;
+  --auth-hover: #f6f6f4;
+  --auth-ink-900: #0a0a0a;
+  --auth-ink-800: #1a1a19;
+  --auth-ink-700: #3a3a38;
+  --auth-ink-500: #76766f;
+  --auth-ink-400: #9a9a93;
+  --auth-line: #e7e7e3;
+  --auth-line-strong: #dcdcd6;
+  --auth-line-hover: #c2c2bb;
+  --auth-line-faint: #f0f0ec;
+  --auth-accent: var(--brand-accent);
+  --auth-accent-ring: rgba(42, 111, 219, .14);
+  --auth-primary-bg: #0a0a0a;
+  --auth-primary-hover: #1a1a19;
+  --auth-primary-fg: #fff;
+  --auth-shadow: 0 8px 24px rgba(16, 16, 15, .08), 0 1px 3px rgba(16, 16, 15, .04);
+  min-height: 100svh;
+  background: var(--auth-canvas);
+  color: var(--auth-ink-900);
+}
+html[data-theme="dark"] .mq-auth {
+  --auth-canvas: #0c0c0b;
+  --auth-surface: #161614;
+  --auth-surface-2: #1e1e1b;
+  --auth-hover: #232320;
+  --auth-ink-900: #f4f4f1;
+  --auth-ink-800: #e4e4df;
+  --auth-ink-700: #c6c6bf;
+  --auth-ink-500: #8f8f88;
+  --auth-ink-400: #6d6d66;
+  --auth-line: #262624;
+  --auth-line-strong: #34342f;
+  --auth-line-hover: #45453f;
+  --auth-line-faint: #1d1d1a;
+  --auth-accent-ring: rgba(90, 144, 242, .22);
+  --auth-primary-bg: #f4f4f1;
+  --auth-primary-hover: #e4e4df;
+  --auth-primary-fg: #0a0a0a;
+  --auth-shadow: 0 8px 24px rgba(0, 0, 0, .55), 0 2px 6px rgba(0, 0, 0, .4);
+  color-scheme: dark;
+}
 .mq-schedule-theme { --surface:#fff;--surface-2:#fbfbfa;--ink-900:#0a0a0a;--ink-800:#1a1a19;--ink-700:#3a3a38;--ink-500:#76766f;--ink-400:#9a9a93;--ink-300:#c2c2bb;--line:#e7e7e3;--line-strong:#dcdcd6;--line-faint:#f0f0ec;--sh-lg:0 8px 24px rgba(16,16,15,.1),0 2px 6px rgba(16,16,15,.05);font-family:var(--font-inter),sans-serif;color-scheme:light; }
 html[data-theme="dark"] .mq-schedule-theme { --surface:#161614;--surface-2:#1e1e1b;--ink-900:#f4f4f1;--ink-800:#e4e4df;--ink-700:#c6c6bf;--ink-500:#8f8f88;--ink-400:#6d6d66;--ink-300:#45453f;--line:#262624;--line-strong:#34342f;--line-faint:#1d1d1a;--sh-lg:0 8px 24px rgba(0,0,0,.55),0 2px 6px rgba(0,0,0,.4);color-scheme:dark; }
 
