@@ -14,6 +14,17 @@ export type UserPreferences = {
 export const THEME_STORAGE_KEY = "marquill-theme";
 export const THEME_CHANGE_EVENT = "marquill-theme-change";
 
+/**
+ * Inline <head> script (app/layout.tsx): paints the remembered theme before
+ * React loads, and puts it back whenever `data-theme` disappears from <html>.
+ *
+ * It has to put it back because React strips every attribute it doesn't render
+ * from <html> when the root layout mounts on the client rather than hydrating,
+ * as it can on the client-side navigation after sign-in. The theme is saved, but
+ * the page would stay light until a reload re-ran this script.
+ */
+export const THEME_BOOT_SCRIPT = `(function(){try{var d=document.documentElement;var paint=function(){var t;try{t=localStorage.getItem('${THEME_STORAGE_KEY}')}catch(e){}if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';d.dataset.theme=t};paint();new MutationObserver(function(){if(!d.dataset.theme)paint()}).observe(d,{attributes:true,attributeFilter:['data-theme']})}catch(e){}})()`;
+
 export function isThemePreference(value: unknown): value is ThemePreference {
   return value === "system" || value === "light" || value === "dark";
 }
