@@ -3,6 +3,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Courier_Prime, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { THEME_BOOT_SCRIPT } from "./lib/preferences";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -75,11 +76,7 @@ export default function RootLayout({
         className={`${inter.variable} ${jetbrainsMono.variable} ${courierPrime.variable}`}
       >
         <head>
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `(function(){try{var t=localStorage.getItem('marquill-theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}})()`,
-            }}
-          />
+          <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         </head>
         <body suppressHydrationWarning className="antialiased">
           {children}
