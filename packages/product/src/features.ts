@@ -303,12 +303,19 @@ export const features: Feature[] = [
     id: 'post-analytics',
     name: 'Post analytics',
     area: 'insights',
-    status: 'planned',
-    summary: 'Impressions and engagement for published posts, pulled from LinkedIn, inside Marquill.',
+    status: 'building',
+    summary: 'Analytics on the Dashboard for each connected LinkedIn account (pick it in the account switcher, which also shows followers and impressions for each account): impressions, engagement rate, followers and daily trends over 7, 28 or 90 days, top posts, and follower seniority and company size for pages. Personal accounts list only posts published through Marquill.',
     public: { title: 'Analytics', body: 'Post performance inside Marquill. It stays switched off until the numbers are right.' },
     board: true,
-    docs: ['apps/api/docs/LINKEDIN_ORGANIZATION_ANALYTICS_RESEARCH.md'],
-    notes: ['No issue yet. Open one when work starts.'],
+    docs: [
+      'apps/api/docs/linkedin-analytics-design.md',
+      'apps/api/docs/api/analytics.md',
+      'apps/api/docs/LINKEDIN_ORGANIZATION_ANALYTICS_RESEARCH.md',
+    ],
+    notes: [
+      'Built on feat/linkedin-analytics; not yet run against real LinkedIn data.',
+      'Personal accounts need the second LinkedIn app (LINKEDIN_ANALYTICS_CLIENT_ID and friends, Community Management API) approved and configured, and each member to grant it from the Dashboard.',
+    ],
   },
 
   /* ----------------------------------------------------------------- billing */

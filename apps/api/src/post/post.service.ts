@@ -48,6 +48,7 @@ import type { DocumentContent, PollContent } from '../artifact/schemas';
 import { CONTENT_TITLE_MAX_LENGTH } from '../common/constants';
 import { randomUUID } from 'crypto';
 import { isLinkedinAccessUsable } from '../common/HelperFn/linkedin-access.helper';
+import { resolveLinkedinAuthorUrn } from './linkedin-author-urn';
 
 interface PostFilters {
   availableMonths: string[];
@@ -1389,32 +1390,7 @@ export class PostService {
   }
 
   private resolveLinkedinAuthorUrn(connectedAccount: ConnectedAccount): string {
-    if (
-      connectedAccount.accountType === LinkedinAccountType.ORGANIZATION ||
-      connectedAccount.profileMetadata?.organizationUrn
-    ) {
-      const organizationId =
-        connectedAccount.externalId ??
-        connectedAccount.profileMetadata?.organizationUrn?.split(':').pop();
-      if (!organizationId) {
-        throw new BadRequestException(
-          'Connected organization account is missing organization identifier',
-        );
-      }
-      return `urn:li:organization:${organizationId}`;
-    }
-
-    const profileSub =
-      connectedAccount.profileMetadata?.sub ??
-      connectedAccount.externalId ??
-      connectedAccount.impersonatorUrn?.split(':').pop();
-    if (!profileSub) {
-      throw new BadRequestException(
-        'Connected personal account is missing LinkedIn profile identifier',
-      );
-    }
-
-    return `urn:li:person:${profileSub}`;
+    return resolveLinkedinAuthorUrn(connectedAccount);
   }
 
   private getUtcMonthRange(month: string): { start: Date; end: Date } {

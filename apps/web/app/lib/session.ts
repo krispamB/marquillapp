@@ -218,6 +218,7 @@ export async function getConnectedAccounts(
         provider: account.provider,
         accountType: account.accountType,
         accessTokenExpiresAt: account.accessTokenExpiresAt,
+        analyticsExpiresAt: account.analyticsAccessTokenExpiresAt,
         displayName: account.displayName,
         avatarUrl: account.avatarUrl ?? account.profileMetadata?.picture,
         vanityName: account.vanityName ?? account.profileMetadata?.vanityName,

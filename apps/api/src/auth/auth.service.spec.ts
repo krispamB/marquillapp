@@ -42,9 +42,13 @@ const makeRedisService = () => {
 };
 
 describe('AuthService.createLinkedinOath', () => {
-  const makeService = () => {
+  const BASE_SCOPE =
+    'openid profile email w_member_social r_basicprofile r_organization_admin rw_organization_admin w_organization_social r_organization_social';
+
+  const makeService = (env: Record<string, string | undefined> = {}) => {
     const redisService = makeRedisService();
     const configService = {
+      ...env,
       getOrThrow: jest.fn((key: string) =>
         key === 'LINKEDIN_CLIENT_ID'
           ? 'client-id'
@@ -96,6 +100,164 @@ describe('AuthService.createLinkedinOath', () => {
 
     expect(first.searchParams.get('state')).not.toBe(
       second.searchParams.get('state'),
+    );
+  });
+
+  it('should never request the member analytics scopes from the main app', async () => {
+    const { service } = makeService();
+    const user = { _id: new Types.ObjectId() } as unknown as User;
+
+    const url = await service.createLinkedinOath(user);
+
+    expect(new URL(url).searchParams.get('scope')).toBe(BASE_SCOPE);
+    expect(url).toContain(
+      'scope=openid+profile+email+w_member_social+r_basicprofile+r_organization_admin+rw_organization_admin+w_organization_social+r_organization_social&',
+    );
+  });
+});
+
+describe('AuthService analytics app', () => {
+  const ANALYTICS_ENV = {
+    LINKEDIN_ANALYTICS_CLIENT_ID: 'analytics-client',
+    LINKEDIN_ANALYTICS_CLIENT_SECRET: 'analytics-secret',
+    LINKEDIN_ANALYTICS_REDIRECT_URI:
+      'https://api.example.com/api/v1/auth/linkedin/analytics/callback',
+  };
+  const personalAccount = (overrides: Record<string, unknown> = {}) => ({
+    _id: new Types.ObjectId(),
+    isActive: true,
+    accessToken: 'encrypted-main',
+    profileMetadata: { vanityName: 'ada-lovelace' },
+    ...overrides,
+  });
+
+  const makeService = (
+    env: Record<string, string> = ANALYTICS_ENV,
+    account: unknown = personalAccount(),
+  ) => {
+    const redisService = makeRedisService();
+    const connectedAccountModel = {
+      findOne: jest.fn().mockResolvedValue(account),
+      updateOne: jest.fn().mockResolvedValue({}),
+    };
+    const configService = {
+      get: jest.fn((key: string) => (env as Record<string, string>)[key]),
+    };
+    const encryptionService = {
+      encrypt: jest.fn().mockResolvedValue('encrypted-analytics'),
+    };
+    const service = new AuthService(
+      connectedAccountModel as any,
+      {} as any,
+      configService as any,
+      encryptionService as any,
+      redisService as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    return { service, mocks: { redisService, connectedAccountModel } };
+  };
+  const user = { _id: new Types.ObjectId() } as unknown as User;
+
+  it('should build the authorize URL from the analytics app and its own state namespace', async () => {
+    const { service, mocks } = makeService();
+
+    const url = new URL(await service.createLinkedinAnalyticsOauth(user));
+
+    expect(url.searchParams.get('client_id')).toBe('analytics-client');
+    expect(url.searchParams.get('redirect_uri')).toBe(
+      ANALYTICS_ENV.LINKEDIN_ANALYTICS_REDIRECT_URI,
+    );
+    expect(url.searchParams.get('scope')).toBe(
+      'r_member_postAnalytics r_member_profileAnalytics r_basicprofile',
+    );
+    expect(mocks.redisService.client.set).toHaveBeenCalledWith(
+      `auth:linkedin:analytics-oauth-state:${url.searchParams.get('state')}`,
+      user._id.toString(),
+      'EX',
+      600,
+    );
+  });
+
+  it('should answer 503 when the analytics app is not configured', async () => {
+    const { service } = makeService({});
+
+    await expect(
+      service.createLinkedinAnalyticsOauth(user),
+    ).rejects.toMatchObject({
+      response: { code: 'LINKEDIN_ANALYTICS_NOT_CONFIGURED' },
+    });
+  });
+
+  it('should refuse to start when no personal account is connected', async () => {
+    const { service } = makeService(ANALYTICS_ENV, null);
+
+    await expect(
+      service.createLinkedinAnalyticsOauth(user),
+    ).rejects.toMatchObject({
+      response: { code: 'LINKEDIN_ACCOUNT_NOT_CONNECTED' },
+    });
+  });
+
+  it('should store the analytics token on the personal account without touching the main one', async () => {
+    const account = personalAccount();
+    const { service, mocks } = makeService(ANALYTICS_ENV, account);
+    mocks.redisService.client.getdel.mockResolvedValueOnce(user._id.toString());
+    const getAccessToken = jest
+      .spyOn(service as any, 'getLinkedinAccessToken')
+      .mockResolvedValue({ access_token: 'analytics', expires_in: 3600 });
+    jest
+      .spyOn(service as any, 'getLinkedinUser')
+      .mockResolvedValue({
+        memberId: 'other-app-id',
+        vanityName: 'ada-lovelace',
+      });
+
+    await service.linkedinAnalyticsCallback('code', 'state-nonce');
+
+    expect(mocks.redisService.client.getdel).toHaveBeenCalledWith(
+      'auth:linkedin:analytics-oauth-state:state-nonce',
+    );
+    expect(getAccessToken).toHaveBeenCalledWith('code', 'analytics');
+    const [filter, update] =
+      mocks.connectedAccountModel.updateOne.mock.calls[0];
+    expect(filter).toEqual({ _id: account._id });
+    expect(Object.keys(update.$set)).toEqual([
+      'analyticsAccessToken',
+      'analyticsAccessTokenExpiresAt',
+    ]);
+    expect(update.$set.analyticsAccessToken).toBe('encrypted-analytics');
+  });
+
+  it('should reject a grant from a different LinkedIn member', async () => {
+    const { service, mocks } = makeService();
+    mocks.redisService.client.getdel.mockResolvedValueOnce(user._id.toString());
+    jest
+      .spyOn(service as any, 'getLinkedinAccessToken')
+      .mockResolvedValue({ access_token: 'analytics', expires_in: 3600 });
+    jest
+      .spyOn(service as any, 'getLinkedinUser')
+      .mockResolvedValue({ memberId: 'x', vanityName: 'someone-else' });
+
+    await expect(
+      service.linkedinAnalyticsCallback('code', 'state-nonce'),
+    ).rejects.toMatchObject({
+      response: { code: 'LINKEDIN_ACCOUNT_MISMATCH' },
+    });
+    expect(mocks.connectedAccountModel.updateOne).not.toHaveBeenCalled();
+  });
+
+  it('should not accept a state issued by the main flow', async () => {
+    const { service, mocks } = makeService();
+
+    await expect(
+      service.linkedinAnalyticsCallback('code', 'main-state'),
+    ).rejects.toMatchObject({
+      response: { code: 'LINKEDIN_OAUTH_STATE_INVALID' },
+    });
+    expect(mocks.redisService.client.getdel).toHaveBeenCalledWith(
+      'auth:linkedin:analytics-oauth-state:main-state',
     );
   });
 });
