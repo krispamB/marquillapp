@@ -13,6 +13,7 @@ The API is versioned under `/api/v1`:
 | LinkedIn connected accounts         | [linkedin.md](./linkedin.md)   |
 | Paddle checkout and billing         | [payment.md](./payment.md)     |
 | User profile and preferences        | [users.md](./users.md)         |
+| LinkedIn analytics                  | [analytics.md](./analytics.md) |
 
 ## Common conventions
 
@@ -47,9 +48,11 @@ Authenticated routes are rate-limited per user and per route. The default is 120
 | --- | --- |
 | `POST /artifacts`, `POST /artifacts/:id/refine` | 10 per minute |
 | `POST /auth/linkedin` | 10 per minute |
+| `POST /auth/linkedin/analytics` | 10 per minute |
 | `POST /payment/checkout` | 10 per minute |
 | `GET /payment/invoices/:transactionId/pdf` | 20 per minute |
 | `POST /feedback/issues` | 10 per hour |
+| `GET /analytics/accounts/:connectedAccountId/{overview,posts,audience}` with `refresh=true` | 10 per minute, counted separately from plain reads |
 
 Over the limit, the server returns `429 Too Many Requests` with a `Retry-After` header in seconds. Responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.
 

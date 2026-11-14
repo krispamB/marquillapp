@@ -23,6 +23,7 @@ This document records the backend coverage reviewed while implementing the redes
 | Bug reports and feature requests | `POST /feedback/issues` | Implemented in the redesigned shell feedback dialog with browser/device metadata. |
 | Billing | `GET /tiers/active`, `GET /payment/usage`, `GET /payment/invoices` | Implemented. |
 | Connected accounts | `GET /auth/connected-accounts`, `DELETE /auth/connected-accounts/:id` | Implemented in the shared shell/settings route. |
+| Analytics | `GET /analytics/accounts/:id/overview`, `/posts`, `/audience` | Implemented on `/dashboard`: selecting one account in the top-bar switcher shows its analytics (`AnalyticsPanel`) in place of the old per-account stat cards and post lists. The scope and range live in the URL (`?account=<id>&range=28d`). Whether analytics is off comes from `analyticsAccessTokenExpiresAt` on `GET /auth/connected-accounts` (no analytics request). The switcher also shows each account's 28-day followers and impressions, loaded from `/overview` only when the menu is about to open. There is no separate Analytics route (see `apps/api/docs/api/analytics.md`). |
 
 ## Missing or mismatched backend coverage
 
@@ -30,7 +31,6 @@ These are real gaps or contract mismatches, not mocked values hidden as working 
 
 | UI component/state | Gap | Current behavior |
 | --- | --- | --- |
-| Dashboard “Avg. engagement” tile | No engagement/analytics endpoint exists in the current frontend contract. `GET /posts/metrics/:accountId` only returns post counts by month. | The redesign shows `—` and labels the metric as unavailable. |
 | Billing “Manage payment” | No payment-method/portal endpoint is present. | Disabled control with an explicit tooltip. |
 | Billing receipt links | The invoice list has no receipt/download URL contract. | Disabled receipt controls. |
 | Billing cancel subscription | The product spec mentions cancellation, but no client endpoint is available in this repository. | Not presented as an active action; documented here for backend work. |
@@ -39,7 +39,6 @@ These are real gaps or contract mismatches, not mocked values hidden as working 
 | Blank “create draft” | The product spec lists `POST /posts`, but the working frontend contract creates drafts through `POST /posts/:accountId/draft`. | The composer requires a prompt and generation before save/publish. |
 | Account connection from Settings | The working frontend starts OAuth from `POST /auth/linkedin`; the design/spec names `POST /auth/linkedin/connect`. | Settings links to the existing onboarding connection flow. |
 | Global notification center/search | The handoff shows a notification bell and desktop search field but no notification or global-search endpoint. | Search filters the currently loaded page data; the bell is visual only. |
-| Analytics destination | The old navigation contains a disabled Analytics item, but there is no analytics route or endpoint. | It is not added as a fake page in the redesign. |
 
 ## LinkedIn preview behavior
 

@@ -30,6 +30,7 @@ import { DiagnosticsModule } from './diagnostics/diagnostics.module';
 import { ArtifactModule } from './artifact';
 import { DocumentRenderModule } from './document-render/document-render.module';
 import { DesignSystemModule } from './design-system';
+import { AnalyticsModule } from './analytics';
 
 // The HTTP server's root. The LLM stack (`LlmModule`, `AgentModule`) and its
 // scraping siblings (`ApifyModule`, `ActorsModule`) live in `WorkerModule`
@@ -68,6 +69,7 @@ import { DesignSystemModule } from './design-system';
     ArtifactModule,
     DocumentRenderModule,
     DesignSystemModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

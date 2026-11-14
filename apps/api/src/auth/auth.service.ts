@@ -5,6 +5,7 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { randomBytes } from 'crypto';
@@ -24,6 +25,23 @@ import { FeatureGatingService } from '../feature-gating/feature-gating.service';
 import { LinkedinAvatarRefreshQueue } from '../workflow/linkedin-avatar-refresh.queue';
 import { ScheduleQueue } from '../workflow/schedule.queue';
 import { isLinkedinAccessUsable } from '../common/HelperFn/linkedin-access.helper';
+
+const LINKEDIN_BASE_SCOPE =
+  'openid profile email w_member_social r_basicprofile r_organization_admin rw_organization_admin w_organization_social r_organization_social';
+/**
+ * Requested from the analytics app (`LINKEDIN_ANALYTICS_CLIENT_ID`), a second
+ * LinkedIn app holding only the Community Management API product.
+ * `r_basicprofile` is there to check the member is the one already connected.
+ */
+const LINKEDIN_ANALYTICS_SCOPE =
+  'r_member_postAnalytics r_member_profileAnalytics r_basicprofile';
+
+/** One LinkedIn developer app: a token only works with the app that issued it. */
+interface LinkedinAppCredentials {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+}
 
 interface LinkedinUserInfo {
   memberId: string;
@@ -65,6 +83,8 @@ export class AuthService {
   private readonly AVATAR_REFRESH_LEAD_TIME_MS = 24 * 60 * 60 * 1000;
   private readonly LINKEDIN_OAUTH_STATE_KEY_PREFIX =
     'auth:linkedin:oauth-state:';
+  private readonly LINKEDIN_ANALYTICS_OAUTH_STATE_KEY_PREFIX =
+    'auth:linkedin:analytics-oauth-state:';
   private readonly LINKEDIN_OAUTH_STATE_TTL_SECONDS = 10 * 60;
   private readonly LINKEDIN_ALLOWED_ORG_ROLES = new Set([
     'ADMINISTRATOR',
@@ -110,11 +130,142 @@ export class AuthService {
         'LINKEDIN_REDIRECT_URI',
       ),
       state,
-      scope:
-        'openid profile email w_member_social r_basicprofile r_organization_admin rw_organization_admin w_organization_social r_organization_social',
+      scope: LINKEDIN_BASE_SCOPE,
       enable_extended_login: 'true',
     });
     return `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`;
+  }
+
+  /** The app that signs members in and publishes. */
+  private linkedinMainApp(): LinkedinAppCredentials {
+    return {
+      clientId: this.configService.getOrThrow<string>('LINKEDIN_CLIENT_ID'),
+      clientSecret: this.configService.getOrThrow<string>(
+        'LINKEDIN_CLIENT_SECRET',
+      ),
+      redirectUri: this.configService.getOrThrow<string>(
+        'LINKEDIN_REDIRECT_URI',
+      ),
+    };
+  }
+
+  /** The Community Management app, or a 503 while it is not configured. */
+  private linkedinAnalyticsApp(): LinkedinAppCredentials {
+    const clientId = this.configService.get<string>(
+      'LINKEDIN_ANALYTICS_CLIENT_ID',
+    );
+    const clientSecret = this.configService.get<string>(
+      'LINKEDIN_ANALYTICS_CLIENT_SECRET',
+    );
+    const redirectUri = this.configService.get<string>(
+      'LINKEDIN_ANALYTICS_REDIRECT_URI',
+    );
+    if (!clientId || !clientSecret || !redirectUri) {
+      throw new ServiceUnavailableException({
+        message: 'LinkedIn analytics is not available yet.',
+        code: 'LINKEDIN_ANALYTICS_NOT_CONFIGURED',
+      });
+    }
+    return { clientId, clientSecret, redirectUri };
+  }
+
+  /**
+   * Builds the authorize URL of the analytics app, for a member whose
+   * personal account is already connected through the main app. It is a
+   * second consent, because LinkedIn only grants the member analytics
+   * permissions to an app that holds no other product.
+   */
+  async createLinkedinAnalyticsOauth(user: User): Promise<string> {
+    const app = this.linkedinAnalyticsApp();
+    const userId = user._id.toString();
+    const personalAccount = await this.getLinkedinPersonalAccount(userId);
+    if (!personalAccount || !isLinkedinAccessUsable(personalAccount)) {
+      throw new ConflictException({
+        message: 'Connect your LinkedIn account before turning analytics on.',
+        code: 'LINKEDIN_ACCOUNT_NOT_CONNECTED',
+      });
+    }
+
+    const state = randomBytes(32).toString('base64url');
+    await this.redisService
+      .getClient()
+      .set(
+        `${this.LINKEDIN_ANALYTICS_OAUTH_STATE_KEY_PREFIX}${state}`,
+        userId,
+        'EX',
+        this.LINKEDIN_OAUTH_STATE_TTL_SECONDS,
+      );
+
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: app.clientId,
+      redirect_uri: app.redirectUri,
+      state,
+      scope: LINKEDIN_ANALYTICS_SCOPE,
+    });
+    return `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`;
+  }
+
+  async linkedinAnalyticsCallback(
+    code: string | undefined,
+    state: string | undefined,
+  ) {
+    const userId = await this.consumeLinkedinOauthState(
+      state,
+      this.LINKEDIN_ANALYTICS_OAUTH_STATE_KEY_PREFIX,
+    );
+    if (!code) {
+      throw new BadRequestException({
+        message: 'LinkedIn authorization was not completed.',
+        code: 'LINKEDIN_AUTHORIZATION_INCOMPLETE',
+      });
+    }
+
+    const personalAccount = await this.getLinkedinPersonalAccount(userId);
+    if (!personalAccount || !personalAccount.isActive) {
+      throw new ConflictException({
+        message: 'Connect your LinkedIn account before turning analytics on.',
+        code: 'LINKEDIN_ACCOUNT_NOT_CONNECTED',
+      });
+    }
+
+    const { access_token, expires_in } = await this.getLinkedinAccessToken(
+      code,
+      'analytics',
+    );
+
+    // LinkedIn member ids differ per app, so the two grants are matched on
+    // the public profile name, which does not.
+    const connectedVanityName = personalAccount.profileMetadata?.vanityName as
+      | string
+      | undefined;
+    const { vanityName } = await this.getLinkedinUser(access_token);
+    if (
+      connectedVanityName &&
+      vanityName &&
+      connectedVanityName !== vanityName
+    ) {
+      throw new ConflictException({
+        message:
+          'A different LinkedIn account is already connected to this user.',
+        code: 'LINKEDIN_ACCOUNT_MISMATCH',
+      });
+    }
+
+    await this.connectedAccountModel.updateOne(
+      { _id: personalAccount._id },
+      {
+        $set: {
+          analyticsAccessToken:
+            await this.encryptionService.encrypt(access_token),
+          analyticsAccessTokenExpiresAt: new Date(
+            Date.now() + expires_in * 1000,
+          ),
+        },
+      },
+    );
+
+    return true;
   }
 
   async linkedinCallback(code: string | undefined, state: string | undefined) {
@@ -126,8 +277,10 @@ export class AuthService {
       });
     }
 
-    const { access_token, expires_in } =
-      await this.getLinkedinAccessToken(code);
+    const { access_token, expires_in } = await this.getLinkedinAccessToken(
+      code,
+      'main',
+    );
     const profileMetadata = await this.getLinkedinUser(access_token);
     const encryptedAccessToken =
       await this.encryptionService.encrypt(access_token);
@@ -204,11 +357,10 @@ export class AuthService {
   /** Resolves and deletes the nonce, so each `state` works exactly once. */
   private async consumeLinkedinOauthState(
     state: string | undefined,
+    keyPrefix = this.LINKEDIN_OAUTH_STATE_KEY_PREFIX,
   ): Promise<string> {
     const userId = state
-      ? await this.redisService
-          .getClient()
-          .getdel(this.linkedinOauthStateKey(state))
+      ? await this.redisService.getClient().getdel(`${keyPrefix}${state}`)
       : null;
     if (!userId) {
       throw new BadRequestException({
@@ -426,18 +578,21 @@ export class AuthService {
       .select('-accessToken');
   }
 
-  private async getLinkedinAccessToken(code: string) {
+  private async getLinkedinAccessToken(
+    code: string,
+    issuer: 'main' | 'analytics',
+  ) {
+    const app =
+      issuer === 'analytics'
+        ? this.linkedinAnalyticsApp()
+        : this.linkedinMainApp();
     const url = 'https://www.linkedin.com/oauth/v2/accessToken';
     const data = new URLSearchParams({
       grant_type: 'authorization_code',
       code,
-      client_id: this.configService.getOrThrow<string>('LINKEDIN_CLIENT_ID'),
-      client_secret: this.configService.getOrThrow<string>(
-        'LINKEDIN_CLIENT_SECRET',
-      ),
-      redirect_uri: this.configService.getOrThrow<string>(
-        'LINKEDIN_REDIRECT_URI',
-      ),
+      client_id: app.clientId,
+      client_secret: app.clientSecret,
+      redirect_uri: app.redirectUri,
     });
 
     interface IResponse {
@@ -614,6 +769,8 @@ export class AuthService {
           isActive: false,
           accessToken: null,
           accessTokenExpiresAt: null,
+          analyticsAccessToken: null,
+          analyticsAccessTokenExpiresAt: null,
           avatarUrlExpiresAt: null,
           'profileMetadata.disconnectedAt': now,
           'profileMetadata.disconnectReason': 'USER_REQUESTED',

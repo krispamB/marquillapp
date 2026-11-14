@@ -120,4 +120,40 @@ describe("MarquillSelect", () => {
     fireEvent.pointerDown(screen.getByRole("button", { name: "elsewhere" }));
     expect(screen.queryByRole("listbox")).toBeNull();
   });
+
+  test("shows an option description in the menu but not in the closed trigger", () => {
+    const withDescription = [
+      { value: "a", label: "Alpha", description: "4,821 followers" },
+      { value: "b", label: "Beta" },
+    ];
+    const screen = render(<MarquillSelect value="a" onChange={() => {}} options={withDescription} ariaLabel="Scope" />);
+    const trigger = screen.getByRole("button", { name: "Scope: Alpha" });
+    expect(trigger.textContent).not.toContain("4,821");
+    fireEvent.click(trigger);
+    expect(screen.getByText("4,821 followers").className).toBe("mq-select-option-desc");
+    // An option without a description keeps the plain label markup.
+    expect(screen.getByRole("option", { name: "Beta" }).querySelector(".mq-select-option-text")).toBeNull();
+  });
+
+  test("reports opening and closing through onOpenChange", () => {
+    const onOpenChange = mock();
+    const screen = render(
+      <MarquillSelect value="pro" onChange={() => {}} options={options} ariaLabel="Tone" onOpenChange={onOpenChange} />,
+    );
+    expect(onOpenChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Tone/ }));
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+    expect(onOpenChange).toHaveBeenCalledTimes(2);
+  });
+
+  test("calls onTriggerIntent when the pointer reaches the trigger", () => {
+    const onTriggerIntent = mock();
+    const screen = render(
+      <MarquillSelect value="pro" onChange={() => {}} options={options} ariaLabel="Tone" onTriggerIntent={onTriggerIntent} />,
+    );
+    fireEvent.pointerEnter(screen.getByRole("button", { name: /Tone/ }));
+    expect(onTriggerIntent).toHaveBeenCalled();
+  });
 });
