@@ -78,22 +78,35 @@ describe('ActorsService', () => {
   });
 
   describe('transcribeVideo', () => {
+    const transcriptItems = [
+      {
+        timestamped: [{ start: 0, duration: 1.5, text: 'hello world' }],
+        non_timestamped: 'hello world',
+      },
+    ];
+
+    it('should parse a YoutubeTranscripts dataset row', () => {
+      expect(YouTubeTranscriptResponseSchema.parse(transcriptItems)).toEqual(
+        transcriptItems,
+      );
+    });
+
     it('should call Apify actors and parse transcript', async () => {
       const run = { id: '999' };
       const completedRun = { defaultDatasetId: 'dataset-2' };
-      const datasetItems = { items: [{ text: 'hello world' }] };
+      const datasetItems = { items: transcriptItems };
 
       apifyService.startActor.mockResolvedValue(run as any);
       apifyService.waitForRun.mockResolvedValue(completedRun as any);
       apifyService.getDatasetItems.mockResolvedValue(datasetItems as any);
 
-      parserService.parseWithSchema.mockReturnValue([{ text: 'hello world' }]);
+      parserService.parseWithSchema.mockReturnValue(transcriptItems);
 
       const result = await service.transcribeVideo('https://youtube.com/x');
 
       expect(apifyService.startActor).toHaveBeenCalledWith(
-        'pintostudio/youtube-transcript-scraper',
-        { videoUrl: 'https://youtube.com/x' },
+        'johnvc/YoutubeTranscripts',
+        { youtube_url: 'https://youtube.com/x' },
       );
       expect(apifyService.waitForRun).toHaveBeenCalledWith(run.id);
       expect(apifyService.getDatasetItems).toHaveBeenCalledWith(
@@ -105,7 +118,7 @@ describe('ActorsService', () => {
         YouTubeTranscriptResponseSchema,
       );
 
-      expect(result).toEqual([{ text: 'hello world' }]);
+      expect(result).toEqual(transcriptItems);
     });
   });
 
