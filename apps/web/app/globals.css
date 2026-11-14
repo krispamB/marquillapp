@@ -1983,7 +1983,7 @@ html[data-theme="dark"] .mq-select-backdrop { background: rgba(0, 0, 0, .6); }
 .mq-analytics-state p { margin: 0; max-width: 60ch; color: var(--ink-500); font-size: var(--fs-sm); }
 .mq-analytics-state-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .mq-analytics-state-list li { display: flex; align-items: center; gap: 8px; color: var(--ink-700); font-size: var(--fs-sm); }
-.mq-analytics-state-list svg { flex: none; color: var(--ink-500); }
+.mq-analytics-state-list svg { flex: none; color: var(--accent-ink); }
 .mq-analytics-spin { animation: mqSpin .9s linear infinite; }
 .mq-analytics-tile .mq-stat-value-row { flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .mq-analytics-tile .mq-stat-value-row strong { font-variant-numeric: tabular-nums; }
@@ -2014,13 +2014,13 @@ html:not([data-theme="dark"]) .mq-analytics-chip.is-up { color: color-mix(in srg
 .mq-analytics-chart svg { display: block; max-width: 100%; }
 .mq-analytics-grid { stroke: var(--line); stroke-width: 1; }
 .mq-analytics-axis { fill: var(--ink-500); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; }
-.mq-analytics-bar { fill: var(--ink-500); }
-.mq-analytics-bar.is-active { fill: var(--ink-900); }
+.mq-analytics-bar { fill: var(--accent); }
+.mq-analytics-bar.is-active { fill: color-mix(in srgb, var(--accent) 65%, var(--ink-900)); }
 .mq-analytics-zero { stroke: var(--ink-500); stroke-width: 2; stroke-linecap: round; }
-.mq-analytics-zero.is-active { stroke: var(--ink-900); }
-.mq-analytics-line { fill: none; stroke: var(--ink-900); stroke-width: 1.5; stroke-linejoin: round; }
-.mq-analytics-area { fill: color-mix(in srgb, var(--ink-900) 8%, transparent); }
-.mq-analytics-dot { fill: var(--ink-900); }
+.mq-analytics-zero.is-active { stroke: var(--accent); }
+.mq-analytics-line { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; }
+.mq-analytics-area { fill: color-mix(in srgb, var(--accent) 10%, transparent); }
+.mq-analytics-dot { fill: var(--accent); }
 .mq-analytics-cursor { stroke: var(--ink-500); stroke-width: 1; }
 .mq-analytics-tip { position: absolute; top: 0; display: flex; flex-direction: column; gap: 4px; max-width: 100%; overflow: hidden; padding: 4px 8px; border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--surface); box-shadow: var(--sh-md); color: var(--ink-500); font-size: var(--fs-xs); pointer-events: none; transform: translateX(-50%); white-space: nowrap; }
 .mq-analytics-tip[hidden] { display: none; }
@@ -2057,7 +2057,7 @@ html:not([data-theme="dark"]) .mq-analytics-chip.is-up { color: color-mix(in srg
 .mq-analytics-facet-label { overflow: hidden; color: var(--ink-700); text-overflow: ellipsis; white-space: nowrap; }
 .mq-analytics-facet-value { color: var(--ink-500); font-variant-numeric: tabular-nums; }
 .mq-analytics-facet-bar { grid-column: 1 / -1; display: block; height: 8px; border-radius: var(--r-xs); background: var(--line-strong); }
-.mq-analytics-facet-bar::before { content: ""; display: block; width: var(--share); height: 100%; border-radius: var(--r-xs); background: var(--ink-700); }
+.mq-analytics-facet-bar::before { content: ""; display: block; width: var(--share); height: 100%; border-radius: var(--r-xs); background: var(--accent); }
 .mq-analytics-skel { display: block; border-radius: var(--r-sm); background: linear-gradient(100deg, var(--canvas-sub) 20%, var(--surface-2) 40%, var(--canvas-sub) 60%); background-size: 200% 100%; animation: mq-artifact-shimmer 1.2s infinite linear; }
 .mq-analytics-skel-label { width: 56%; height: 12px; }
 .mq-analytics-skel-value { width: 38%; height: 24px; margin-top: 8px; }

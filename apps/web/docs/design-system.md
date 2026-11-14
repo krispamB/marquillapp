@@ -63,6 +63,8 @@ Use the existing ink, line, surface, and status tokens, and do not add colors. `
 
 The comparison chip (a change against the previous period, as in the Dashboard analytics) shows gains as `--pos` (mixed 65% toward `--ink-900` in light mode, to reach 4.5:1) on `--pos-bg` and declines as `--ink-700` on a neutral fill with no outline, never `--neg`, because a lower number is not an error. The chip is `padding: 0 8px` and 20px tall. When there is nothing to compare, show no chip. A tile whose figure is too small to compare (under 100 impressions) shows a neutral "Small sample" chip in the same slot.
 
+In analytics, the data marks (the trend line, its area, the bars and the audience share bars) use `--accent`. Axes, gridlines, labels and tiles stay neutral. Accent is not used for a second series or for status.
+
 ## For agents changing the UI
 
 1. Use a token. If no token fits, the design probably needs rethinking; ask before adding one.
