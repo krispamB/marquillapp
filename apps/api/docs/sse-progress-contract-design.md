@@ -87,12 +87,11 @@ up fighting it on every one of the four points above.
 already uniquely identifies the run and its artifact; the extra path segment adds
 a second thing to validate for no gain.
 
-**Rejected — WebSocket (`socket.io` is already a dependency).** Progress is
+**Rejected — WebSocket.** Progress is
 **server→client, one-way, per-run, short-lived**. SSE gives us native
 auto-reconnect + `Last-Event-ID` replay for free over plain HTTP/cookies; a
 socket adds a bidirectional channel, its own auth handshake, and room management
-we don't need. (`socket.io` stays for whatever it's currently used for; it is not
-the progress transport.)
+we don't need.
 
 ## 2. Wire format & the SSE envelope
 
