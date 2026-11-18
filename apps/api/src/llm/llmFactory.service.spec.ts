@@ -1,8 +1,3 @@
-// The factory reaches the ESM-only SDK through the strategies barrel.
-jest.mock('@openrouter/sdk', () => ({ OpenRouter: jest.fn() }), {
-  virtual: true,
-});
-
 import { LLMProvider } from './interfaces';
 import { LLMFactoryService } from './llmFactory.service';
 
@@ -34,6 +29,17 @@ describe('LLMFactoryService', () => {
     it('should return the Anthropic strategy when the provider is ANTHROPIC', () => {
       expect(service.getStrategy(LLMProvider.ANTHROPIC)).toBe(
         mocks.anthropicStrategy,
+      );
+    });
+
+    it('should throw when OpenRouter is requested but was not loaded', () => {
+      const anthropicOnly = new LLMFactoryService(
+        null,
+        mocks.anthropicStrategy as any,
+      );
+
+      expect(() => anthropicOnly.getStrategy(LLMProvider.OPENROUTER)).toThrow(
+        'OpenRouter strategy is not loaded; LLM_PROVIDER is not openrouter',
       );
     });
 
