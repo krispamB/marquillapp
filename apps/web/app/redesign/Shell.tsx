@@ -59,6 +59,7 @@ const subscribeToNothing = () => () => {};
 const useHasHydrated = () => useSyncExternalStore(subscribeToNothing, () => true, () => false);
 
 export const WORKSPACE_SELECTOR_VALUE = "__marquill_workspace__";
+const ACCOUNT_MENU_WIDTH_WITH_DESCRIPTIONS = 320;
 
 type TopbarConfig = {
   back?: {
@@ -101,6 +102,8 @@ export default function RedesignShell({
   hideMobileNav = false,
   subscription,
   initialUsage,
+  accountDescriptions,
+  onAccountMenuIntent,
   children,
 }: {
   user: UserProfile;
@@ -116,6 +119,10 @@ export default function RedesignShell({
   hideMobileNav?: boolean;
   subscription?: SubscriptionTier | null;
   initialUsage?: PaymentUsageResponse["data"] | null;
+  /** A quiet second line per option in the top-bar account menu, keyed by option value. */
+  accountDescriptions?: Record<string, ReactNode>;
+  /** Called when the account menu opens or is about to (pointer or focus on its trigger). */
+  onAccountMenuIntent?: () => void;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -341,14 +348,18 @@ export default function RedesignShell({
                 value={selectedAccountId ?? ""}
                 onChange={(value) => onSelectAccount?.(value)}
                 ariaLabel={includeWorkspaceOption ? "Dashboard scope" : "Connected account"}
+                menuMinWidth={accountDescriptions ? ACCOUNT_MENU_WIDTH_WITH_DESCRIPTIONS : undefined}
+                onTriggerIntent={onAccountMenuIntent}
+                onOpenChange={(open) => { if (open) onAccountMenuIntent?.(); }}
                 options={[
                   ...(includeWorkspaceOption
-                    ? [{ value: WORKSPACE_SELECTOR_VALUE, label: "Workspace" }]
+                    ? [{ value: WORKSPACE_SELECTOR_VALUE, label: "Workspace", description: accountDescriptions?.[WORKSPACE_SELECTOR_VALUE] }]
                     : []),
                   ...accounts.map((account) => ({
                     value: account.id,
                     label: account.displayName ?? "LinkedIn account",
                     icon: <AccountAvatar account={account} size="sm" />,
+                    description: accountDescriptions?.[account.id],
                   })),
                   ...(!includeWorkspaceOption && !accounts.length
                     ? [{ value: "", label: "No account connected", disabled: true }]

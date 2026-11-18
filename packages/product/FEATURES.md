@@ -100,7 +100,7 @@ Every feature Marquill has, is building, or has discussed. `live` means deployed
 
 | Id | Feature | Status | Date | What it does | Landing; plans | Links |
 | --- | --- | --- | --- | --- | --- | --- |
-| `post-analytics` | Post analytics | planned |  | Impressions and engagement for published posts, pulled from LinkedIn, inside Marquill.<br>_No issue yet. Open one when work starts._ | board | [LINKEDIN_ORGANIZATION_ANALYTICS_RESEARCH.md](../../apps/api/docs/LINKEDIN_ORGANIZATION_ANALYTICS_RESEARCH.md) |
+| `post-analytics` | Post analytics | building |  | Analytics on the Dashboard for each connected LinkedIn account (pick it in the account switcher, which also shows followers and impressions for each account): impressions, engagement rate, followers and daily trends over 7, 28 or 90 days, top posts, and follower seniority and company size for pages. Personal accounts list only posts published through Marquill.<br>_Built on feat/linkedin-analytics; not yet run against real LinkedIn data._<br>_Personal accounts need the second LinkedIn app (LINKEDIN_ANALYTICS_CLIENT_ID and friends, Community Management API) approved and configured, and each member to grant it from the Dashboard._ | board | [linkedin-analytics-design.md](../../apps/api/docs/linkedin-analytics-design.md), [analytics.md](../../apps/api/docs/api/analytics.md), [LINKEDIN_ORGANIZATION_ANALYTICS_RESEARCH.md](../../apps/api/docs/LINKEDIN_ORGANIZATION_ANALYTICS_RESEARCH.md) |
 
 ### Billing
 

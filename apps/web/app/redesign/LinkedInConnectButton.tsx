@@ -12,6 +12,13 @@ interface LinkedInConnectButtonProps {
   disabled?: boolean;
   title?: string;
   "aria-label"?: string;
+  /**
+   * `analytics` asks for the second LinkedIn consent that member analytics
+   * needs, on an account that is already connected.
+   */
+  flow?: "connect" | "analytics";
+  /** Runs once the LinkedIn window has closed. */
+  onDone?: () => void;
 }
 
 /** Starts the reusable LinkedIn OAuth flow, then refreshes workspace data. */
@@ -21,6 +28,8 @@ export default function LinkedInConnectButton({
   disabled = false,
   title,
   "aria-label": ariaLabel,
+  flow = "connect",
+  onDone,
 }: LinkedInConnectButtonProps) {
   const router = useRouter();
   const watcherRef = useRef<number | null>(null);
@@ -57,10 +66,13 @@ export default function LinkedInConnectButton({
     setError(null);
     setIsConnecting(true);
     try {
-      const response = await readApi<LinkedInAuthResponse>(`${API_BASE}/auth/linkedin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
+      const response = await readApi<LinkedInAuthResponse>(
+        `${API_BASE}/auth/linkedin${flow === "analytics" ? "/analytics" : ""}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        },
+      );
       if (!response?.data) throw new Error("Unable to start the LinkedIn connection.");
 
       popup.location.href = response.data;
@@ -70,6 +82,7 @@ export default function LinkedInConnectButton({
         clearWatcher();
         setIsConnecting(false);
         router.refresh();
+        onDone?.();
       }, 500);
     } catch (reason) {
       if (!popup.closed) popup.close();

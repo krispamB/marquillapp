@@ -48,6 +48,17 @@ export class ConnectedAccount extends Document {
   @Prop()
   accessTokenExpiresAt?: Date;
 
+  /**
+   * Token of the second LinkedIn app (Community Management API), held by a
+   * `PERSON` account for member analytics. Never selected by default, so it
+   * cannot ride along in an account returned to a client.
+   */
+  @Prop({ type: String, select: false })
+  analyticsAccessToken?: string | null;
+
+  @Prop()
+  analyticsAccessTokenExpiresAt?: Date;
+
   @Prop({ type: Object })
   profileMetadata?: Record<string, any>;
 

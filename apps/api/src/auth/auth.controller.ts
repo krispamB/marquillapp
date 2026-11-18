@@ -22,6 +22,35 @@ import { ConnectLinkedinOrganizationsDto } from './dto/connect-linkedin-organiza
 import { UserThrottlerGuard } from '../common/guards/user-throttler.guard';
 import { Throttle, minutes } from '@nestjs/throttler';
 
+/** Errors a LinkedIn callback explains in the popup instead of failing. */
+const LINKEDIN_CALLBACK_FAILURES: Record<
+  string,
+  { statusCode: HttpStatus; message: string }
+> = {
+  LINKEDIN_OAUTH_STATE_INVALID: {
+    statusCode: HttpStatus.BAD_REQUEST,
+    message:
+      'This connection link is invalid or has expired. Start again from Marquill.',
+  },
+  LINKEDIN_AUTHORIZATION_INCOMPLETE: {
+    statusCode: HttpStatus.BAD_REQUEST,
+    message:
+      'LinkedIn authorization was not completed. Start again from Marquill.',
+  },
+  LINKEDIN_ACCOUNT_ALREADY_CONNECTED: {
+    statusCode: HttpStatus.CONFLICT,
+    message: 'This LinkedIn account is already connected to another user.',
+  },
+  LINKEDIN_ACCOUNT_MISMATCH: {
+    statusCode: HttpStatus.CONFLICT,
+    message: 'A different LinkedIn account is already connected to this user.',
+  },
+  LINKEDIN_ACCOUNT_NOT_CONNECTED: {
+    statusCode: HttpStatus.CONFLICT,
+    message: 'Connect your LinkedIn account in Marquill first, then try again.',
+  },
+};
+
 @Controller('auth')
 export class AuthController {
   private readonly LINKEDIN_CALLBACK_CLOSE_DELAY_SECONDS = 4;
@@ -47,48 +76,68 @@ export class AuthController {
     @Query('state') state: string | undefined,
     @Res() res: Response,
   ) {
-    try {
-      await this.authService.linkedinCallback(code, state);
-      return this.sendLinkedinCallbackHtml(res, {
-        statusCode: HttpStatus.OK,
+    return this.respondToLinkedinCallback(
+      res,
+      () => this.authService.linkedinCallback(code, state),
+      {
         title: 'LinkedIn connected',
         message: 'Your LinkedIn account is now connected.',
+      },
+    );
+  }
+
+  // The analytics app is a second LinkedIn app with its own consent.
+  @Throttle({ default: { limit: 10, ttl: minutes(1) } })
+  @UseGuards(ClerkAuthGuard, UserThrottlerGuard)
+  @Post('linkedin/analytics')
+  async linkedinAnalyticsAuth(@GetUser() user: User): Promise<IAppResponse> {
+    const url = await this.authService.createLinkedinAnalyticsOauth(user);
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Linkedin analytics auth URL generated successfully',
+      data: url,
+    };
+  }
+
+  @Get('linkedin/analytics/callback')
+  async linkedinAnalyticsAuthRedirect(
+    @Query('code') code: string | undefined,
+    @Query('state') state: string | undefined,
+    @Res() res: Response,
+  ) {
+    return this.respondToLinkedinCallback(
+      res,
+      () => this.authService.linkedinAnalyticsCallback(code, state),
+      {
+        title: 'Analytics turned on',
+        message: 'Marquill can now show analytics for your LinkedIn account.',
+      },
+    );
+  }
+
+  /** Runs a LinkedIn callback and answers the popup with a closing page. */
+  private async respondToLinkedinCallback(
+    res: Response,
+    run: () => Promise<unknown>,
+    success: { title: string; message: string },
+  ) {
+    try {
+      await run();
+      return this.sendLinkedinCallbackHtml(res, {
+        statusCode: HttpStatus.OK,
+        ...success,
         variant: 'success',
       });
     } catch (error) {
-      const errorCode = this.extractErrorCode(error);
-      if (
-        errorCode === 'LINKEDIN_OAUTH_STATE_INVALID' ||
-        errorCode === 'LINKEDIN_AUTHORIZATION_INCOMPLETE'
-      ) {
-        const message =
-          errorCode === 'LINKEDIN_OAUTH_STATE_INVALID'
-            ? 'This connection link is invalid or has expired. Start again from Marquill.'
-            : 'LinkedIn authorization was not completed. Start again from Marquill.';
-        return this.sendLinkedinCallbackHtml(res, {
-          statusCode: HttpStatus.BAD_REQUEST,
-          title: "LinkedIn couldn't connect",
-          message,
-          variant: 'error',
-        });
-      }
-      if (
-        errorCode === 'LINKEDIN_ACCOUNT_ALREADY_CONNECTED' ||
-        errorCode === 'LINKEDIN_ACCOUNT_MISMATCH'
-      ) {
-        const message =
-          errorCode === 'LINKEDIN_ACCOUNT_ALREADY_CONNECTED'
-            ? 'This LinkedIn account is already connected to another user.'
-            : 'A different LinkedIn account is already connected to this user.';
-        return this.sendLinkedinCallbackHtml(res, {
-          statusCode: HttpStatus.CONFLICT,
-          title: "LinkedIn couldn't connect",
-          message,
-          variant: 'error',
-        });
-      }
-
-      throw error;
+      const failure =
+        LINKEDIN_CALLBACK_FAILURES[this.extractErrorCode(error) ?? ''];
+      if (!failure) throw error;
+      return this.sendLinkedinCallbackHtml(res, {
+        statusCode: failure.statusCode,
+        title: "LinkedIn couldn't connect",
+        message: failure.message,
+        variant: 'error',
+      });
     }
   }
 

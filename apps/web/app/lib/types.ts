@@ -79,6 +79,8 @@ export type ConnectedAccount = {
   provider: ConnectedAccountProvider;
   accountType?: ConnectedAccountType;
   accessTokenExpiresAt?: string;
+  /** When the personal analytics grant lapses. Missing means analytics was never turned on. */
+  analyticsExpiresAt?: string;
   displayName?: string;
   avatarUrl?: string;
   vanityName?: string;
@@ -95,6 +97,7 @@ export type ConnectedAccountsResponse = {
     provider: ConnectedAccountProvider;
     accountType?: ConnectedAccountType;
     accessTokenExpiresAt?: string;
+    analyticsAccessTokenExpiresAt?: string;
     displayName?: string;
     avatarUrl?: string;
     vanityName?: string;
@@ -490,4 +493,107 @@ export type VideoUploadStatusResponse = {
   statusCode?: number;
   message?: string;
   data?: { status: "PROCESSING" | "AVAILABLE" | "FAILED" };
+};
+
+// LinkedIn analytics. Contract: apps/api/docs/api/analytics.md
+export type AnalyticsRangeKey = "7d" | "28d" | "90d";
+export type AnalyticsAccess =
+  | "ok"
+  | "reconnect_required"
+  | "missing_scope"
+  | "not_admin"
+  | "unavailable";
+export type AnalyticsAccountType = "PERSON" | "ORGANIZATION";
+
+export type AnalyticsMetric = {
+  value: number;
+  previous: number | null;
+  changePct: number | null;
+};
+
+export type AnalyticsRange = {
+  key: AnalyticsRangeKey;
+  days: number;
+  start: string;
+  end: string;
+  previousStart: string;
+  previousEnd: string;
+};
+
+export type AnalyticsMetricKey =
+  | "impressions"
+  | "reactions"
+  | "comments"
+  | "reposts"
+  | "engagementRate"
+  | "membersReached"
+  | "uniqueImpressions"
+  | "clicks"
+  | "pageViews";
+
+export type AnalyticsSeriesPoint = {
+  date: string;
+  impressions: number | null;
+  reactions: number | null;
+  comments: number | null;
+  reposts: number | null;
+  followersGained: number | null;
+  clicks: number | null;
+  pageViews: number | null;
+};
+
+export type AnalyticsOverview = {
+  account: {
+    id: string;
+    accountType: AnalyticsAccountType;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+  access: AnalyticsAccess;
+  range: AnalyticsRange;
+  fetchedAt: string;
+  cached: boolean;
+  followers: { total: number | null; gained: AnalyticsMetric | null };
+  metrics: Record<AnalyticsMetricKey, AnalyticsMetric | null>;
+  series: AnalyticsSeriesPoint[];
+  unavailable: string[];
+};
+
+export type AnalyticsPost = {
+  urn: string;
+  postId: string | null;
+  text: string;
+  publishedAt: string;
+  url: string;
+  impressions: number | null;
+  reactions: number | null;
+  comments: number | null;
+  reposts: number | null;
+  clicks: number | null;
+  engagementRate: number | null;
+};
+
+export type AnalyticsPostsResponse = {
+  access: AnalyticsAccess;
+  range: AnalyticsRange;
+  fetchedAt: string;
+  cached: boolean;
+  coverage: "marquill_posts" | "all_posts";
+  truncated: boolean;
+  posts: AnalyticsPost[];
+};
+
+export type AnalyticsAudienceFacet = {
+  key: "seniority" | "companySize";
+  label: string;
+  items: Array<{ label: string; count: number; share: number }>;
+};
+
+export type AnalyticsAudience = {
+  access: AnalyticsAccess;
+  supported: boolean;
+  fetchedAt: string;
+  cached: boolean;
+  totalFollowers: number | null;
+  facets: AnalyticsAudienceFacet[];
 };

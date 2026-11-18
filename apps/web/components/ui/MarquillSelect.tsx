@@ -18,6 +18,8 @@ export type MarquillSelectOption = {
   value: string;
   label: string;
   icon?: ReactNode;
+  /** A second, quieter line under the label inside the menu. Not shown in the closed trigger. */
+  description?: ReactNode;
   disabled?: boolean;
 };
 
@@ -36,6 +38,12 @@ interface MarquillSelectProps {
   dropdownPosition?: "top" | "bottom";
   /** Title of the menu; shown above the options on mobile. */
   dropdownHeader?: string;
+  /** Called with `true` when the menu opens and `false` when it closes. */
+  onOpenChange?: (open: boolean) => void;
+  /** Called when the pointer or focus reaches the trigger, ahead of a likely open. */
+  onTriggerIntent?: () => void;
+  /** Narrowest the desktop popover may be, in px. */
+  menuMinWidth?: number;
 }
 
 /** Below this width the menu opens as a bottom sheet. Matches the app's mobile breakpoint. */
@@ -44,6 +52,8 @@ const GAP = 6;
 const EDGE = 8;
 const MAX_MENU_HEIGHT = 320;
 const MIN_MENU_WIDTH = 180;
+const OPTION_HEIGHT = 38;
+const OPTION_WITH_DESCRIPTION_HEIGHT = 54;
 
 type Placement = { style: CSSProperties; side: "top" | "bottom" };
 
@@ -82,6 +92,9 @@ export default function MarquillSelect({
   name,
   dropdownPosition = "bottom",
   dropdownHeader,
+  onOpenChange,
+  onTriggerIntent,
+  menuMinWidth = MIN_MENU_WIDTH,
 }: MarquillSelectProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -99,6 +112,17 @@ export default function MarquillSelect({
   const selectedIndex = options.findIndex((option) => option.value === value);
   const selected = selectedIndex >= 0 ? options[selectedIndex] : undefined;
   const title = dropdownHeader ?? ariaLabel ?? placeholder;
+
+  const onOpenChangeRef = useRef(onOpenChange);
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  });
+  useEffect(() => {
+    if (wasOpen.current === open) return;
+    wasOpen.current = open;
+    onOpenChangeRef.current?.(open);
+  }, [open]);
 
   const close = useCallback((restoreFocus = true) => {
     setOpen(false);
@@ -131,11 +155,15 @@ export default function MarquillSelect({
     const rect = trigger.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-    const width = Math.min(Math.max(rect.width, MIN_MENU_WIDTH), viewportWidth - EDGE * 2);
+    const width = Math.min(Math.max(rect.width, menuMinWidth), viewportWidth - EDGE * 2);
     const left = Math.min(Math.max(rect.left, EDGE), viewportWidth - width - EDGE);
     const below = viewportHeight - rect.bottom - GAP - EDGE;
     const above = rect.top - GAP - EDGE;
-    const wanted = Math.min(MAX_MENU_HEIGHT, options.length * 38 + 12);
+    const optionsHeight = options.reduce(
+      (sum, option) => sum + (option.description ? OPTION_WITH_DESCRIPTION_HEIGHT : OPTION_HEIGHT),
+      0,
+    );
+    const wanted = Math.min(MAX_MENU_HEIGHT, optionsHeight + 12);
     let side: "top" | "bottom" = dropdownPosition;
     if (side === "bottom" && below < wanted && above > below) side = "top";
     if (side === "top" && above < wanted && below > above) side = "bottom";
@@ -146,7 +174,7 @@ export default function MarquillSelect({
         ? { top: rect.bottom + GAP, left, width, maxHeight }
         : { bottom: viewportHeight - rect.top + GAP, left, width, maxHeight },
     });
-  }, [dropdownPosition, isSheet, options.length]);
+  }, [dropdownPosition, isSheet, menuMinWidth, options]);
 
   useLayoutEffect(() => {
     if (open) position();
@@ -275,6 +303,8 @@ export default function MarquillSelect({
         aria-label={ariaLabel ? `${ariaLabel}: ${display}` : undefined}
         onClick={() => (open ? close() : openMenu())}
         onKeyDown={onTriggerKeyDown}
+        onPointerEnter={onTriggerIntent}
+        onFocus={onTriggerIntent}
       >
         {icon ? <span className="mq-select-lead" aria-hidden="true">{icon}</span> : null}
         {selected?.icon ? <span className="mq-select-lead" aria-hidden="true">{selected.icon}</span> : null}
@@ -322,7 +352,14 @@ export default function MarquillSelect({
                     onClick={() => commit(index)}
                   >
                     {option.icon ? <span className="mq-select-option-icon" aria-hidden="true">{option.icon}</span> : null}
-                    <span className="mq-select-option-label">{option.label}</span>
+                    {option.description ? (
+                      <span className="mq-select-option-text">
+                        <span className="mq-select-option-label">{option.label}</span>
+                        <span className="mq-select-option-desc">{option.description}</span>
+                      </span>
+                    ) : (
+                      <span className="mq-select-option-label">{option.label}</span>
+                    )}
                     {isSelected ? <Check className="mq-select-check" size={15} aria-hidden="true" /> : null}
                   </li>
                 );

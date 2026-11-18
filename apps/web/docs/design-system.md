@@ -50,6 +50,8 @@ Size with the tokens rather than a raw `min-height`, so desktop and touch stay i
 - Radii: `--r-sm` 8px for small inner parts and chips, `--r-md` 8px for controls (so there are two radii: 8 and 12, plus pills; `--r-xs` 4px is only for thin decorative bars), `--r-lg` 12px for cards, `--r-xl` 12px for modals, sheets, and the prompt composer. `--r-full` is for pills and avatars.
 - Cards rest on a hairline border with no shadow. Only floating layers (menus, modals, sheets, the composer) cast a shadow: `--sh-md` or `--sh-lg`.
 - Do not nest a bordered card inside a bordered card when spacing or a divider would do.
+- **State card.** When a screen can't show its data (analytics off, reconnect, no longer an admin, service down), use one `.mq-card` with a title, one or two sentences in `--ink-500`, and exactly one action, rather than a one-line `.mq-alert`. The action is filled only when it fixes the cause (turn on, reconnect), and secondary when it just retries. See `AnalyticsState.tsx`.
+- **Select option descriptions.** `MarquillSelect` options may carry a `description`: a quieter `--fs-xs` second line in the menu only, never in the closed trigger. Keep it to one line of facts the user would otherwise open another page to see.
 
 ## Logo
 
@@ -58,6 +60,10 @@ The mark is Mark: a dot with one eye open and the other the underscore from `mar
 ## Color
 
 Use the existing ink, line, surface, and status tokens, and do not add colors. `--neg` and `--neg-bg` are for destructive and error states only; their values come from the reds the stylesheet already used. `--ink-600` sits between `--ink-700` and `--ink-500`.
+
+The comparison chip (a change against the previous period, as in the Dashboard analytics) shows gains as `--pos` (mixed 65% toward `--ink-900` in light mode, to reach 4.5:1) on `--pos-bg` and declines as `--ink-700` on a neutral fill with no outline, never `--neg`, because a lower number is not an error. The chip is `padding: 0 8px` and 20px tall. When there is nothing to compare, show no chip. A tile whose figure is too small to compare (under 100 impressions) shows a neutral "Small sample" chip in the same slot.
+
+In analytics, the data marks (the trend line, its area, the bars and the audience share bars) use `--accent`. Axes, gridlines, labels and tiles stay neutral. Accent is not used for a second series or for status.
 
 ## For agents changing the UI
 
