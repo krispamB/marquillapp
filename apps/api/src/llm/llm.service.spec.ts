@@ -1,10 +1,5 @@
 import { z } from 'zod';
 
-// `llm.service` reaches the ESM-only SDK through LLMFactoryService -> strategies.
-jest.mock('@openrouter/sdk', () => ({ OpenRouter: jest.fn() }), {
-  virtual: true,
-});
-
 import { LLMService } from './llm.service';
 import { LLMProvider, MessageRole, ToolDefinition } from './interfaces';
 

@@ -34,8 +34,9 @@ import { DesignSystemModule } from './design-system';
 // The HTTP server's root. The LLM stack (`LlmModule`, `AgentModule`) and its
 // scraping siblings (`ApifyModule`, `ActorsModule`) live in `WorkerModule`
 // instead: nothing on the HTTP surface injects them, and `@openrouter/sdk`
-// alone retains ~129MB of zod schemas per process. `WorkerModule` imports this
-// module, so anything added here is still paid for twice.
+// retains ~129MB of zod schemas when `LLM_PROVIDER` is openrouter (the
+// default). The worker imports that strategy only in that case. `WorkerModule`
+// imports this module, so anything added here is still paid for twice.
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
