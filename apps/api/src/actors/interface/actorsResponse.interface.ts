@@ -20,15 +20,16 @@ export type YoutubeScraperResponse = z.infer<
   typeof YoutubeScraperResponseSchema
 >;
 
-//pintostudio/youtube-transcript-scraper
+// johnvc/YoutubeTranscripts
 const TranscriptSegmentSchema = z.object({
-  start: z.string(),
-  dur: z.string(),
+  start: z.number(),
+  duration: z.number(),
   text: z.string(),
 });
 
 const TranscriptDataSchema = z.object({
-  data: z.array(TranscriptSegmentSchema),
+  timestamped: z.array(TranscriptSegmentSchema),
+  non_timestamped: z.string(),
 });
 
 export const YouTubeTranscriptResponseSchema = z.array(TranscriptDataSchema);

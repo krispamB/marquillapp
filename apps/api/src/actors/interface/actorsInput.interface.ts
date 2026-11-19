@@ -23,9 +23,9 @@ export interface YoutubeScraperConfig {
   sortingOrder: string;
 }
 
-//pintostudio/youtube-transcript-scraper
+// johnvc/YoutubeTranscripts
 export interface YoutubeTranscriptConfig {
-  videoUrl: string;
+  youtube_url: string;
 }
 
 // jupri/reddit
