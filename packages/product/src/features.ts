@@ -339,7 +339,7 @@ export const features: Feature[] = [
     name: 'Billing page',
     area: 'billing',
     status: 'live',
-    summary: 'The /billing page shows the current plan, usage against limits, and invoices, and cancels a subscription.',
+    summary: 'The /billing page shows the current plan, usage against limits, and invoices, and cancels a subscription. On phones it is reachable from the Plan & billing card in Settings.',
     since: '2026-03-07',
   },
   {

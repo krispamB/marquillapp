@@ -71,7 +71,7 @@ Every feature Marquill has, is building, or has discussed. `live` means deployed
 | --- | --- | --- | --- | --- | --- | --- |
 | `plans-and-checkout` | Plans and checkout | live | 2026-04-14 | Four plans (Free, Starter, Creator, Pro Writer). Paddle checkout from the landing page or billing; upgrades and downgrades prorate.<br>_The plan cards list "30 day / 90 day / 1 year / unlimited history", but nothing in the api enforces a history window._ |  | [payment.md](../../apps/api/docs/api/payment.md) |
 | `credits` | AI credits | live | 2026-08-06 | Every run is metered in credits (LLM tokens, web searches, renders) against the plan's monthly allowance; the run shows its credit count live. |  | #109, #128, #129, #130, [credit-usage-system-design.md](../../apps/api/docs/credit-usage-system-design.md), [credit-allocation-proposal.md](../../apps/api/docs/credit-allocation-proposal.md) |
-| `billing-page` | Billing page | live | 2026-03-07 | The /billing page shows the current plan, usage against limits, and invoices, and cancels a subscription. |  |  |
+| `billing-page` | Billing page | live | 2026-03-07 | The /billing page shows the current plan, usage against limits, and invoices, and cancels a subscription. On phones it is reachable from the Plan & billing card in Settings. |  |  |
 
 ### Workspace
 

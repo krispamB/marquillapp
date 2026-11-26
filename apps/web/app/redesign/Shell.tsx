@@ -38,6 +38,7 @@ import { getAccountInitials, getInitials } from "./types";
 import type { WorkspacePage } from "./types";
 import MarquillSelect from "../../components/ui/MarquillSelect";
 import { API_BASE, readApi } from "./api";
+import { getCreditsRemaining, getPlanSummary } from "./planSummary";
 import {
   getLinkedInAccountAccess,
   hasUsablePersonalLinkedInAccount,
@@ -128,13 +129,7 @@ export default function RedesignShell({
   const selectedAccount = accounts.find((account) => account.id === selectedAccountId);
   const initials = getInitials(user.name, user.email);
   const tier = subscription ?? user.tier;
-  const tierName = tier?.name?.trim() || "Free";
-  const isFreeTier = Boolean(
-    tier && (
-      tier.isDefault === true ||
-      tierName.toLowerCase().replace(/\s+plan$/, "") === "free"
-    ),
-  );
+  const { tierName, isFreeTier } = getPlanSummary(tier);
   const hasUsablePersonalAccount = hasUsablePersonalLinkedInAccount(accounts);
   const connectedOrganizationIds = useMemo(
     () => accounts.filter((account) => account.accountType === "ORGANIZATION").map((account) => account.id),
@@ -172,9 +167,7 @@ export default function RedesignShell({
 
   const creditUsage = fetchedCreditUsage ?? initialUsage?.usage.credits;
   const creditLimit = creditUsage?.limit ?? 0;
-  const creditsRemaining = creditUsage
-    ? Math.max(0, creditUsage.remaining ?? creditLimit - creditUsage.used)
-    : null;
+  const creditsRemaining = getCreditsRemaining(creditUsage);
   const creditPercent = creditLimit > 0 && creditsRemaining !== null
     ? Math.min(100, (creditsRemaining / creditLimit) * 100)
     : 0;
