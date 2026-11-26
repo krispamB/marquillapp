@@ -369,7 +369,7 @@ export default function RedesignShell({
             <span>{item.key === "dashboard" ? "Home" : item.label}</span>
           </Link>
         ))}
-        <Link href="/posts/new" className="mq-mobile-fab" aria-label="New post"><span>+</span></Link>
+        <Link href="/artifacts/new" className="mq-mobile-fab" aria-label="New artifact"><span>+</span></Link>
         {mobileNavItems.slice(2).map((item) => (
           <Link key={item.key} href={item.href} className={item.key === active ? "is-active" : ""}>
             {item.icon}
