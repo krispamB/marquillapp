@@ -1,5 +1,6 @@
 import { ContentValidationError } from '../../agent/agent-runner.error';
 import type { DocumentRefineInput } from '../../agent/agent-runner.interface';
+import type { DocumentContent } from '../../artifact/schemas';
 import { ArtifactType, RunKind } from '../../database/schemas';
 import { runDate } from '../engine/run-date';
 import { RunEventType } from '../engine/run-event.types';
@@ -179,12 +180,27 @@ function refineBaseOf(state: RunState, label: string): DocumentRefineInput {
     // a wiring bug a replay would reproduce exactly.
     throw terminal(`GENERATE reached ${label} without its refine base`);
   }
-  const { commentary } = refine.priorContent;
+  const { commentary, document } = refine.priorContent as DocumentContent;
   return {
     candidate: baseCandidate,
     ...(commentary !== undefined ? { commentary } : {}),
     feedback: refine.feedback,
     earlierFeedback: refine.earlierFeedback,
     handEdited: refine.handEdited,
+    designSystemChanged: pinChanged(document, state.input.designSystem),
   };
+}
+
+/**
+ * A refine carries the base's exact pin unless the user switched or upgraded
+ * (spec §6.5), so any difference is a deliberate move to another Design System.
+ */
+function pinChanged(
+  base: Partial<DocumentContent['document']> | undefined,
+  pin: RunState['input']['designSystem'],
+): boolean {
+  if (!pin || base?.designSystemId === undefined) return false;
+  return (
+    base.designSystemId !== pin.id || base.designSystemVersion !== pin.version
+  );
 }

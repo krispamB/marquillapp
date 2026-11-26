@@ -554,6 +554,10 @@ document.
      slug's `ACTIVE` version (`400` if not active or unlisted). It covers changing look, upgrading,
      and answering the `409`.
   4. A move is derivable by comparing a version's pin with its `parentVersion`'s.
+  5. When the new Attempt's pin differs from the base's (a switch or an upgrade), the refine prompt
+     says so after the precedence rule: rebuild the current document in the Design System the
+     system prompt describes, keeping its content, the earlier revisions and any hand edits. This
+     is the one change a refinement makes besides the new request.
 
 ### 6.6 Posts pin an exact version (#138)
 

@@ -132,6 +132,11 @@ export interface DocumentRefineInput {
   /** Requests already applied to the base, oldest first (see RefineContext). */
   earlierFeedback: string[];
   handEdited: boolean;
+  /**
+   * True when this Attempt is pinned to a different Design System Version
+   * than the base was built with (an explicit switch or upgrade, spec §6.5).
+   */
+  designSystemChanged: boolean;
 }
 
 /** A DOCUMENT draft (spec §7.5), INITIAL or REFINE. */

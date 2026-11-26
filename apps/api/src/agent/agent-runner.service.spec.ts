@@ -803,6 +803,7 @@ describe('AgentRunnerService', () => {
           feedback: 'Make page two shorter',
           earlierFeedback: [],
           handEdited: false,
+          designSystemChanged: false,
         },
       });
 

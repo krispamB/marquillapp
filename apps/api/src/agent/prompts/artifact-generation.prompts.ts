@@ -287,6 +287,11 @@ function refinePrecedence(hasEarlier: boolean): string {
 const HAND_EDIT_NOTE =
   'The author edited the current version by hand; keep those edits.';
 
+// A switched Design System is the one change besides the new request that a
+// DOCUMENT refinement makes: the base's markup belongs to the old one.
+const DESIGN_SYSTEM_CHANGED_NOTE =
+  'One exception: the Design System has changed since the current document was made. Rebuild the current document in the Design System the system prompt describes, using its layout, components and styles, and keep its content, the earlier revisions and any hand edits.';
+
 /**
  * The brief. Sections appear only when they carry content, so an unresearched,
  * unstyled initial run sends the model nothing but the topic.
@@ -387,6 +392,7 @@ export function buildDocumentGenerationUserPrompt(
           ? [`CURRENT COMMENTARY:\n${commentary}`]
           : []),
       ]),
+      ...(refine.designSystemChanged ? [DESIGN_SYSTEM_CHANGED_NOTE] : []),
       'Re-emit the complete document as "html", with its commentary.',
     );
   }

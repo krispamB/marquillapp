@@ -1132,6 +1132,7 @@ describe('DOCUMENT generation, end to end', () => {
           feedback: 'Make page two shorter',
           earlierFeedback: [],
           handEdited: false,
+          designSystemChanged: false,
         },
       });
       expect(draft.fragment).toContain('margin');

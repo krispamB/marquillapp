@@ -210,6 +210,7 @@ describe('artifact-generation prompts', () => {
           feedback: 'Fewer pages',
           earlierFeedback: [],
           handEdited: false,
+          designSystemChanged: false,
         },
       });
 
@@ -342,6 +343,8 @@ describe('refinement user prompts', () => {
     PRECEDENCE_LEAD + (hasEarlier ? PRECEDENCE_EARLIER : '') + PRECEDENCE_TAIL;
   const HAND_EDIT =
     'The author edited the current version by hand; keep those edits.';
+  const DESIGN_SYSTEM_CHANGED =
+    'One exception: the Design System has changed since the current document was made. Rebuild the current document in the Design System the system prompt describes, using its layout, components and styles, and keep its content, the earlier revisions and any hand edits.';
   const research = {
     findings: 'A synthesis.',
     sources: [{ title: 'A', url: 'https://a.com/' }],
@@ -446,6 +449,7 @@ describe('refinement user prompts', () => {
       feedback: 'Fewer pages',
       earlierFeedback: [] as string[],
       handEdited: false,
+      designSystemChanged: false,
     };
     const CURRENT =
       'CURRENT DOCUMENT:\n<html></html>\n\nCURRENT COMMENTARY:\nSwipe through.';
@@ -498,6 +502,32 @@ describe('refinement user prompts', () => {
           newRequest(true),
         ].join('\n\n'),
       );
+    });
+
+    it('should ask to rebuild in the new Design System when the pin changed', () => {
+      const prompt = buildDocumentGenerationUserPrompt({
+        ...initial,
+        refine: { ...refine, designSystemChanged: true },
+      });
+
+      expect(prompt).toBe(
+        [
+          todaySection(TODAY),
+          'ORIGINAL BRIEF:\nThe brief',
+          VOICE,
+          RESEARCH,
+          CURRENT,
+          `NEW REVISION REQUEST:\nFewer pages\n\n${precedence(false)}`,
+          DESIGN_SYSTEM_CHANGED,
+          'Re-emit the complete document as "html", with its commentary.',
+        ].join('\n\n'),
+      );
+    });
+
+    it('should not mention a Design System change when the pin is unchanged', () => {
+      const prompt = buildDocumentGenerationUserPrompt({ ...initial, refine });
+
+      expect(prompt).not.toContain(DESIGN_SYSTEM_CHANGED);
     });
 
     it('should leave out the commentary section when the base has none', () => {
