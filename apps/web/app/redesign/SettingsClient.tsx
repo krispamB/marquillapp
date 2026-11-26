@@ -8,8 +8,9 @@ import RedesignShell from "./Shell";
 import LinkedInConnectButton from "./LinkedInConnectButton";
 import OrganizationConnectModal from "./OrganizationConnectModal";
 import PreferencesCard from "./PreferencesCard";
+import PlanBillingCard from "./PlanBillingCard";
 import { API_BASE, readApi } from "./api";
-import type { ConnectedAccount, SubscriptionTier, UserProfile } from "../lib/types";
+import type { ConnectedAccount, PaymentUsageResponse, SubscriptionTier, UserProfile } from "../lib/types";
 import LinkedInIcon from "../../components/brand/LinkedInIcon";
 import { getAccountInitials } from "./types";
 import {
@@ -22,11 +23,13 @@ export default function SettingsRedesignClient({
   connectedAccounts,
   primaryAccountId,
   subscription,
+  initialUsage,
 }: {
   user: UserProfile;
   connectedAccounts: ConnectedAccount[];
   primaryAccountId?: string;
   subscription?: SubscriptionTier | null;
+  initialUsage?: PaymentUsageResponse["data"] | null;
 }) {
   const { signOut } = useClerk();
   const router = useRouter();
@@ -63,7 +66,7 @@ export default function SettingsRedesignClient({
   }
 
   return (
-    <RedesignShell user={user} accounts={accounts} selectedAccountId={effectiveSelectedAccountId} onSelectAccount={setSelectedAccountId} subscription={subscription} active="settings" title="Settings">
+    <RedesignShell user={user} accounts={accounts} selectedAccountId={effectiveSelectedAccountId} onSelectAccount={setSelectedAccountId} subscription={subscription} initialUsage={initialUsage} active="settings" title="Settings">
       <div className="mq-page-heading mq-page-heading-compact"><div><span className="mq-eyebrow">Workspace preferences</span><h1 className="mq-h1-dup">Settings</h1><p>Manage your publishing accounts and workspace defaults.</p></div></div>
       {message ? <div className="mq-alert mq-alert-success">{message}</div> : null}
       {error ? <div className="mq-alert mq-alert-error">{error}</div> : null}
@@ -156,6 +159,7 @@ export default function SettingsRedesignClient({
         </div>
 
         <PreferencesCard initialPreferences={user.preferences} />
+        <PlanBillingCard tier={subscription ?? user.tier} credits={initialUsage?.usage?.credits} />
       </section>
 
       <section className="mq-card mq-settings-card mq-danger-zone">

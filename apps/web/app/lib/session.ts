@@ -78,6 +78,15 @@ function previousUtcMonth(month: string) {
   return date.toISOString().slice(0, 7);
 }
 
+export async function getUsage(serverAuth: ServerAuth) {
+  try {
+    const response = await readServerApi<PaymentUsageResponse>("/payment/usage", serverAuth);
+    return response.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getDashboardInitialData(
   serverAuth: ServerAuth,
 ): Promise<DashboardInitialData> {

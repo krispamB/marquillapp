@@ -1260,6 +1260,12 @@ html[data-theme="dark"] .mq-studio-refine-submit:disabled { background: var(--ca
 .mq-session-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px var(--card-pad) 0; }
 .mq-session-row p { margin: 0; color: var(--ink-500); }
 .mq-session-row > .mq-secondary-button { flex: none; }
+.mq-plan-billing-row { flex-wrap: wrap; }
+.mq-plan-billing-row > div:first-child { min-width: 0; }
+.mq-plan-billing-row strong { color: var(--ink-900); font-size: var(--fs-sm); font-weight: 500; }
+.mq-plan-billing-row p { margin-top: 2px; font-size: var(--fs-xs); }
+.mq-plan-billing-actions { display: flex; flex: none; flex-flow: row wrap; align-items: center; justify-content: flex-end; gap: 12px; }
+.mq-plan-billing-actions .mq-upgrade-link { font-size: var(--fs-xs); }
 .mq-mobile-tabbar { display: none; }
 .mq-selected-account-name { display: none; }
 @keyframes mq-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: .5; } }
