@@ -149,6 +149,39 @@ const PREVIEW_SNIPPET_LENGTH = 240;
 /** Signed object URLs are minted per read and live for one hour. */
 const SIGNED_URL_TTL_SECONDS = 3600;
 
+type StoredVersion = Artifact['versions'][number];
+
+/**
+ * The refinement requests already applied to `base`, oldest first: the
+ * `refineFeedback` of `base` and of each READY ancestor reached through
+ * `parentVersion`. Failed Attempts are siblings, never ancestors. The walk
+ * stops quietly at a missing link, a non-READY ancestor, or a cycle.
+ */
+function appliedFeedback(
+  versions: StoredVersion[],
+  base: StoredVersion,
+): string[] {
+  const applied: string[] = [];
+  const visited = new Set<number>();
+  let current: StoredVersion | undefined = base;
+
+  while (
+    current &&
+    current.status === VersionStatus.READY &&
+    !visited.has(current.version)
+  ) {
+    visited.add(current.version);
+    if (current.refineFeedback) applied.push(current.refineFeedback);
+    const parent: number | undefined = current.parentVersion;
+    current =
+      parent === undefined
+        ? undefined
+        : versions.find((item) => item.version === parent);
+  }
+
+  return applied.reverse();
+}
+
 interface ArtifactListRow {
   _id: Types.ObjectId | string;
   type: ArtifactType;
@@ -343,6 +376,8 @@ export class ArtifactService implements ArtifactWriter {
     return {
       priorContent: parseArtifactContent(artifact.type, base.content),
       feedback: target.refineFeedback,
+      earlierFeedback: appliedFeedback(artifact.versions, base),
+      handEdited: base.editedAt != null,
     };
   }
 

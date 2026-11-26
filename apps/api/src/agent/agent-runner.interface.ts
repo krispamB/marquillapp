@@ -113,7 +113,12 @@ export interface GenerateInput extends SessionAffinity, RunDate {
   prompt: string;
   stylePreset?: StylePreset;
   research?: ResearchResult;
-  refine?: { priorContent: ArtifactContent; feedback: string };
+  refine?: {
+    priorContent: ArtifactContent;
+    feedback: string;
+    earlierFeedback: string[];
+    handEdited: boolean;
+  };
 }
 
 /**
@@ -124,6 +129,9 @@ export interface DocumentRefineInput {
   candidate: string;
   commentary?: string;
   feedback: string;
+  /** Requests already applied to the base, oldest first (see RefineContext). */
+  earlierFeedback: string[];
+  handEdited: boolean;
 }
 
 /** A DOCUMENT draft (spec §7.5), INITIAL or REFINE. */

@@ -16,7 +16,16 @@ export interface VersionRead {
 
 export interface RefineContext {
   priorContent: ArtifactContent;
+  /** The new refinement request: the only change this round makes. */
   feedback: string;
+  /**
+   * The refinement requests already applied to the base, oldest first: the
+   * `refineFeedback` of each READY ancestor reached through `parentVersion`.
+   * They explain why the base differs from the brief; they are not re-applied.
+   */
+  earlierFeedback: string[];
+  /** True when the base itself was edited by hand (`editedAt` is set). */
+  handEdited: boolean;
 }
 
 /**

@@ -317,6 +317,8 @@ describe('AgentRunnerService', () => {
         refine: {
           priorContent: { commentary: 'The old post.' },
           feedback: 'Make the hook sharper.',
+          earlierFeedback: [],
+          handEdited: false,
         },
       });
 
@@ -799,6 +801,8 @@ describe('AgentRunnerService', () => {
           candidate: HTML,
           commentary: 'Swipe through.',
           feedback: 'Make page two shorter',
+          earlierFeedback: [],
+          handEdited: false,
         },
       });
 
@@ -806,13 +810,13 @@ describe('AgentRunnerService', () => {
       expect(user.content).toContain('BRIEF:\nThree fixes for documents');
       expect(user.content).toContain('VOICE:');
       expect(user.content).toContain('RESEARCH FINDINGS:\nPrior findings');
-      expect(user.content).toContain(`PREVIOUS DOCUMENT:\n${HTML}`);
-      expect(user.content).toContain('PREVIOUS COMMENTARY:\nSwipe through.');
+      expect(user.content).toContain(`CURRENT DOCUMENT:\n${HTML}`);
+      expect(user.content).toContain('CURRENT COMMENTARY:\nSwipe through.');
       expect(user.content).toContain(
-        'REFINEMENT FEEDBACK:\nMake page two shorter',
+        'NEW REVISION REQUEST:\nMake page two shorter',
       );
       expect(user.content.indexOf('BRIEF:')).toBeLessThan(
-        user.content.indexOf('PREVIOUS DOCUMENT:'),
+        user.content.indexOf('CURRENT DOCUMENT:'),
       );
     });
 

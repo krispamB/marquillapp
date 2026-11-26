@@ -146,6 +146,8 @@ describe('resolveInputStep', () => {
     mocks.artifacts.readRefineInput.mockResolvedValue({
       priorContent: { commentary: 'The original post.' },
       feedback: 'Make the hook sharper',
+      earlierFeedback: [],
+      handEdited: false,
     });
     mocks.run.getLatestCompletedResearch.mockResolvedValue({
       findings: 'Cached findings',
@@ -156,6 +158,8 @@ describe('resolveInputStep', () => {
       refine: {
         priorContent: { commentary: 'The original post.' },
         feedback: 'Make the hook sharper',
+        earlierFeedback: [],
+        handEdited: false,
       },
       research: {
         findings: 'Cached findings',
@@ -184,6 +188,8 @@ describe('resolveInputStep', () => {
     mocks.artifacts.readRefineInput.mockResolvedValue({
       priorContent: { commentary: 'The original post.' },
       feedback: 'Make the hook sharper',
+      earlierFeedback: [],
+      handEdited: false,
     });
     mocks.run.getLatestCompletedResearch.mockResolvedValue(undefined);
 
@@ -191,6 +197,8 @@ describe('resolveInputStep', () => {
       refine: {
         priorContent: { commentary: 'The original post.' },
         feedback: 'Make the hook sharper',
+        earlierFeedback: [],
+        handEdited: false,
       },
     });
   });
@@ -301,6 +309,8 @@ describe('resolveInputStep', () => {
         mocks.artifacts.readRefineInput.mockResolvedValue({
           priorContent,
           feedback: 'Make it warmer',
+          earlierFeedback: [],
+          handEdited: false,
         });
         mocks.run.getLatestCompletedResearch.mockResolvedValue(undefined);
         mocks.run.readAcceptedCandidateText.mockResolvedValue(undefined);
@@ -396,7 +406,12 @@ describe('resolveInputStep', () => {
             definition: fixtures.definition,
             fragment: 'FRAGMENT',
           },
-          refine: { priorContent, feedback: 'Make it warmer' },
+          refine: {
+            priorContent,
+            feedback: 'Make it warmer',
+            earlierFeedback: [],
+            handEdited: false,
+          },
           baseCandidate: CANDIDATE,
         });
         expect(mocks.objects.get).toHaveBeenCalledWith(

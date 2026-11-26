@@ -146,6 +146,8 @@ describe('generateStep', () => {
     const refine = {
       priorContent: { commentary: 'old' },
       feedback: 'sharper',
+      earlierFeedback: [],
+      handEdited: false,
     };
 
     await generateStep({ ...fixtures.state, research, refine }, ctx);
@@ -362,6 +364,8 @@ describe('generateStep', () => {
         refine: {
           priorContent: { commentary: 'The original intro.', document: {} },
           feedback: 'Make page two shorter',
+          earlierFeedback: ['Use a warmer tone', 'Add a closing page'],
+          handEdited: true,
         },
         baseCandidate: base,
       } as unknown as RunState;
@@ -376,6 +380,8 @@ describe('generateStep', () => {
             candidate: base,
             commentary: 'The original intro.',
             feedback: 'Make page two shorter',
+            earlierFeedback: ['Use a warmer tone', 'Add a closing page'],
+            handEdited: true,
           },
         }),
         expect.anything(),

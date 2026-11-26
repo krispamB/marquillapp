@@ -1087,6 +1087,8 @@ describe('DOCUMENT generation, end to end', () => {
       run.artifacts.readRefineInput.mockResolvedValue({
         priorContent: baseContent(),
         feedback: 'Make page two shorter',
+        earlierFeedback: [],
+        handEdited: false,
       });
       run.objects.get.mockResolvedValue(Buffer.from(MARGIN_SAMPLE, 'utf8'));
       run.runHandle.getLatestCompletedResearch.mockResolvedValue({
@@ -1128,6 +1130,8 @@ describe('DOCUMENT generation, end to end', () => {
           candidate: MARGIN_SAMPLE,
           commentary: 'The first intro.',
           feedback: 'Make page two shorter',
+          earlierFeedback: [],
+          handEdited: false,
         },
       });
       expect(draft.fragment).toContain('margin');
@@ -1153,6 +1157,8 @@ describe('DOCUMENT generation, end to end', () => {
       run.artifacts.readRefineInput.mockResolvedValue({
         priorContent: baseContent({ id: 'schematic', version: 1 }),
         feedback: 'Use the margin look',
+        earlierFeedback: [],
+        handEdited: false,
       });
 
       await expect(runJob(run, refineJob())).resolves.toBeUndefined();

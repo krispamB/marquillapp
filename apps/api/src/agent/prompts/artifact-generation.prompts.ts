@@ -6,6 +6,7 @@ import type {
   GenerateInput,
 } from '../agent-runner.interface';
 import { resolveStylePresetInstruction } from '../style-presets.config';
+import { formatEarlierRequests } from './refine-history';
 import { todaySection } from './today.prompt';
 
 // LinkedIn demotes generic AI-written posts and rewards dwell time and saves.
@@ -265,12 +266,55 @@ TITLE:
   poll, or document.`;
 }
 
+// Closes every refinement. The system prompts say to write from the brief,
+// which on a refinement would pull the accepted version back towards it.
+const REFINE_PRECEDENCE_LEAD =
+  'Apply only the new revision request; make no other change. The current version is the accepted text and overrides the original brief where they differ (this overrides writing from the brief).';
+// Only when earlier requests are listed: they explain the divergence.
+const REFINE_PRECEDENCE_EARLIER =
+  ' The earlier revision requests are already applied and explain why the current version differs from the brief; do not re-apply them, and where the current version conflicts with one, the current version wins.';
+const REFINE_PRECEDENCE_TAIL =
+  ' Use the brief and research only to fill gaps and ground facts.';
+
+function refinePrecedence(hasEarlier: boolean): string {
+  return (
+    REFINE_PRECEDENCE_LEAD +
+    (hasEarlier ? REFINE_PRECEDENCE_EARLIER : '') +
+    REFINE_PRECEDENCE_TAIL
+  );
+}
+
+const HAND_EDIT_NOTE =
+  'The author edited the current version by hand; keep those edits.';
+
 /**
  * The brief. Sections appear only when they carry content, so an unresearched,
  * unstyled initial run sends the model nothing but the topic.
  */
 export function buildGenerationUserPrompt(input: GenerateInput): string {
-  const sections = [todaySection(input.today), `BRIEF:\n${input.prompt}`];
+  const { refine } = input;
+  const sections = briefSections(input, refine ? 'ORIGINAL BRIEF' : 'BRIEF');
+
+  if (refine) {
+    sections.push(
+      ...refineSections(refine, [
+        `CURRENT VERSION:\n${JSON.stringify(refine.priorContent)}`,
+      ]),
+    );
+  }
+
+  return sections.join('\n\n');
+}
+
+/** The date, brief, voice and research every draft opens with. */
+function briefSections(
+  input: Omit<GenerateInput, 'type' | 'refine'>,
+  briefHeading: 'BRIEF' | 'ORIGINAL BRIEF',
+): string[] {
+  const sections = [
+    todaySection(input.today),
+    `${briefHeading}:\n${input.prompt}`,
+  ];
 
   const voice = resolveStylePresetInstruction(input.stylePreset);
   if (voice) sections.push(`VOICE:\n${voice}`);
@@ -293,42 +337,61 @@ export function buildGenerationUserPrompt(input: GenerateInput): string {
     }
   }
 
-  if (input.refine) {
-    sections.push(
-      `PREVIOUS VERSION:\n${JSON.stringify(input.refine.priorContent)}`,
-      `REVISION FEEDBACK:\n${input.refine.feedback}\n\nRewrite it to address the feedback. Keep what the feedback does not ask you to change.`,
-    );
-  }
+  return sections;
+}
 
-  return sections.join('\n\n');
+/**
+ * What a refinement adds after the brief: the requests already applied, the
+ * current version they produced, then the one new request and how to read it
+ * all.
+ */
+function refineSections(
+  {
+    feedback,
+    earlierFeedback,
+    handEdited,
+  }: Pick<
+    NonNullable<GenerateInput['refine']>,
+    'feedback' | 'earlierFeedback' | 'handEdited'
+  >,
+  currentVersion: string[],
+): string[] {
+  const earlier = formatEarlierRequests(earlierFeedback);
+  return [
+    ...(earlier !== undefined ? [earlier] : []),
+    ...currentVersion,
+    ...(handEdited ? [HAND_EDIT_NOTE] : []),
+    `NEW REVISION REQUEST:\n${feedback}`,
+    refinePrecedence(earlier !== undefined),
+  ];
 }
 
 /**
  * A DOCUMENT draft's user message: the brief, plus, on a refinement, the
- * base's Candidate Source, its commentary and the feedback (spec §6.5). The
- * model re-emits the whole document, so it sees the whole base.
+ * earlier requests, the base's Candidate Source, its commentary and the new
+ * request (spec §6.5). The model re-emits the whole document, so it sees the
+ * whole base.
  */
 export function buildDocumentGenerationUserPrompt(
   input: DocumentGenerateInput,
 ): string {
-  const brief = buildGenerationUserPrompt({
-    type: ArtifactType.DOCUMENT,
-    prompt: input.prompt,
-    today: input.today,
-    stylePreset: input.stylePreset,
-    research: input.research,
-  });
-  if (!input.refine) return brief;
+  const { refine } = input;
+  const sections = briefSections(input, refine ? 'ORIGINAL BRIEF' : 'BRIEF');
 
-  const { candidate, commentary, feedback } = input.refine;
-  return [
-    brief,
-    `PREVIOUS DOCUMENT:\n${candidate}`,
-    ...(commentary !== undefined
-      ? [`PREVIOUS COMMENTARY:\n${commentary}`]
-      : []),
-    `REFINEMENT FEEDBACK:\n${feedback}\n\nRewrite the document and its commentary to address the feedback, and re-emit the complete document as "html". Keep what the feedback does not ask you to change.`,
-  ].join('\n\n');
+  if (refine) {
+    const { candidate, commentary } = refine;
+    sections.push(
+      ...refineSections(refine, [
+        `CURRENT DOCUMENT:\n${candidate}`,
+        ...(commentary !== undefined
+          ? [`CURRENT COMMENTARY:\n${commentary}`]
+          : []),
+      ]),
+      'Re-emit the complete document as "html", with its commentary.',
+    );
+  }
+
+  return sections.join('\n\n');
 }
 
 /**

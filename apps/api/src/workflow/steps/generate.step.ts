@@ -184,5 +184,7 @@ function refineBaseOf(state: RunState, label: string): DocumentRefineInput {
     candidate: baseCandidate,
     ...(commentary !== undefined ? { commentary } : {}),
     feedback: refine.feedback,
+    earlierFeedback: refine.earlierFeedback,
+    handEdited: refine.handEdited,
   };
 }

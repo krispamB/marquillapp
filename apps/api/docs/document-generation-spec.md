@@ -532,6 +532,16 @@ document.
   `stylePreset`, the prompt fragment of the new Attempt's pin, the prior run's research, and the
   refine run's own date (the `TODAY:` line every draft brief opens with). There is no new research
   pass.
+- It also carries the **earlier refinement requests** already applied to the base, oldest first (the
+  `refineFeedback` of the base and of each `READY` ancestor reached through `parentVersion`), and a
+  **hand-edit flag**, set when the base itself has `editedAt`.
+- **Precedence:** the new request is the only change to make. The base overrides the original brief
+  where they differ. The earlier requests explain why it differs and are not re-applied; where the
+  base conflicts with one, the base wins. The brief and research only fill gaps and ground facts. A
+  flagged hand edit is kept.
+- **Cap on earlier requests:** the newest 8 stay verbatim while the total is within about 4,000
+  characters; older ones, and any that would overflow, are shortened to 160 characters. If still
+  over, the oldest are dropped behind an "N earlier requests omitted" line.
 - The model re-emits the whole document, which goes through check → Repair → assemble → render.
 - **Design System on refine:**
   1. By default the new Attempt carries the base's exact pin, whatever its status: `SUPERSEDED` and

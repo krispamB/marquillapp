@@ -94,6 +94,7 @@ export const features: Feature[] = [
     summary: 'Ask Mark for changes to an existing artifact from its conversation page. Each refine is a new Document Version; research is reused, not re-run.',
     since: '2026-08-06',
     issues: [118],
+    notes: ['Refinements now remember earlier refinement requests, so later rounds do not drift back to the original brief. Not yet deployed as of 2026-11-26.'],
   },
   {
     id: 'artifact-library',
