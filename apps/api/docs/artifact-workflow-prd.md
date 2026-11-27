@@ -455,7 +455,7 @@ interface BuildInput {
 interface RunState {
   input:    BuildInput;                                  // RESOLVE_INPUT
   research?: ResearchResult;                             // RESEARCH, or seeded on REFINE
-  refine?:  { priorContent: ArtifactContent; feedback: string };  // RESOLVE_INPUT on REFINE
+  refine?:  { priorContent: ArtifactContent; feedback: string; earlierFeedback: string[]; handEdited: boolean };  // RESOLVE_INPUT on REFINE
   generatedTitle?: string;                               // GENERATE on INITIAL only
   content?: ArtifactContent;                             // GENERATE
   render?:  { pdfKey: string; pageCount: number };       // RENDER_PDF — R1
@@ -528,11 +528,20 @@ A refine is a **new run** (`kind: REFINE`) over an existing artifact. `POST
 `202 { artifactId, version, runId }`, then kicks off the run that fills it.
 
 `RESOLVE_INPUT` seeds `input` from the family-level `source`, plus
-`refine = { priorContent, feedback }`, plus `research` **copied from the artifact's latest
-`COMPLETED` `WorkflowRun.researchContext`**. The builder omits `RESEARCH` for
-`kind: REFINE`, so refine re-charges no web-search surcharge and adds no latency. If the
-original run was research-off there is simply no cached research, and `GENERATE` runs on
-prompt + feedback alone.
+`refine = { priorContent, feedback, earlierFeedback, handEdited }`, plus `research`
+**copied from the artifact's latest `COMPLETED` `WorkflowRun.researchContext`**. The builder
+omits `RESEARCH` for `kind: REFINE`, so refine re-charges no web-search surcharge and adds
+no latency. If the original run was research-off there is simply no cached research, and
+`GENERATE` runs without it.
+
+`earlierFeedback` lists the refinement requests already applied to the base, oldest first:
+the `refineFeedback` of the base and of each `READY` ancestor reached through
+`parentVersion`. `handEdited` is true when the base itself has `editedAt`. In the prompt,
+the new request is the only change to make; the Current Version overrides the original brief
+where they differ; the earlier requests explain that divergence and are not re-applied (the
+Current Version wins a conflict). The newest 8 stay verbatim while the total is within about
+4,000 characters; older ones, and any that would overflow, are shortened to 160 characters,
+and if still over, the oldest are dropped behind an "N earlier requests omitted" line.
 
 ---
 
@@ -724,7 +733,7 @@ interface GenerateInput {
   stylePreset?: StylePreset;   // voice — R4
   theme?: CarouselTheme;       // look  — R4, DOCUMENT only
   research?: ResearchResult;
-  refine?: { priorContent: ArtifactContent; feedback: string };
+  refine?: { priorContent: ArtifactContent; feedback: string; earlierFeedback: string[]; handEdited: boolean };
 }
 ```
 
@@ -1457,7 +1466,7 @@ usage.tick → run.completed`; the version is `READY`; credits are debited once.
 > **T12 — REFINE runs.**
 > `POST /artifacts/:id/refine {feedback}` → append a `GENERATING` version →
 > `202 {artifactId, version, runId}`. `RunKind.REFINE`; builder omits `RESEARCH`.
-> `RESOLVE_INPUT` seeds `refine = { priorContent, feedback }` and copies `research` from the
+> `RESOLVE_INPUT` seeds `refine = { priorContent, feedback, earlierFeedback, handEdited }` and copies `research` from the
 > artifact's latest `COMPLETED` `WorkflowRun.researchContext`. Revision prompt in `generate()`.
 > DOCUMENT refine re-runs `RENDER_PDF` to the new version's key, carrying the theme forward.
 > *Blocked by: T11.*

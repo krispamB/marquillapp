@@ -430,6 +430,8 @@ describe('ArtifactService', () => {
       ).resolves.toEqual({
         priorContent: { commentary: 'The original post.' },
         feedback: 'Make the hook sharper',
+        earlierFeedback: [],
+        handEdited: false,
       });
     });
 
@@ -465,6 +467,128 @@ describe('ArtifactService', () => {
       ).resolves.toEqual({
         priorContent: { commentary: 'The original post.' },
         feedback: 'Try a more direct opening',
+        earlierFeedback: [],
+        handEdited: false,
+      });
+    });
+
+    // v1 -> v2 -> v3 (READY), plus a FAILED sibling and a READY non-ancestor.
+    const refineChain = (): {
+      _id: string;
+      type: ArtifactType;
+      currentVersion: number;
+      versions: Array<Record<string, unknown>>;
+    } => ({
+      _id: fixtures.artifactId,
+      type: ArtifactType.POST,
+      currentVersion: 3,
+      versions: [
+        {
+          version: 1,
+          status: VersionStatus.READY,
+          content: { commentary: 'The original post.' },
+        },
+        {
+          version: 2,
+          status: VersionStatus.READY,
+          content: { commentary: 'Sharper hook.' },
+          refineFeedback: 'Make the hook sharper',
+          parentVersion: 1,
+        },
+        {
+          version: 3,
+          status: VersionStatus.READY,
+          content: { commentary: 'Sharper hook, shorter.' },
+          refineFeedback: 'Make it shorter',
+          parentVersion: 2,
+        },
+        {
+          version: 4,
+          status: VersionStatus.FAILED,
+          failureReason: 'generation failed',
+          refineFeedback: 'Add emoji',
+          parentVersion: 3,
+        },
+        {
+          version: 5,
+          status: VersionStatus.READY,
+          content: { commentary: 'A branch off v1.' },
+          refineFeedback: 'Go formal',
+          parentVersion: 1,
+        },
+        {
+          version: 6,
+          status: VersionStatus.GENERATING,
+          refineFeedback: 'Mention the launch date',
+          parentVersion: 3,
+        },
+      ],
+    });
+
+    it('should return every request already applied to the base, oldest first', async () => {
+      mocks.artifactModel.findById.mockResolvedValue(refineChain());
+
+      await expect(
+        service.readRefineInput(fixtures.artifactId, 6),
+      ).resolves.toEqual({
+        priorContent: { commentary: 'Sharper hook, shorter.' },
+        feedback: 'Mention the launch date',
+        earlierFeedback: ['Make the hook sharper', 'Make it shorter'],
+        handEdited: false,
+      });
+    });
+
+    it('should mark the input hand-edited only when the base itself was edited', async () => {
+      const editedBase = refineChain();
+      editedBase.versions[2] = {
+        ...editedBase.versions[2],
+        editedAt: new Date(),
+      };
+      mocks.artifactModel.findById.mockResolvedValue(editedBase);
+
+      await expect(
+        service.readRefineInput(fixtures.artifactId, 6),
+      ).resolves.toMatchObject({ handEdited: true });
+
+      const editedAncestor = refineChain();
+      editedAncestor.versions[1] = {
+        ...editedAncestor.versions[1],
+        editedAt: new Date(),
+      };
+      mocks.artifactModel.findById.mockResolvedValue(editedAncestor);
+
+      await expect(
+        service.readRefineInput(fixtures.artifactId, 6),
+      ).resolves.toMatchObject({ handEdited: false });
+    });
+
+    it('should stop at a missing or non-READY ancestor without throwing', async () => {
+      const broken = refineChain();
+      broken.versions[1] = { ...broken.versions[1], status: VersionStatus.FAILED };
+      mocks.artifactModel.findById.mockResolvedValue(broken);
+
+      await expect(
+        service.readRefineInput(fixtures.artifactId, 6),
+      ).resolves.toMatchObject({ earlierFeedback: ['Make it shorter'] });
+
+      const missing = refineChain();
+      missing.versions[2] = { ...missing.versions[2], parentVersion: 99 };
+      mocks.artifactModel.findById.mockResolvedValue(missing);
+
+      await expect(
+        service.readRefineInput(fixtures.artifactId, 6),
+      ).resolves.toMatchObject({ earlierFeedback: ['Make it shorter'] });
+    });
+
+    it('should stop at a cycle in the parent chain without throwing', async () => {
+      const cyclic = refineChain();
+      cyclic.versions[1] = { ...cyclic.versions[1], parentVersion: 3 };
+      mocks.artifactModel.findById.mockResolvedValue(cyclic);
+
+      await expect(
+        service.readRefineInput(fixtures.artifactId, 6),
+      ).resolves.toMatchObject({
+        earlierFeedback: ['Make the hook sharper', 'Make it shorter'],
       });
     });
 

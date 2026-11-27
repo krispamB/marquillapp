@@ -63,7 +63,7 @@ At most one Attempt is in flight per artifact.
 }
 ```
 
-`feedback` is required, non-empty, and maximum 2,000 characters. Refinement does not run a new research pass; it can reuse completed research from the artifact's prior run.
+`feedback` is required, non-empty, and maximum 2,000 characters. Refinement does not run a new research pass; it can reuse completed research from the artifact's prior run. A refinement carries the original brief, the reused research, the Current Version, and the artifact's earlier refinement requests (those already applied to the Current Version); the request body is unchanged.
 
 `designSystemId` is optional and applies only to a `DOCUMENT`. A document refinement rewrites the Current Version's document, and by default keeps the Current Version's Design System pin (`content.document.designSystemId` and `designSystemVersion`) exactly, even if that version has since been superseded or retired. Send `designSystemId` to switch: the refinement is pinned to that system's current version, as listed by `GET /design-systems`. Use it to change the look, to move to a newer version, or to answer a `409 design_system.unavailable`.
 

@@ -475,6 +475,8 @@ describe('ArtifactRunProcessor', () => {
       mocks.artifacts.readRefineInput.mockResolvedValue({
         priorContent: { commentary: 'The original post.' },
         feedback: 'Make the hook sharper',
+        earlierFeedback: [],
+        handEdited: false,
       });
       mocks.runHandle.getLatestCompletedResearch.mockResolvedValue(research);
       const job = makeJob({
@@ -490,6 +492,8 @@ describe('ArtifactRunProcessor', () => {
           refine: {
             priorContent: { commentary: 'The original post.' },
             feedback: 'Make the hook sharper',
+            earlierFeedback: [],
+            handEdited: false,
           },
         }),
         expect.any(Object),

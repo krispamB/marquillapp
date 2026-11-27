@@ -21,6 +21,10 @@ import {
 } from './artifact-generation.prompts';
 import { ArtifactType } from 'src/database/schemas';
 import { todaySection } from './today.prompt';
+import {
+  resolveStylePresetInstruction,
+  StylePreset,
+} from '../style-presets.config';
 
 describe('artifact-generation prompts', () => {
   describe('FEED RULES', () => {
@@ -161,11 +165,13 @@ describe('artifact-generation prompts', () => {
         refine: {
           priorContent: { commentary: 'Old post' } as never,
           feedback: 'Shorter',
+          earlierFeedback: [],
+          handEdited: false,
         },
       });
 
       expect(prompt).toContain(TODAY_LINE);
-      expect(prompt).toContain('REVISION FEEDBACK:\nShorter');
+      expect(prompt).toContain('NEW REVISION REQUEST:\nShorter');
     });
 
     it('should name the weekday when given a run date', () => {
@@ -199,11 +205,17 @@ describe('artifact-generation prompts', () => {
       const prompt = buildDocumentGenerationUserPrompt({
         ...base,
         includeTitle: false,
-        refine: { candidate: '<html></html>', feedback: 'Fewer pages' },
+        refine: {
+          candidate: '<html></html>',
+          feedback: 'Fewer pages',
+          earlierFeedback: [],
+          handEdited: false,
+          designSystemChanged: false,
+        },
       });
 
       expect(prompt.split('\n\n')[0]).toBe(TODAY_LINE);
-      expect(prompt).toContain('PREVIOUS DOCUMENT:\n<html></html>');
+      expect(prompt).toContain('CURRENT DOCUMENT:\n<html></html>');
     });
   });
 
@@ -315,6 +327,216 @@ Answer with JSON {"html": …} only.`,
       });
 
       expect(prompt).toBe(`${todaySection(brief.today)}\n\nBRIEF:\nThe brief`);
+    });
+  });
+});
+
+describe('refinement user prompts', () => {
+  const TODAY = '2026-10-25';
+  const PRECEDENCE_LEAD =
+    'Apply only the new revision request; make no other change. The current version is the accepted text and overrides the original brief where they differ (this overrides writing from the brief).';
+  const PRECEDENCE_EARLIER =
+    ' The earlier revision requests are already applied and explain why the current version differs from the brief; do not re-apply them, and where the current version conflicts with one, the current version wins.';
+  const PRECEDENCE_TAIL =
+    ' Use the brief and research only to fill gaps and ground facts.';
+  const precedence = (hasEarlier: boolean) =>
+    PRECEDENCE_LEAD + (hasEarlier ? PRECEDENCE_EARLIER : '') + PRECEDENCE_TAIL;
+  const HAND_EDIT =
+    'The author edited the current version by hand; keep those edits.';
+  const DESIGN_SYSTEM_CHANGED =
+    'One exception: the Design System has changed since the current document was made. Rebuild the current document in the Design System the system prompt describes, using its layout, components and styles, and keep its content, the earlier revisions and any hand edits.';
+  const research = {
+    findings: 'A synthesis.',
+    sources: [{ title: 'A', url: 'https://a.com/' }],
+  };
+  const RESEARCH =
+    'RESEARCH FINDINGS:\nA synthesis.\n\nSOURCES:\n- A (https://a.com/)';
+  const stylePreset = Object.values(StylePreset)[0];
+  const VOICE = `VOICE:\n${resolveStylePresetInstruction(stylePreset)}`;
+
+  describe('buildGenerationUserPrompt', () => {
+    const initial = {
+      type: ArtifactType.POST,
+      prompt: 'The brief',
+      today: TODAY,
+      stylePreset,
+      research,
+    };
+    const refine = {
+      priorContent: { commentary: 'Current post' } as never,
+      feedback: 'Add a list',
+      earlierFeedback: [] as string[],
+      handEdited: false,
+    };
+    const CURRENT = 'CURRENT VERSION:\n{"commentary":"Current post"}';
+    const newRequest = (hasEarlier = false) =>
+      `NEW REVISION REQUEST:\nAdd a list\n\n${precedence(hasEarlier)}`;
+    const NEW = newRequest();
+
+    it('should leave the initial prompt as it was when there is no refinement', () => {
+      expect(buildGenerationUserPrompt(initial)).toBe(
+        [todaySection(TODAY), 'BRIEF:\nThe brief', VOICE, RESEARCH].join(
+          '\n\n',
+        ),
+      );
+    });
+
+    it('should give the precedence instruction with no earlier requests on a first refinement', () => {
+      const prompt = buildGenerationUserPrompt({ ...initial, refine });
+
+      expect(prompt).toBe(
+        [
+          todaySection(TODAY),
+          'ORIGINAL BRIEF:\nThe brief',
+          VOICE,
+          RESEARCH,
+          CURRENT,
+          NEW,
+        ].join('\n\n'),
+      );
+      expect(prompt).not.toContain('EARLIER REVISION REQUESTS');
+      expect(prompt).not.toContain('earlier revision requests');
+    });
+
+    it('should list the earlier requests after the brief and research on a later refinement', () => {
+      const prompt = buildGenerationUserPrompt({
+        ...initial,
+        refine: { ...refine, earlierFeedback: ['Shorter', 'Drop the hook'] },
+      });
+
+      expect(prompt).toBe(
+        [
+          todaySection(TODAY),
+          'ORIGINAL BRIEF:\nThe brief',
+          VOICE,
+          RESEARCH,
+          'EARLIER REVISION REQUESTS:\n1. Shorter\n2. Drop the hook',
+          CURRENT,
+          newRequest(true),
+        ].join('\n\n'),
+      );
+    });
+
+    it('should ask to keep hand edits when the base was edited by hand', () => {
+      const prompt = buildGenerationUserPrompt({
+        ...initial,
+        refine: { ...refine, handEdited: true },
+      });
+
+      expect(prompt).toContain(`${CURRENT}\n\n${HAND_EDIT}\n\n${NEW}`);
+    });
+
+    it('should not mention hand edits when the base was not edited by hand', () => {
+      const prompt = buildGenerationUserPrompt({ ...initial, refine });
+
+      expect(prompt).not.toContain(HAND_EDIT);
+    });
+  });
+
+  describe('buildDocumentGenerationUserPrompt', () => {
+    const initial = {
+      prompt: 'The brief',
+      today: TODAY,
+      stylePreset,
+      research,
+      fragment: 'FRAGMENT',
+      includeTitle: false,
+      maxEnvelopeRepairs: 1,
+    };
+    const refine = {
+      candidate: '<html></html>',
+      commentary: 'Swipe through.',
+      feedback: 'Fewer pages',
+      earlierFeedback: [] as string[],
+      handEdited: false,
+      designSystemChanged: false,
+    };
+    const CURRENT =
+      'CURRENT DOCUMENT:\n<html></html>\n\nCURRENT COMMENTARY:\nSwipe through.';
+    const newRequest = (hasEarlier = false) =>
+      `NEW REVISION REQUEST:\nFewer pages\n\n${precedence(hasEarlier)}\n\nRe-emit the complete document as "html", with its commentary.`;
+    const NEW = newRequest();
+
+    it('should leave the initial prompt as it was when there is no refinement', () => {
+      expect(buildDocumentGenerationUserPrompt(initial)).toBe(
+        [todaySection(TODAY), 'BRIEF:\nThe brief', VOICE, RESEARCH].join(
+          '\n\n',
+        ),
+      );
+    });
+
+    it('should ask for the complete document with no earlier requests on a first refinement', () => {
+      const prompt = buildDocumentGenerationUserPrompt({ ...initial, refine });
+
+      expect(prompt).toBe(
+        [
+          todaySection(TODAY),
+          'ORIGINAL BRIEF:\nThe brief',
+          VOICE,
+          RESEARCH,
+          CURRENT,
+          NEW,
+        ].join('\n\n'),
+      );
+    });
+
+    it('should give the same earlier requests block and hand-edit line as a POST', () => {
+      const prompt = buildDocumentGenerationUserPrompt({
+        ...initial,
+        refine: {
+          ...refine,
+          earlierFeedback: ['Shorter', 'Drop the hook'],
+          handEdited: true,
+        },
+      });
+
+      expect(prompt).toBe(
+        [
+          todaySection(TODAY),
+          'ORIGINAL BRIEF:\nThe brief',
+          VOICE,
+          RESEARCH,
+          'EARLIER REVISION REQUESTS:\n1. Shorter\n2. Drop the hook',
+          CURRENT,
+          HAND_EDIT,
+          newRequest(true),
+        ].join('\n\n'),
+      );
+    });
+
+    it('should ask to rebuild in the new Design System when the pin changed', () => {
+      const prompt = buildDocumentGenerationUserPrompt({
+        ...initial,
+        refine: { ...refine, designSystemChanged: true },
+      });
+
+      expect(prompt).toBe(
+        [
+          todaySection(TODAY),
+          'ORIGINAL BRIEF:\nThe brief',
+          VOICE,
+          RESEARCH,
+          CURRENT,
+          `NEW REVISION REQUEST:\nFewer pages\n\n${precedence(false)}`,
+          DESIGN_SYSTEM_CHANGED,
+          'Re-emit the complete document as "html", with its commentary.',
+        ].join('\n\n'),
+      );
+    });
+
+    it('should not mention a Design System change when the pin is unchanged', () => {
+      const prompt = buildDocumentGenerationUserPrompt({ ...initial, refine });
+
+      expect(prompt).not.toContain(DESIGN_SYSTEM_CHANGED);
+    });
+
+    it('should leave out the commentary section when the base has none', () => {
+      const prompt = buildDocumentGenerationUserPrompt({
+        ...initial,
+        refine: { ...refine, commentary: undefined },
+      });
+
+      expect(prompt).not.toContain('CURRENT COMMENTARY');
     });
   });
 });

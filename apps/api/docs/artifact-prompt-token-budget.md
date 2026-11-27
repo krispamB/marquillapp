@@ -1,6 +1,6 @@
 # Artifact prompt token budget
 
-How many input tokens the fixed parts of an artifact run cost: the system prompts, the Design System fragment, and the structured-output schemas and tools sent with them. The brief, research findings, and the previous version are excluded, because they vary per run.
+How many input tokens the fixed parts of an artifact run cost: the system prompts, the Design System fragment, and the structured-output schemas and tools sent with them. The brief, research findings, and the previous version are excluded, because they vary per run. A refine prompt also carries the earlier refinement requests, which are capped and add at most about 4,000 characters (about 1K tokens).
 
 Measured on 2026-10-31 against `claude-haiku-5-5` (production `GENERATION_MODEL` and `RESEARCH_MODEL`, `LLM_PROVIDER=anthropic`) with Anthropic's `count_tokens` endpoint. Each figure is the request's count minus a baseline request that holds only a one-word user message. Character counts are given for comparison.
 

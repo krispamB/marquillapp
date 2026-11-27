@@ -146,6 +146,8 @@ describe('generateStep', () => {
     const refine = {
       priorContent: { commentary: 'old' },
       feedback: 'sharper',
+      earlierFeedback: [],
+      handEdited: false,
     };
 
     await generateStep({ ...fixtures.state, research, refine }, ctx);
@@ -362,6 +364,8 @@ describe('generateStep', () => {
         refine: {
           priorContent: { commentary: 'The original intro.', document: {} },
           feedback: 'Make page two shorter',
+          earlierFeedback: ['Use a warmer tone', 'Add a closing page'],
+          handEdited: true,
         },
         baseCandidate: base,
       } as unknown as RunState;
@@ -376,11 +380,48 @@ describe('generateStep', () => {
             candidate: base,
             commentary: 'The original intro.',
             feedback: 'Make page two shorter',
+            earlierFeedback: ['Use a warmer tone', 'Add a closing page'],
+            handEdited: true,
+            designSystemChanged: false,
           },
         }),
         expect.anything(),
       );
     });
+
+    it.each([
+      ['a different Design System', 'folio', 2, true],
+      ['a newer version of the same Design System', 'margin', 1, true],
+      ['the same pin', 'margin', 2, false],
+    ])(
+      'should flag a Design System change when the base was built with %s',
+      async (_label, designSystemId, designSystemVersion, changed) => {
+        // The run is pinned to margin v2 (fixtures.documentState).
+        const state = {
+          ...fixtures.documentState,
+          input: { ...fixtures.documentState.input, kind: 'REFINE' },
+          refine: {
+            priorContent: {
+              commentary: 'Intro.',
+              document: { designSystemId, designSystemVersion },
+            },
+            feedback: 'Make page two shorter',
+            earlierFeedback: [],
+            handEdited: false,
+          },
+          baseCandidate: '<html></html>',
+        } as unknown as RunState;
+
+        await generateStep(state, ctx);
+
+        expect(mocks.agent.generateDocument).toHaveBeenCalledWith(
+          expect.objectContaining({
+            refine: expect.objectContaining({ designSystemChanged: changed }),
+          }),
+          expect.anything(),
+        );
+      },
+    );
 
     it('should fail terminally when a refinement reaches it without its base', async () => {
       const state = {
